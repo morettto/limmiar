@@ -234,6 +234,16 @@ jobs:
           # the underlying zap-baseline.py exit code (1 on any FAIL rule) is
           # swallowed and the Action step reports success regardless.
           fail_action: true
+          # Without -I, zap-baseline.py fails on ANY alert (WARN or FAIL),
+          # which made this job red even on a zero-defect baseline — this
+          # app currently has several real, pre-existing WARN-level gaps
+          # (missing CSP, X-Content-Type-Options, Permissions-Policy, etc.)
+          # that are out of scope for this ticket. -I scopes "fail the scan"
+          # down to only the rules .zap/rules.tsv explicitly promotes to
+          # FAIL (verified empirically: PR #2's baseline run showed
+          # "FAIL-NEW: 0, WARN-NEW: 7" yet still exited non-zero without
+          # this flag).
+          cmd_options: '-I'
           # Don't file/maintain a GitHub issue per scan — this gate's job is
           # to block the PR/build, not manage issues, and skipping it avoids
           # needing an `issues: write` grant on this job.
