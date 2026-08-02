@@ -1,0 +1,15 @@
+{
+  "name": "limmiar",
+  "private": true,
+  "version": "0.0.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@10.34.4",
+  "devDependencies": {
+    "@rolldown/binding-win32-x64-msvc": "1.2.1"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild", "workerd"]
+  }
+}

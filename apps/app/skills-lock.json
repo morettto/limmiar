@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "cloudflare-worker-builder": {
+      "source": "jezweb/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/cloudflare/skills/cloudflare-worker-builder/SKILL.md",
+      "computedHash": "6baaf2ee0259e9e0c43df7bfbf51879951a155f6d957769049c26704f46da702"
+    }
+  }
+}
