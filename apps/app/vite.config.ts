@@ -11,7 +11,8 @@ export default defineConfig({
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'credentialless',
-      'X-Content-Type-Options': 'nosniff',
+      // DEFEITO PROPOSITAL (PR canhoto, ticket S00-02): removido pra provar
+      // que o gate DAST (regra ZAP 10021) reprova de verdade.
     },
   },
   test: {
