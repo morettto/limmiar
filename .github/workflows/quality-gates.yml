@@ -1,0 +1,289 @@
+name: Quality gates
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  # Runs on every push to main AND every PR (not gated to pull_request) —
+  # coverage must hold on main too, not just be checked before merge.
+  coverage:
+    name: "Coverage 100% (Vitest+Istanbul)"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+
+      - uses: actions/setup-node@v4
+        with:
+          # setup-node resolves '22' to the latest 22.x release, which is
+          # already well past 22.12 — the version jsdom's ESM-only CSS deps
+          # need unflagged (see vite.config.ts's execArgv comment). Matches
+          # deploy.yml's pin.
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # vitest exits non-zero when any coverage threshold (perFile 100%) is
+      # unmet, so this step's own exit code is the gate — nothing extra to
+      # check.
+      - name: Unit tests + coverage
+        run: pnpm --filter app test:unit
+
+  # PR-only: this is the fast incremental check that runs on every PR push.
+  # The full/complete score is enforced separately by the nightly job
+  # (mutation-nightly.yml) which also refreshes the baseline this restores.
+  mutation-pr:
+    name: "Mutation testing (PR incremental)"
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Restore Stryker incremental baseline (from nightly, main)
+        uses: actions/cache/restore@v6
+        with:
+          path: apps/app/.stryker-tmp/incremental.json
+          # Deliberately unique per run so this primary key never hits —
+          # every PR run falls through to restore-keys, which always
+          # resolves to whatever the nightly job most recently published.
+          key: stryker-incremental-pr-${{ github.run_id }}
+          restore-keys: |
+            stryker-incremental-main-
+
+      # stryker exits non-zero if the mutation score is below the `break`
+      # threshold (90, see stryker.config.mjs) — that failure is this
+      # step's own exit code, nothing extra to check.
+      - name: Mutation testing (incremental)
+        run: pnpm --filter app test:mutation:incremental
+
+      - name: Save Stryker incremental cache
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: apps/app/.stryker-tmp/incremental.json
+          key: stryker-incremental-pr-${{ github.run_id }}
+
+  sast:
+    name: "SAST (CodeQL)"
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: javascript-typescript
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v4
+
+      # `analyze` (verified against its action.yml) has no severity-threshold
+      # input and does not fail the step based on what it finds — it only
+      # uploads SARIF to the Code Scanning UI. The usual way to make that
+      # blocking is a *separate* branch-protection setting ("Require code
+      # scanning results"), out of scope here. Since every gate in this file
+      # must be able to fail for real on its own, query the Code Scanning
+      # alerts API for this ref right after analysis (its default
+      # wait-for-processing: true means alerts are already queryable) and
+      # fail the job if any error/high/critical alert is open.
+      - name: Fail on open CodeQL alerts (error/high/critical)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          open_count=$(gh api \
+            "repos/${{ github.repository }}/code-scanning/alerts?state=open&ref=${{ github.ref }}&per_page=100" \
+            --jq '[.[] | select(.rule.security_severity_level == "critical" or .rule.security_severity_level == "high" or .rule.severity == "error")] | length')
+          echo "Open error/high/critical CodeQL alerts for ${{ github.ref }}: $open_count"
+          if [ "$open_count" -gt 0 ]; then
+            echo "::error::$open_count open CodeQL alert(s) at error/high/critical severity for ${{ github.ref }}."
+            exit 1
+          fi
+
+  # PR-only: dependency review diffs the dependency graph between the PR's
+  # base and head ref, which is only meaningful for pull_request events.
+  #
+  # IMPORTANT — flagged, not silently worked around: this action's own docs
+  # state it's available for "Public repositories" or "Private repositories
+  # with a GitHub Advanced Security license" (github.com/actions/
+  # dependency-review-action). This repo (morettto/limmiar) is private. If
+  # GHAS isn't enabled on it, this job will error on every run regardless of
+  # what a PR introduces — see final report.
+  sca:
+    name: "SCA (dependency review)"
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v5.0.0
+        with:
+          fail-on-severity: high
+
+  secrets:
+    name: "Secret scanning (gitleaks)"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # gitleaks scans git history by default; a shallow (depth-1)
+          # checkout would only let it see the latest commit.
+          fetch-depth: 0
+
+      # Deliberately NOT zricethezav/gitleaks-action: that wrapper requires
+      # a paid license for use on private repos/orgs (gitleaks' own docs).
+      # gitleaks itself is OSS (MIT, gitleaks/gitleaks) and free regardless
+      # of repo visibility, so install the official release binary directly
+      # instead of the wrapper action.
+      - name: Install gitleaks (OSS binary, v8.30.1)
+        run: |
+          curl -sSL -o gitleaks.tar.gz \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          tar -xzf gitleaks.tar.gz gitleaks
+          chmod +x gitleaks
+          sudo mv gitleaks /usr/local/bin/gitleaks
+          rm gitleaks.tar.gz
+          gitleaks version
+
+      # --redact avoids echoing real secret values into the (shared) CI log
+      # if something is actually found; --exit-code 1 is gitleaks' default
+      # on a detected leak but is spelled out for clarity.
+      - name: Run gitleaks detect
+        run: gitleaks detect --source . --redact --exit-code 1
+
+  dast:
+    name: "DAST (ZAP baseline)"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm --filter app build
+
+      - name: Start preview server (background)
+        run: |
+          nohup pnpm --filter app exec vite preview --port 4173 --strictPort \
+            > /tmp/vite-preview.log 2>&1 &
+          echo $! > /tmp/vite-preview.pid
+
+      - name: Wait for preview server to respond
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:4173/ >/dev/null 2>&1; then
+              echo "Preview server is up after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Preview server did not respond within 30s" >&2
+          cat /tmp/vite-preview.log || true
+          exit 1
+
+      - name: ZAP Baseline Scan
+        uses: zaproxy/action-baseline@v0.15.0
+        with:
+          target: 'http://localhost:4173'
+          rules_file_name: '.zap/rules.tsv'
+          # This is what makes the job actually able to go red: without it,
+          # the underlying zap-baseline.py exit code (1 on any FAIL rule) is
+          # swallowed and the Action step reports success regardless.
+          fail_action: true
+          # Don't file/maintain a GitHub issue per scan — this gate's job is
+          # to block the PR/build, not manage issues, and skipping it avoids
+          # needing an `issues: write` grant on this job.
+          allow_issue_writing: false
+
+      - name: Stop preview server
+        if: always()
+        run: |
+          if [ -f /tmp/vite-preview.pid ]; then
+            kill "$(cat /tmp/vite-preview.pid)" 2>/dev/null || true
+          fi
+
+  # Runs on every push to main AND every PR (not gated to pull_request) —
+  # explicitly required ("SBOM e coverage devem rodar em todo build").
+  sbom:
+    name: "SBOM (CycloneDX)"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm --filter app build
+
+      # NOT @cyclonedx/cyclonedx-npm: its own README requires "npm >= 9" and
+      # shells out to the real npm CLI / an npm-format lockfile to walk the
+      # dependency tree. This repo is pnpm-only (pnpm-lock.yaml, no
+      # package-lock.json, no npm-compatible node_modules metadata), so that
+      # tool would either error or silently produce an empty/wrong SBOM.
+      # cdxgen (same CycloneDX org) has native pnpm-lock.yaml support, so it
+      # runs from the repo root (where the lockfile lives — apps/app has no
+      # lockfile of its own) and writes into apps/app/sbom.json as requested.
+      - name: Generate CycloneDX SBOM
+        run: npx --yes @cyclonedx/cdxgen@12.8.2 -o apps/app/sbom.json .
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: sbom
+          path: apps/app/sbom.json
