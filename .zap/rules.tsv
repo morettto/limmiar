@@ -1,20 +1,25 @@
 # ZAP Baseline Scan rule overrides.
 #
-# Format: <rule-id>\t<WARN|FAIL|IGNORE|INFO>\t(<rule name, informational only>)
-# Any rule not listed here keeps ZAP's default baseline behaviour (WARN),
-# which never fails the scan (see quality-gates.yml's `cmd_options: '-I'`).
+# GROUND TRUTH (read straight from zaproxy/action-baseline's actual source,
+# zaproxy/actions-common src/action-helper.ts, processLineByLine): this
+# action's rules file ONLY understands the action "IGNORE" — it collects
+# plugin IDs whose 2nd column is exactly "IGNORE" and uses them to filter
+# alerts out of the report. It does NOT support "FAIL"/"WARN" overrides the
+# way zap-baseline.py's native -c mechanism does; a "FAIL" line here is
+# silently inert (confirmed empirically across several PR canhoto runs
+# before finding this in the source — plugins.length stayed 0, so -c was
+# never even passed to the container).
 #
-# IMPORTANT — zap_common.py's load_config keys config_dict by the alert's
-# bare `pluginId` (e.g. "90004"), not by the finer-grained `alertRef` shown
-# in ZAP's docs pages (e.g. "90004-3" for COOP, "90004-2" for COEP). A rules
-# file entry keyed "90004-3" is silently never matched — verified empirically
-# against this project's own PR canhoto (2 rounds of that exact mistake).
-# Plugin 90004 also bundles COOP+COEP+CORP under one pluginId, and this app
-# doesn't set CORP, so promoting bare "90004" would make this gate
-# permanently red on correct code.
-#
-# 10021 (X-Content-Type-Options Header Missing) has no such sub-id — it's a
-# single, cleanly matchable pluginId — so it's the gate instead: a real,
-# zero-downside header (see public/_headers and vite.config.ts's
-# preview.headers) that this project actually ships.
-10021	FAIL	(X-Content-Type-Options Header Missing)
+# Actual mechanism: zap-baseline.py fails (non-zero exit) if ANY alert at
+# WARN-or-above remains after filtering, so the workflow does NOT pass
+# `-I` (that would suppress ALL warn-level failures, defeating the gate).
+# Everything below is IGNORE-d except X-Content-Type-Options (10021), which
+# is this project's one real, zero-downside header (public/_headers,
+# vite.config.ts) — so it's the only thing left that can still fail the
+# scan, cleanly and on purpose.
+10020	IGNORE	(Missing Anti-clickjacking Header)
+10038	IGNORE	(Content Security Policy (CSP) Header Not Set)
+10049	IGNORE	(Storable but Non-Cacheable Content)
+10063	IGNORE	(Permissions Policy Header Not Set)
+10109	IGNORE	(Modern Web Application)
+90004	IGNORE	(Insufficient Site Isolation Against Spectre Vulnerability)

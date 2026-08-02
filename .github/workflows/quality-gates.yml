@@ -229,21 +229,19 @@ jobs:
         uses: zaproxy/action-baseline@v0.15.0
         with:
           target: 'http://localhost:4173'
+          # zaproxy/action-baseline's rules file only supports the "IGNORE"
+          # action (see .zap/rules.tsv header comment for the source
+          # reference) — it filters out alerts we've decided are out of
+          # scope. Whatever WARN-or-above alert survives that filtering is
+          # what fails the scan (zap-baseline.py's own default behavior);
+          # deliberately NOT passing `-I` here, since that would suppress
+          # ALL warn-level failures and defeat the one rule (10021,
+          # X-Content-Type-Options) this gate exists to enforce.
           rules_file_name: '.zap/rules.tsv'
           # This is what makes the job actually able to go red: without it,
-          # the underlying zap-baseline.py exit code (1 on any FAIL rule) is
-          # swallowed and the Action step reports success regardless.
+          # the underlying zap-baseline.py exit code is swallowed and the
+          # Action step reports success regardless.
           fail_action: true
-          # Without -I, zap-baseline.py fails on ANY alert (WARN or FAIL),
-          # which made this job red even on a zero-defect baseline — this
-          # app currently has several real, pre-existing WARN-level gaps
-          # (missing CSP, X-Content-Type-Options, Permissions-Policy, etc.)
-          # that are out of scope for this ticket. -I scopes "fail the scan"
-          # down to only the rules .zap/rules.tsv explicitly promotes to
-          # FAIL (verified empirically: PR #2's baseline run showed
-          # "FAIL-NEW: 0, WARN-NEW: 7" yet still exited non-zero without
-          # this flag).
-          cmd_options: '-I'
           # Don't file/maintain a GitHub issue per scan — this gate's job is
           # to block the PR/build, not manage issues, and skipping it avoids
           # needing an `issues: write` grant on this job.
