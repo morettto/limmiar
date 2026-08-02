@@ -1,0 +1,66 @@
+name: Mutation testing (nightly)
+
+on:
+  schedule:
+    # 03:17 UTC daily — off the hour, avoids the top-of-hour GitHub Actions
+    # scheduler pile-up.
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  mutation-full:
+    name: "Mutation testing (full nightly)"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # schedule/workflow_dispatch already default to the repo's default
+          # branch, but this run's whole point is to (re)publish the main
+          # baseline, so pin it explicitly rather than relying on whatever
+          # ref a manual dispatch happened to be triggered from.
+          ref: main
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # NOTE: `pnpm --filter app test:mutation` (plain `stryker run`) does
+      # NOT write .stryker-tmp/incremental.json — Stryker only reads/writes
+      # that file when `--incremental` is set (verified against this repo's
+      # pinned @stryker-mutator/core@9.6.1: incremental-differ.js reads it
+      # guarded by `if (!this.incremental) return`, and the writer in
+      # fs/project-reader.js is guarded by `if (this.options.incremental)`).
+      # A plain full run would leave nothing for the cache step below to
+      # save, so this job runs `--incremental --force` instead: `--force`
+      # disables incremental *reuse* (every mutant is re-run — this stays a
+      # true full/complete pass), while `--incremental` makes Stryker still
+      # persist the resulting report as the baseline file that the PR job's
+      # "Mutation testing (PR incremental)" cache restores from.
+      - name: Mutation testing (full run, refresh incremental baseline)
+        run: pnpm --filter app exec stryker run --incremental --force
+
+      # Explicit save (not the combined `actions/cache` action's automatic
+      # post-step) so this still runs even if the mutation score threshold
+      # broke and the step above failed — the baseline is worth publishing
+      # either way, and a failed nightly run must not leave PR runs stuck
+      # restoring a stale cache forever.
+      - name: Publish incremental baseline for PR runs
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: apps/app/.stryker-tmp/incremental.json
+          # Unique per run on purpose: every nightly run creates a new cache
+          # entry (never collides/"already exists"). The PR job's
+          # restore-keys (`stryker-incremental-main-`) prefix-matches
+          # whichever of these is newest.
+          key: stryker-incremental-main-${{ github.run_id }}

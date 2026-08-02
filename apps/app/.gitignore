@@ -10,7 +10,13 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+coverage
 *.local
+
+# Stryker mutation testing (incremental baseline is cached via
+# actions/cache in CI, not committed; html/json reports are build output)
+.stryker-tmp
+reports/mutation
 
 # Editor directories and files
 .vscode/*
