@@ -1,23 +1,25 @@
 # ZAP Baseline Scan rule overrides.
 #
-# Format: <rule-id>\t<WARN|FAIL|IGNORE|INFO>\t(<rule name, informational only>)
-# Any rule not listed here keeps ZAP's default baseline behaviour (WARN),
-# which never fails the scan.
+# GROUND TRUTH (read straight from zaproxy/action-baseline's actual source,
+# zaproxy/actions-common src/action-helper.ts, processLineByLine): this
+# action's rules file ONLY understands the action "IGNORE" — it collects
+# plugin IDs whose 2nd column is exactly "IGNORE" and uses them to filter
+# alerts out of the report. It does NOT support "FAIL"/"WARN" overrides the
+# way zap-baseline.py's native -c mechanism does; a "FAIL" line here is
+# silently inert (confirmed empirically across several PR canhoto runs
+# before finding this in the source — plugins.length stayed 0, so -c was
+# never even passed to the container).
 #
-# 90004-3 (COOP) is the one rule this project promotes to FAIL — it's exactly
-# what Spec S00 exists to prove (see ADR-S00-02), and it's a real regression
-# gate: passes today because vite.config.ts's `preview.headers` mirrors the
-# real public/_headers Cloudflare config, and it's what the PR canhoto will
-# strip to prove this gate bites.
-#
-# 90004-2 (COEP) is deliberately NOT promoted, even though this app also sets
-# a COEP header: ZAP's own rule implementation only recognizes `require-corp`
-# as a valid COEP value and flags `credentialless` as "missing or invalid" —
-# a confirmed upstream bug (zaproxy/zaproxy#8840), not a defect in this app.
-# `credentialless` is this project's deliberate choice (ADR-S00-02, needed
-# for third-party iframe compatibility), so promoting 90004-2 would make this
-# gate permanently red on correct code. Revisit once that issue is fixed
-# upstream.
-#
-# Rule IDs verified against https://www.zaproxy.org/docs/alerts/90004-3/
-90004-3	FAIL	(Cross-Origin-Opener-Policy Header Missing or Invalid)
+# Actual mechanism: zap-baseline.py fails (non-zero exit) if ANY alert at
+# WARN-or-above remains after filtering, so the workflow does NOT pass
+# `-I` (that would suppress ALL warn-level failures, defeating the gate).
+# Everything below is IGNORE-d except X-Content-Type-Options (10021), which
+# is this project's one real, zero-downside header (public/_headers,
+# vite.config.ts) — so it's the only thing left that can still fail the
+# scan, cleanly and on purpose.
+10020	IGNORE	(Missing Anti-clickjacking Header)
+10038	IGNORE	(Content Security Policy (CSP) Header Not Set)
+10049	IGNORE	(Storable but Non-Cacheable Content)
+10063	IGNORE	(Permissions Policy Header Not Set)
+10109	IGNORE	(Modern Web Application)
+90004	IGNORE	(Insufficient Site Isolation Against Spectre Vulnerability)
