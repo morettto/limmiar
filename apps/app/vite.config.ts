@@ -9,10 +9,9 @@ export default defineConfig({
   // header posture instead of scanning a preview server with none of it.
   preview: {
     headers: {
-      // DEFEITO PROPOSITAL (PR canhoto, ticket S00-02): COOP removido (não
-      // trocado por outro valor válido) pra provar que o gate DAST (regra
-      // ZAP 90004-3, "Header Missing or Invalid") reprova de verdade.
+      'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'credentialless',
+      'X-Content-Type-Options': 'nosniff',
     },
   },
   test: {

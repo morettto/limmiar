@@ -2,22 +2,19 @@
 #
 # Format: <rule-id>\t<WARN|FAIL|IGNORE|INFO>\t(<rule name, informational only>)
 # Any rule not listed here keeps ZAP's default baseline behaviour (WARN),
-# which never fails the scan.
+# which never fails the scan (see quality-gates.yml's `cmd_options: '-I'`).
 #
-# 90004-3 (COOP) is the one rule this project promotes to FAIL — it's exactly
-# what Spec S00 exists to prove (see ADR-S00-02), and it's a real regression
-# gate: passes today because vite.config.ts's `preview.headers` mirrors the
-# real public/_headers Cloudflare config, and it's what the PR canhoto will
-# strip to prove this gate bites.
+# IMPORTANT — zap_common.py's load_config keys config_dict by the alert's
+# bare `pluginId` (e.g. "90004"), not by the finer-grained `alertRef` shown
+# in ZAP's docs pages (e.g. "90004-3" for COOP, "90004-2" for COEP). A rules
+# file entry keyed "90004-3" is silently never matched — verified empirically
+# against this project's own PR canhoto (2 rounds of that exact mistake).
+# Plugin 90004 also bundles COOP+COEP+CORP under one pluginId, and this app
+# doesn't set CORP, so promoting bare "90004" would make this gate
+# permanently red on correct code.
 #
-# 90004-2 (COEP) is deliberately NOT promoted, even though this app also sets
-# a COEP header: ZAP's own rule implementation only recognizes `require-corp`
-# as a valid COEP value and flags `credentialless` as "missing or invalid" —
-# a confirmed upstream bug (zaproxy/zaproxy#8840), not a defect in this app.
-# `credentialless` is this project's deliberate choice (ADR-S00-02, needed
-# for third-party iframe compatibility), so promoting 90004-2 would make this
-# gate permanently red on correct code. Revisit once that issue is fixed
-# upstream.
-#
-# Rule IDs verified against https://www.zaproxy.org/docs/alerts/90004-3/
-90004-3	FAIL	(Cross-Origin-Opener-Policy Header Missing or Invalid)
+# 10021 (X-Content-Type-Options Header Missing) has no such sub-id — it's a
+# single, cleanly matchable pluginId — so it's the gate instead: a real,
+# zero-downside header (see public/_headers and vite.config.ts's
+# preview.headers) that this project actually ships.
+10021	FAIL	(X-Content-Type-Options Header Missing)
