@@ -57,6 +57,9 @@ importers:
       jsdom:
         specifier: ^30.0.1
         version: 30.0.1
+      lodash:
+        specifier: 4.17.4
+        version: 4.17.4
       oxlint:
         specifier: ^1.75.0
         version: 1.76.0
@@ -1640,6 +1643,9 @@ packages:
 
   lodash.groupby@4.6.0:
     resolution: {integrity: sha512-5dcWxm23+VAoz+awKmBaiBvzox8+RqMgFhi7UvX9DHZr2HdxHXM/Wrf8cfKpsW37RNrvtPn6hSwNqurSILbmJw==}
+
+  lodash@4.17.4:
+    resolution: {integrity: sha512-6X37Sq9KCpLSXEh8uM12AKYlviHPNNk4RxiGBn4cmKGJinbXBneWIV7iE/nXkM928O7ytHcHb6+X6Svl0f4hXg==}
 
   lru-cache@11.5.2:
     resolution: {integrity: sha512-4pfM1Ff0x50o0tQwb5ucw/RzNyD0/YJME6IVcStalZuMWxdt3sR3huStTtxz4PUmvZfRguvDejasvQ2kifR11g==}
@@ -3540,6 +3546,8 @@ snapshots:
       lightningcss-win32-x64-msvc: 1.33.0
 
   lodash.groupby@4.6.0: {}
+
+  lodash@4.17.4: {}
 
   lru-cache@11.5.2: {}
 

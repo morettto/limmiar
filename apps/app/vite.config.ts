@@ -9,7 +9,9 @@ export default defineConfig({
   // header posture instead of scanning a preview server with none of it.
   preview: {
     headers: {
-      'Cross-Origin-Opener-Policy': 'same-origin',
+      // DEFEITO PROPOSITAL (PR canhoto, ticket S00-02): COOP enfraquecido
+      // pra provar que o gate DAST (regra ZAP 90004-3) reprova.
+      'Cross-Origin-Opener-Policy': 'unsafe-none',
       'Cross-Origin-Embedder-Policy': 'credentialless',
     },
   },
