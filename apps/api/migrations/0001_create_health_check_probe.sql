@@ -33,4 +33,7 @@ BEGIN
 END
 $$;
 
-GRANT SELECT, INSERT ON health_check_probe TO app_role;
+-- SELECT only: nothing in the API writes to this table yet (health checks are
+-- read-only), and no test exercises an app_role INSERT -- granting INSERT now
+-- would be unused write access sitting on a least-privilege role.
+GRANT SELECT ON health_check_probe TO app_role;

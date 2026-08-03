@@ -74,7 +74,10 @@ public sealed class HealthCheckProbeRlsTests : IAsyncLifetime
     {
         var rows = await SelectProbeValuesAsync(TenantB);
 
-        Assert.DoesNotContain("probe-a", rows);
+        // Assert.Single (not just DoesNotContain("probe-a", rows)) so a policy bug that
+        // hides ALL rows -- not just the other tenant's -- would also fail this test.
+        var row = Assert.Single(rows);
+        Assert.Equal("probe-b", row);
     }
 
     /// <summary>
