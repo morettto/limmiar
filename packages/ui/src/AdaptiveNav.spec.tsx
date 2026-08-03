@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/experimental-ct-react'
 import { AdaptiveNav, type AdaptiveNavItem } from './AdaptiveNav'
+import { HeaderAction } from './HeaderAction'
+import { MOBILE_NAV_HEIGHT_PX } from './layout-constants'
 import { componentAxeBuilder } from './test-support/axe'
 import { VISUAL_LOCALES } from './test-support/locales'
 
@@ -79,4 +81,43 @@ test('touch targets meet 44px at T/M (rail toggle + links, bottom-bar links)', a
   const trigger = component.getByRole('button', { name: /Limmiar|Mais/ })
   const box = await trigger.boundingBox()
   expect(box?.height ?? 0).toBeGreaterThanOrEqual(44)
+})
+
+// MOBILE_NAV_HEIGHT_PX (layout-constants.ts) is HeaderAction's only source
+// of truth for AdaptiveNav's real M bottom-bar height — this keeps that
+// constant honest against the actual rendered layout.
+test('M bottom bar renders at the height layout-constants.ts assumes', async ({ mount }, testInfo) => {
+  test.skip(testInfo.project.name !== 'M-sm', 'bottom bar only renders at sm')
+
+  const component = await mount(
+    <div style={wrapperStyle}>
+      <AdaptiveNav items={ITEMS} brandLabel="Limmiar" />
+    </div>,
+  )
+
+  const box = await component.getByRole('navigation').boundingBox()
+  expect(box?.height).toBe(MOBILE_NAV_HEIGHT_PX)
+})
+
+// R4's "acima da nav" composed with R1's M bottom bar (P1-M in the
+// wireframe: "Iniciar sessão" sits directly above the 5-item nav) — proves
+// HeaderAction's stackAboveMobileNav actually clears AdaptiveNav, not just
+// that the two numbers add up on paper.
+test('HeaderAction with stackAboveMobileNav does not overlap AdaptiveNav at M-sm', async ({ mount }, testInfo) => {
+  test.skip(testInfo.project.name !== 'M-sm', 'both primitives only stack like this at sm')
+
+  const component = await mount(
+    <div style={wrapperStyle}>
+      <HeaderAction stackAboveMobileNav>Iniciar sessão</HeaderAction>
+      <AdaptiveNav items={ITEMS} brandLabel="Limmiar" />
+    </div>,
+  )
+
+  const actionBox = await component.getByRole('button', { name: 'Iniciar sessão' }).boundingBox()
+  const navBox = await component.getByRole('navigation').boundingBox()
+
+  expect(actionBox).not.toBeNull()
+  expect(navBox).not.toBeNull()
+  // action's bottom edge must sit at or above nav's top edge — no overlap.
+  expect((actionBox?.y ?? 0) + (actionBox?.height ?? 0)).toBeLessThanOrEqual(navBox?.y ?? 0)
 })

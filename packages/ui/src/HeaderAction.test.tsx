@@ -35,12 +35,17 @@ describe('HeaderAction', () => {
     expect(screen.getByRole('button', { name: 'Mais opções' })).toBeDefined()
   })
 
-  it('is fixed to the bottom (R4 mobile) at 48px min height, above/outside the base cascade', () => {
+  it('is fixed to the bottom (R4 mobile) at 48px min height, 16px gap by default', () => {
     render(<HeaderAction>Assinar</HeaderAction>)
-    const className = screen.getByRole('button').className
-    expect(className).toContain('fixed')
-    expect(className).toContain('bottom-4')
-    expect(className).toContain('min-h-12')
+    const button = screen.getByRole('button')
+    expect(button.className).toContain('fixed')
+    expect(button.className).toContain('min-h-12')
+    expect(button.style.bottom).toBe('16px')
+  })
+
+  it('sits higher when stackAboveMobileNav is set, clearing AdaptiveNav\'s M bottom bar (R4: "acima da nav")', () => {
+    render(<HeaderAction stackAboveMobileNav>Assinar</HeaderAction>)
+    expect(screen.getByRole('button').style.bottom).toBe('63px')
   })
 
   it('sits inline in the header from md up, at the T touch minimum (44px)', () => {

@@ -1,5 +1,6 @@
-import { type ReactNode, useId, useState } from 'react'
+import type { ReactNode } from 'react'
 import { useBreakpoint } from './use-breakpoint'
+import { useDisclosure } from './use-disclosure'
 
 export interface AdaptivePanelProps {
   children: ReactNode
@@ -16,8 +17,7 @@ export interface AdaptivePanelProps {
  */
 export function AdaptivePanel({ children, label }: AdaptivePanelProps) {
   const breakpoint = useBreakpoint()
-  const [isOpen, setIsOpen] = useState(false)
-  const panelId = useId()
+  const { isOpen, id: panelId, triggerProps } = useDisclosure()
 
   if (breakpoint === 'xl') {
     return (
@@ -30,13 +30,7 @@ export function AdaptivePanel({ children, label }: AdaptivePanelProps) {
   if (breakpoint === 'sm') {
     return (
       <div className="rounded-lg border border-neutral-300">
-        <button
-          type="button"
-          onClick={() => setIsOpen((open) => !open)}
-          aria-expanded={isOpen}
-          aria-controls={panelId}
-          className="flex min-h-11 w-full items-center justify-between px-3 text-left"
-        >
+        <button {...triggerProps} className="flex min-h-11 w-full items-center justify-between px-3 text-left">
           {label}
         </button>
         {isOpen && (
@@ -51,13 +45,7 @@ export function AdaptivePanel({ children, label }: AdaptivePanelProps) {
   // md/lg (T): 40%-width on-demand drawer over the content.
   return (
     <div className="relative">
-      <button
-        type="button"
-        onClick={() => setIsOpen((open) => !open)}
-        aria-expanded={isOpen}
-        aria-controls={panelId}
-        className="min-h-11 min-w-11 rounded-md border border-neutral-300 px-3"
-      >
+      <button {...triggerProps} className="min-h-11 min-w-11 rounded-md border border-neutral-300 px-3">
         {label}
       </button>
       {isOpen && (

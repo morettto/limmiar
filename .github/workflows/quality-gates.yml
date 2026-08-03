@@ -94,7 +94,9 @@ jobs:
   # enter packages/i18n — Intl (backed by the same CLDR data as the plural
   # catalog) is the single source of truth for formatting. Its own step,
   # separate from the coverage job above, since it's a structural check, not
-  # a test run.
+  # a test run. The same rule extends to packages/ui (CalendarViewport
+  # formats dates directly), so its own dependency-cruiser config mirrors
+  # i18n's here rather than being a special case.
   arch:
     name: "Architecture rules (dependency-cruiser)"
     runs-on: ubuntu-latest
@@ -117,6 +119,9 @@ jobs:
 
       - name: Dependency rules (i18n)
         run: pnpm --filter i18n lint:arch
+
+      - name: Dependency rules (ui)
+        run: pnpm --filter ui lint:arch
 
   # S00.5-03 gate 1: custom ESLint config enforcing i18n-safe source — no
   # hardcoded JSX text outside a translation macro

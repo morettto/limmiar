@@ -1,5 +1,6 @@
-import { type ReactNode, useId, useState } from 'react'
+import type { ReactNode } from 'react'
 import { useBreakpoint } from './use-breakpoint'
+import { useDisclosure } from './use-disclosure'
 
 export interface AdaptiveNavItem {
   key: string
@@ -27,8 +28,7 @@ const MAX_VISIBLE_BEFORE_OVERFLOW = MAX_BOTTOM_BAR_ITEMS - 1
  */
 export function AdaptiveNav({ items, brandLabel = 'Menu', moreLabel = 'Mais' }: AdaptiveNavProps) {
   const breakpoint = useBreakpoint()
-  const [isOpen, setIsOpen] = useState(false)
-  const panelId = useId()
+  const { isOpen, id: panelId, triggerProps } = useDisclosure()
 
   if (breakpoint === 'xl') {
     return (
@@ -69,10 +69,7 @@ export function AdaptiveNav({ items, brandLabel = 'Menu', moreLabel = 'Mais' }: 
         {hasOverflow && (
           <div className="relative flex-1">
             <button
-              type="button"
-              onClick={() => setIsOpen((open) => !open)}
-              aria-expanded={isOpen}
-              aria-controls={panelId}
+              {...triggerProps}
               className="flex min-h-11 w-full flex-col items-center justify-center gap-0.5 py-1 text-xs"
             >
               {moreLabel}
@@ -108,10 +105,7 @@ export function AdaptiveNav({ items, brandLabel = 'Menu', moreLabel = 'Mais' }: 
       className="relative flex w-[72px] shrink-0 flex-col items-center gap-1 border-r border-neutral-300 p-2"
     >
       <button
-        type="button"
-        onClick={() => setIsOpen((open) => !open)}
-        aria-expanded={isOpen}
-        aria-controls={panelId}
+        {...triggerProps}
         aria-label={brandLabel}
         className="mb-2 flex min-h-11 min-w-11 items-center justify-center rounded-md"
       >

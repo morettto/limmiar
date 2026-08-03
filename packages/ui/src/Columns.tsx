@@ -1,5 +1,6 @@
-import { type ReactNode, useId, useState } from 'react'
+import type { ReactNode } from 'react'
 import { useBreakpoint } from './use-breakpoint'
+import { useDisclosure } from './use-disclosure'
 
 export interface ColumnsProps {
   /** Primary content — 1st column at D, stays visible at T, last at M. */
@@ -18,8 +19,7 @@ export interface ColumnsProps {
  */
 export function Columns({ content, alert, action, actionLabel = 'Mais' }: ColumnsProps) {
   const breakpoint = useBreakpoint()
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false)
-  const drawerId = useId()
+  const { isOpen: isDrawerOpen, id: drawerId, triggerProps } = useDisclosure()
 
   if (breakpoint === 'sm') {
     return (
@@ -47,10 +47,7 @@ export function Columns({ content, alert, action, actionLabel = 'Mais' }: Column
       <div className="min-w-0 flex-1">{content}</div>
       <div className="min-w-0 flex-1">{alert}</div>
       <button
-        type="button"
-        onClick={() => setIsDrawerOpen((open) => !open)}
-        aria-expanded={isDrawerOpen}
-        aria-controls={drawerId}
+        {...triggerProps}
         className="min-h-11 min-w-11 self-start rounded-md border border-neutral-300 px-3"
       >
         {actionLabel}

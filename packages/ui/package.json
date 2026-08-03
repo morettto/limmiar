@@ -10,6 +10,7 @@
   },
   "scripts": {
     "lint": "oxlint",
+    "lint:arch": "depcruise src --config .dependency-cruiser.cjs",
     "test:unit": "vitest run --coverage",
     "test:unit:watch": "vitest",
     "test:mutation": "stryker run",
@@ -34,6 +35,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.4",
     "@vitest/coverage-istanbul": "4.1.10",
+    "dependency-cruiser": "^18.1.0",
     "jsdom": "^30.0.1",
     "oxlint": "^1.76.0",
     "react": "^19.2.8",
