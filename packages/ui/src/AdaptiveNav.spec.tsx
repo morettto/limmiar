@@ -3,7 +3,9 @@ import { AdaptiveNav, type AdaptiveNavItem } from './AdaptiveNav'
 import { HeaderAction } from './HeaderAction'
 import { MOBILE_NAV_HEIGHT_PX } from './layout-constants'
 import { componentAxeBuilder } from './test-support/axe'
-import { VISUAL_LOCALES } from './test-support/locales'
+import { findOverflowViolations } from './test-support/overflow'
+import { pseudoLocalize } from './test-support/pseudo-locale'
+import { VISUAL_LOCALES, type VisualLocale } from './test-support/locales'
 
 function icon() {
   return (
@@ -13,15 +15,45 @@ function icon() {
   )
 }
 
-const ITEMS: AdaptiveNavItem[] = [
-  { key: 'painel', label: 'Painel', icon: icon(), href: '/painel', current: true },
-  { key: 'pacientes', label: 'Pacientes', icon: icon(), href: '/pacientes' },
-  { key: 'sessoes', label: 'Sessões', icon: icon(), href: '/sessoes' },
-  { key: 'agenda', label: 'Agenda', icon: icon(), href: '/agenda' },
-  { key: 'notas', label: 'Notas', icon: icon(), href: '/notas' },
-  { key: 'cobranca', label: 'Cobrança', icon: icon(), href: '/cobranca' },
-  { key: 'privacidade', label: 'Privacidade', icon: icon(), href: '/privacidade' },
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+// key/href/current são estrutura, não rótulo de UI — ficam constantes nas 5
+// entradas; só o texto do label muda por locale.
+const ITEM_META: Array<Omit<AdaptiveNavItem, 'label' | 'icon'>> = [
+  { key: 'painel', href: '/painel', current: true },
+  { key: 'pacientes', href: '/pacientes' },
+  { key: 'sessoes', href: '/sessoes' },
+  { key: 'agenda', href: '/agenda' },
+  { key: 'notas', href: '/notas' },
+  { key: 'cobranca', href: '/cobranca' },
+  { key: 'privacidade', href: '/privacidade' },
 ]
+
+const PT_BR_LABELS = ['Painel', 'Pacientes', 'Sessões', 'Agenda', 'Notas', 'Cobrança', 'Privacidade']
+const PT_BR_MORE_LABEL = 'Mais'
+
+const LABELS: Record<VisualLocale, string[]> = {
+  'pt-BR': PT_BR_LABELS,
+  'es-419': ['Panel', 'Pacientes', 'Sesiones', 'Agenda', 'Notas', 'Facturación', 'Privacidad'],
+  'it-IT': ['Pannello', 'Pazienti', 'Sessioni', 'Agenda', 'Note', 'Fatturazione', 'Privacy'],
+  'en-US': ['Dashboard', 'Patients', 'Sessions', 'Schedule', 'Notes', 'Billing', 'Privacy'],
+  // Sempre derivado de pt-BR via pseudoLocalize, nunca escrito à mão.
+  pseudo: PT_BR_LABELS.map((label) => pseudoLocalize(label)),
+}
+
+const MORE_LABEL: Record<VisualLocale, string> = {
+  'pt-BR': PT_BR_MORE_LABEL,
+  'es-419': 'Más',
+  'it-IT': 'Altro',
+  'en-US': 'More',
+  pseudo: pseudoLocalize(PT_BR_MORE_LABEL),
+}
+
+function itemsFor(locale: VisualLocale): AdaptiveNavItem[] {
+  return ITEM_META.map((meta, index) => ({ ...meta, label: LABELS[locale][index], icon: icon() }))
+}
 
 // The M bottom bar is `fixed`, which positions relative to the *viewport* by
 // default — outside the bounding box a component screenshot captures
@@ -39,7 +71,7 @@ for (const locale of VISUAL_LOCALES) {
   test(`renders correctly [${locale}]`, async ({ mount, page }) => {
     const component = await mount(
       <div style={wrapperStyle}>
-        <AdaptiveNav items={ITEMS} brandLabel="Limmiar" />
+        <AdaptiveNav items={itemsFor(locale)} brandLabel="Limmiar" />
       </div>,
     )
 
@@ -47,6 +79,8 @@ for (const locale of VISUAL_LOCALES) {
 
     const results = await componentAxeBuilder(page).analyze()
     expect(results.violations).toEqual([])
+
+    expect(await findOverflowViolations(component)).toEqual([])
   })
 }
 
@@ -58,7 +92,7 @@ test('T rail label drawer / M overflow menu open correctly and stay axe-clean (T
 
   const component = await mount(
     <div style={wrapperStyle}>
-      <AdaptiveNav items={ITEMS} brandLabel="Limmiar" />
+      <AdaptiveNav items={itemsFor('pt-BR')} brandLabel="Limmiar" />
     </div>,
   )
 
@@ -74,11 +108,27 @@ test('touch targets meet 44px at T/M (rail toggle + links, bottom-bar links)', a
 
   const component = await mount(
     <div style={wrapperStyle}>
-      <AdaptiveNav items={ITEMS} brandLabel="Limmiar" />
+      <AdaptiveNav items={itemsFor('pt-BR')} brandLabel="Limmiar" />
     </div>,
   )
 
   const trigger = component.getByRole('button', { name: /Limmiar|Mais/ })
+  const box = await trigger.boundingBox()
+  expect(box?.height ?? 0).toBeGreaterThanOrEqual(44)
+})
+
+test('touch target holds 44px under pseudo-locale expansion at T/M (rail toggle / overflow trigger)', async ({
+  mount,
+}, testInfo) => {
+  test.skip(testInfo.project.name === 'D-xl', 'AC2 (S00.5-04) is scoped to tablet/mobile')
+
+  const component = await mount(
+    <div style={wrapperStyle}>
+      <AdaptiveNav items={itemsFor('pseudo')} brandLabel="Limmiar" moreLabel={MORE_LABEL.pseudo} />
+    </div>,
+  )
+
+  const trigger = component.getByRole('button', { name: new RegExp(`Limmiar|${escapeRegExp(MORE_LABEL.pseudo)}`) })
   const box = await trigger.boundingBox()
   expect(box?.height ?? 0).toBeGreaterThanOrEqual(44)
 })
@@ -91,7 +141,7 @@ test('M bottom bar renders at the height layout-constants.ts assumes', async ({ 
 
   const component = await mount(
     <div style={wrapperStyle}>
-      <AdaptiveNav items={ITEMS} brandLabel="Limmiar" />
+      <AdaptiveNav items={itemsFor('pt-BR')} brandLabel="Limmiar" />
     </div>,
   )
 
@@ -109,7 +159,7 @@ test('HeaderAction with stackAboveMobileNav does not overlap AdaptiveNav at M-sm
   const component = await mount(
     <div style={wrapperStyle}>
       <HeaderAction stackAboveMobileNav>Iniciar sessão</HeaderAction>
-      <AdaptiveNav items={ITEMS} brandLabel="Limmiar" />
+      <AdaptiveNav items={itemsFor('pt-BR')} brandLabel="Limmiar" />
     </div>,
   )
 
