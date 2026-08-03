@@ -1,0 +1,18 @@
+# Build context is the repo root (docker build -f apps/api/Dockerfile .). Docker only
+# honors this file's contents because it is named "<dockerfile>.dockerignore" and sits
+# in the context root -- a plain apps/api/.dockerignore would be silently ignored here.
+# Keep the build context lean by excluding everything the Dockerfile's surgical COPY
+# steps never reference.
+
+**/bin/
+**/obj/
+**/TestResults/
+**/node_modules/
+.git/
+.github/
+.claude/
+apps/app/
+apps/site/
+packages/
+apps/api/publish-test/
+**/*.user

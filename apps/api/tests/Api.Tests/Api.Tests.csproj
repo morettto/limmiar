@@ -1,0 +1,52 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <!-- Coverage defaults for coverlet.msbuild. Set here (not only passed on the CLI)
+       because `dotnet test` on this SDK mis-splits a comma-separated /p:ThresholdType
+       value passed on the command line (it gets forwarded to MSBuild as two separate,
+       broken switches). Declaring the same values as project defaults means `dotnet
+       test apps/api/Api.sln -c Release /p:CollectCoverage=true ...` still enforces
+       100% line+branch coverage even though the CLI-supplied ThresholdType is dropped.
+       ExcludeByFile excludes compiler/source-generator-emitted code (RequestDelegateGenerator,
+       OpenAPI XML comment support, System.Text.Json source-gen) under obj/, which is
+       framework glue we did not write and cannot meaningfully unit test line-by-line;
+       see the dotnet-test-quality skill's guidance to exclude generated code from
+       coverage. -->
+  <PropertyGroup>
+    <CollectCoverage>true</CollectCoverage>
+    <CoverletOutputFormat>cobertura</CoverletOutputFormat>
+    <Threshold>100</Threshold>
+    <ThresholdType>line,branch</ThresholdType>
+    <ThresholdStat>total</ThresholdStat>
+    <ExcludeByFile>**/obj/**/*.cs</ExcludeByFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="coverlet.msbuild" Version="10.0.1">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.10" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="Respawn" Version="7.0.0" />
+    <PackageReference Include="Testcontainers.PostgreSql" Version="4.13.0" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Api\Api.csproj" />
+  </ItemGroup>
+
+</Project>

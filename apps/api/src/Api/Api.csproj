@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <PublishAot>true</PublishAot>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.8" />
+    <!-- Pinned above the transitive 2.0.0 that Microsoft.AspNetCore.OpenApi 10.0.8 pulls
+         in, which has a known high-severity vulnerability (GHSA-v5pm-xwqc-g5wc, patched in
+         2.7.5) that trips this repo's SCA gate (dependency-review-action, fail-on-severity:
+         high). Staying on the 2.x line (not jumping to 3.x): Microsoft.AspNetCore.OpenApi
+         10.0.8's XmlCommentGenerator source generator targets the 2.x IOpenApiMediaType
+         shape and fails to compile against 3.x's read-only Example property. -->
+    <PackageReference Include="Microsoft.OpenApi" Version="2.7.6" />
+    <PackageReference Include="Npgsql" Version="10.0.3" />
+  </ItemGroup>
+  
+</Project>
