@@ -46,8 +46,11 @@ jobs:
       # true full/complete pass), while `--incremental` makes Stryker still
       # persist the resulting report as the baseline file that the PR job's
       # "Mutation testing (PR incremental)" cache restores from.
-      - name: Mutation testing (full run, refresh incremental baseline)
+      - name: Mutation testing (full run, refresh incremental baseline, app)
         run: pnpm --filter app exec stryker run --incremental --force
+
+      - name: Mutation testing (full run, refresh incremental baseline, i18n)
+        run: pnpm --filter i18n exec stryker run --incremental --force
 
       # Explicit save (not the combined `actions/cache` action's automatic
       # post-step) so this still runs even if the mutation score threshold
@@ -58,7 +61,9 @@ jobs:
         if: always()
         uses: actions/cache/save@v6
         with:
-          path: apps/app/.stryker-tmp/incremental.json
+          path: |
+            apps/app/.stryker-tmp/incremental.json
+            packages/i18n/.stryker-tmp/incremental.json
           # Unique per run on purpose: every nightly run creates a new cache
           # entry (never collides/"already exists"). The PR job's
           # restore-keys (`stryker-incremental-main-`) prefix-matches
