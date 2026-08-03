@@ -15,6 +15,12 @@ export function App() {
       <p>
         <Trans>Bem-vindo ao Limmiar</Trans>
       </p>
+      {/* PR canhoto S00.5-03 — 4 violacoes plantadas de proposito, prova os gates, PR fecha sem merge */}
+      <p>Hardcoded string plantada pelo PR canhoto</p>
+      <p>Ultima atualizacao: {new Date().toLocaleDateString()}</p>
+      <p>
+        <Trans>Mensagem nova plantada, nunca passou por lingui extract</Trans>
+      </p>
       <RouterProvider router={router} />
     </I18nProvider>
   )

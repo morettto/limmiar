@@ -15,4 +15,4 @@ msgstr ""
 
 #: src/App.tsx:16
 msgid "Bem-vindo ao Limmiar"
-msgstr "Welcome to Limmiar"
+msgstr ""
