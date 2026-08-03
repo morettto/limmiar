@@ -36,8 +36,228 @@ jobs:
       # vitest exits non-zero when any coverage threshold (perFile 100%) is
       # unmet, so this step's own exit code is the gate — nothing extra to
       # check.
-      - name: Unit tests + coverage
+      - name: Unit tests + coverage (app)
         run: pnpm --filter app test:unit
+
+      - name: Unit tests + coverage (i18n)
+        run: pnpm --filter i18n test:unit
+
+      - name: Unit tests + coverage (ui)
+        run: pnpm --filter ui test:unit
+
+  # S00-03 gate: the 7 adaptive primitives × 4 breakpoints (sm/md/lg/xl —
+  # Wireframes - Responsivo (3 plataformas).dc.html) must render correctly
+  # and stay axe-clean. Playwright Component Testing mounts each primitive
+  # in isolation (no app shell needed) at 4 fixed viewport projects defined
+  # in packages/ui/playwright-ct.config.ts; a missing/changed baseline
+  # screenshot or a new axe violation fails this job. S00.5-04 (pseudo-locale
+  # in this same matrix) extends these *.spec.tsx files, not this job.
+  visual-regression:
+    name: "Visual regression (7 primitivas × 4 breakpoints)"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright (chromium)
+        run: pnpm --filter ui exec playwright install --with-deps chromium
+
+      # playwright exits non-zero on a screenshot mismatch/missing baseline
+      # or a failed assertion (axe violations, touch-target size) — that
+      # failure is this step's own exit code, nothing extra to check.
+      - name: Visual regression + axe + touch targets (ui)
+        run: pnpm --filter ui test:visual
+
+      - name: Upload diff artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: visual-regression-report
+          path: |
+            packages/ui/test-results
+            packages/ui/playwright-report
+
+  # Enforces ADR-S00.5-03: no date/number library (date-fns/dayjs/moment) may
+  # enter packages/i18n — Intl (backed by the same CLDR data as the plural
+  # catalog) is the single source of truth for formatting. Its own step,
+  # separate from the coverage job above, since it's a structural check, not
+  # a test run. The same rule extends to packages/ui (CalendarViewport
+  # formats dates directly), so its own dependency-cruiser config mirrors
+  # i18n's here rather than being a special case.
+  arch:
+    name: "Architecture rules (dependency-cruiser)"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Dependency rules (i18n)
+        run: pnpm --filter i18n lint:arch
+
+      - name: Dependency rules (ui)
+        run: pnpm --filter ui lint:arch
+
+  # S00.5-03 gate 1: custom ESLint config enforcing i18n-safe source — no
+  # hardcoded JSX text outside a translation macro
+  # (lingui/no-unlocalized-strings, official @lingui plugin) and no
+  # toLocaleDateString/toLocaleTimeString/toLocaleString call without an
+  # explicit locale (local rule, unit-tested via eslint-rules/*.test.js).
+  # Scoped, separate from oxlint (pnpm --filter app lint) — same precedent as
+  # dependency-cruiser coexisting with oxlint in packages/i18n (above) for a
+  # rule oxlint has no equivalent/custom-rule API for.
+  i18n-lint:
+    name: "i18n: lint (hardcoded strings + unlocalized formatting)"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Unit tests (custom ESLint rule)
+        run: pnpm --filter app test:eslint-rules
+
+      - name: ESLint (i18n gate)
+        run: pnpm --filter app lint:i18n
+
+  # S00.5-03 gate 2: a message added in code without running `lingui
+  # extract` first must fail the PR. `lingui extract` only rewrites a
+  # catalog file when its content actually changed (deterministic output —
+  # verified against @lingui/cli's formatterWrapper source), so running it
+  # and then checking for a diff/untracked change on the catalogs is
+  # Lingui's own documented CI pattern for this — the CLI has no `--check`
+  # flag to do it in one step.
+  i18n-extract-check:
+    name: "i18n: extract check (message without catalog entry)"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Extract messages
+        run: pnpm --filter app check:i18n-extract
+
+      # `git status --porcelain` (not `git diff --exit-code`) on purpose: a
+      # brand-new locale catalog would be untracked, not modified, and
+      # `git diff` alone never sees untracked files.
+      - name: Fail if catalogs changed (message in code without a catalog entry)
+        run: |
+          if [ -n "$(git status --porcelain -- apps/app/src/locales)" ]; then
+            echo "::error::Catalogs changed after 'lingui extract' — a message in code has no catalog entry. Run 'pnpm --filter app check:i18n-extract' locally and commit the result."
+            git status --porcelain -- apps/app/src/locales
+            git diff -- apps/app/src/locales
+            exit 1
+          fi
+
+  # S00.5-03 gate 3: none of the 4 real catalogs may have a missing
+  # translation for a key that exists in the source catalog — `--strict` is
+  # the native Lingui CLI flag for this (fails the process, not just a
+  # report).
+  i18n-catalog-complete:
+    name: "i18n: catalog completeness (compile --strict)"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Compile catalogs (strict — fails on any missing translation)
+        run: pnpm --filter app check:i18n-complete
+
+  # S00.5-03 gate 4 / AC4: proves the CI-only pseudo-locale mechanism
+  # (ADR-S00.5-06) actually generates a pseudo-LOCALE catalog from the real
+  # source catalog at CI build time. lingui.config.pseudo.ts is never read by
+  # the production build (@lingui/vite-plugin reads lingui.config.ts) — this
+  # job is the only place pseudo-LOCALE is ever compiled, and its output is
+  # gitignored (apps/app/.gitignore). Consuming it in the 7-primitives visual
+  # regression matrix is ticket S00.5-04, not this one.
+  i18n-pseudo-locale:
+    name: "i18n: pseudo-locale generation (CI-only)"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Compile pseudo-locale catalog
+        run: pnpm --filter app build:i18n-pseudo
+
+      - name: Verify pseudo-locale output (real compiler, no mock)
+        run: node apps/app/scripts/verify-pseudo-locale.mjs
 
   # PR-only: this is the fast incremental check that runs on every PR push.
   # The full/complete score is enforced separately by the nightly job
@@ -66,7 +286,10 @@ jobs:
       - name: Restore Stryker incremental baseline (from nightly, main)
         uses: actions/cache/restore@v6
         with:
-          path: apps/app/.stryker-tmp/incremental.json
+          path: |
+            apps/app/.stryker-tmp/incremental.json
+            packages/i18n/.stryker-tmp/incremental.json
+            packages/ui/.stryker-tmp/incremental.json
           # Deliberately unique per run so this primary key never hits —
           # every PR run falls through to restore-keys, which always
           # resolves to whatever the nightly job most recently published.
@@ -77,14 +300,23 @@ jobs:
       # stryker exits non-zero if the mutation score is below the `break`
       # threshold (90, see stryker.config.mjs) — that failure is this
       # step's own exit code, nothing extra to check.
-      - name: Mutation testing (incremental)
+      - name: Mutation testing (incremental, app)
         run: pnpm --filter app test:mutation:incremental
+
+      - name: Mutation testing (incremental, i18n)
+        run: pnpm --filter i18n test:mutation:incremental
+
+      - name: Mutation testing (incremental, ui)
+        run: pnpm --filter ui test:mutation:incremental
 
       - name: Save Stryker incremental cache
         if: always()
         uses: actions/cache/save@v6
         with:
-          path: apps/app/.stryker-tmp/incremental.json
+          path: |
+            apps/app/.stryker-tmp/incremental.json
+            packages/i18n/.stryker-tmp/incremental.json
+            packages/ui/.stryker-tmp/incremental.json
           key: stryker-incremental-pr-${{ github.run_id }}
 
   sast:

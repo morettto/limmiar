@@ -1,0 +1,48 @@
+{
+  "name": "@limmiar/ui",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "oxlint",
+    "lint:arch": "depcruise src --config .dependency-cruiser.cjs",
+    "test:unit": "vitest run --coverage",
+    "test:unit:watch": "vitest",
+    "test:mutation": "stryker run",
+    "test:mutation:incremental": "stryker run --incremental",
+    "test:visual": "playwright test -c playwright-ct.config.ts"
+  },
+  "peerDependencies": {
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.10.2",
+    "@playwright/experimental-ct-react": "^1.62.1",
+    "@playwright/test": "^1.62.1",
+    "@stryker-mutator/core": "9.6.1",
+    "@stryker-mutator/vitest-runner": "9.6.1",
+    "@tailwindcss/vite": "^4.0.0",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.4",
+    "@vitest/coverage-istanbul": "4.1.10",
+    "dependency-cruiser": "^18.1.0",
+    "jsdom": "^30.0.1",
+    "oxlint": "^1.76.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "tailwindcss": "^4.0.0",
+    "typescript": "~6.0.3",
+    "vite": "^8.2.0",
+    "vitest": "4.1.10"
+  }
+}

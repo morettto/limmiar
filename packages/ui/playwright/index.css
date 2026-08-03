@@ -1,0 +1,8 @@
+@import "tailwindcss";
+
+/* Playwright CT's Vite root is this `playwright/` dir, a sibling of `../src`
+   (not an ancestor) — Tailwind v4's automatic content detection walks down
+   from its root and would never see `../src`, so the primitives' utility
+   classes get silently dropped from the generated CSS. This explicit
+   @source is the documented escape hatch for exactly this layout. */
+@source "../src";

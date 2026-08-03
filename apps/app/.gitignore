@@ -18,6 +18,15 @@ coverage
 .stryker-tmp
 reports/mutation
 
+# Lingui: only the .po source catalogs are committed. `lingui compile`
+# output (messages.js) is a build artifact — @lingui/vite-plugin compiles
+# .po on the fly for the real app build, this is only ever written by the
+# CI gates (check:i18n-complete, build:i18n-pseudo) that run the CLI
+# directly. pseudo-LOCALE has no .po at all (ADR-S00.5-06: CI-only, never
+# committed, never shipped) so the whole directory is ignored.
+src/locales/**/messages.js
+src/locales/pseudo-LOCALE/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
