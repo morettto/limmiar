@@ -1,9 +1,16 @@
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
+import { lingui, linguiTransformerBabelPreset } from '@lingui/vite-plugin'
+import babel from '@rolldown/plugin-babel'
+import tailwindcss from '@tailwindcss/vite'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  // @vitejs/plugin-react v6 dropped its own Babel integration (Oxc-based
+  // JSX transform now) — Lingui's macros (t/<Trans>) still need a Babel
+  // pass, so it runs as its own plugin via @rolldown/plugin-babel rather
+  // than through react()'s (now-removed) `babel` option.
+  plugins: [react(), lingui(), babel({ presets: [linguiTransformerBabelPreset()] }), tailwindcss()],
   // Mirrors public/_headers (the real Cloudflare-served headers) so `vite
   // preview` — used by the DAST (ZAP) CI job — reflects actual production
   // header posture instead of scanning a preview server with none of it.

@@ -7,3 +7,6 @@ test-results/
 .env
 .env.*
 !.env.example
+
+# Serena MCP local project state (cache, memories, machine-local config)
+.serena/
