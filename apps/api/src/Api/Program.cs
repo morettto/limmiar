@@ -1,16 +1,7 @@
 using Api.Data;
-using Api.Endpoints;
-using Api.Serialization;
 using Npgsql;
 
 var builder = WebApplication.CreateSlimBuilder(args);
-
-builder.Services.ConfigureHttpJsonOptions(options =>
-{
-    options.SerializerOptions.TypeInfoResolverChain.Insert(0, ApiJsonSerializerContext.Default);
-});
-
-builder.Services.AddOpenApi();
 
 // Fly.io's release_command runs this exact binary with --migrate-only before the new
 // version starts serving traffic. This is the SAME MigrationRunner used by the
@@ -34,19 +25,10 @@ if (args.Contains("--migrate-only"))
 }
 else
 {
-    var appConnectionString = builder.Configuration.GetConnectionString("AppDb")
-        ?? throw new InvalidOperationException("Missing required configuration: ConnectionStrings:AppDb");
-
-    builder.Services.AddSingleton(NpgsqlDataSourceFactory.Create(appConnectionString));
-
-    var app = builder.Build();
-
-    if (app.Environment.IsDevelopment())
-    {
-        app.MapOpenApi();
-    }
-
-    app.MapHealthEndpoints();
+    // Shared with the Pact provider-verification test (Api.Tests/Contracts), which needs
+    // this exact composition bound to a real Kestrel listener instead of an in-memory
+    // WebApplicationFactory TestServer -- see Program.Composition.cs.
+    var app = BuildApp(builder);
 
     app.Run();
 }

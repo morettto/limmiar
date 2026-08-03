@@ -14,7 +14,9 @@ namespace Api.Tests.Infrastructure;
 /// </summary>
 public sealed class PostgresContainerFixture : IAsyncLifetime
 {
-    /// <summary>Must match the password in migrations/0001_create_health_check_probe.sql.</summary>
+    /// <summary>Substituted into migrations/0001_create_health_check_probe.sql's
+    /// {{APP_ROLE_PASSWORD}} placeholder by MigrationRunner -- the file itself has no
+    /// literal password to match.</summary>
     public const string AppRolePassword = "app_role_dev_password";
 
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:17-alpine")

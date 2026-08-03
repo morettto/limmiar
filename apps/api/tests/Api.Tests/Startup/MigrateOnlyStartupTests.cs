@@ -25,14 +25,6 @@ public sealed class MigrateOnlyStartupTests
     [Fact]
     public async Task Main_WithMigrateOnlyFlag_RunsMigrationsAgainstAdminConnectionAndReturns()
     {
-        var entryPoint = typeof(Program).Assembly.EntryPoint
-            ?? throw new InvalidOperationException("Api assembly has no entry point.");
-
-        var args = new[] { "--migrate-only" };
-        var invokeArgs = entryPoint.GetParameters().Length == 0
-            ? []
-            : new object?[] { args };
-
         // WebApplication.CreateSlimBuilder(args) does not wire the command-line
         // configuration provider, so the connection strings must travel via the standard
         // ASP.NET Core environment-variable convention (double underscore == nested config
@@ -43,11 +35,7 @@ public sealed class MigrateOnlyStartupTests
         Environment.SetEnvironmentVariable("ConnectionStrings__AppDb", _fixture.AppRoleConnectionString);
         try
         {
-            var result = entryPoint.Invoke(null, invokeArgs);
-            if (result is Task task)
-            {
-                await task;
-            }
+            await MigrateOnlyEntryPoint.InvokeAsync();
         }
         finally
         {

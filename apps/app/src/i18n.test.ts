@@ -1,23 +1,39 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { negotiateLocale } from '@limmiar/i18n'
-import { i18n, initialLocale, dynamicActivate } from './i18n'
+import { LOCALE_STORAGE_KEY } from './locale/local-storage-locale-store'
+import { bootLocale, dynamicActivate, i18n, initialLocale, setLocale } from './i18n'
 
 describe('initialLocale', () => {
   afterEach(() => {
     vi.restoreAllMocks()
+    localStorage.clear()
   })
 
-  it('negotiates the initial locale from navigator.languages via RFC 4647 lookup', () => {
+  it('negotiates the initial locale from navigator.languages via RFC 4647 lookup when nothing is persisted', async () => {
     vi.spyOn(window.navigator, 'languages', 'get').mockReturnValue(['it-IT', 'en-US'])
 
-    expect(initialLocale()).toBe(negotiateLocale(window.navigator.languages))
-    expect(initialLocale()).toBe('it-IT')
+    await expect(initialLocale()).resolves.toBe(negotiateLocale(window.navigator.languages))
+    await expect(initialLocale()).resolves.toBe('it-IT')
   })
 
-  it('falls back to the base locale when the browser has no matching preference', () => {
+  it('falls back to the base locale when the browser has no matching preference and nothing is persisted', async () => {
     vi.spyOn(window.navigator, 'languages', 'get').mockReturnValue(['fr-FR', 'de-DE'])
 
-    expect(initialLocale()).toBe('pt-BR')
+    await expect(initialLocale()).resolves.toBe('pt-BR')
+  })
+
+  it('a persisted localStorage locale wins over navigator.languages (ADR-S00.5-05 order: device beats navigator)', async () => {
+    vi.spyOn(window.navigator, 'languages', 'get').mockReturnValue(['en-US'])
+    window.localStorage.setItem(LOCALE_STORAGE_KEY, 'it-IT')
+
+    await expect(initialLocale()).resolves.toBe('it-IT')
+  })
+
+  it('ignores a corrupted/invalid localStorage value and falls through to navigator.languages', async () => {
+    vi.spyOn(window.navigator, 'languages', 'get').mockReturnValue(['es-419'])
+    window.localStorage.setItem(LOCALE_STORAGE_KEY, 'not-a-real-locale')
+
+    await expect(initialLocale()).resolves.toBe('es-419')
   })
 })
 
@@ -48,5 +64,59 @@ describe('dynamicActivate — happy path', () => {
     await dynamicActivate('en-US')
 
     expect(i18n.locale).toBe('en-US')
+  })
+})
+
+describe('setLocale', () => {
+  afterEach(() => {
+    localStorage.clear()
+  })
+
+  it('persists the locale to localStorage and activates its catalog', async () => {
+    await setLocale('it-IT')
+
+    expect(window.localStorage.getItem(LOCALE_STORAGE_KEY)).toBe('it-IT')
+    expect(i18n.locale).toBe('it-IT')
+  })
+})
+
+describe('bootLocale', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    localStorage.clear()
+  })
+
+  it('resolves the initial locale (per the 4-level order) and activates it in one call', async () => {
+    vi.spyOn(window.navigator, 'languages', 'get').mockReturnValue(['es-419'])
+
+    await bootLocale()
+
+    expect(i18n.locale).toBe('es-419')
+  })
+})
+
+describe('window.limmiarI18n — deliberate E2E test seam', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.resetModules()
+  })
+
+  it('exposes setLocale and dynamicActivate on window when a window exists (real browser/jsdom)', () => {
+    // The module-scope assignment already ran once when this file's static
+    // import at the top pulled in ./i18n under the normal jsdom `window` —
+    // asserting against those same exported references confirms it went
+    // through the truthy branch of the window guard.
+    expect(window.limmiarI18n).toEqual({ setLocale, dynamicActivate })
+  })
+
+  it('skips the assignment without throwing when window is undefined (defensive non-DOM guard)', async () => {
+    // Re-imported fresh (vi.resetModules + dynamic import) so the
+    // module-top-level guard actually re-executes under this test's own
+    // call stack with `window` stubbed out, instead of only ever running
+    // once at file-load time under the real jsdom window.
+    vi.resetModules()
+    vi.stubGlobal('window', undefined)
+
+    await expect(import('./i18n')).resolves.toBeDefined()
   })
 })

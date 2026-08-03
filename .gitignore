@@ -10,3 +10,9 @@ test-results/
 
 # Serena MCP local project state (cache, memories, machine-local config)
 .serena/
+
+# .NET build output (apps/api)
+bin/
+obj/
+TestResults/
+*.user

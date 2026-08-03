@@ -1,3 +1,4 @@
+using Api.Tests.Infrastructure;
 using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace Api.Tests.Startup;
@@ -31,33 +32,7 @@ public sealed class MissingConfigurationTests
     [Fact]
     public async Task Main_WithMigrateOnlyFlagAndWithoutAdminDbConnectionString_ThrowsInvalidOperationException()
     {
-        var entryPoint = typeof(Program).Assembly.EntryPoint
-            ?? throw new InvalidOperationException("Api assembly has no entry point.");
-
-        var args = new[] { "--migrate-only" };
-        var invokeArgs = entryPoint.GetParameters().Length == 0
-            ? []
-            : new object?[] { args };
-
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
-        {
-            try
-            {
-                var result = entryPoint.Invoke(null, invokeArgs);
-                if (result is Task task)
-                {
-                    await task;
-                }
-            }
-            catch (System.Reflection.TargetInvocationException ex) when (ex.InnerException is not null)
-            {
-                // MethodInfo.Invoke wraps exceptions thrown by the invoked method.
-                // Program's generated <Main>$ wrapper blocks synchronously on the async
-                // body, so the missing-configuration throw surfaces here rather than
-                // through a faulted Task -- unwrap it to assert on the real exception.
-                throw ex.InnerException;
-            }
-        });
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(MigrateOnlyEntryPoint.InvokeAsync);
 
         Assert.Contains("ConnectionStrings:AdminDb", exception.Message);
     }
@@ -65,34 +40,12 @@ public sealed class MissingConfigurationTests
     [Fact]
     public async Task Main_WithMigrateOnlyFlagAndWithoutAppDbConnectionString_ThrowsInvalidOperationException()
     {
-        var entryPoint = typeof(Program).Assembly.EntryPoint
-            ?? throw new InvalidOperationException("Api assembly has no entry point.");
-
-        var args = new[] { "--migrate-only" };
-        var invokeArgs = entryPoint.GetParameters().Length == 0
-            ? []
-            : new object?[] { args };
-
         // AdminDb is set so the branch under test is the AppDb guard specifically, not the
         // earlier AdminDb one already covered above.
         Environment.SetEnvironmentVariable("ConnectionStrings__AdminDb", "Host=127.0.0.1;Port=1;Database=irrelevant");
         try
         {
-            var exception = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
-            {
-                try
-                {
-                    var result = entryPoint.Invoke(null, invokeArgs);
-                    if (result is Task task)
-                    {
-                        await task;
-                    }
-                }
-                catch (System.Reflection.TargetInvocationException ex) when (ex.InnerException is not null)
-                {
-                    throw ex.InnerException;
-                }
-            });
+            var exception = await Assert.ThrowsAsync<InvalidOperationException>(MigrateOnlyEntryPoint.InvokeAsync);
 
             Assert.Contains("ConnectionStrings:AppDb", exception.Message);
         }
@@ -105,33 +58,11 @@ public sealed class MissingConfigurationTests
     [Fact]
     public async Task Main_WithMigrateOnlyFlagAndAppDbWithoutPassword_ThrowsInvalidOperationException()
     {
-        var entryPoint = typeof(Program).Assembly.EntryPoint
-            ?? throw new InvalidOperationException("Api assembly has no entry point.");
-
-        var args = new[] { "--migrate-only" };
-        var invokeArgs = entryPoint.GetParameters().Length == 0
-            ? []
-            : new object?[] { args };
-
         Environment.SetEnvironmentVariable("ConnectionStrings__AdminDb", "Host=127.0.0.1;Port=1;Database=irrelevant");
         Environment.SetEnvironmentVariable("ConnectionStrings__AppDb", "Host=127.0.0.1;Port=1;Database=irrelevant;Username=app_role");
         try
         {
-            var exception = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
-            {
-                try
-                {
-                    var result = entryPoint.Invoke(null, invokeArgs);
-                    if (result is Task task)
-                    {
-                        await task;
-                    }
-                }
-                catch (System.Reflection.TargetInvocationException ex) when (ex.InnerException is not null)
-                {
-                    throw ex.InnerException;
-                }
-            });
+            var exception = await Assert.ThrowsAsync<InvalidOperationException>(MigrateOnlyEntryPoint.InvokeAsync);
 
             Assert.Contains("must include a Password", exception.Message);
         }

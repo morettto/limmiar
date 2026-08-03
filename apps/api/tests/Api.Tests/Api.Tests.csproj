@@ -35,6 +35,11 @@
     </PackageReference>
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.10" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <!-- Provider-side Pact verification only (apps/api/tests/Api.Tests/Contracts). Test-only:
+         must never be added to src/Api/Api.csproj, which is published with PublishAot=true
+         in CI and cannot carry PactNet's non-AOT-safe FFI/native verifier dependency. -->
+    <PackageReference Include="PactNet" Version="5.0.1" />
+    <PackageReference Include="PactNet.Output.Xunit" Version="1.0.0" />
     <PackageReference Include="Respawn" Version="7.0.0" />
     <PackageReference Include="Testcontainers.PostgreSql" Version="4.13.0" />
     <PackageReference Include="xunit" Version="2.9.3" />

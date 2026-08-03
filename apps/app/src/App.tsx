@@ -3,11 +3,11 @@ import { I18nProvider } from '@lingui/react'
 import { Trans } from '@lingui/react/macro'
 import { RouterProvider } from '@tanstack/react-router'
 import { router } from './router'
-import { i18n, dynamicActivate, initialLocale } from './i18n'
+import { i18n, bootLocale } from './i18n'
 
 export function App() {
   useEffect(() => {
-    void dynamicActivate(initialLocale())
+    void bootLocale()
   }, [])
 
   return (

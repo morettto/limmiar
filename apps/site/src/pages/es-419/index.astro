@@ -1,0 +1,10 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro'
+import { content } from '../../lib/content'
+
+const { title, body } = content['es-419']
+---
+
+<BaseLayout locale="es-419" title={title}>
+  <p>{body}</p>
+</BaseLayout>

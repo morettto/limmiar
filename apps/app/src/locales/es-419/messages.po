@@ -13,6 +13,21 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
+#. js-lingui-explicit-id
+#: src/errors/problem-messages.ts:13
+msgid "health.database_unreachable"
+msgstr "Base de datos no disponible en este momento."
+
 #: src/App.tsx:16
 msgid "Bem-vindo ao Limmiar"
 msgstr "Bienvenido a Limmiar"
+
+#. js-lingui-explicit-id
+#: src/errors/problem-messages.ts:17
+msgid "unexpected_error"
+msgstr "Ocurrió un error inesperado en el servidor."
+
+#. js-lingui-explicit-id
+#: src/errors/problem-messages.ts:26
+msgid "errors.generic"
+msgstr "Ocurrió un error inesperado. Inténtalo de nuevo."
