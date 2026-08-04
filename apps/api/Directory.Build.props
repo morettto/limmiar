@@ -1,0 +1,15 @@
+<Project>
+
+  <PropertyGroup>
+    <WarningsAsErrors>$(WarningsAsErrors);IL2026;IL2046;IL2055;IL2065;IL2067;IL2070;IL2072;IL2075;IL2090;IL2091;IL2111;IL3050;IL3051</WarningsAsErrors>
+  </PropertyGroup>
+
+  <!-- Every project (Api and Api.Tests) gets the migration scripts copied next to its
+       output. MigrationRunner resolves them at AppContext.BaseDirectory/migrations, so
+       this is the single source of truth for both the app's migrate-only startup path
+       and the Testcontainers-backed integration tests. -->
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)migrations\*.sql" LinkBase="migrations" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

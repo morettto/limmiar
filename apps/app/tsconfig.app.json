@@ -22,5 +22,14 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  // Pact consumer tests import Node built-ins (node:path, node:url) to
+  // resolve the shared pacts/ output directory — this project's "types":
+  // ["vite/client"] above is deliberately browser-only (no "node"), so
+  // pulling Node's ambient types in just for these files would risk global
+  // conflicts with the DOM lib the rest of the app relies on. They already
+  // run under their own vitest.pact.config.ts, separate from this build's
+  // gate, so excluding them here from `tsc -b` (used by the "build" script)
+  // costs nothing the "test:pact" script doesn't already cover at runtime.
+  "exclude": ["src/**/*.pact.test.ts"]
 }

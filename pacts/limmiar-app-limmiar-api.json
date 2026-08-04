@@ -1,0 +1,75 @@
+{
+  "consumer": {
+    "name": "limmiar-app"
+  },
+  "interactions": [
+    {
+      "description": "a request to check database health",
+      "providerStates": [
+        {
+          "name": "the database is unreachable"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/health/db"
+      },
+      "response": {
+        "body": {
+          "code": "health.database_unreachable",
+          "params": {},
+          "status": 503,
+          "title": "Database unreachable",
+          "type": "about:blank"
+        },
+        "headers": {
+          "Content-Type": "application/problem+json"
+        },
+        "matchingRules": {
+          "body": {
+            "$.status": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.title": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        },
+        "status": 503
+      }
+    }
+  ],
+  "metadata": {
+    "pact-js": {
+      "version": "17.0.1"
+    },
+    "pactRust": {
+      "ffi": "0.5.4",
+      "models": "1.3.11"
+    },
+    "pactSpecification": {
+      "version": "3.0.0"
+    }
+  },
+  "provider": {
+    "name": "limmiar-api"
+  }
+}

@@ -1,0 +1,10 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro'
+import { content } from '../../lib/content'
+
+const { title, body } = content['it-IT']
+---
+
+<BaseLayout locale="it-IT" title={title}>
+  <p>{body}</p>
+</BaseLayout>

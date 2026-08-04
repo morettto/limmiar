@@ -1,0 +1,36 @@
+---
+import { getRelativeLocaleUrl } from 'astro:i18n'
+import type { Locale } from '@limmiar/i18n'
+import { buildHreflangAlternates } from '../lib/hreflang'
+
+export interface Props {
+  locale: Locale
+  title: string
+  // Explicit prop rather than parsed from Astro.url — deliberate seam: this
+  // ticket only ever renders single-segment locale root pages (path === ''),
+  // but a later Spec (S16, real site content) will add nested paths and can
+  // just pass them here instead of parsing Astro.url, which is fragile
+  // (trailing slashes, query strings, the locale prefix itself, etc.).
+  path?: string
+}
+
+const { locale, title, path = '' } = Astro.props
+
+const urlForLocale = (targetLocale: Locale): string => getRelativeLocaleUrl(targetLocale, path)
+
+const canonicalHref = urlForLocale(locale)
+const alternates = buildHreflangAlternates(urlForLocale)
+---
+
+<html lang={locale}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <link rel="canonical" href={canonicalHref} />
+    {alternates.map(({ hreflang, href }) => <link rel="alternate" hreflang={hreflang} href={href} />)}
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>

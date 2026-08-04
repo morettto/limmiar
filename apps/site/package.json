@@ -1,0 +1,24 @@
+{
+  "name": "site",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "test:unit": "vitest run --coverage",
+    "test:unit:watch": "vitest",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@limmiar/i18n": "workspace:*",
+    "astro": "^7.1.6"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "@vitest/coverage-istanbul": "4.1.10",
+    "typescript": "~6.0.2",
+    "vitest": "4.1.10"
+  }
+}

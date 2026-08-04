@@ -45,6 +45,9 @@ jobs:
       - name: Unit tests + coverage (ui)
         run: pnpm --filter ui test:unit
 
+      - name: Unit tests + coverage (site)
+        run: pnpm --filter site test:unit
+
   # S00-03 gate: the 7 adaptive primitives × 4 breakpoints (sm/md/lg/xl —
   # Wireframes - Responsivo (3 plataformas).dc.html) must render correctly
   # and stay axe-clean. Playwright Component Testing mounts each primitive
@@ -258,6 +261,172 @@ jobs:
 
       - name: Verify pseudo-locale output (real compiler, no mock)
         run: node apps/app/scripts/verify-pseudo-locale.mjs
+
+  # S00.5-05: proves the Astro public site (apps/site) actually routes by
+  # locale (astro:i18n, no i18n library in the bundle — ADR-S00.5-02) with
+  # correct hreflang/canonical output. apps/site has no deploy.yml of its own
+  # yet to piggyback its E2E run on (unlike apps/app), so this is its own gate
+  # — without it, i18n-routing.spec.ts would never run in CI at all.
+  site-e2e:
+    name: "Astro site: i18n routing E2E (hreflang/canonical)"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright (chromium)
+        run: pnpm --filter site exec playwright install --with-deps chromium
+
+      - name: Build + E2E (site)
+        run: pnpm --filter site test:e2e
+
+  # S00-04 gate 1: apps/api is the first .NET code in this monorepo (esqueleto
+  # vazio — Solution promised it in S00 but S00-01/02/03 only covered the SPA).
+  # Testcontainers.PostgreSql spins up a REAL Postgres container to prove RLS
+  # (tenant_isolation policy + FORCE ROW LEVEL SECURITY) actually blocks/allows
+  # rows correctly — mocking the database would prove nothing about RLS. The
+  # 100% line+branch coverage threshold is enforced as project defaults in
+  # tests/Api.Tests/Api.Tests.csproj (not via CLI /p: flags — dotnet test on
+  # this SDK mis-splits a comma-separated /p:ThresholdType value passed on the
+  # command line), so plain `dotnet test` is enough to fail the step.
+  api-tests:
+    name: "API: build + tests (Testcontainers Postgres — real, sem mock)"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        run: dotnet restore apps/api/Api.sln
+
+      # ubuntu-latest already has Docker available — Testcontainers needs no
+      # extra setup (Ryuk resource reaper works out of the box on this runner).
+      - name: Build + test + coverage (api)
+        run: dotnet test apps/api/Api.sln -c Release
+
+  # S00-04 gate 2 / AC1: proves apps/api actually publishes as Native AOT with
+  # zero reflection at runtime. `dotnet test`/`build`/`run` always JIT, even
+  # with PublishAot=true in the csproj — only a real `dotnet publish
+  # -p:PublishAot=true` exercises the trim/AOT analyzer for real. The expanded
+  # WarningsAsErrors set in Directory.Build.props (IL2026/IL2070/IL3050/etc.)
+  # is what makes any trim/reflection regression fail this step, not just warn.
+  api-aot-publish:
+    name: "API: Native AOT publish (sem reflexão)"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Publish (Native AOT, linux-x64)
+        run: >
+          dotnet publish apps/api/src/Api/Api.csproj -c Release -r linux-x64
+          --self-contained -p:PublishAot=true -o apps/api/publish-ci
+
+  # S00.5-06 gate 1 / AC4: the client (apps/app) and the .NET API disagree
+  # about the error-response JSON shape unless something proves it on every
+  # PR — this regenerates the Pact consumer contract and fails if the
+  # committed pacts/*.json drifts, the exact same "regenerate a deterministic
+  # artifact, then git-status-check it" pattern as i18n-extract-check above
+  # (Pact's own JS library has no `--check` flag either).
+  pact-consumer:
+    name: "Contract: Pact consumer (client, drift detection)"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Pact consumer contract
+        run: pnpm --filter app test:pact
+
+      # `git status --porcelain` (not `git diff --exit-code`) for the same
+      # reason as i18n-extract-check above: a brand-new contract file would
+      # be untracked, not modified.
+      - name: Fail if contract changed (consumer expectation not committed)
+        run: |
+          if [ -n "$(git status --porcelain -- pacts)" ]; then
+            echo "::error::pacts/ changed after running the Pact consumer test — a consumer expectation isn't committed. Run 'pnpm --filter app test:pact' locally and commit pacts/limmiar-app-limmiar-api.json."
+            git status --porcelain -- pacts
+            git diff -- pacts
+            exit 1
+          fi
+
+  # S00.5-06 gate 2 / AC4: the provider counterpart to pact-consumer above —
+  # proves the real .NET API (not a mock) actually satisfies the committed
+  # contract. PactNet's verifier issues real HTTP requests over a real
+  # socket, so the test this runs boots the exact same WebApplication
+  # composition Program.cs uses (Program.BuildApp) on a real Kestrel listener
+  # rather than the in-memory WebApplicationFactory TestServer every other
+  # apps/api test uses — see
+  # tests/Api.Tests/Contracts/ProblemDetailsProviderPactTests.cs for why.
+  # Independent of pact-consumer (no `needs:`, same as every other job pair
+  # in this file) — verifies against whatever pacts/*.json is currently
+  # committed, regardless of run order.
+  pact-provider-verify:
+    name: "Contract: Pact provider verification (API)"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        run: dotnet restore apps/api/Api.sln
+
+      # The contract's one interaction ("the database is unreachable") needs
+      # no Postgres/Testcontainers — its provider state is a connection
+      # string that refuses instantly (see ProblemDetailsProviderPactTests.cs)
+      # — so unlike api-tests above, this job doesn't depend on Docker.
+      #
+      # -p:CollectCoverage=false: coverlet's 100% threshold is a project
+      # default (Api.Tests.csproj) measured against whatever subset of tests
+      # actually ran — a --filter'd single-test run would otherwise fail on
+      # "coverage below 100%" even though the contract verification itself
+      # passed (confirmed locally: filtering without this flag hard-fails on
+      # the threshold, not on the test). Full-suite coverage is already
+      # api-tests' job above; this job's only concern is contract
+      # conformance.
+      - name: Verify provider contract (Pact)
+        run: dotnet test apps/api/Api.sln -c Release --filter FullyQualifiedName~ProblemDetailsProviderPactTests -p:CollectCoverage=false
 
   # PR-only: this is the fast incremental check that runs on every PR push.
   # The full/complete score is enforced separately by the nightly job

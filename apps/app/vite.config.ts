@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config'
+import { configDefaults, defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import { lingui, linguiTransformerBabelPreset } from '@lingui/vite-plugin'
 import babel from '@rolldown/plugin-babel'
@@ -25,6 +25,14 @@ export default defineConfig({
     environment: 'jsdom',
     // Playwright owns e2e/**; keep Vitest scoped to unit specs under src/.
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    // Pact consumer tests spin up a real mock-server process and hit a live
+    // .po-derived catalog through the whole client -> translateProblemCode
+    // pipeline — they're contract tests, not unit tests, and must stay out
+    // of this coverage-gated run (a separate "test:pact" script + CI job
+    // runs them via vitest.pact.config.ts instead). Spreading
+    // configDefaults.exclude keeps Vitest's own default ignores (node_modules,
+    // dist, etc.) intact instead of replacing them.
+    exclude: [...configDefaults.exclude, '**/*.pact.test.ts'],
     // jsdom's CSS deps ship ESM-only files loaded via require(); the local
     // Node (22.11) needs this flag explicitly (it's unflagged from 22.12+).
     execArgv: ['--experimental-require-module'],

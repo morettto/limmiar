@@ -15,6 +15,7 @@
     "preview": "vite preview",
     "test:unit": "vitest run --coverage",
     "test:unit:watch": "vitest",
+    "test:pact": "vitest run --config vitest.pact.config.ts",
     "test:e2e": "playwright test",
     "test:mutation": "stryker run",
     "test:mutation:incremental": "stryker run --incremental"
@@ -31,6 +32,7 @@
     "@lingui/cli": "^6.6.0",
     "@lingui/conf": "^6.6.0",
     "@lingui/vite-plugin": "^6.6.0",
+    "@pact-foundation/pact": "^17.0.1",
     "@playwright/test": "^1.62.1",
     "@rolldown/plugin-babel": "^0.2.3",
     "@stryker-mutator/core": "9.6.1",

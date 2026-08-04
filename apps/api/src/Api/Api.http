@@ -1,0 +1,13 @@
+@Api_HostAddress = http://localhost:5037
+
+### Liveness probe -- always 200, no external dependencies
+GET {{Api_HostAddress}}/health
+Accept: application/json
+
+###
+
+### Database readiness probe -- 200 if reachable, 503 + ProblemDetails if not
+GET {{Api_HostAddress}}/health/db
+Accept: application/json
+
+###
