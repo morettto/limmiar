@@ -18,6 +18,10 @@ coverage
 .stryker-tmp
 reports/mutation
 
+# Playwright component testing (test-results/playwright-report already
+# covered by the root .gitignore for e2e; this is CT's own dev-server cache)
+playwright/.cache
+
 # Lingui: only the .po source catalogs are committed. `lingui compile`
 # output (messages.js) is a build artifact — @lingui/vite-plugin compiles
 # .po on the fly for the real app build, this is only ever written by the

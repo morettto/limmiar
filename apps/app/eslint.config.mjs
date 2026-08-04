@@ -11,7 +11,21 @@ import noImplicitLocaleFormatting from './eslint-rules/no-implicit-locale-format
 // architecture rules oxlint doesn't cover either.
 export default tseslint.config(
   {
-    ignores: ['**/*.test.{ts,tsx}', 'dist/**', 'coverage/**', 'node_modules/**'],
+    // *.spec.tsx (S02-01): Playwright Component Testing files, same
+    // test-only status as *.test.tsx (locators/screenshot filenames/stub
+    // fixture values aren't user-facing copy needing translation) -- see
+    // playwright-ct.config.ts and vite.config.ts's matching Vitest-vs-CT
+    // include split. src/test-support/**: CT-only mount helpers (axe
+    // rule ids, the pt-BR locale tag passed to i18n.loadAndActivate) --
+    // never rendered in the production app either.
+    ignores: [
+      '**/*.test.{ts,tsx}',
+      '**/*.spec.{ts,tsx}',
+      'src/test-support/**',
+      'dist/**',
+      'coverage/**',
+      'node_modules/**',
+    ],
   },
   {
     // TypeScript parser (needed for both .ts and .tsx — plain .ts files hit
@@ -49,6 +63,17 @@ export default tseslint.config(
             'name',
             'htmlFor',
             'data-testid',
+            // <input type="radio"/checkbox/option value="..."> — a wire/DOM
+            // value (e.g. AuthScreen's AccountRole segmented control), never
+            // rendered text on its own (rendered text is a sibling/child).
+            'value',
+            // Internal state-machine tags (e.g. AuthScreen's SubmitState
+            // `{ status: 'idle' | 'submitting' | 'error' | 'success' }`) --
+            // never rendered as-is, only branched on to pick real <Trans> copy.
+            'status',
+            // SCREAMING_SNAKE_CASE module-level constants are identifiers/keys
+            // (e.g. storage keys), by this repo's own convention never prose.
+            { regex: { pattern: '^[A-Z][A-Z0-9_]*$' } },
           ],
           // DOM/browser APIs whose string argument is an element id/selector,
           // never user-visible copy.
