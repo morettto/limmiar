@@ -17,10 +17,12 @@
     "test:unit:watch": "vitest",
     "test:pact": "vitest run --config vitest.pact.config.ts",
     "test:e2e": "playwright test",
+    "test:visual": "playwright test -c playwright-ct.config.ts",
     "test:mutation": "stryker run",
     "test:mutation:incremental": "stryker run --incremental"
   },
   "dependencies": {
+    "@limmiar/crypto": "workspace:*",
     "@limmiar/i18n": "workspace:*",
     "@lingui/core": "^6.6.0",
     "@lingui/react": "^6.6.0",
@@ -29,10 +31,12 @@
     "react-dom": "^19.2.8"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.10.2",
     "@lingui/cli": "^6.6.0",
     "@lingui/conf": "^6.6.0",
     "@lingui/vite-plugin": "^6.6.0",
     "@pact-foundation/pact": "^17.0.1",
+    "@playwright/experimental-ct-react": "^1.62.1",
     "@playwright/test": "^1.62.1",
     "@rolldown/plugin-babel": "^0.2.3",
     "@stryker-mutator/core": "9.6.1",

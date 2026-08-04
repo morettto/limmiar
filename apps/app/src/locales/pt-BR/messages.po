@@ -13,6 +13,10 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
+#: src/auth/AuthScreen.tsx:139
+msgid "Acompanhe suas consultas e informações de saúde com segurança."
+msgstr "Acompanhe suas consultas e informações de saúde com segurança."
+
 #. js-lingui-explicit-id
 #: src/errors/problem-messages.ts:13
 msgid "health.database_unreachable"
@@ -23,11 +27,75 @@ msgid "Bem-vindo ao Limmiar"
 msgstr "Bem-vindo ao Limmiar"
 
 #. js-lingui-explicit-id
+#: src/errors/problem-messages.ts:43
+msgid "validation.invalid_field"
+msgstr "Campo inválido: {field}."
+
+#: src/auth/AuthScreen.tsx:111
+msgid "Como você vai usar o Limmiar?"
+msgstr "Como você vai usar o Limmiar?"
+
+#: src/auth/AuthScreen.tsx:104
+msgid "Conta criada. Você está cadastrado como paciente."
+msgstr "Conta criada. Você está cadastrado como paciente."
+
+#: src/auth/AuthScreen.tsx:102
+msgid "Conta criada. Você está cadastrado como profissional."
+msgstr "Conta criada. Você está cadastrado como profissional."
+
+#: src/auth/AuthScreen.tsx:189
+msgid "Continuar com o Google"
+msgstr "Continuar com o Google"
+
+#: src/auth/AuthScreen.tsx:181
+msgid "Criar conta"
+msgstr "Criar conta"
+
+#: src/auth/AuthScreen.tsx:147
+msgid "E-mail"
+msgstr "E-mail"
+
+#. js-lingui-explicit-id
+#: src/errors/problem-messages.ts:32
+msgid "auth.invalid_credentials"
+msgstr "E-mail ou senha inválidos."
+
+#. js-lingui-explicit-id
+#: src/errors/problem-messages.ts:24
+msgid "auth.email_already_registered"
+msgstr "Este e-mail já está cadastrado."
+
+#: src/auth/AuthScreen.tsx:137
+msgid "Gerencie pacientes, prontuários e agenda em um só lugar."
+msgstr "Gerencie pacientes, prontuários e agenda em um só lugar."
+
+#. js-lingui-explicit-id
+#: src/errors/problem-messages.ts:36
+msgid "auth.google_token_invalid"
+msgstr "Não foi possível continuar com o Google. Tente novamente."
+
+#. js-lingui-explicit-id
 #: src/errors/problem-messages.ts:17
 msgid "unexpected_error"
 msgstr "Ocorreu um erro inesperado no servidor."
 
 #. js-lingui-explicit-id
-#: src/errors/problem-messages.ts:26
+#: src/errors/problem-messages.ts:52
 msgid "errors.generic"
 msgstr "Ocorreu um erro inesperado. Tente novamente."
+
+#: src/auth/AuthScreen.tsx:132
+msgid "Paciente"
+msgstr "Paciente"
+
+#: src/auth/AuthScreen.tsx:122
+msgid "Profissional"
+msgstr "Profissional"
+
+#: src/auth/AuthScreen.tsx:159
+msgid "Senha"
+msgstr "Senha"
+
+#: src/auth/AuthScreen.tsx:113
+msgid "Tipo de conta"
+msgstr "Tipo de conta"

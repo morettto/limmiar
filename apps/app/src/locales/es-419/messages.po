@@ -13,6 +13,10 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
+#: src/auth/AuthScreen.tsx:139
+msgid "Acompanhe suas consultas e informações de saúde com segurança."
+msgstr ""
+
 #. js-lingui-explicit-id
 #: src/errors/problem-messages.ts:13
 msgid "health.database_unreachable"
@@ -23,11 +27,75 @@ msgid "Bem-vindo ao Limmiar"
 msgstr "Bienvenido a Limmiar"
 
 #. js-lingui-explicit-id
+#: src/errors/problem-messages.ts:43
+msgid "validation.invalid_field"
+msgstr "Campo inválido: {field}."
+
+#: src/auth/AuthScreen.tsx:111
+msgid "Como você vai usar o Limmiar?"
+msgstr ""
+
+#: src/auth/AuthScreen.tsx:104
+msgid "Conta criada. Você está cadastrado como paciente."
+msgstr ""
+
+#: src/auth/AuthScreen.tsx:102
+msgid "Conta criada. Você está cadastrado como profissional."
+msgstr ""
+
+#: src/auth/AuthScreen.tsx:189
+msgid "Continuar com o Google"
+msgstr ""
+
+#: src/auth/AuthScreen.tsx:181
+msgid "Criar conta"
+msgstr ""
+
+#: src/auth/AuthScreen.tsx:147
+msgid "E-mail"
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/errors/problem-messages.ts:32
+msgid "auth.invalid_credentials"
+msgstr "Correo electrónico o contraseña inválidos."
+
+#. js-lingui-explicit-id
+#: src/errors/problem-messages.ts:24
+msgid "auth.email_already_registered"
+msgstr "Este correo electrónico ya está registrado."
+
+#: src/auth/AuthScreen.tsx:137
+msgid "Gerencie pacientes, prontuários e agenda em um só lugar."
+msgstr ""
+
+#. js-lingui-explicit-id
+#: src/errors/problem-messages.ts:36
+msgid "auth.google_token_invalid"
+msgstr "No se pudo continuar con Google. Inténtalo de nuevo."
+
+#. js-lingui-explicit-id
 #: src/errors/problem-messages.ts:17
 msgid "unexpected_error"
 msgstr "Ocurrió un error inesperado en el servidor."
 
 #. js-lingui-explicit-id
-#: src/errors/problem-messages.ts:26
+#: src/errors/problem-messages.ts:52
 msgid "errors.generic"
 msgstr "Ocurrió un error inesperado. Inténtalo de nuevo."
+
+#: src/auth/AuthScreen.tsx:132
+msgid "Paciente"
+msgstr ""
+
+#: src/auth/AuthScreen.tsx:122
+msgid "Profissional"
+msgstr ""
+
+#: src/auth/AuthScreen.tsx:159
+msgid "Senha"
+msgstr ""
+
+#: src/auth/AuthScreen.tsx:113
+msgid "Tipo de conta"
+msgstr ""

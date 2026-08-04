@@ -18,6 +18,32 @@ const knownProblemMessages: Record<string, MessageDescriptor> = {
     id: 'unexpected_error',
     message: 'Ocorreu um erro inesperado no servidor.',
   }),
+  // S02-01 backend codes (apps/api/src/Api/Problems/ProblemCodes.cs), surfaced
+  // by AuthScreen's register/login/Google flows via the client functions in
+  // api/client.ts.
+  'auth.email_already_registered': msg({
+    id: 'auth.email_already_registered',
+    message: 'Este e-mail já está cadastrado.',
+  }),
+  // Deliberately generic wording: the backend returns this SAME code (and
+  // same status/body) for both an unknown e-mail and a wrong password
+  // (AccountService.LoginAsync's enumeration mitigation) -- the translated
+  // text must not hint at which one it was either.
+  'auth.invalid_credentials': msg({
+    id: 'auth.invalid_credentials',
+    message: 'E-mail ou senha inválidos.',
+  }),
+  'auth.google_token_invalid': msg({
+    id: 'auth.google_token_invalid',
+    message: 'Não foi possível continuar com o Google. Tente novamente.',
+  }),
+  // `field` is interpolated from the backend's `params.field` (e.g. "email",
+  // "passwordVerifier") -- not itself translated, since it's a wire-level
+  // field name, not user-facing prose.
+  'validation.invalid_field': msg({
+    id: 'validation.invalid_field',
+    message: 'Campo inválido: {field}.',
+  }),
 }
 
 // Fallback for any backend `code` not present in the registry above. Only

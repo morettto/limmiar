@@ -20,6 +20,9 @@ importers:
 
   apps/app:
     dependencies:
+      '@limmiar/crypto':
+        specifier: workspace:*
+        version: link:../../packages/crypto
       '@limmiar/i18n':
         specifier: workspace:*
         version: link:../../packages/i18n
@@ -39,6 +42,9 @@ importers:
         specifier: ^19.2.8
         version: 19.2.8(react@19.2.8)
     devDependencies:
+      '@axe-core/playwright':
+        specifier: ^4.10.2
+        version: 4.12.1(playwright-core@1.62.1)
       '@lingui/cli':
         specifier: ^6.6.0
         version: 6.6.0(esbuild@0.28.1)(rolldown@1.2.1)
@@ -51,6 +57,9 @@ importers:
       '@pact-foundation/pact':
         specifier: ^17.0.1
         version: 17.0.1
+      '@playwright/experimental-ct-react':
+        specifier: ^1.62.1
+        version: 1.62.1(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.2.1)(vite@8.2.0(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)))(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(vite@8.2.0(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0))
       '@playwright/test':
         specifier: ^1.62.1
         version: 1.62.1
