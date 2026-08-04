@@ -11,3 +11,43 @@ GET {{Api_HostAddress}}/health/db
 Accept: application/json
 
 ###
+
+### Register by e-mail -- passwordVerifier is a base64-encoded, client-derived Argon2id
+### output (ADR-S02-02), never a plaintext password. The bytes below are a placeholder,
+### not a real verifier.
+POST {{Api_HostAddress}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "someone@example.com",
+  "passwordVerifier": "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHw==",
+  "role": "professional"
+}
+
+###
+
+### Login by e-mail -- returns the SAME response for an unknown e-mail and a wrong
+### verifier (account enumeration mitigation).
+POST {{Api_HostAddress}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "someone@example.com",
+  "passwordVerifier": "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHw=="
+}
+
+###
+
+### Register/login via Google -- requestedRole is only used when this e-mail has no
+### account yet; otherwise the existing role wins (ADR-S02-01). Real Google ID token
+### verification is not wired up yet (see Api/Accounts/GoogleIdentityProvider's TODO),
+### so this call 401s against a real server today.
+POST {{Api_HostAddress}}/auth/google
+Content-Type: application/json
+
+{
+  "idToken": "replace-with-a-real-google-id-token",
+  "requestedRole": "patient"
+}
+
+###

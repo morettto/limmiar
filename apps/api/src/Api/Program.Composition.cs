@@ -1,3 +1,4 @@
+using Api.Accounts;
 using Api.Data;
 using Api.Endpoints;
 using Api.ExceptionHandling;
@@ -41,6 +42,15 @@ public partial class Program
 
         builder.Services.AddExceptionHandler<GlobalProblemExceptionHandler>();
 
+        // TODO(follow-up ticket, not S02-01's confirmed backend seams): IAccountStore's
+        // in-memory placeholder does not persist across restarts or instances -- see its
+        // own TODO. IGoogleIdentityProvider's placeholder throws NotSupportedException;
+        // real Google ID token verification is a separate follow-up (see its own TODO).
+        builder.Services.AddSingleton<IAccountStore, InMemoryAccountStore>();
+        builder.Services.AddSingleton<IPasswordVerifierComparer, ConstantTimePasswordVerifierComparer>();
+        builder.Services.AddSingleton<IGoogleIdentityProvider, GoogleIdentityProvider>();
+        builder.Services.AddSingleton<AccountService>();
+
         var app = builder.Build();
 
         if (app.Environment.IsDevelopment())
@@ -51,6 +61,7 @@ public partial class Program
         app.UseExceptionHandler(_ => { });
 
         app.MapHealthEndpoints();
+        app.MapAuthEndpoints();
 
         return app;
     }
