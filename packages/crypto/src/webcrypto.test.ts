@@ -5,13 +5,13 @@ import { describe, expect, it } from 'vitest'
 import {
   __resetIvSourceForTests,
   __setIvSourceForTests,
-  type CryptoKey,
   decrypt,
   encrypt,
   generateWrappedDek,
   importKek,
   rewrapDek,
   unwrapDek,
+  type WebCryptoKey as CryptoKey,
 } from './webcrypto'
 
 // Same vendored NIST CAVP vector already cited in aes-gcm.test.ts — see that
@@ -30,7 +30,7 @@ const NIST_CAVP_VECTOR = {
 // output to wrapKey/unwrapKey usages only (a KEK never encrypts application
 // data directly), so a DEK-shaped key for encrypt()/decrypt() tests has to be
 // constructed independently of this module's own public surface.
-async function importRawDekForTests(raw: Uint8Array): Promise<CryptoKey> {
+async function importRawDekForTests(raw: Uint8Array<ArrayBuffer>): Promise<CryptoKey> {
   return crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt'])
 }
 

@@ -10,7 +10,7 @@ export { createKeychain, type Keychain, type KeychainState } from './keychain'
 // export below on purpose, NOT `export * as webcrypto`, so those two never
 // reach the package's public surface.
 import * as webcryptoInternal from './webcrypto'
-export type { CryptoKey } from './webcrypto'
+export type { WebCryptoKey as CryptoKey } from './webcrypto'
 export const webcrypto = {
   importKek: webcryptoInternal.importKek,
   generateWrappedDek: webcryptoInternal.generateWrappedDek,
