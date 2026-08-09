@@ -20,6 +20,9 @@ export const webcrypto = {
   decrypt: webcryptoInternal.decrypt,
 }
 export { generateKeyPair, getPublicKey, getSharedSecret } from './x25519'
+// Grouped with x25519 above rather than sorted on its own: deriveChannelKey
+// only ever consumes a getSharedSecret() output, so the two read as one API.
+export { deriveChannelKey } from './device-pairing-channel'
 export {
   type Bip39Strength,
   entropyToMnemonic,

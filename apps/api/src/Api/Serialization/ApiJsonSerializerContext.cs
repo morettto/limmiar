@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using Api.Accounts;
+using Api.Endpoints;
 using Api.Problems;
 
 namespace Api.Serialization;
@@ -13,6 +14,36 @@ namespace Api.Serialization;
 [JsonSerializable(typeof(LoginResponse))]
 [JsonSerializable(typeof(GoogleAuthRequest))]
 [JsonSerializable(typeof(GoogleAuthResponse))]
+[JsonSerializable(typeof(SubmitProfessionalCredentialRequest))]
+[JsonSerializable(typeof(SubmitProfessionalCredentialResponse))]
+[JsonSerializable(typeof(ProfessionalVerificationDecisionRequest))]
+[JsonSerializable(typeof(ProfessionalVerificationDecisionResponse))]
+[JsonSerializable(typeof(IReadOnlyList<ProfessionalVerificationQueueEntry>))]
+[JsonSerializable(typeof(BeginTotpEnrollmentRequest))]
+[JsonSerializable(typeof(BeginTotpEnrollmentResponse))]
+[JsonSerializable(typeof(ConfirmTotpEnrollmentRequest))]
+[JsonSerializable(typeof(ConfirmTotpEnrollmentResponse))]
+[JsonSerializable(typeof(TotpChallengeRequest))]
+[JsonSerializable(typeof(RefreshTokenRequest))]
+[JsonSerializable(typeof(RefreshTokenResponse))]
+[JsonSerializable(typeof(CreatePairingSessionRequest))]
+[JsonSerializable(typeof(CreatePairingSessionResponse))]
+[JsonSerializable(typeof(ClaimPairingSessionRequest))]
+[JsonSerializable(typeof(ClaimPairingSessionResponse))]
+[JsonSerializable(typeof(PairingClaimStatusResponse))]
+[JsonSerializable(typeof(SubmitPairingPayloadRequest))]
+[JsonSerializable(typeof(PairingSessionPayloadResponse))]
+[JsonSerializable(typeof(MagicLinkRequestRequest))]
+[JsonSerializable(typeof(MagicLinkRequestResponse))]
+[JsonSerializable(typeof(VerifyMagicLinkRequest))]
+[JsonSerializable(typeof(VerifyMagicLinkResponse))]
+[JsonSerializable(typeof(CompleteMagicLinkWebAuthnRequest))]
+[JsonSerializable(typeof(CompleteMagicLinkWebAuthnResponse))]
+[JsonSerializable(typeof(MagicLinkDebugLastResponse))]
+[JsonSerializable(typeof(RecoverAccessRequest))]
+[JsonSerializable(typeof(RecoverAccessResponse))]
+[JsonSerializable(typeof(RegisterRecoveryVerifierRequest))]
+[JsonSerializable(typeof(RegisterRecoveryVerifierResponse))]
 public partial class ApiJsonSerializerContext : JsonSerializerContext
 {
 }

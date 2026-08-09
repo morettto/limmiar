@@ -44,6 +44,45 @@ const knownProblemMessages: Record<string, MessageDescriptor> = {
     id: 'validation.invalid_field',
     message: 'Campo inválido: {field}.',
   }),
+  // S02-03 backend codes (apps/api/src/Api/Problems/ProblemCodes.cs), surfaced
+  // by TotpSetup/TotpChallenge's enrollment and login-challenge flows.
+  'auth.totp_already_enabled': msg({
+    id: 'auth.totp_already_enabled',
+    message: 'A verificação em duas etapas já está ativada para esta conta.',
+  }),
+  'auth.totp_not_pending': msg({
+    id: 'auth.totp_not_pending',
+    message: 'Não há uma configuração de verificação em duas etapas pendente para esta conta.',
+  }),
+  // Deliberately the same wording for both a wrong authenticator code and a
+  // wrong/already-used backup code (AccountService.VerifyTotpChallengeAsync
+  // returns the same code for both) -- the message must not hint at which.
+  'auth.totp_invalid_code': msg({
+    id: 'auth.totp_invalid_code',
+    message: 'Código inválido. Verifique o app autenticador ou use um código de backup.',
+  }),
+  'auth.totp_not_enabled': msg({
+    id: 'auth.totp_not_enabled',
+    message: 'A verificação em duas etapas ainda não foi ativada para esta conta.',
+  }),
+  'auth.magic_link_invalid': msg({
+    id: 'auth.magic_link_invalid',
+    message: 'Este link de acesso não é mais válido. Solicite um novo.',
+  }),
+  'auth.webauthn_ceremony_failed': msg({
+    id: 'auth.webauthn_ceremony_failed',
+    message: 'Não foi possível confirmar sua identidade neste dispositivo. Tente novamente.',
+  }),
+  // S02-06 backend code (apps/api/src/Api/Problems/ProblemCodes.cs), surfaced by
+  // RecoveryScreen's recoverAccess() call. Deliberately generic wording, same
+  // enumeration-mitigation discipline as auth.invalid_credentials above: the backend
+  // returns this SAME code for an unknown e-mail and for a wrong recovery phrase, and the
+  // translated text must not hint at which part is wrong -- and must never name which
+  // word of the phrase, if any, was incorrect.
+  'auth.invalid_recovery_phrase': msg({
+    id: 'auth.invalid_recovery_phrase',
+    message: 'E-mail ou frase de recuperação inválidos.',
+  }),
 }
 
 // Fallback for any backend `code` not present in the registry above. Only

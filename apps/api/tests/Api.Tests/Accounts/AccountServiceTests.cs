@@ -233,11 +233,26 @@ public sealed class AccountServiceTests
         public Task<Account?> FindByEmailAsync(string normalizedEmail, CancellationToken cancellationToken) =>
             Task.FromResult(_accountsByEmail.GetValueOrDefault(normalizedEmail));
 
+        public Task<Account?> FindByIdAsync(Guid id, CancellationToken cancellationToken) =>
+            Task.FromResult(_accountsByEmail.Values.FirstOrDefault(account => account.Id == id));
+
         public Task InsertAsync(Account account, CancellationToken cancellationToken)
         {
             _accountsByEmail[account.Email] = account;
             return Task.CompletedTask;
         }
+
+        public Task UpdateAsync(Account account, CancellationToken cancellationToken)
+        {
+            _accountsByEmail[account.Email] = account;
+            return Task.CompletedTask;
+        }
+
+        public Task<IReadOnlyList<Account>> ListPendingDocumentReviewAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<Account>>(_accountsByEmail.Values
+                .Where(account => account.Role == AccountRole.Professional && account.VerificationStatus == AccountVerificationStatus.InReview)
+                .OrderBy(account => account.VerificationSubmittedAt)
+                .ToList());
     }
 
     private sealed class StubPasswordVerifierComparer : IPasswordVerifierComparer

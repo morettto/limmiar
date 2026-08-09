@@ -15,6 +15,13 @@ public sealed class HealthEndpointTests
             .WithWebHostBuilder(builder =>
             {
                 builder.UseSetting("ConnectionStrings:AppDb", "Host=127.0.0.1;Port=1;Username=app_role;Password=unused;");
+                // App startup also needs StaffAccess:ApiKey/WebAuthn:RelyingPartyId/
+                // WebAuthn:ExpectedOrigin configured (same "fail fast if missing" pattern as
+                // ConnectionStrings:AppDb) even though this test never hits a staff-gated or
+                // WebAuthn endpoint.
+                builder.UseSetting("StaffAccess:ApiKey", "test-staff-api-key");
+                builder.UseSetting("WebAuthn:RelyingPartyId", "limmiar.test");
+                builder.UseSetting("WebAuthn:ExpectedOrigin", "https://limmiar.test");
             });
 
         using var client = factory.CreateClient();

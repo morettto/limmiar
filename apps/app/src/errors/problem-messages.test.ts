@@ -97,3 +97,35 @@ describe('translateProblemCode — S02-01 auth codes', () => {
     )
   })
 })
+
+// S02-05 backend codes (apps/api/src/Api/Problems/ProblemCodes.cs), surfaced by
+// MagicLinkCallback's verify/complete flow.
+describe('translateProblemCode — S02-05 magic-link/WebAuthn codes', () => {
+  it('translates auth.magic_link_invalid', () => {
+    const i18nInstance = setupI18n({
+      locale: 'pt-BR',
+      messages: {
+        'pt-BR': { 'auth.magic_link_invalid': 'Este link de acesso não é mais válido. Solicite um novo.' },
+      },
+    })
+
+    expect(translateProblemCode('auth.magic_link_invalid', {}, i18nInstance)).toBe(
+      'Este link de acesso não é mais válido. Solicite um novo.',
+    )
+  })
+
+  it('translates auth.webauthn_ceremony_failed', () => {
+    const i18nInstance = setupI18n({
+      locale: 'pt-BR',
+      messages: {
+        'pt-BR': {
+          'auth.webauthn_ceremony_failed': 'Não foi possível confirmar sua identidade neste dispositivo. Tente novamente.',
+        },
+      },
+    })
+
+    expect(translateProblemCode('auth.webauthn_ceremony_failed', {}, i18nInstance)).toBe(
+      'Não foi possível confirmar sua identidade neste dispositivo. Tente novamente.',
+    )
+  })
+})

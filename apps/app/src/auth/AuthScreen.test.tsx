@@ -12,11 +12,19 @@ vi.mock('../api/client', async () => {
     ...actual,
     register: vi.fn(),
     continueWithGoogle: vi.fn(),
+    beginTotpEnrollment: vi.fn(),
+    confirmTotpEnrollment: vi.fn(),
+    verifyTotpChallenge: vi.fn(),
+    requestMagicLink: vi.fn(),
   }
 })
 
 const registerMock = vi.mocked(client.register)
 const continueWithGoogleMock = vi.mocked(client.continueWithGoogle)
+const beginTotpEnrollmentMock = vi.mocked(client.beginTotpEnrollment)
+const confirmTotpEnrollmentMock = vi.mocked(client.confirmTotpEnrollment)
+const verifyTotpChallengeMock = vi.mocked(client.verifyTotpChallenge)
+const requestMagicLinkMock = vi.mocked(client.requestMagicLink)
 
 function renderAuthScreen(props: Partial<React.ComponentProps<typeof AuthScreen>> = {}) {
   const getGoogleIdToken = props.getGoogleIdToken ?? vi.fn().mockResolvedValue('google-id-token')
@@ -63,7 +71,13 @@ describe('AuthScreen', () => {
   it('submitting the e-mail form calls register() with the Argon2id-derived verifier, never the plaintext password', async () => {
     registerMock.mockResolvedValue({
       ok: true,
-      account: { id: '11111111-1111-1111-1111-111111111111', email: 'user@example.com', role: 'Professional' },
+      account: {
+        id: '11111111-1111-1111-1111-111111111111',
+        email: 'user@example.com',
+        role: 'Professional',
+        twoFactorRequirement: 'NotApplicable',
+        twoFactorTicket: null,
+      },
     })
     renderAuthScreen()
 
@@ -107,7 +121,13 @@ describe('AuthScreen', () => {
     const getGoogleIdToken = vi.fn().mockResolvedValue('google-id-token')
     continueWithGoogleMock.mockResolvedValue({
       ok: true,
-      account: { id: '22222222-2222-2222-2222-222222222222', email: 'user@example.com', role: 'Patient' },
+      account: {
+        id: '22222222-2222-2222-2222-222222222222',
+        email: 'user@example.com',
+        role: 'Patient',
+        twoFactorRequirement: 'NotApplicable',
+        twoFactorTicket: null,
+      },
       isNewAccount: true,
     })
     renderAuthScreen({ getGoogleIdToken })
@@ -140,7 +160,13 @@ describe('AuthScreen', () => {
     // e-mail already has an account as a Patient (ADR-S02-01: backend wins).
     continueWithGoogleMock.mockResolvedValue({
       ok: true,
-      account: { id: '33333333-3333-3333-3333-333333333333', email: 'existing@example.com', role: 'Patient' },
+      account: {
+        id: '33333333-3333-3333-3333-333333333333',
+        email: 'existing@example.com',
+        role: 'Patient',
+        twoFactorRequirement: 'NotApplicable',
+        twoFactorTicket: null,
+      },
       isNewAccount: false,
     })
     renderAuthScreen({ getGoogleIdToken })
@@ -155,5 +181,234 @@ describe('AuthScreen', () => {
     // No second role prompt: the segmented control still shows the
     // (now-irrelevant) local selection, and no additional radiogroup appears.
     expect(screen.getAllByRole('radiogroup')).toHaveLength(1)
+  })
+
+  // S02-03/S02-04 wiring: register()/continueWithGoogle() success is no
+  // longer immediately "authenticated" for a Professional account with
+  // pending or confirmed 2FA -- see AuthScreen's handleAccountResult.
+  it('routes a freshly-registered professional (twoFactorRequirement: SetupRequired) into TotpSetup instead of success', async () => {
+    registerMock.mockResolvedValue({
+      ok: true,
+      account: {
+        id: '44444444-4444-4444-4444-444444444444',
+        email: 'pro@example.com',
+        role: 'Professional',
+        twoFactorRequirement: 'SetupRequired',
+        twoFactorTicket: 'ticket-pro-setup',
+      },
+    })
+    // TotpSetup calls beginTotpEnrollment on mount; resolve it so step 1 renders.
+    beginTotpEnrollmentMock.mockResolvedValue({
+      ok: true,
+      secret: 'JBSWY3DPEHPK3PXP',
+      provisioningUri: 'otpauth://totp/Limmiar:pro@example.com?secret=JBSWY3DPEHPK3PXP&issuer=Limmiar',
+    })
+    const onAuthenticated = vi.fn()
+    renderAuthScreen({ onAuthenticated })
+
+    fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'pro@example.com' } })
+    fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'correct horse battery staple' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Criar conta' }))
+
+    await waitFor(() =>
+      expect(beginTotpEnrollmentMock).toHaveBeenCalledWith(
+        'http://api.test',
+        '44444444-4444-4444-4444-444444444444',
+        'ticket-pro-setup',
+      ),
+    )
+    expect(await screen.findByDisplayValue('JBSWY3DPEHPK3PXP')).toBeTruthy()
+
+    // Not authenticated yet: the registration form's own "success" copy and
+    // onAuthenticated must not have fired.
+    expect(onAuthenticated).not.toHaveBeenCalled()
+    expect(screen.queryByText('Conta criada. Você está cadastrado como profissional.')).toBeNull()
+  }, 15000)
+
+  it('a Google sign-in for a patient (twoFactorRequirement: NotApplicable) still goes straight to success, unchanged', async () => {
+    const getGoogleIdToken = vi.fn().mockResolvedValue('google-id-token')
+    continueWithGoogleMock.mockResolvedValue({
+      ok: true,
+      account: {
+        id: '55555555-5555-5555-5555-555555555555',
+        email: 'patient@example.com',
+        role: 'Patient',
+        twoFactorRequirement: 'NotApplicable',
+        twoFactorTicket: null,
+      },
+      isNewAccount: true,
+    })
+    const onAuthenticated = vi.fn()
+    renderAuthScreen({ getGoogleIdToken, onAuthenticated })
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Paciente' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar com o Google' }))
+
+    expect((await screen.findByRole('status')).textContent).toBe(
+      'Conta criada. Você está cadastrado como paciente.',
+    )
+    expect(onAuthenticated).toHaveBeenCalledWith({
+      id: '55555555-5555-5555-5555-555555555555',
+      email: 'patient@example.com',
+      role: 'Patient',
+      twoFactorRequirement: 'NotApplicable',
+      twoFactorTicket: null,
+    })
+  }, 15000)
+
+  it('routes a Google sign-in with twoFactorRequirement: ChallengeRequired into TotpChallenge', async () => {
+    const getGoogleIdToken = vi.fn().mockResolvedValue('google-id-token')
+    continueWithGoogleMock.mockResolvedValue({
+      ok: true,
+      account: {
+        id: '66666666-6666-6666-6666-666666666666',
+        email: 'pro@example.com',
+        role: 'Professional',
+        twoFactorRequirement: 'ChallengeRequired',
+        twoFactorTicket: 'ticket-pro-challenge',
+      },
+      isNewAccount: false,
+    })
+    const onAuthenticated = vi.fn()
+    renderAuthScreen({ getGoogleIdToken, onAuthenticated })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar com o Google' }))
+
+    expect(await screen.findByRole('button', { name: 'Verificar' })).toBeTruthy()
+    expect(onAuthenticated).not.toHaveBeenCalled()
+
+    verifyTotpChallengeMock.mockResolvedValue({
+      ok: true,
+      account: {
+        id: '66666666-6666-6666-6666-666666666666',
+        email: 'pro@example.com',
+        role: 'Professional',
+        twoFactorRequirement: 'ChallengeRequired',
+        twoFactorTicket: null,
+      },
+    })
+    fireEvent.change(screen.getByLabelText(/código/i), { target: { value: '123456' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Verificar' }))
+
+    await waitFor(() => expect(onAuthenticated).toHaveBeenCalledTimes(1))
+    expect(verifyTotpChallengeMock).toHaveBeenCalledWith(
+      'http://api.test',
+      '66666666-6666-6666-6666-666666666666',
+      'ticket-pro-challenge',
+      { code: '123456' },
+    )
+  })
+
+  it('calling TotpSetup.onDone (after confirming enrollment) completes authentication', async () => {
+    registerMock.mockResolvedValue({
+      ok: true,
+      account: {
+        id: '77777777-7777-7777-7777-777777777777',
+        email: 'pro2@example.com',
+        role: 'Professional',
+        twoFactorRequirement: 'SetupRequired',
+        twoFactorTicket: 'ticket-pro2-setup',
+      },
+    })
+    beginTotpEnrollmentMock.mockResolvedValue({
+      ok: true,
+      secret: 'JBSWY3DPEHPK3PXP',
+      provisioningUri: 'otpauth://totp/Limmiar:pro2@example.com?secret=JBSWY3DPEHPK3PXP&issuer=Limmiar',
+    })
+    const backupCodes = Array.from({ length: 10 }, (_, index) => `abcde-${index}0000`)
+    confirmTotpEnrollmentMock.mockResolvedValue({ ok: true, backupCodes })
+    const onAuthenticated = vi.fn()
+    renderAuthScreen({ onAuthenticated })
+
+    fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'pro2@example.com' } })
+    fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'correct horse battery staple' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Criar conta' }))
+
+    await screen.findByDisplayValue('JBSWY3DPEHPK3PXP')
+    fireEvent.change(screen.getByLabelText(/código de 6 dígitos/i), { target: { value: '123456' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }))
+
+    expect(confirmTotpEnrollmentMock).toHaveBeenCalledWith(
+      'http://api.test',
+      '77777777-7777-7777-7777-777777777777',
+      'ticket-pro2-setup',
+      '123456',
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Guardei meus códigos' }))
+
+    expect(onAuthenticated).toHaveBeenCalledWith({
+      id: '77777777-7777-7777-7777-777777777777',
+      email: 'pro2@example.com',
+      role: 'Professional',
+      twoFactorRequirement: 'SetupRequired',
+      twoFactorTicket: 'ticket-pro2-setup',
+    })
+    expect((await screen.findByRole('status')).textContent).toBe(
+      'Conta criada. Você está cadastrado como profissional.',
+    )
+  }, 15000)
+
+  it('shows no password field for the "paciente" segment', () => {
+    renderAuthScreen()
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Paciente' }))
+
+    expect(screen.queryByLabelText('Senha')).toBeNull()
+  })
+
+  it('still shows the password field for the "profissional" segment (unchanged)', () => {
+    renderAuthScreen()
+
+    expect(screen.getByLabelText('Senha')).toBeTruthy()
+  })
+
+  it('shows "Enviar link mágico" (not "Criar conta") as the submit label for the "paciente" segment', () => {
+    renderAuthScreen()
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Paciente' }))
+
+    expect(screen.getByRole('button', { name: 'Enviar link mágico' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Criar conta' })).toBeNull()
+  })
+
+  it('still shows "Criar conta" (not "Enviar link mágico") as the submit label for the "profissional" segment (unchanged)', () => {
+    renderAuthScreen()
+
+    expect(screen.getByRole('button', { name: 'Criar conta' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Enviar link mágico' })).toBeNull()
+  })
+
+  it('submitting the "paciente" form calls requestMagicLink(), not register(), and replaces the form with the "check your email" state', async () => {
+    requestMagicLinkMock.mockResolvedValue({ ok: true })
+    renderAuthScreen()
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Paciente' }))
+    fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'patient@example.com' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar link mágico' }))
+
+    await waitFor(() => expect(requestMagicLinkMock).toHaveBeenCalledTimes(1))
+    expect(requestMagicLinkMock).toHaveBeenCalledWith('http://api.test', { email: 'patient@example.com' })
+    expect(registerMock).not.toHaveBeenCalled()
+
+    expect((await screen.findByRole('status')).textContent).toBe(
+      'Verifique seu e-mail para continuar. Enviamos um link de acesso, se este e-mail existir.',
+    )
+
+    expect(screen.queryByRole('radiogroup')).toBeNull()
+    expect(screen.queryByLabelText('E-mail')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Enviar link mágico' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Continuar com o Google' })).toBeNull()
+  })
+
+  it('shows a translated error message when requestMagicLink() reports a problem', async () => {
+    requestMagicLinkMock.mockResolvedValue({ ok: false, code: 'validation.invalid_field', params: { field: 'email' } })
+    renderAuthScreen()
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Paciente' }))
+    fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'patient@example.com' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar link mágico' }))
+
+    expect((await screen.findByRole('alert')).textContent).toBe('Campo inválido: email.')
   })
 })

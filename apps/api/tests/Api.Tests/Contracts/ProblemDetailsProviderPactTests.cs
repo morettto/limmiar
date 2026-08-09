@@ -56,6 +56,14 @@ public sealed class ProblemDetailsProviderPactTests
         builder.Configuration["ConnectionStrings:AppDb"] =
             "Host=127.0.0.1;Port=1;Username=app_role;Password=unused;Timeout=2;";
 
+        // App startup also needs StaffAccess:ApiKey/WebAuthn:RelyingPartyId/
+        // WebAuthn:ExpectedOrigin configured (same "fail fast if missing" pattern as
+        // ConnectionStrings:AppDb) even though this contract test never hits a staff-gated
+        // or WebAuthn endpoint.
+        builder.Configuration["StaffAccess:ApiKey"] = "test-staff-api-key";
+        builder.Configuration["WebAuthn:RelyingPartyId"] = "limmiar.test";
+        builder.Configuration["WebAuthn:ExpectedOrigin"] = "https://limmiar.test";
+
         await using var app = Program.BuildApp(builder);
 
         await app.StartAsync();
