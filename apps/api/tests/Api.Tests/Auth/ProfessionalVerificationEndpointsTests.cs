@@ -236,6 +236,26 @@ public sealed class ProfessionalVerificationEndpointsTests
         Assert.Equal("auth.access_token_invalid", doc.RootElement.GetProperty("code").GetString());
     }
 
+    /// <summary>A syntactically well-formed but never-issued Bearer token must resolve to no account -- the other half of IsAuthorizedForAccount's equality check from PostSubmit_WithAccessTokenForAnotherAccount_Returns401WithProblemDetails, where ValidateAccess instead resolves to a real, different account.</summary>
+    [Fact]
+    public async Task PostSubmit_WithInvalidAccessToken_Returns401WithProblemDetails()
+    {
+        using var factory = CreateFactory(new StubCouncilRegistryVerifier(verified: true));
+        using var client = factory.CreateClient();
+        var accountId = await RegisterProfessionalAsync(client, "submit-invalid-token@example.com");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "not-a-real-token");
+
+        var response = await client.PostAsJsonAsync(
+            $"/accounts/{accountId}/professional-verification",
+            new SubmitProfessionalCredentialRequest(ProfessionalCredentialType.Crp, "06/123456", "SP", null),
+            ApiJsonSerializerContext.Default.SubmitProfessionalCredentialRequest);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(body);
+        Assert.Equal("auth.access_token_invalid", doc.RootElement.GetProperty("code").GetString());
+    }
+
     [Fact]
     public async Task PostSubmit_WhenAlreadyActive_Returns409WithProblemDetails()
     {

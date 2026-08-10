@@ -192,6 +192,7 @@ public sealed class AccountServiceMagicLinkTests
         Assert.Equal(AccountVerificationStatus.Active, result.Account.VerificationStatus);
         Assert.Equal(authenticator.CredentialId, result.Account.WebAuthnCredentialId);
         Assert.Equal(authenticator.CosePublicKey, result.Account.WebAuthnCosePublicKey);
+        Assert.Equal(Guid.Empty, result.Account.WebAuthnAaGuid);
         Assert.NotNull(result.Session);
         Assert.NotNull(result.Session!.AccessToken);
         Assert.NotNull(result.Session.RefreshToken);

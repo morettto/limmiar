@@ -3,6 +3,7 @@ using Api.Data;
 using Api.Endpoints;
 using Api.ExceptionHandling;
 using Api.Serialization;
+using Microsoft.AspNetCore.Cors.Infrastructure;
 
 public partial class Program
 {
@@ -17,16 +18,15 @@ public partial class Program
 
         // Empty allow-list (no cross-origin access) unless configured -- AllowAnyOrigin was rejected as too wide for this app even though every account-scoped endpoint is bearer-token-gated.
         var corsAllowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
-        builder.Services.AddCors(options =>
+        // Built once here, not inline inside the AddCors callback, so Roslyn does not emit an unreachable delegate-cache-reuse branch (AddCors invokes its configuration callback exactly once).
+        Action<CorsPolicyBuilder> configureCorsPolicy = policy =>
         {
-            options.AddDefaultPolicy(policy =>
+            if (corsAllowedOrigins.Length > 0)
             {
-                if (corsAllowedOrigins.Length > 0)
-                {
-                    policy.WithOrigins(corsAllowedOrigins).AllowAnyHeader().AllowAnyMethod();
-                }
-            });
-        });
+                policy.WithOrigins(corsAllowedOrigins).AllowAnyHeader().AllowAnyMethod();
+            }
+        };
+        builder.Services.AddCors(options => options.AddDefaultPolicy(configureCorsPolicy));
 
         var appConnectionString = builder.Configuration.GetConnectionString("AppDb")
             ?? throw new InvalidOperationException("Missing required configuration: ConnectionStrings:AppDb");

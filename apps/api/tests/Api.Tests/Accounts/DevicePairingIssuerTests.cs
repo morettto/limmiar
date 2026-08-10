@@ -20,6 +20,21 @@ public sealed class DevicePairingIssuerTests
         Assert.Equal(now + DevicePairingIssuer.PairingSessionLifetime, session.ExpiresAt);
     }
 
+    // Program.Composition.cs passes an explicit sessionLifetime only when DevicePairing:SessionLifetimeSeconds
+    // is configured; every other call site (including the constructor's own default) relies on the null branch.
+    [Fact]
+    public void Create_WithExplicitSessionLifetime_ExpiresAfterThatLifetimeInsteadOfTheDefault()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var explicitLifetime = TimeSpan.FromSeconds(30);
+        var issuer = new DevicePairingIssuer(clock: () => now, sessionLifetime: explicitLifetime);
+
+        var session = issuer.Create(Guid.NewGuid(), PrimaryPublicKey);
+
+        Assert.Equal(now + explicitLifetime, session.ExpiresAt);
+        Assert.NotEqual(now + DevicePairingIssuer.PairingSessionLifetime, session.ExpiresAt);
+    }
+
     [Fact]
     public void Create_ReturnsDifferentSessionIdsForDifferentCalls()
     {

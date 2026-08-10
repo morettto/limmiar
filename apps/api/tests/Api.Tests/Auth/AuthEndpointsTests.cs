@@ -152,6 +152,29 @@ public sealed class AuthEndpointsTests
         Assert.Equal("auth.invalid_credentials", doc.RootElement.GetProperty("code").GetString());
     }
 
+    /// <summary>A Patient owes no 2FA (ADR-S02-03), so login must return a session immediately -- the other half of PostLogin_WithCorrectVerifier_Returns200WithAccountBody's Professional/2FA-pending case.</summary>
+    [Fact]
+    public async Task PostLogin_WithPatientRole_ReturnsSessionTokens()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        await client.PostAsJsonAsync(
+            "/auth/register",
+            new RegisterRequest("login-patient-tokens@example.com", SomeVerifier, AccountRole.Patient),
+            ApiJsonSerializerContext.Default.RegisterRequest);
+
+        var response = await client.PostAsJsonAsync(
+            "/auth/login",
+            new LoginRequest("login-patient-tokens@example.com", SomeVerifier),
+            ApiJsonSerializerContext.Default.LoginRequest);
+
+        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.LoginResponse);
+        Assert.NotNull(body);
+        Assert.NotNull(body!.AccessToken);
+        Assert.NotNull(body.RefreshToken);
+        Assert.NotNull(body.AccessTokenExpiresAt);
+    }
+
     [Fact]
     public async Task PostLogin_WithMissingEmail_Returns400WithValidationProblemDetails()
     {
@@ -236,6 +259,26 @@ public sealed class AuthEndpointsTests
         Assert.NotNull(body);
         Assert.Equal(AccountRole.Professional, body!.Role);
         Assert.False(body.IsNewAccount);
+    }
+
+    /// <summary>A Patient owes no 2FA (ADR-S02-03), so Google auth must return a session immediately -- the other half of PostGoogle_WithNewEmail_Returns200WithRequestedRoleAndIsNewAccountTrue's Professional/2FA-pending case.</summary>
+    [Fact]
+    public async Task PostGoogle_WithNewPatientEmail_ReturnsSessionTokens()
+    {
+        using var factory = CreateFactory(new StubGoogleIdentityProvider(
+            ("new-patient-google-token", new GoogleIdentity("new-patient-via-google@example.com", "google-subject-new-patient"))));
+        using var client = factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync(
+            "/auth/google",
+            new GoogleAuthRequest("new-patient-google-token", AccountRole.Patient),
+            ApiJsonSerializerContext.Default.GoogleAuthRequest);
+
+        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.GoogleAuthResponse);
+        Assert.NotNull(body);
+        Assert.NotNull(body!.AccessToken);
+        Assert.NotNull(body.RefreshToken);
+        Assert.NotNull(body.AccessTokenExpiresAt);
     }
 
     [Fact]

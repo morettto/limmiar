@@ -416,6 +416,24 @@ public sealed class DevicePairingEndpointsTests
         Assert.Equal(EncryptedKek, fetched!.EncryptedKek);
     }
 
+    /// <summary>Exercises Program.Composition.cs's DevicePairing:SessionLifetimeSeconds E2E override branch -- same precedent as MagicLink:TokenLifetimeSeconds.</summary>
+    [Fact]
+    public async Task PostPairingSession_WithConfiguredSessionLifetimeOverride_Returns201WithShorterExpiry()
+    {
+        using var factory = CreateFactory().WithWebHostBuilder(builder =>
+            builder.UseSetting("DevicePairing:SessionLifetimeSeconds", "30"));
+        using var client = factory.CreateClient();
+        var (accountId, _) = await RegisterAsync(client, "pairing-lifetime-override@example.com");
+        var before = DateTimeOffset.UtcNow;
+
+        var response = await PostCreateAsync(client, accountId);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.CreatePairingSessionResponse);
+        Assert.NotNull(body);
+        Assert.True(body!.ExpiresAt <= before + TimeSpan.FromSeconds(30) + TimeSpan.FromSeconds(5));
+    }
+
     private static Task<HttpResponseMessage> GetPayloadAsync(HttpClient client, string sessionId) =>
         client.GetAsync($"/devices/pairing-sessions/{sessionId}/payload");
 

@@ -210,6 +210,33 @@ public sealed class RecoveryEndpointsTests
         Assert.Null(body.RefreshToken);
     }
 
+    /// <summary>Recovery-phrase registration is professional-only (see PostAccountRecoveryPhrase_WithPatientAccount_Returns409WithProblemDetails), and every professional owes 2FA on every login (ADR-S02-03/S02-04) -- so an immediate-session recovery is unreachable through the public API. This seeds a non-professional account with a RecoveryVerifier directly in the store (bypassing that registration rule, the way a defect or a future non-professional recovery flow could) to reach AccountService's other branch: no 2FA pending, session returned immediately.</summary>
+    [Fact]
+    public async Task PostAuthRecover_WhenNoTwoFactorPending_ReturnsSessionImmediately()
+    {
+        const string email = "recover-immediate@example.com";
+        var recoveryVerifier = CreateVerifier(0x05);
+        var account = new Account(
+            Guid.NewGuid(), email, AccountRole.Patient, SomeVerifier, null, RecoveryVerifier: recoveryVerifier);
+        using var factory = CreateFactory().WithWebHostBuilder(builder =>
+            builder.ConfigureTestServices(services => services.AddSingleton<IAccountStore>(new SeededAccountStore(account))));
+        using var client = factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync(
+            "/auth/recover",
+            new RecoverAccessRequest(email, recoveryVerifier),
+            ApiJsonSerializerContext.Default.RecoverAccessRequest);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.RecoverAccessResponse);
+        Assert.NotNull(body);
+        Assert.Equal(TwoFactorRequirement.NotApplicable, body!.TwoFactorRequirement);
+        Assert.Null(body.TwoFactorTicket);
+        Assert.NotNull(body.AccessToken);
+        Assert.NotNull(body.RefreshToken);
+        Assert.NotNull(body.AccessTokenExpiresAt);
+    }
+
     [Fact]
     public async Task PostAuthRecover_WithWrongVerifier_Returns401WithProblemDetails()
     {
@@ -378,5 +405,39 @@ public sealed class RecoveryEndpointsTests
         public RefreshSessionResult Refresh(string refreshToken) => throw new NotSupportedException("not needed by the one test that uses this stub");
 
         public Guid? ValidateAccess(string accessToken) => Guid.TryParse(accessToken, out var accountId) ? accountId : null;
+    }
+
+    private sealed class SeededAccountStore : IAccountStore
+    {
+        private readonly Dictionary<string, Account> _accountsByEmail = new(StringComparer.Ordinal);
+
+        public SeededAccountStore(params Account[] seed)
+        {
+            foreach (var account in seed)
+            {
+                _accountsByEmail[account.Email] = account;
+            }
+        }
+
+        public Task<Account?> FindByEmailAsync(string normalizedEmail, CancellationToken cancellationToken) =>
+            Task.FromResult(_accountsByEmail.GetValueOrDefault(normalizedEmail));
+
+        public Task<Account?> FindByIdAsync(Guid id, CancellationToken cancellationToken) =>
+            Task.FromResult(_accountsByEmail.Values.FirstOrDefault(account => account.Id == id));
+
+        public Task InsertAsync(Account account, CancellationToken cancellationToken)
+        {
+            _accountsByEmail[account.Email] = account;
+            return Task.CompletedTask;
+        }
+
+        public Task UpdateAsync(Account account, CancellationToken cancellationToken)
+        {
+            _accountsByEmail[account.Email] = account;
+            return Task.CompletedTask;
+        }
+
+        public Task<IReadOnlyList<Account>> ListPendingDocumentReviewAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<Account>>([]);
     }
 }
