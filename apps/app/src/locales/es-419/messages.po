@@ -14,7 +14,37 @@ msgstr ""
 "Plural-Forms: \n"
 
 #. js-lingui-explicit-id
-#: src/errors/problem-messages.ts:13
+#: src/errors/problem-messages.ts:50
+msgid "auth.totp_not_enabled"
+msgstr "La verificación en dos pasos aún no ha sido activada para esta cuenta."
+
+#. js-lingui-explicit-id
+#: src/errors/problem-messages.ts:36
+msgid "auth.totp_already_enabled"
+msgstr "La verificación en dos pasos ya está activada para esta cuenta."
+
+#: src/auth/RecoveryScreen.tsx:104
+msgid "Acesso recuperado com sucesso."
+msgstr "Acceso recuperado con éxito."
+
+#: src/auth/AuthScreen.tsx:181
+msgid "Acompanhe suas consultas e informações de saúde com segurança."
+msgstr "Da seguimiento a tus consultas e información de salud con seguridad."
+
+#: src/auth/TotpSetup.tsx:128
+msgid "Adicione esta conta no seu aplicativo autenticador, usando as informações abaixo."
+msgstr "Agrega esta cuenta en tu app autenticadora, usando la información de abajo."
+
+#: src/devices/PairNewDevice.tsx:90
+msgid "Aguardando o outro dispositivo enviar a chave..."
+msgstr "Esperando a que el otro dispositivo envíe la clave..."
+
+#: src/devices/PairingScan.tsx:122
+msgid "Aponte a câmera para o código QR exibido no outro dispositivo."
+msgstr "Apunta la cámara al código QR que se muestra en el otro dispositivo."
+
+#. js-lingui-explicit-id
+#: src/errors/problem-messages.ts:10
 msgid "health.database_unreachable"
 msgstr "Base de datos no disponible en este momento."
 
@@ -23,11 +53,260 @@ msgid "Bem-vindo ao Limmiar"
 msgstr "Bienvenido a Limmiar"
 
 #. js-lingui-explicit-id
-#: src/errors/problem-messages.ts:17
+#: src/errors/problem-messages.ts:32
+msgid "validation.invalid_field"
+msgstr "Campo inválido: {field}."
+
+#: src/auth/TotpSetup.tsx:158
+msgid "Código de 6 dígitos do aplicativo autenticador"
+msgstr "Código de 6 dígitos de tu app autenticadora"
+
+#: src/auth/TotpChallenge.tsx:53
+msgid "Código de verificação"
+msgstr "Código de verificación"
+
+#. js-lingui-explicit-id
+#: src/errors/problem-messages.ts:46
+msgid "auth.totp_invalid_code"
+msgstr "Código inválido. Verifica la app autenticadora o usa un código de respaldo."
+
+#: src/auth/TotpChallenge.tsx:60
+msgid "Código ou código de backup"
+msgstr "Código o código de respaldo"
+
+#: src/devices/PairingScan.tsx:70
+msgid "Código QR inválido. Tente escanear novamente."
+msgstr "Código QR inválido. Intenta escanear de nuevo."
+
+#: src/devices/PairingQr.tsx:155
+msgid "Código QR para parear novo dispositivo"
+msgstr "Código QR para vincular un nuevo dispositivo"
+
+#: src/auth/TotpSetup.tsx:132
+msgid "Código secreto"
+msgstr "Código secreto"
+
+#: src/auth/AuthScreen.tsx:153
+msgid "Como você vai usar o Limmiar?"
+msgstr "¿Cómo vas a usar Limmiar?"
+
+#: src/devices/PairingScan.tsx:120
+msgid "Concluindo o pareamento..."
+msgstr "Completando la vinculación..."
+
+#: src/auth/TotpSetup.tsx:125
+msgid "Configure a verificação em duas etapas"
+msgstr "Configura la verificación en dos pasos"
+
+#: src/auth/MagicLinkCallback.tsx:155
+msgid "Confirmando seu acesso..."
+msgstr "Confirmando tu acceso..."
+
+#: src/auth/TotpSetup.tsx:178
+msgid "Confirmar"
+msgstr "Confirmar"
+
+#: src/auth/AuthScreen.tsx:146
+msgid "Conta criada. Você está cadastrado como paciente."
+msgstr "Cuenta creada. Estás registrado como paciente."
+
+#: src/auth/AuthScreen.tsx:144
+msgid "Conta criada. Você está cadastrado como profissional."
+msgstr "Cuenta creada. Estás registrado como profesional."
+
+#: src/auth/AuthScreen.tsx:233
+msgid "Continuar com o Google"
+msgstr "Continuar con Google"
+
+#: src/auth/AuthScreen.tsx:225
+msgid "Criar conta"
+msgstr "Crear cuenta"
+
+#: src/auth/TotpChallenge.tsx:47
+msgid "Digite o código de 6 dígitos do seu aplicativo autenticador ou um dos seus códigos de backup."
+msgstr "Ingresa el código de 6 dígitos de tu app autenticadora o uno de tus códigos de respaldo."
+
+#: src/auth/RecoveryScreen.tsx:118
+msgid "Digite seu e-mail e sua frase de recuperação para recuperar o acesso à sua conta."
+msgstr "Ingresa tu correo electrónico y tu frase de recuperación para recuperar el acceso a tu cuenta."
+
+#: src/devices/PairingQr.tsx:139
+#: src/devices/PairingScan.tsx:110
+#: src/devices/PairNewDevice.tsx:100
+#: src/devices/PairPrimaryDevice.tsx:76
+msgid "Dispositivo pareado com sucesso."
+msgstr "Dispositivo vinculado con éxito."
+
+#: src/auth/AuthScreen.tsx:189
+#: src/auth/RecoveryScreen.tsx:124
+msgid "E-mail"
+msgstr "Correo electrónico"
+
+#. js-lingui-explicit-id
+#: src/errors/problem-messages.ts:64
+msgid "auth.invalid_recovery_phrase"
+msgstr "Correo electrónico o frase de recuperación inválidos."
+
+#. js-lingui-explicit-id
+#: src/errors/problem-messages.ts:24
+msgid "auth.invalid_credentials"
+msgstr "Correo electrónico o contraseña inválidos."
+
+#: src/devices/PairPrimaryDevice.tsx:66
+msgid "Enviando a chave para o novo dispositivo..."
+msgstr "Enviando la clave al nuevo dispositivo..."
+
+#: src/auth/AuthScreen.tsx:225
+msgid "Enviar link mágico"
+msgstr "Enviar enlace mágico"
+
+#: src/devices/PairingQr.tsx:151
+msgid "Escaneie este código QR com o dispositivo que você quer parear."
+msgstr "Escanea este código QR con el dispositivo que quieres vincular."
+
+#: src/auth/RecoveryPhraseSetup.tsx:85
+msgid "Esta frase não será exibida novamente. Guarde-a em um local seguro: ela é a única forma de recuperar o acesso à sua conta caso você perca todos os seus dispositivos."
+msgstr "Esta frase no se mostrará de nuevo. Guárdala en un lugar seguro: es la única forma de recuperar el acceso a tu cuenta si pierdes todos tus dispositivos."
+
+#: src/devices/PairingQr.tsx:129
+msgid "Este código expirou. Volte para gerar um novo."
+msgstr "Este código expiró. Vuelve para generar uno nuevo."
+
+#. js-lingui-explicit-id
+#: src/errors/problem-messages.ts:18
+msgid "auth.email_already_registered"
+msgstr "Este correo electrónico ya está registrado."
+
+#. js-lingui-explicit-id
+#: src/errors/problem-messages.ts:54
+msgid "auth.magic_link_invalid"
+msgstr "Este enlace de acceso ya no es válido. Solicita uno nuevo."
+
+#: src/auth/TotpSetup.tsx:101
+msgid "Estes códigos não serão exibidos novamente. Guarde-os em um local seguro: eles são a única forma de recuperar o acesso à sua conta caso você perca o aplicativo autenticador."
+msgstr "Estos códigos no se mostrarán de nuevo. Guárdalos en un lugar seguro: son la única forma de recuperar el acceso a tu cuenta si pierdes tu app autenticadora."
+
+#: src/auth/RecoveryScreen.tsx:136
+msgid "Frase de recuperação"
+msgstr "Frase de recuperación"
+
+#: src/auth/RecoveryScreen.tsx:60
+msgid "Frase de recuperação inválida. Verifique se você digitou todas as palavras corretamente."
+msgstr "Frase de recuperación inválida. Verifica que hayas escrito todas las palabras correctamente."
+
+#: src/auth/RecoveryPhraseSetup.tsx:61
+msgid "Gerando sua frase de recuperação..."
+msgstr "Generando tu frase de recuperación..."
+
+#: src/auth/AuthScreen.tsx:179
+msgid "Gerencie pacientes, prontuários e agenda em um só lugar."
+msgstr "Gestiona pacientes, historiales clínicos y agenda en un solo lugar."
+
+#: src/auth/TotpSetup.tsx:98
+msgid "Guarde seus códigos de backup"
+msgstr "Guarda tus códigos de respaldo"
+
+#: src/auth/RecoveryPhraseSetup.tsx:82
+msgid "Guarde sua frase de recuperação"
+msgstr "Guarda tu frase de recuperación"
+
+#: src/auth/TotpSetup.tsx:114
+msgid "Guardei meus códigos"
+msgstr "Guardé mis códigos"
+
+#: src/auth/RecoveryPhraseSetup.tsx:99
+msgid "Guardei minha frase"
+msgstr "Guardé mi frase"
+
+#: src/auth/TotpSetup.tsx:144
+msgid "Link de provisionamento"
+msgstr "Enlace de aprovisionamiento"
+
+#: src/auth/MagicLinkCallback.tsx:146
+msgid "Login realizado com sucesso."
+msgstr "Inicio de sesión realizado con éxito."
+
+#: src/devices/PairingScan.tsx:60
+msgid "Não foi possível acessar a câmera para escanear o código."
+msgstr "No se pudo acceder a la cámara para escanear el código."
+
+#: src/devices/PairPrimaryDevice.tsx:57
+msgid "Não foi possível concluir o pareamento com segurança. Tente novamente."
+msgstr "No se pudo completar la vinculación de forma segura. Intenta de nuevo."
+
+#. js-lingui-explicit-id
+#: src/errors/problem-messages.ts:58
+msgid "auth.webauthn_ceremony_failed"
+msgstr "No se pudo confirmar tu identidad en este dispositivo. Intenta de nuevo."
+
+#. js-lingui-explicit-id
+#: src/errors/problem-messages.ts:28
+msgid "auth.google_token_invalid"
+msgstr "No se pudo continuar con Google. Inténtalo de nuevo."
+
+#: src/devices/PairNewDevice.tsx:57
+msgid "Não foi possível decifrar a chave recebida. Tente parear novamente."
+msgstr "No se pudo descifrar la clave recibida. Intenta vincular de nuevo."
+
+#. js-lingui-explicit-id
+#: src/errors/problem-messages.ts:40
+msgid "auth.totp_not_pending"
+msgstr "No hay una configuración de verificación en dos pasos pendiente para esta cuenta."
+
+#. js-lingui-explicit-id
+#: src/errors/problem-messages.ts:14
 msgid "unexpected_error"
 msgstr "Ocurrió un error inesperado en el servidor."
 
 #. js-lingui-explicit-id
-#: src/errors/problem-messages.ts:26
+#: src/errors/problem-messages.ts:72
 msgid "errors.generic"
 msgstr "Ocurrió un error inesperado. Inténtalo de nuevo."
+
+#: src/auth/AuthScreen.tsx:174
+msgid "Paciente"
+msgstr "Paciente"
+
+#: src/devices/PairingQr.tsx:148
+msgid "Parear novo dispositivo"
+msgstr "Vincular nuevo dispositivo"
+
+#: src/auth/TotpSetup.tsx:78
+msgid "Preparando a verificação em duas etapas..."
+msgstr "Preparando la verificación en dos pasos..."
+
+#: src/devices/PairingQr.tsx:109
+msgid "Preparando o código para parear o novo dispositivo..."
+msgstr "Preparando el código para vincular el nuevo dispositivo..."
+
+#: src/auth/AuthScreen.tsx:164
+msgid "Profissional"
+msgstr "Profesional"
+
+#: src/auth/RecoveryScreen.tsx:156
+msgid "Recuperar acesso"
+msgstr "Recuperar acceso"
+
+#: src/auth/RecoveryScreen.tsx:115
+msgid "Recuperar acesso à conta"
+msgstr "Recuperar acceso a la cuenta"
+
+#: src/auth/AuthScreen.tsx:202
+msgid "Senha"
+msgstr "Contraseña"
+
+#: src/auth/AuthScreen.tsx:155
+msgid "Tipo de conta"
+msgstr "Tipo de cuenta"
+
+#: src/auth/TotpChallenge.tsx:44
+msgid "Verificação em duas etapas"
+msgstr "Verificación en dos pasos"
+
+#: src/auth/TotpChallenge.tsx:76
+msgid "Verificar"
+msgstr "Verificar"
+
+#: src/auth/AuthScreen.tsx:131
+msgid "Verifique seu e-mail para continuar. Enviamos um link de acesso, se este e-mail existir."
+msgstr "Revisa tu correo electrónico para continuar. Enviamos un enlace de acceso, si este correo existe."

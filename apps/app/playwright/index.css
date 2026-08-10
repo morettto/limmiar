@@ -1,0 +1,13 @@
+@import "tailwindcss";
+
+/* Playwright CT's Vite root is this `playwright/` dir, a sibling of `../src`
+   (not an ancestor) -- Tailwind v4's automatic content detection walks down
+   from its root and would never see `../src`, so AuthScreen's utility
+   classes get silently dropped from the generated CSS. This explicit
+   @source is the documented escape hatch for exactly this layout (same as
+   packages/ui/playwright/index.css). apps/app's real src/index.css also
+   carries product-wide CSS custom properties (colors, fonts, #root layout)
+   that AuthScreen doesn't use -- deliberately not pulled in here so this CT
+   bundle stays scoped to what AuthScreen actually renders with, same as the
+   packages/ui precedent. */
+@source "../src";

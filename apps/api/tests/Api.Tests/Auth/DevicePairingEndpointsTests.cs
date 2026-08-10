@@ -1,0 +1,522 @@
+using System.Net;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Text.Json;
+using Api.Accounts;
+using Api.Endpoints;
+using Api.Serialization;
+using Api.Tests.Accounts;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace Api.Tests.Auth;
+
+/// <summary>S02-04 HTTP-layer tests for the device-pairing-by-QR handshake (domain layer covered by DevicePairingIssuerTests): who each endpoint authenticates, which failure maps to which status/code, and that claim/payload-fetch stay single-use over real HTTP.</summary>
+public sealed class DevicePairingEndpointsTests
+{
+    private static readonly byte[] SomeVerifier = CreateVerifier(0x01);
+
+    /// <summary>Stand-ins for raw X25519 public keys -- opaque to this backend, so any distinguishable bytes will do.</summary>
+    private static readonly byte[] PrimaryPublicKey = [0xA0, 0xA1, 0xA2, 0xA3];
+
+    private static readonly byte[] NewDevicePublicKey = [0xB0, 0xB1, 0xB2, 0xB3];
+
+    /// <summary>Stand-in for the primary's KEK encrypted to the claiming device; includes 0x00/0xFF and invalid UTF-8 so the full-flow test proves a byte-exact relay through base64/JSON.</summary>
+    private static readonly byte[] EncryptedKek = [0x00, 0xFF, 0x10, 0x80, 0x7F, 0xC3, 0x28];
+
+    [Fact]
+    public async Task PostPairingSession_WithoutAuth_Returns401()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        var (accountId, _) = await RegisterAsync(client, "pairing-create-no-token@example.com");
+        client.DefaultRequestHeaders.Authorization = null;
+
+        var response = await PostCreateAsync(client, accountId);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal("auth.access_token_invalid", await ReadCodeAsync(response));
+    }
+
+    /// <summary>An Authorization header present but not Bearer is rejected exactly like a missing one.</summary>
+    [Fact]
+    public async Task PostPairingSession_WithNonBearerAuthorizationHeader_Returns401()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        var (accountId, _) = await RegisterAsync(client, "pairing-create-basic-auth@example.com");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", "not-a-bearer-token");
+
+        var response = await PostCreateAsync(client, accountId);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal("auth.access_token_invalid", await ReadCodeAsync(response));
+    }
+
+    /// <summary>An unrecognized Bearer token resolves to no account, rejected the same as a token for the wrong account -- no hint which case it was.</summary>
+    [Fact]
+    public async Task PostPairingSession_WithUnrecognizedBearerToken_Returns401()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        var (accountId, _) = await RegisterAsync(client, "pairing-create-unknown-token@example.com");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "never-issued-token");
+
+        var response = await PostCreateAsync(client, accountId);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal("auth.access_token_invalid", await ReadCodeAsync(response));
+    }
+
+    /// <summary>Core account-scoping regression: a valid token for a DIFFERENT account must not open a pairing session here, or any authenticated user could mint a QR code exposing someone else's KEK.</summary>
+    [Fact]
+    public async Task PostPairingSession_ForAnotherAccountId_Returns401()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        var (victimAccountId, _) = await RegisterAsync(client, "pairing-create-victim@example.com");
+        // RegisterAsync leaves the client carrying the LAST registered account's token, so
+        // registering the attacker second makes the client the attacker.
+        await RegisterAsync(client, "pairing-create-attacker@example.com");
+
+        var response = await PostCreateAsync(client, victimAccountId);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal("auth.access_token_invalid", await ReadCodeAsync(response));
+    }
+
+    [Fact]
+    public async Task PostPairingSession_Authenticated_Returns201WithSessionIdAndExpiry()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        var (accountId, _) = await RegisterAsync(client, "pairing-create-ok@example.com");
+        var before = DateTimeOffset.UtcNow;
+
+        var response = await PostCreateAsync(client, accountId);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.CreatePairingSessionResponse);
+        Assert.NotNull(body);
+        Assert.False(string.IsNullOrWhiteSpace(body!.SessionId));
+        Assert.True(body.ExpiresAt > before);
+        Assert.True(body.ExpiresAt <= DateTimeOffset.UtcNow + DevicePairingIssuer.PairingSessionLifetime);
+    }
+
+    /// <summary>One code/status for "never existed", "expired" and "already claimed" -- a caller must not tell a guessed session id apart from one someone else already scanned.</summary>
+    [Fact]
+    public async Task PostClaim_UnknownSessionId_Returns404WithDevicePairingSessionNotFound()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+
+        var response = await PostClaimAsync(client, "not-a-real-session-id");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("auth.device_pairing_session_not_found", await ReadCodeAsync(response));
+    }
+
+    [Fact]
+    public async Task PostClaim_ValidSession_Returns200WithPrimaryPublicKey()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        var sessionId = await CreateSessionAsync(client, "pairing-claim-ok@example.com");
+        // The scanning device has no session for this account -- that's the point of pairing -- so this call must succeed with no credential.
+        client.DefaultRequestHeaders.Authorization = null;
+
+        var response = await PostClaimAsync(client, sessionId);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.ClaimPairingSessionResponse);
+        Assert.NotNull(body);
+        Assert.Equal(PrimaryPublicKey, body!.PrimaryPublicKey);
+    }
+
+    /// <summary>Replay proof at the HTTP layer: first caller wins, making a photographed QR code worthless.</summary>
+    [Fact]
+    public async Task PostClaim_CalledTwiceForSameSession_SecondCallReturns404()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        var sessionId = await CreateSessionAsync(client, "pairing-claim-replay@example.com");
+        var firstResponse = await PostClaimAsync(client, sessionId);
+        Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
+
+        var response = await PostClaimAsync(client, sessionId);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("auth.device_pairing_session_not_found", await ReadCodeAsync(response));
+    }
+
+    [Fact]
+    public async Task GetClaimStatus_BeforeClaim_ReturnsClaimedFalse()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        var (accountId, _) = await RegisterAsync(client, "pairing-status-pending@example.com");
+        var sessionId = await CreateSessionForAsync(client, accountId);
+
+        var response = await GetClaimStatusAsync(client, accountId, sessionId);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.PairingClaimStatusResponse);
+        Assert.NotNull(body);
+        Assert.False(body!.Claimed);
+        Assert.Null(body.NewDevicePublicKey);
+    }
+
+    [Fact]
+    public async Task GetClaimStatus_AfterClaim_ReturnsClaimedTrueWithNewDevicePublicKey()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        var (accountId, _) = await RegisterAsync(client, "pairing-status-claimed@example.com");
+        var sessionId = await CreateSessionForAsync(client, accountId);
+        await PostClaimAsync(client, sessionId);
+
+        var response = await GetClaimStatusAsync(client, accountId, sessionId);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.PairingClaimStatusResponse);
+        Assert.NotNull(body);
+        Assert.True(body!.Claimed);
+        Assert.Equal(NewDevicePublicKey, body.NewDevicePublicKey);
+    }
+
+    [Fact]
+    public async Task GetClaimStatus_WithoutAuth_Returns401()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        var (accountId, _) = await RegisterAsync(client, "pairing-status-no-token@example.com");
+        var sessionId = await CreateSessionForAsync(client, accountId);
+        client.DefaultRequestHeaders.Authorization = null;
+
+        var response = await GetClaimStatusAsync(client, accountId, sessionId);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal("auth.access_token_invalid", await ReadCodeAsync(response));
+    }
+
+    /// <summary>Account-scoping regression: another account's session must be reported as if it did not exist, or this endpoint becomes a probe for open pairing sessions.</summary>
+    [Fact]
+    public async Task GetClaimStatus_ForAnotherAccountsSession_Returns404WithDevicePairingSessionNotFound()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        var (victimAccountId, _) = await RegisterAsync(client, "pairing-status-victim@example.com");
+        var victimSessionId = await CreateSessionForAsync(client, victimAccountId);
+        var (attackerAccountId, _) = await RegisterAsync(client, "pairing-status-attacker@example.com");
+
+        var response = await GetClaimStatusAsync(client, attackerAccountId, victimSessionId);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("auth.device_pairing_session_not_found", await ReadCodeAsync(response));
+    }
+
+    /// <summary>Nothing to encrypt a KEK for until a device has claimed the session; 409 not 404 because the session is real and owned by the caller.</summary>
+    [Fact]
+    public async Task PostPayload_BeforeClaim_Returns409WithDevicePairingPayloadNotReady()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        var (accountId, _) = await RegisterAsync(client, "pairing-payload-not-claimed@example.com");
+        var sessionId = await CreateSessionForAsync(client, accountId);
+
+        var response = await PostPayloadAsync(client, accountId, sessionId);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal("auth.device_pairing_payload_not_ready", await ReadCodeAsync(response));
+    }
+
+    [Fact]
+    public async Task PostPayload_AfterClaim_Returns204()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        var (accountId, _) = await RegisterAsync(client, "pairing-payload-ok@example.com");
+        var sessionId = await CreateSessionForAsync(client, accountId);
+        await PostClaimAsync(client, sessionId);
+
+        var response = await PostPayloadAsync(client, accountId, sessionId);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    /// <summary>One handshake, one ciphertext -- resubmitting is the same 409 as submitting too early.</summary>
+    [Fact]
+    public async Task PostPayload_CalledTwice_SecondCallReturns409()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        var (accountId, _) = await RegisterAsync(client, "pairing-payload-twice@example.com");
+        var sessionId = await CreateSessionForAsync(client, accountId);
+        await PostClaimAsync(client, sessionId);
+        var firstResponse = await PostPayloadAsync(client, accountId, sessionId);
+        Assert.Equal(HttpStatusCode.NoContent, firstResponse.StatusCode);
+
+        var response = await PostPayloadAsync(client, accountId, sessionId);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal("auth.device_pairing_payload_not_ready", await ReadCodeAsync(response));
+    }
+
+    [Fact]
+    public async Task PostPayload_WithoutAuth_Returns401()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        var (accountId, _) = await RegisterAsync(client, "pairing-payload-no-token@example.com");
+        var sessionId = await CreateSessionForAsync(client, accountId);
+        await PostClaimAsync(client, sessionId);
+        client.DefaultRequestHeaders.Authorization = null;
+
+        var response = await PostPayloadAsync(client, accountId, sessionId);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal("auth.access_token_invalid", await ReadCodeAsync(response));
+    }
+
+    /// <summary>The one submission failure that is 404 rather than 409: no such session for this caller (unknown, expired, or another account's all collapse to NotFound).</summary>
+    [Fact]
+    public async Task PostPayload_UnknownSession_Returns404WithDevicePairingSessionNotFound()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        var (accountId, _) = await RegisterAsync(client, "pairing-payload-unknown@example.com");
+
+        var response = await PostPayloadAsync(client, accountId, "not-a-real-session-id");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("auth.device_pairing_session_not_found", await ReadCodeAsync(response));
+    }
+
+    /// <summary>One code for "unknown/expired", "not submitted yet" and "already fetched" -- the claiming device just keeps polling on it, and distinguishing reasons would help an attacker enumerate session state.</summary>
+    [Fact]
+    public async Task GetPayload_BeforeSubmit_Returns404WithDevicePairingPayloadNotDelivered()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        var sessionId = await CreateSessionAsync(client, "pairing-fetch-early@example.com");
+        await PostClaimAsync(client, sessionId);
+        client.DefaultRequestHeaders.Authorization = null;
+
+        var response = await GetPayloadAsync(client, sessionId);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("auth.device_pairing_payload_not_delivered", await ReadCodeAsync(response));
+    }
+
+    [Fact]
+    public async Task GetPayload_AfterSubmit_Returns200WithEncryptedKek()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        var (accountId, _) = await RegisterAsync(client, "pairing-fetch-ok@example.com");
+        var sessionId = await CreateSessionForAsync(client, accountId);
+        await PostClaimAsync(client, sessionId);
+        await PostPayloadAsync(client, accountId, sessionId);
+        // The claiming device has no session for this account -- it collects the ciphertext with only the session id it won.
+        client.DefaultRequestHeaders.Authorization = null;
+
+        var response = await GetPayloadAsync(client, sessionId);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.PairingSessionPayloadResponse);
+        Assert.NotNull(body);
+        Assert.Equal(EncryptedKek, body!.EncryptedKek);
+    }
+
+    /// <summary>Payload-replay proof at the HTTP layer: a successful fetch consumes the session outright.</summary>
+    [Fact]
+    public async Task GetPayload_CalledTwice_SecondCallReturns404()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        var (accountId, _) = await RegisterAsync(client, "pairing-fetch-twice@example.com");
+        var sessionId = await CreateSessionForAsync(client, accountId);
+        await PostClaimAsync(client, sessionId);
+        await PostPayloadAsync(client, accountId, sessionId);
+        var firstResponse = await GetPayloadAsync(client, sessionId);
+        Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
+
+        var response = await GetPayloadAsync(client, sessionId);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("auth.device_pairing_payload_not_delivered", await ReadCodeAsync(response));
+    }
+
+    /// <summary>S02-07: a finished handshake alerts the account holder by e-mail, proven here by driving Create-Claim-SubmitPayload over real HTTP and reading the capturing double back.</summary>
+    [Fact]
+    public async Task PostPayload_AfterClaim_SendsNewDeviceAlertToAccountEmail()
+    {
+        const string email = "pairing-alert-sent@example.com";
+        var (factory, sender) = CreateFactoryWithNewDeviceAlertCapture();
+        using var factoryDisposable = factory;
+        using var client = factory.CreateClient();
+        var (accountId, _) = await RegisterAsync(client, email);
+        var sessionId = await CreateSessionForAsync(client, accountId);
+        await PostClaimAsync(client, sessionId);
+
+        var response = await PostPayloadAsync(client, accountId, sessionId);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.True(sender.WasSentTo(email));
+    }
+
+    /// <summary>Swallow-on-failure proof over real HTTP: runs against the default wiring, where INewDeviceAlertSender is the real, NotSupportedException-throwing placeholder, and the handshake must still succeed.</summary>
+    [Fact]
+    public async Task PostPayload_AfterClaim_WithRealNewDeviceAlertSenderRegistration_StillReturns204()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        var (accountId, _) = await RegisterAsync(client, "pairing-alert-swallowed@example.com");
+        var sessionId = await CreateSessionForAsync(client, accountId);
+        await PostClaimAsync(client, sessionId);
+
+        var response = await PostPayloadAsync(client, accountId, sessionId);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    /// <summary>The whole handshake over HTTP in the order two real devices would drive it; proves the ciphertext the claiming device collects is byte-for-byte what the primary submitted.</summary>
+    [Fact]
+    public async Task FullFlow_CreateClaimSubmitFetch_RelaysEncryptedKekByteForByte()
+    {
+        using var factory = CreateFactory();
+        using var primary = factory.CreateClient();
+        // A second client with no credentials at all -- the device doing the scanning.
+        using var newDevice = factory.CreateClient();
+        var (accountId, _) = await RegisterAsync(primary, "pairing-full-flow@example.com");
+
+        var sessionId = await CreateSessionForAsync(primary, accountId);
+
+        var pendingStatus = await GetClaimStatusAsync(primary, accountId, sessionId);
+        var pending = await pendingStatus.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.PairingClaimStatusResponse);
+        Assert.False(pending!.Claimed);
+
+        var claimResponse = await PostClaimAsync(newDevice, sessionId);
+        Assert.Equal(HttpStatusCode.OK, claimResponse.StatusCode);
+        var claimed = await claimResponse.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.ClaimPairingSessionResponse);
+        Assert.Equal(PrimaryPublicKey, claimed!.PrimaryPublicKey);
+
+        var claimedStatus = await GetClaimStatusAsync(primary, accountId, sessionId);
+        var observed = await claimedStatus.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.PairingClaimStatusResponse);
+        Assert.True(observed!.Claimed);
+        Assert.Equal(NewDevicePublicKey, observed.NewDevicePublicKey);
+
+        var submitResponse = await PostPayloadAsync(primary, accountId, sessionId);
+        Assert.Equal(HttpStatusCode.NoContent, submitResponse.StatusCode);
+
+        var fetchResponse = await GetPayloadAsync(newDevice, sessionId);
+        Assert.Equal(HttpStatusCode.OK, fetchResponse.StatusCode);
+        var fetched = await fetchResponse.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.PairingSessionPayloadResponse);
+        Assert.Equal(EncryptedKek, fetched!.EncryptedKek);
+    }
+
+    /// <summary>Exercises Program.Composition.cs's DevicePairing:SessionLifetimeSeconds E2E override branch -- same precedent as MagicLink:TokenLifetimeSeconds.</summary>
+    [Fact]
+    public async Task PostPairingSession_WithConfiguredSessionLifetimeOverride_Returns201WithShorterExpiry()
+    {
+        using var factory = CreateFactory().WithWebHostBuilder(builder =>
+            builder.UseSetting("DevicePairing:SessionLifetimeSeconds", "30"));
+        using var client = factory.CreateClient();
+        var (accountId, _) = await RegisterAsync(client, "pairing-lifetime-override@example.com");
+        var before = DateTimeOffset.UtcNow;
+
+        var response = await PostCreateAsync(client, accountId);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.CreatePairingSessionResponse);
+        Assert.NotNull(body);
+        Assert.True(body!.ExpiresAt <= before + TimeSpan.FromSeconds(30) + TimeSpan.FromSeconds(5));
+    }
+
+    private static Task<HttpResponseMessage> GetPayloadAsync(HttpClient client, string sessionId) =>
+        client.GetAsync($"/devices/pairing-sessions/{sessionId}/payload");
+
+    private static Task<HttpResponseMessage> PostPayloadAsync(HttpClient client, Guid accountId, string sessionId) =>
+        client.PostAsJsonAsync(
+            $"/accounts/{accountId}/devices/pairing-sessions/{sessionId}/payload",
+            new SubmitPairingPayloadRequest(EncryptedKek),
+            ApiJsonSerializerContext.Default.SubmitPairingPayloadRequest);
+
+    private static Task<HttpResponseMessage> GetClaimStatusAsync(HttpClient client, Guid accountId, string sessionId) =>
+        client.GetAsync($"/accounts/{accountId}/devices/pairing-sessions/{sessionId}/claim-status");
+
+    private static Task<HttpResponseMessage> PostClaimAsync(HttpClient client, string sessionId) =>
+        client.PostAsJsonAsync(
+            $"/devices/pairing-sessions/{sessionId}/claim",
+            new ClaimPairingSessionRequest(NewDevicePublicKey),
+            ApiJsonSerializerContext.Default.ClaimPairingSessionRequest);
+
+    /// <summary>Registers a fresh account and opens a pairing session, returning the session id the primary device would encode into its QR code; leaves client authenticated as that account.</summary>
+    private static async Task<string> CreateSessionAsync(HttpClient client, string email)
+    {
+        var (accountId, _) = await RegisterAsync(client, email);
+        return await CreateSessionForAsync(client, accountId);
+    }
+
+    /// <summary>Opens a pairing session for an account client is already authenticated as, returning its session id.</summary>
+    private static async Task<string> CreateSessionForAsync(HttpClient client, Guid accountId)
+    {
+        var response = await PostCreateAsync(client, accountId);
+        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.CreatePairingSessionResponse);
+        return body!.SessionId;
+    }
+
+    private static Task<HttpResponseMessage> PostCreateAsync(HttpClient client, Guid accountId) =>
+        client.PostAsJsonAsync(
+            $"/accounts/{accountId}/devices/pairing-sessions",
+            new CreatePairingSessionRequest(PrimaryPublicKey),
+            ApiJsonSerializerContext.Default.CreatePairingSessionRequest);
+
+    /// <summary>Registers a Patient account (2FA NotApplicable per ADR-S02-03, so registration yields a real access token with no TOTP flow) and leaves client carrying it as the default Bearer header.</summary>
+    private static async Task<(Guid AccountId, string AccessToken)> RegisterAsync(HttpClient client, string email)
+    {
+        var response = await client.PostAsJsonAsync(
+            "/auth/register",
+            new RegisterRequest(email, SomeVerifier, AccountRole.Patient),
+            ApiJsonSerializerContext.Default.RegisterRequest);
+        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.RegisterResponse);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", body!.AccessToken);
+        return (body.Id, body.AccessToken!);
+    }
+
+    private static async Task<string?> ReadCodeAsync(HttpResponseMessage response)
+    {
+        var body = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(body);
+        return doc.RootElement.GetProperty("code").GetString();
+    }
+
+    private static WebApplicationFactory<Program> CreateFactory() =>
+        new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder =>
+            {
+                // Same reasoning as AuthEndpointsTests.CreateFactory: never touches Postgres, but
+                // startup still needs a syntactically valid ConnectionStrings:AppDb.
+                builder.UseSetting("ConnectionStrings:AppDb", "Host=127.0.0.1;Port=1;Username=app_role;Password=unused;");
+                builder.UseSetting("StaffAccess:ApiKey", "test-staff-api-key");
+                builder.UseSetting("WebAuthn:RelyingPartyId", "limmiar.test");
+                builder.UseSetting("WebAuthn:ExpectedOrigin", "https://limmiar.test");
+            });
+
+    private static byte[] CreateVerifier(byte fill)
+    {
+        var verifier = new byte[AccountService.PasswordVerifierLength];
+        Array.Fill(verifier, fill);
+        return verifier;
+    }
+
+    /// <summary>Overrides the production INewDeviceAlertSender registration with a capturing fake so the S02-07 tests can read back which e-mail POST .../payload alerted.</summary>
+    private static (WebApplicationFactory<Program> Factory, CapturingNewDeviceAlertSender Sender) CreateFactoryWithNewDeviceAlertCapture()
+    {
+        var sender = new CapturingNewDeviceAlertSender();
+        var factory = CreateFactory().WithWebHostBuilder(builder =>
+            builder.ConfigureTestServices(services => services.AddSingleton<INewDeviceAlertSender>(sender)));
+        return (factory, sender);
+    }
+}

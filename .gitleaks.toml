@@ -1,0 +1,11 @@
+title = "limmiar gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Known-answer crypto test vectors (RFC 7748, NIST CAVP) and a placeholder API request example, not real secrets"
+paths = [
+  '''packages/crypto/src/.*\.test\.ts$''',
+  '''apps/api/src/Api/Api\.http$''',
+]

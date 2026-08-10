@@ -1,0 +1,34 @@
+{
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.tsbuildinfo",
+    "target": "es2023",
+    // DOM added alongside Node's own types: this package's webcrypto.ts
+    // uses the Web Crypto API (global crypto.subtle), which is DOM-shaped
+    // even under Node — without it, the ambient CryptoKey identifier
+    // resolves to a value only (Node's global.d.ts constructor variable),
+    // not a type, and `Uint8Array`/BufferSource interop with subtle.*
+    // diverges from how apps/app (browser, "DOM" lib) sees the same files.
+    // Keeps both compile contexts (this package standalone, and apps/app's
+    // tsc -b pulling these .ts files in directly via workspace import) on
+    // the same ambient definitions instead of two incompatible ones.
+    "lib": ["ES2023", "ESNext.Intl", "DOM"],
+    "types": ["node"],
+    "allowArbitraryExtensions": true,
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["src", "vite.config.ts", "stryker.config.mjs"]
+}

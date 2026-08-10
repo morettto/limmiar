@@ -49,3 +49,83 @@ describe('translateProblemCode', () => {
     expect(result).not.toContain(rawCode)
   })
 })
+
+// S02-01 backend codes (apps/api/src/Api/Problems/ProblemCodes.cs) that
+// AuthScreen's register/login/Google flows can surface.
+describe('translateProblemCode — S02-01 auth codes', () => {
+  it('translates auth.email_already_registered', () => {
+    const i18nInstance = setupI18n({
+      locale: 'pt-BR',
+      messages: { 'pt-BR': { 'auth.email_already_registered': 'Este e-mail já está cadastrado.' } },
+    })
+
+    expect(translateProblemCode('auth.email_already_registered', {}, i18nInstance)).toBe(
+      'Este e-mail já está cadastrado.',
+    )
+  })
+
+  it('translates auth.invalid_credentials', () => {
+    const i18nInstance = setupI18n({
+      locale: 'pt-BR',
+      messages: { 'pt-BR': { 'auth.invalid_credentials': 'E-mail ou senha inválidos.' } },
+    })
+
+    expect(translateProblemCode('auth.invalid_credentials', {}, i18nInstance)).toBe('E-mail ou senha inválidos.')
+  })
+
+  it('translates auth.google_token_invalid', () => {
+    const i18nInstance = setupI18n({
+      locale: 'pt-BR',
+      messages: {
+        'pt-BR': { 'auth.google_token_invalid': 'Não foi possível continuar com o Google. Tente novamente.' },
+      },
+    })
+
+    expect(translateProblemCode('auth.google_token_invalid', {}, i18nInstance)).toBe(
+      'Não foi possível continuar com o Google. Tente novamente.',
+    )
+  })
+
+  it('translates validation.invalid_field, interpolating the offending field name', () => {
+    const i18nInstance = setupI18n({
+      locale: 'pt-BR',
+      messages: { 'pt-BR': { 'validation.invalid_field': 'Campo inválido: {field}.' } },
+    })
+
+    expect(translateProblemCode('validation.invalid_field', { field: 'email' }, i18nInstance)).toBe(
+      'Campo inválido: email.',
+    )
+  })
+})
+
+// S02-05 backend codes (apps/api/src/Api/Problems/ProblemCodes.cs), surfaced by
+// MagicLinkCallback's verify/complete flow.
+describe('translateProblemCode — S02-05 magic-link/WebAuthn codes', () => {
+  it('translates auth.magic_link_invalid', () => {
+    const i18nInstance = setupI18n({
+      locale: 'pt-BR',
+      messages: {
+        'pt-BR': { 'auth.magic_link_invalid': 'Este link de acesso não é mais válido. Solicite um novo.' },
+      },
+    })
+
+    expect(translateProblemCode('auth.magic_link_invalid', {}, i18nInstance)).toBe(
+      'Este link de acesso não é mais válido. Solicite um novo.',
+    )
+  })
+
+  it('translates auth.webauthn_ceremony_failed', () => {
+    const i18nInstance = setupI18n({
+      locale: 'pt-BR',
+      messages: {
+        'pt-BR': {
+          'auth.webauthn_ceremony_failed': 'Não foi possível confirmar sua identidade neste dispositivo. Tente novamente.',
+        },
+      },
+    })
+
+    expect(translateProblemCode('auth.webauthn_ceremony_failed', {}, i18nInstance)).toBe(
+      'Não foi possível confirmar sua identidade neste dispositivo. Tente novamente.',
+    )
+  })
+})

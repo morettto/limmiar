@@ -3,19 +3,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace Api.Tests.Startup;
 
-/// <summary>
-/// Proves the defensive "missing configuration" guards in Program.cs actually fire.
-/// Deliberately no ConnectionStrings defaults exist in appsettings*.json (never commit
-/// database credentials, even placeholder ones, to source control) -- every environment
-/// (tests, Docker, Fly) must supply ConnectionStrings__AppDb / ConnectionStrings__AdminDb
-/// explicitly. These tests exercise what happens when that requirement isn't met.
-/// </summary>
-/// <remarks>
-/// In the "Database" collection (not because it needs the Postgres container, but so
-/// xUnit never runs it in parallel with MigrateOnlyStartupTests -- both manipulate the
-/// same process-wide ConnectionStrings__AdminDb environment variable, and tests in
-/// different collections can run concurrently by default).
-/// </remarks>
+/// <summary>Proves the defensive "missing configuration" guards in Program.cs fire -- no ConnectionStrings defaults exist in appsettings*.json, so every environment must supply them explicitly. In the "Database" collection so xUnit never runs this in parallel with MigrateOnlyStartupTests, since both manipulate the same process-wide ConnectionStrings__AdminDb environment variable.</summary>
 [Collection("Database")]
 public sealed class MissingConfigurationTests
 {
@@ -29,6 +17,52 @@ public sealed class MissingConfigurationTests
         Assert.Contains("ConnectionStrings:AppDb", exception.Message);
     }
 
+    /// <summary>AppDb and WebAuthn settings (checked earlier in Program.Composition.cs) are set here so this test reaches the StaffAccess:ApiKey guard specifically, not an earlier one.</summary>
+    [Fact]
+    public void CreatingHost_WithoutStaffAccessApiKey_ThrowsInvalidOperationException()
+    {
+        using var factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder =>
+            {
+                builder.UseSetting("ConnectionStrings:AppDb", "Host=127.0.0.1;Port=1;Username=app_role;Password=unused;");
+                builder.UseSetting("WebAuthn:RelyingPartyId", "limmiar.test");
+                builder.UseSetting("WebAuthn:ExpectedOrigin", "https://limmiar.test");
+            });
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("StaffAccess:ApiKey", exception.Message);
+    }
+
+    [Fact]
+    public void CreatingHost_WithoutWebAuthnRelyingPartyId_ThrowsInvalidOperationException()
+    {
+        using var factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder =>
+            {
+                builder.UseSetting("ConnectionStrings:AppDb", "Host=127.0.0.1;Port=1;Username=app_role;Password=unused;");
+            });
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("WebAuthn:RelyingPartyId", exception.Message);
+    }
+
+    [Fact]
+    public void CreatingHost_WithoutWebAuthnExpectedOrigin_ThrowsInvalidOperationException()
+    {
+        using var factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder =>
+            {
+                builder.UseSetting("ConnectionStrings:AppDb", "Host=127.0.0.1;Port=1;Username=app_role;Password=unused;");
+                builder.UseSetting("WebAuthn:RelyingPartyId", "limmiar.test");
+            });
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("WebAuthn:ExpectedOrigin", exception.Message);
+    }
+
     [Fact]
     public async Task Main_WithMigrateOnlyFlagAndWithoutAdminDbConnectionString_ThrowsInvalidOperationException()
     {
@@ -40,8 +74,7 @@ public sealed class MissingConfigurationTests
     [Fact]
     public async Task Main_WithMigrateOnlyFlagAndWithoutAppDbConnectionString_ThrowsInvalidOperationException()
     {
-        // AdminDb is set so the branch under test is the AppDb guard specifically, not the
-        // earlier AdminDb one already covered above.
+        // AdminDb is set so the branch under test is the AppDb guard specifically.
         Environment.SetEnvironmentVariable("ConnectionStrings__AdminDb", "Host=127.0.0.1;Port=1;Database=irrelevant");
         try
         {

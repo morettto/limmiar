@@ -9,6 +9,17 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- WebAuthn ceremony verification (S02-05), consumed by WebAuthnCeremonyVerifier. The
+         package id is "Fido2"; the assembly/namespace it ships is Fido2NetLib (there is a
+         separate, abandoned "Fido2NetLib" package id stuck on 1.0.0-alpha, which is NOT this).
+         Kept after a Native AOT spike: `dotnet publish -c Release -p:PublishAot=true
+         -p:TrimmerSingleWarn=false` reports zero IL warnings with its full call graph rooted,
+         because 4.x parses CBOR/COSE directly and serializes through its own
+         System.Text.Json source-generated contexts. Note it drags in NSec.Cryptography plus a
+         NATIVE libsodium (for the Ed25519 algorithms this project never enables), which is
+         copied next to the AOT binary; worth revisiting if the runtime image is ever
+         audited for unused native surface. -->
+    <PackageReference Include="Fido2" Version="4.0.1" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.8" />
     <!-- Pinned above the transitive 2.0.0 that Microsoft.AspNetCore.OpenApi 10.0.8 pulls
          in, which has a known high-severity vulnerability (GHSA-v5pm-xwqc-g5wc, patched in

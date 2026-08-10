@@ -22,7 +22,7 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"],
+  "include": ["src", "playwright/index.tsx"],
   // Pact consumer tests import Node built-ins (node:path, node:url) to
   // resolve the shared pacts/ output directory — this project's "types":
   // ["vite/client"] above is deliberately browser-only (no "node"), so

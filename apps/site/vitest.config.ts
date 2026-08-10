@@ -1,6 +1,12 @@
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      '@limmiar/i18n': fileURLToPath(new URL('../../packages/i18n/src/index.ts', import.meta.url)),
+    },
+  },
   test: {
     // No DOM needed — only the pure src/lib/**/*.ts helpers are under test.
     environment: 'node',

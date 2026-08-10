@@ -10,28 +10,7 @@ using Xunit.Abstractions;
 
 namespace Api.Tests.Contracts;
 
-/// <summary>
-/// Provider-side verification that the real API honours the consumer-driven contract
-/// recorded by apps/app's Pact consumer test
-/// (pacts/limmiar-app-limmiar-api.json, generated separately by the consumer side --
-/// never edited or regenerated here).
-/// </summary>
-/// <remarks>
-/// PactNet's verifier core is a native/FFI process that issues real HTTP requests over a
-/// real socket. It cannot drive <see cref="Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory{TEntryPoint}"/>'s
-/// in-memory TestServer the way every other test in this project does -- there is no
-/// socket for it to connect to. This test instead builds the exact same WebApplication
-/// composition Program.cs's own top-level statements use (via <see cref="Program.BuildApp"/>),
-/// binds it to an OS-assigned loopback port with Kestrel, and tears it down afterwards.
-///
-/// The contract's single interaction ("the database is unreachable") needs no dynamic
-/// provider-state HTTP callback: its state is entirely determined by the connection
-/// string baked into the <see cref="WebApplicationBuilder"/> before the app starts (the
-/// same port-1-refuses-connections-instantly trick
-/// <c>Health/HealthDbEndpointTests.cs</c> uses), so no <c>WithProviderStateUrl(...)</c>
-/// is configured -- PactNet logs a harmless "no state change URL provided" warning and
-/// verifies the request/response as-is.
-/// </remarks>
+/// <summary>Provider-side verification of the consumer-driven Pact recorded by apps/app (pacts/limmiar-app-limmiar-api.json, never edited or regenerated here). PactNet's verifier issues real HTTP requests over a real socket, so it can't drive WebApplicationFactory's in-memory TestServer -- this builds the real WebApplication via Program.BuildApp, binds it to a real Kestrel port, and tears it down afterwards.</summary>
 public sealed class ProblemDetailsProviderPactTests
 {
     private readonly ITestOutputHelper _output;
@@ -46,15 +25,19 @@ public sealed class ProblemDetailsProviderPactTests
     {
         var builder = WebApplication.CreateSlimBuilder();
 
-        // Port 0 == let the OS pick a free ephemeral loopback port; the actual bound
-        // address is read back below once the server has started.
+        // Port 0 == let the OS pick a free ephemeral loopback port; the bound address is read back below.
         builder.WebHost.UseUrls("http://127.0.0.1:0");
 
-        // Port 1 refuses connections instantly on loopback -- deterministic, no container
-        // or network flakiness involved. Bakes in the contract's only provider state
-        // ("the database is unreachable") before the app is even built.
+        // Port 1 refuses connections instantly on loopback -- deterministic, and bakes in the
+        // contract's only provider state ("the database is unreachable") before the app is built.
         builder.Configuration["ConnectionStrings:AppDb"] =
             "Host=127.0.0.1;Port=1;Username=app_role;Password=unused;Timeout=2;";
+
+        // App startup needs these configured too (same fail-fast pattern as ConnectionStrings:AppDb),
+        // even though this contract test never hits a staff-gated or WebAuthn endpoint.
+        builder.Configuration["StaffAccess:ApiKey"] = "test-staff-api-key";
+        builder.Configuration["WebAuthn:RelyingPartyId"] = "limmiar.test";
+        builder.Configuration["WebAuthn:ExpectedOrigin"] = "https://limmiar.test";
 
         await using var app = Program.BuildApp(builder);
 
@@ -86,10 +69,8 @@ public sealed class ProblemDetailsProviderPactTests
 
     private static string ResolvePactFilePath()
     {
-        // AppContext.BaseDirectory at test run time is the build OUTPUT directory
-        // (bin/Release/net10.0/...), not the source tree -- walk up from there rather
-        // than assuming the source-tree relative depth (apps/api/tests/Api.Tests/../../..)
-        // carries over to the build output.
+        // AppContext.BaseDirectory at test run time is the build output directory, not the
+        // source tree -- walk up from there rather than assume a fixed relative depth.
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
         while (directory is not null)
         {

@@ -55,6 +55,180 @@
         },
         "status": 503
       }
+    },
+    {
+      "description": "a request to log in with an unrecognized e-mail",
+      "providerStates": [
+        {
+          "name": "no account exists for s02-01-pact-login-unknown@example.com"
+        }
+      ],
+      "request": {
+        "body": {
+          "email": "s02-01-pact-login-unknown@example.com",
+          "passwordVerifier": "CgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgo="
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "method": "POST",
+        "path": "/auth/login"
+      },
+      "response": {
+        "body": {
+          "code": "auth.invalid_credentials",
+          "params": {},
+          "status": 401,
+          "title": "Invalid credentials",
+          "type": "about:blank"
+        },
+        "headers": {
+          "Content-Type": "application/problem+json"
+        },
+        "matchingRules": {
+          "body": {
+            "$.status": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.title": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        },
+        "status": 401
+      }
+    },
+    {
+      "description": "a request to register a new professional account by e-mail",
+      "providerStates": [
+        {
+          "name": "no account exists for s02-01-pact-register@example.com"
+        }
+      ],
+      "request": {
+        "body": {
+          "email": "s02-01-pact-register@example.com",
+          "passwordVerifier": "CgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgo=",
+          "role": "Professional"
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "method": "POST",
+        "path": "/auth/register"
+      },
+      "response": {
+        "body": {
+          "email": "s02-01-pact-register@example.com",
+          "id": "e2490de5-5bd3-43d5-b7c4-526e33f71304",
+          "role": "Professional"
+        },
+        "generators": {
+          "body": {
+            "$.id": {
+              "type": "Uuid"
+            }
+          }
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "matchingRules": {
+          "body": {
+            "$.id": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                }
+              ]
+            }
+          }
+        },
+        "status": 201
+      }
+    },
+    {
+      "description": "a request to register with an empty e-mail",
+      "providerStates": [
+        {
+          "name": "the request is missing a required field"
+        }
+      ],
+      "request": {
+        "body": {
+          "email": "",
+          "passwordVerifier": "CgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgo=",
+          "role": "Professional"
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "method": "POST",
+        "path": "/auth/register"
+      },
+      "response": {
+        "body": {
+          "code": "validation.invalid_field",
+          "params": {
+            "field": "email"
+          },
+          "status": 400,
+          "title": "Invalid request",
+          "type": "about:blank"
+        },
+        "headers": {
+          "Content-Type": "application/problem+json"
+        },
+        "matchingRules": {
+          "body": {
+            "$.status": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.title": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        },
+        "status": 400
+      }
     }
   ],
   "metadata": {
