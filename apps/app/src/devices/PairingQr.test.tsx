@@ -33,7 +33,11 @@ const SESSION_ID = 'session-abc'
 // `vi.advanceTimersByTimeAsync(0)` reliably drains the mount effect's
 // createPairingSession -> toDataURL -> setState chain.
 function mockToDataURLForFakeTimers() {
-  return vi.spyOn(QRCode, 'toDataURL').mockResolvedValue('data:image/png;base64,mock')
+  return vi
+    .spyOn(QRCode, 'toDataURL')
+    .mockImplementation(
+      () => Promise.resolve('data:image/png;base64,mock') as unknown as ReturnType<typeof QRCode.toDataURL>,
+    )
 }
 
 async function flushMicrotasks() {
