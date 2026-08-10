@@ -8,25 +8,14 @@ import { PairingScan } from './PairingScan'
 
 export interface PairNewDeviceProps {
   baseUrl: string
-  /** Test/production seam, forwarded straight through to PairingScan -- see qr-decode.ts. */
   decode?: () => Promise<string>
-  /**
-   * Called once this device holds a decrypted, working copy of the account's KEK. The
-   * caller is expected to adopt it into its own Keychain, e.g.
-   * `createKeychain().unlock(() => Promise.resolve(kek))` -- this component does not touch
-   * Keychain itself, matching PairPrimaryDevice.tsx's symmetric choice not to reach into it
-   * either.
-   */
   onKekAdopted: (kek: Uint8Array) => void
 }
 
-// The payload endpoint collapses "primary hasn't submitted yet" and "session
-// gone/expired/already consumed" into the same 404 (ProblemCodes.DevicePairingPayloadNotDelivered
-// -- see DevicePairingEndpoints.cs), on purpose, so callers can't distinguish "keep polling"
-// from "give up" by response shape. A bounded wait, matching the backend's own
-// PairingSessionLifetime (2 minutes -- see DevicePairingIssuer.cs), is what stands in for
-// that distinction here: still-live sessions succeed well within it, and there is no
-// legitimate reason to poll past the window the session could ever have been alive for.
+// The payload endpoint returns the same 404 whether the primary hasn't submitted yet or
+// the session is gone, so callers cannot distinguish "keep polling" from "give up" by
+// response shape. The timeout below must match the backend's PairingSessionLifetime (2
+// minutes): a session cannot succeed after that window closes.
 const PAYLOAD_POLL_INTERVAL_MS = 1000
 const PAYLOAD_POLL_TIMEOUT_MS = 2 * 60 * 1000
 
@@ -36,13 +25,6 @@ type AdoptionState =
   | { status: 'adopted' }
   | { status: 'error'; message: string }
 
-/**
- * Wires PairingScan's relay-only handshake to the actual secure channel: generates this
- * device's ephemeral X25519 keypair, hands PairingScan the public half to claim the scanned
- * session with, and -- once claimed -- polls for the primary's encrypted payload, derives
- * the same channel key the primary derived (HKDF-SHA256 over the shared ECDH secret,
- * salted with the session id), and decrypts the KEK.
- */
 export function PairNewDevice({ baseUrl, decode, onKekAdopted }: PairNewDeviceProps) {
   const { i18n, t } = useLingui()
   const [keyPair] = useState(() => generateKeyPair())

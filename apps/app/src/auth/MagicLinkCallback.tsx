@@ -127,7 +127,6 @@ export function MagicLinkCallback({
     return () => {
       cancelled = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   if (state.status === 'error') {

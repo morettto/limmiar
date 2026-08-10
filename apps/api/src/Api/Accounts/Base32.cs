@@ -2,11 +2,6 @@ using System.Text;
 
 namespace Api.Accounts;
 
-/// <summary>
-/// RFC 4648 Base32 (alphabet "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"), no padding -- not
-/// available in the BCL (<see cref="Convert"/> only has Base64). Only used by
-/// <see cref="TotpProvider"/> to encode/decode the TOTP secret.
-/// </summary>
 public static class Base32
 {
     private const string Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
@@ -36,9 +31,6 @@ public static class Base32
 
         if (bitsLeft > 0)
         {
-            // Pad the last partial group with low-order zero bits, same as any RFC 4648
-            // Base32 encoder -- there is no padding character since callers never need to
-            // concatenate encoded chunks.
             result.Append(Alphabet[(buffer << (5 - bitsLeft)) & 0x1F]);
         }
 

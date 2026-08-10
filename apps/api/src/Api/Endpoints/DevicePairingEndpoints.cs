@@ -6,21 +6,6 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Api.Endpoints;
 
-/// <summary>
-/// S02-04 backend: the HTTP surface of the device-pairing-by-QR handshake. Owns
-/// authentication and HTTP status/Problem+JSON mapping only; the entire handshake --
-/// session lifetime, first-claim-wins, single-use payload delivery -- lives in
-/// <see cref="IDevicePairingIssuer"/>, which every handler here calls exactly once. Same
-/// split as <see cref="AuthEndpoints"/>/<see cref="TwoFactorEndpoints"/>.
-///
-/// Two of the five endpoints are deliberately unauthenticated (claim, fetch payload): the
-/// scanning device has no session for this account yet -- that is the whole point of
-/// pairing -- so possession of the session id it just read off the QR code, plus having won
-/// the single claim that id allows, IS its credential. The other three are account-scoped
-/// exactly like <see cref="ProfessionalVerificationEndpoints"/>'s submit handler: an
-/// <c>Authorization: Bearer</c> access token that <see cref="ISessionTokenIssuer.ValidateAccess"/>
-/// resolves to the <c>accountId</c> URL segment and no other.
-/// </summary>
 public static class DevicePairingEndpoints
 {
     public static void MapDevicePairingEndpoints(this WebApplication app)
@@ -64,14 +49,7 @@ public static class DevicePairingEndpoints
             .Produces<LimmiarProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json");
     }
 
-    /// <summary>
-    /// Synchronous, unlike <see cref="HandleSubmitPayload"/> below: <see cref="IDevicePairingIssuer"/>
-    /// is an in-memory relay with no I/O to await, so wrapping these handlers in <c>Task</c>
-    /// would buy nothing on its own. <see cref="HandleSubmitPayload"/> is the one exception
-    /// among the five -- it also awaits <see cref="AccountService.NotifyNewDeviceLinkedAsync"/>
-    /// to fire the S02-07 new-device alert once the handshake completes, which is why it alone
-    /// needs to be <c>async Task</c>.
-    /// </summary>
+    // The one async handler of the five -- it alone awaits AccountService.NotifyNewDeviceLinkedAsync (S02-07 alert) after the handshake completes.
     private static Results<Created<CreatePairingSessionResponse>, JsonHttpResult<LimmiarProblemDetails>> HandleCreate(
         Guid accountId,
         CreatePairingSessionRequest request,
@@ -146,15 +124,10 @@ public static class DevicePairingEndpoints
             return result.FailureReason switch
             {
                 SubmitPairingPayloadFailureReason.NotFound => SessionNotFoundProblem(),
-                // NotClaimedYet and AlreadySubmitted alike: the session is real and the
-                // caller owns it, it just cannot take a payload right now.
                 _ => ProblemJson(StatusCodes.Status409Conflict, "Pairing session is not ready for a payload", ProblemCodes.DevicePairingPayloadNotReady),
             };
         }
 
-        // S02-07: the handshake just finished -- alert the account holder out-of-band.
-        // AccountService.NotifyNewDeviceLinkedAsync already swallows its own failures, so this
-        // call can never turn a successful handshake into a non-204 response.
         await accountService.NotifyNewDeviceLinkedAsync(accountId, cancellationToken);
 
         return TypedResults.NoContent();
@@ -176,13 +149,6 @@ public static class DevicePairingEndpoints
 
     private const string BearerPrefix = "Bearer ";
 
-    /// <summary>
-    /// True only if <paramref name="authorizationHeader"/> is a well-formed
-    /// <c>Bearer &lt;token&gt;</c> value whose token <see cref="ISessionTokenIssuer.ValidateAccess"/>
-    /// resolves to EXACTLY <paramref name="accountId"/> -- a valid access token for a
-    /// DIFFERENT account must not authorize the call (same account-scoping discipline, and
-    /// the same check, as <see cref="ProfessionalVerificationEndpoints"/>).
-    /// </summary>
     private static bool IsAuthorizedForAccount(string? authorizationHeader, Guid accountId, ISessionTokenIssuer sessionTokenIssuer)
     {
         if (authorizationHeader is null || !authorizationHeader.StartsWith(BearerPrefix, StringComparison.Ordinal))
@@ -218,47 +184,16 @@ public static class DevicePairingEndpoints
     }
 }
 
-/// <summary>
-/// <see cref="PrimaryPublicKey"/> is the already-authorized device's raw X25519 public key,
-/// carried as base64 over JSON -- same <c>byte[]</c>-property convention as
-/// <see cref="Accounts.RegisterRequest.PasswordVerifier"/>. Opaque to this backend, which
-/// only relays it.
-/// </summary>
 public sealed record CreatePairingSessionRequest(byte[] PrimaryPublicKey);
 
-/// <summary>
-/// <see cref="SessionId"/> is what the primary device encodes into its QR code. Opaque --
-/// callers must not attempt to decode or interpret it. It stops working at
-/// <see cref="ExpiresAt"/>, which the primary uses to expire the code on screen.
-/// </summary>
 public sealed record CreatePairingSessionResponse(string SessionId, DateTimeOffset ExpiresAt);
 
-/// <summary>
-/// <see cref="NewDevicePublicKey"/> is the scanning device's own raw X25519 public key --
-/// what the primary will encrypt its KEK for. Base64 over JSON, same convention as
-/// <see cref="CreatePairingSessionRequest.PrimaryPublicKey"/>.
-/// </summary>
 public sealed record ClaimPairingSessionRequest(byte[] NewDevicePublicKey);
 
-/// <summary>The primary device's raw X25519 public key, so the claiming device can derive the shared secret for this pairing.</summary>
 public sealed record ClaimPairingSessionResponse(byte[] PrimaryPublicKey);
 
-/// <summary>
-/// <see cref="Claimed"/> is false while the session is still waiting for a device to scan
-/// the QR code; <see cref="NewDevicePublicKey"/> is null until it is true, and is the key
-/// the primary encrypts its KEK for.
-/// </summary>
 public sealed record PairingClaimStatusResponse(bool Claimed, byte[]? NewDevicePublicKey);
 
-/// <summary>
-/// <see cref="EncryptedKek"/> is the primary's KEK, already encrypted to the claiming
-/// device's key. Base64 over JSON, and completely opaque to this backend -- it never has
-/// the material to read it and relays it verbatim.
-/// </summary>
 public sealed record SubmitPairingPayloadRequest(byte[] EncryptedKek);
 
-/// <summary>
-/// The ciphertext relayed to the claiming device, byte-for-byte as the primary submitted
-/// it. Delivered exactly once -- see <see cref="IDevicePairingIssuer.FetchPayload"/>.
-/// </summary>
 public sealed record PairingSessionPayloadResponse(byte[] EncryptedKek);

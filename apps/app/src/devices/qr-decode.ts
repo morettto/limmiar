@@ -1,16 +1,8 @@
 import jsQR from 'jsqr'
 
-/**
- * Production QR decoder for the new device's pairing scan (PairingScan.tsx): opens the
- * camera, draws frames to an offscreen canvas, and runs jsQR against each frame until it
- * finds a code, then tears the stream down.
- *
- * Deliberately NOT exercised by this repo's automated tests -- PairingScan accepts a
- * `decode` prop that defaults to this function, and tests/E2E inject a fake that resolves
- * immediately with a known QR string instead. That seam proves the pairing PROTOCOL
- * (claim -> derive -> decrypt -> adopt KEK) end-to-end without needing a real or
- * fake-flagged camera device in CI; actual camera-frame decoding is left to manual QA.
- */
+// Not exercised by automated tests: CI has no camera. PairingScan's `decode` prop
+// defaults to this function; tests inject a fake that resolves immediately instead.
+// Camera-frame decoding itself is left to manual QA.
 export async function decodeFromCamera(): Promise<string> {
   const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
 

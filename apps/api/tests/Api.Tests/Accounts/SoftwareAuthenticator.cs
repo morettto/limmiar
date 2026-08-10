@@ -5,16 +5,6 @@ using System.Text;
 
 namespace Api.Tests.Accounts;
 
-/// <summary>
-/// A minimal FIDO2 platform authenticator: one ES256 (COSE alg -7) keypair, one credential id,
-/// and an externally supplied signature counter. Only the <c>none</c> attestation format is
-/// produced -- what a platform authenticator returns when the relying party asks for
-/// <c>attestation: "none"</c>, which is the case S02-05 uses. Shared between
-/// <see cref="WebAuthnCeremonyVerifierTests"/> (which exercises the ceremony verifier directly)
-/// and <see cref="AccountServiceMagicLinkTests"/> (which exercises it through
-/// <c>AccountService.CompleteMagicLinkWebAuthnAsync</c>) so this real ES256/CBOR/ECDSA test
-/// double is written once.
-/// </summary>
 internal sealed class SoftwareAuthenticator
 {
     private const byte FlagUserPresent = 0x01;
@@ -110,11 +100,7 @@ internal sealed class SoftwareAuthenticator
         ];
     }
 
-    /// <summary>
-    /// This authenticator's EC2 P-256 key encoded as a COSE_Key, with the <c>alg</c> label
-    /// forced to <paramref name="coseAlgorithm"/> -- passing anything but ES256 produces a key
-    /// whose <c>kty</c> and <c>alg</c> contradict each other on purpose.
-    /// </summary>
+    // Passing anything but ES256 produces a kty/alg-contradicting key, on purpose.
     public byte[] CoseKeyLabelledAs(int coseAlgorithm)
     {
         var parameters = _key.ExportParameters(includePrivateParameters: false);
@@ -134,7 +120,6 @@ internal sealed class SoftwareAuthenticator
         return writer.Encode();
     }
 
-    /// <summary>A well-formed RSA COSE_Key: an algorithm this verifier never offers, but a coherent credential in its own right.</summary>
     public static byte[] Rs256CoseKey()
     {
         using var rsa = RSA.Create(2048);

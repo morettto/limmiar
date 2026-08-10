@@ -74,10 +74,28 @@ export default tseslint.config(
             // SCREAMING_SNAKE_CASE module-level constants are identifiers/keys
             // (e.g. storage keys), by this repo's own convention never prose.
             { regex: { pattern: '^[A-Z][A-Z0-9_]*$' } },
+            // AccountResult.twoFactorRequirement (e.g. MagicLinkCallback.tsx) is the
+            // same kind of internal state-machine tag as `status` above -- only
+            // branched on to pick real <Trans> copy, never rendered as-is.
+            'twoFactorRequirement',
+            // TanStack Router route config key (router.tsx) -- a URL path, not copy.
+            'path',
           ],
           // DOM/browser APIs whose string argument is an element id/selector,
           // never user-visible copy.
-          ignoreFunctions: ['*.getElementById', '*.querySelector', '*.querySelectorAll'],
+          ignoreFunctions: [
+            '*.getElementById',
+            '*.querySelector',
+            '*.querySelectorAll',
+            // translateProblemCode's `code` argument is a backend problem-code key
+            // looked up in problem-messages.ts's registry, not copy rendered as-is.
+            'translateProblemCode',
+            // router.tsx's own helper -- its 2nd argument is a URL search-param key.
+            'readSearchString',
+            // Error messages are developer-facing diagnostics (thrown/rejected, never
+            // rendered UI), same convention already used across this repo's *.ts files.
+            'Error',
+          ],
         },
       ],
     },

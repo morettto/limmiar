@@ -1,14 +1,11 @@
-// Explicit .ts extension (vs the bare specifier used elsewhere in this package):
-// this module is also run directly by Node (scripts/run-benchmark.mjs), whose
-// native TS support, unlike Vite/Vitest's bundler resolution, requires it.
+// Explicit .ts extension: this module is also run directly by Node (scripts/run-benchmark.mjs), whose native TS support requires it, unlike the bare specifiers used elsewhere.
 import { deriveKey, type Argon2Params } from './argon2id.ts'
 
 export interface BenchmarkResult {
   msPerCall: number
 }
 
-// Manual calibration tool (see vite.config.ts / stryker.config.mjs exclusions) — run by a
-// human against real hardware to pick per-device-tier Argon2Params, not gated logic.
+// Manual calibration tool run by a human against real hardware to pick per-device-tier Argon2Params (excluded from vite.config.ts / stryker.config.mjs as non-gated logic).
 export async function measureArgon2id(params: Argon2Params, iterations = 5): Promise<BenchmarkResult> {
   const password = new Uint8Array(32).fill(0x01)
   const salt = new Uint8Array(16).fill(0x02)

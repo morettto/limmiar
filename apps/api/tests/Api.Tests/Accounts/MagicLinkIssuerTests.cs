@@ -2,12 +2,6 @@ using Api.Accounts;
 
 namespace Api.Tests.Accounts;
 
-/// <summary>
-/// Covers <see cref="MagicLinkIssuer"/> directly -- token issuance/consumption and ticket
-/// issuance/consumption are independent single-use surfaces, each with its own expiry, driven
-/// by an injected fake clock (same discipline as <see cref="DevicePairingIssuerTests"/>/
-/// <see cref="TwoFactorTicketIssuerTests"/>, never a real <c>Thread.Sleep</c>).
-/// </summary>
 public sealed class MagicLinkIssuerTests
 {
     private const string Email = "patient@example.com";
@@ -54,7 +48,6 @@ public sealed class MagicLinkIssuerTests
         Assert.Null(result);
     }
 
-    /// <summary>Core replay rule: a magic-link token is worth exactly one consumption.</summary>
     [Fact]
     public void ConsumeToken_CalledTwice_SecondCallReturnsNull()
     {
@@ -139,7 +132,6 @@ public sealed class MagicLinkIssuerTests
         Assert.Null(result);
     }
 
-    /// <summary>Core replay rule for the second single-use surface, independent of the token's.</summary>
     [Fact]
     public void ConsumeTicket_CalledTwice_SecondCallReturnsNull()
     {
@@ -176,7 +168,6 @@ public sealed class MagicLinkIssuerTests
         Assert.NotNull(issuer.ConsumeTicket(ticket));
     }
 
-    /// <summary>Token and ticket single-use tracking must be independent stores -- consuming one must not affect the other.</summary>
     [Fact]
     public void ConsumeToken_AndConsumeTicket_AreIndependentSingleUseStores()
     {

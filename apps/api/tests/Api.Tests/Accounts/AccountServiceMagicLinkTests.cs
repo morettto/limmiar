@@ -4,19 +4,9 @@ using Api.Accounts;
 
 namespace Api.Tests.Accounts;
 
-/// <summary>
-/// Covers <see cref="AccountService.RequestMagicLinkAsync"/>/<see cref="AccountService.VerifyMagicLinkAsync"/>/
-/// <see cref="AccountService.CompleteMagicLinkWebAuthnAsync"/> (Spec S02, ticket S02-05). A
-/// separate file from <see cref="AccountServiceTests"/> (which already covers
-/// register/login/Google) purely for size -- same "one concern per test file" split as
-/// <see cref="AccountServiceTotpTests"/>/<see cref="AccountServiceProfessionalVerificationTests"/>.
-///
-/// The WebAuthn-completion tests use the REAL <see cref="WebAuthnCeremonyVerifier"/> and a
-/// real ES256 keypair (<see cref="SoftwareAuthenticator"/>), the same technique
-/// <see cref="WebAuthnCeremonyVerifierTests"/> uses directly -- a fake verifier here would
-/// prove nothing about whether AccountService wires the ceremony correctly (right challenge,
-/// right RP id/origin, right stored credential material).
-/// </summary>
+// The WebAuthn-completion tests use the real WebAuthnCeremonyVerifier and a real ES256
+// keypair (SoftwareAuthenticator); a fake verifier would not catch a wrong challenge,
+// RP id/origin, or stored credential material.
 public sealed class AccountServiceMagicLinkTests
 {
     private const string RelyingPartyId = "limmiar.test";
@@ -45,11 +35,8 @@ public sealed class AccountServiceMagicLinkTests
         Assert.True(sender.WasSentTo("patient@example.com"));
     }
 
-    /// <summary>
-    /// Judgment call documented on <see cref="AccountService.RequestMagicLinkAsync"/>: an
-    /// existing Professional account must not receive a passwordless magic link, since that
-    /// would bypass its mandatory password + TOTP flow (ADR-S02-02/S02-03).
-    /// </summary>
+    // A Professional account must not get a passwordless link: it would bypass the
+    // mandatory password + TOTP flow (ADR-S02-02/S02-03).
     [Fact]
     public async Task RequestMagicLinkAsync_WithExistingProfessionalEmail_DoesNotSendToken()
     {
@@ -72,11 +59,8 @@ public sealed class AccountServiceMagicLinkTests
         Assert.Same(RequestMagicLinkResult.Instance, result);
     }
 
-    /// <summary>
-    /// Account-enumeration mitigation: the outward result must be identical -- literally the
-    /// same, dataless <see cref="RequestMagicLinkResult"/> instance -- whether the e-mail is
-    /// unknown, an existing Patient, or a gated Professional.
-    /// </summary>
+    // Account-enumeration mitigation: the same dataless result instance must come back
+    // whether the e-mail is unknown, an existing Patient, or a gated Professional.
     [Fact]
     public async Task RequestMagicLinkAsync_ForEveryCase_ReturnsIdenticalResult()
     {
@@ -180,7 +164,6 @@ public sealed class AccountServiceMagicLinkTests
         Assert.False(result.Succeeded);
     }
 
-    /// <summary>Full chain, real crypto: request -&gt; verify -&gt; complete a REGISTRATION ceremony end to end.</summary>
     [Fact]
     public async Task CompleteMagicLinkWebAuthnAsync_RegistrationPath_CreatesPatientAccountAndIssuesSession()
     {
@@ -214,7 +197,6 @@ public sealed class AccountServiceMagicLinkTests
         Assert.NotNull(result.Session.RefreshToken);
     }
 
-    /// <summary>Full chain, real crypto, second login: register once, then assert (re-use the same credential) and prove the persisted sign count advances.</summary>
     [Fact]
     public async Task CompleteMagicLinkWebAuthnAsync_AssertionPath_UpdatesSignCountAndIssuesSession()
     {
@@ -244,7 +226,6 @@ public sealed class AccountServiceMagicLinkTests
         Assert.NotNull(result.Session);
     }
 
-    /// <summary>A tampered signature must be rejected via the real verifier chain -- a fake verifier would never catch this.</summary>
     [Fact]
     public async Task CompleteMagicLinkWebAuthnAsync_AssertionPath_WithTamperedSignature_ReturnsFailure()
     {
@@ -288,7 +269,6 @@ public sealed class AccountServiceMagicLinkTests
         Assert.False(result.Succeeded);
     }
 
-    /// <summary>The real verifier must reject a registration whose clientDataJSON carries the wrong challenge -- proves AccountService doesn't just trust whatever comes back.</summary>
     [Fact]
     public async Task CompleteMagicLinkWebAuthnAsync_RegistrationPath_WithWrongChallenge_ReturnsFailure()
     {
@@ -348,12 +328,8 @@ public sealed class AccountServiceMagicLinkTests
         Assert.False(result.Succeeded);
     }
 
-    /// <summary>
-    /// Defensive branch: the account behind an Assert ticket's AccountId is gone by the time
-    /// the ceremony completes (e.g. deleted between the two calls). Ticket is minted directly
-    /// via <see cref="IMagicLinkIssuer"/> rather than through <see cref="AccountService.VerifyMagicLinkAsync"/>,
-    /// since that method can never itself produce a ticket pointing at a nonexistent account.
-    /// </summary>
+    // Ticket is minted directly via IMagicLinkIssuer because VerifyMagicLinkAsync can never
+    // itself produce a ticket pointing at a nonexistent account.
     [Fact]
     public async Task CompleteMagicLinkWebAuthnAsync_AssertionPath_WithAccountNoLongerInStore_ReturnsFailure()
     {

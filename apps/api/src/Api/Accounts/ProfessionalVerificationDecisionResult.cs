@@ -3,8 +3,6 @@ namespace Api.Accounts;
 public enum ProfessionalVerificationDecisionFailureReason
 {
     AccountNotFound,
-
-    /// <summary>Only an <see cref="AccountVerificationStatus.InReview"/> account can be decided.</summary>
     NotInReview,
 }
 

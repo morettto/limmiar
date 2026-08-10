@@ -4,13 +4,6 @@ public enum SubmitProfessionalCredentialFailureReason
 {
     AccountNotFound,
     NotAProfessionalAccount,
-
-    /// <summary>
-    /// Submission is only accepted from <see cref="AccountVerificationStatus.Pending"/> or
-    /// <see cref="AccountVerificationStatus.Rejected"/> -- an <see cref="AccountVerificationStatus.Active"/>
-    /// account has nothing to (re)submit, and an <see cref="AccountVerificationStatus.InReview"/>
-    /// one is already in the queue.
-    /// </summary>
     InvalidStateForSubmission,
 }
 
@@ -20,7 +13,6 @@ public sealed class SubmitProfessionalCredentialResult
 
     public Account? Account { get; init; }
 
-    /// <summary>Set only for the document path (Active/Rejected results carry no SLA).</summary>
     public int? DocumentReviewSlaBusinessDays { get; init; }
 
     public SubmitProfessionalCredentialFailureReason? FailureReason { get; init; }

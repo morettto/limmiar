@@ -2,7 +2,6 @@ using Api.Accounts;
 
 namespace Api.Tests.Accounts;
 
-/// <summary>Spec S02, ADR-S02-03/S02-04: 2FA is mandatory for Professional accounts only, never for Patient.</summary>
 public sealed class TwoFactorPolicyTests
 {
     [Fact]
@@ -31,7 +30,6 @@ public sealed class TwoFactorPolicyTests
         Assert.Equal(TwoFactorRequirement.ChallengeRequired, TwoFactorPolicy.Determine(account));
     }
 
-    /// <summary>A pending (secret generated, not yet confirmed) enrollment must still report SetupRequired, not some third state.</summary>
     [Fact]
     public void Determine_WithProfessionalAccount_AndPendingEnrollment_StillReturnsSetupRequired()
     {

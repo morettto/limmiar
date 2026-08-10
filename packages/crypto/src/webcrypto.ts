@@ -1,31 +1,18 @@
-// CryptoKey is a Web Crypto API type ambient in BOTH lib.dom (browser
-// consumers, e.g. apps/app) and @types/node's global webcrypto augmentation
-// (Node consumers, e.g. this package's own test run) — referenced directly
-// below with no import. It's re-exported under the distinct local name
-// WebCryptoKey (index.ts renames it back to CryptoKey on the way out)
-// because `export type CryptoKey = CryptoKey` would be self-referential: a
-// local declaration named CryptoKey shadows the ambient global of the same
-// name for the whole module, so the RHS would resolve to itself instead of
-// the ambient type.
+// Re-exported under the local name WebCryptoKey (index.ts renames it back to CryptoKey) because `export type CryptoKey = CryptoKey` would be self-referential: a local declaration named CryptoKey shadows the ambient lib.dom/@types-node global for the whole module, so the RHS would resolve to itself.
 export type WebCryptoKey = CryptoKey
 
 const AES_256_KEY_LENGTH = 32
 const GCM_IV_LENGTH = 12
 const GCM_TAG_LENGTH_BITS = 128
 
-// Same rationale as aes-gcm.ts's key-length guard: subtle.importKey silently
-// accepts 16/24-byte input as AES-128/192-GCM. This package's contract is
-// specifically AES-256-GCM.
+// Same rationale as aes-gcm.ts's key-length guard: subtle.importKey silently accepts 16/24-byte input as AES-128/192-GCM, but this package's contract is AES-256-GCM only.
 function assertAes256KeyLength(key: Uint8Array<ArrayBuffer>): void {
   if (key.length !== AES_256_KEY_LENGTH) {
     throw new Error(`AES-256-GCM key must be exactly ${AES_256_KEY_LENGTH} bytes, got ${key.length}`)
   }
 }
 
-// Return type pinned to Uint8Array<ArrayBuffer> (not the wider, generic-
-// default Uint8Array<ArrayBufferLike>) so every value this module hands to
-// crypto.subtle.* satisfies lib.dom's BufferSource, which since TS 5.7 no
-// longer structurally accepts ArrayBufferLike (SharedArrayBuffer included).
+// Return type pinned to Uint8Array<ArrayBuffer>, not the wider default Uint8Array<ArrayBufferLike>, so every value handed to crypto.subtle.* satisfies lib.dom's BufferSource, which since TS 5.7 no longer structurally accepts ArrayBufferLike.
 function concat(...parts: Uint8Array<ArrayBuffer>[]): Uint8Array<ArrayBuffer> {
   const total = parts.reduce((sum, part) => sum + part.length, 0)
   const result = new Uint8Array(total)
@@ -43,10 +30,7 @@ function randomIv(): Uint8Array<ArrayBuffer> {
   return crypto.getRandomValues(new Uint8Array(GCM_IV_LENGTH))
 }
 
-// ADR-S01-02 applies to this module too: IV/nonce is never a public
-// parameter of encrypt()/generateWrappedDek()/rewrapDek() — generated
-// internally and prepended to the returned blob. This seam exists solely so
-// KAT tests can pin the IV; production code always resolves to randomIv().
+// ADR-S01-02 applies here too: IV/nonce is never a public parameter of encrypt()/generateWrappedDek()/rewrapDek(), generated internally and prepended to the returned blob; this seam exists only so KAT tests can pin the IV, production always resolves to randomIv().
 let ivSource: IvSourceFn = randomIv
 
 /** @internal test-only seam — not re-exported from the package barrel. */
@@ -59,15 +43,7 @@ export function __resetIvSourceForTests(): void {
   ivSource = randomIv
 }
 
-/**
- * Imports raw KEK bytes as a non-extractable CryptoKey scoped to
- * wrapKey/unwrapKey only — a KEK never encrypts application data directly,
- * it only ever (un)wraps DEKs (see dek-kek.ts for the equivalent raw-bytes
- * semantics). Mutates `rawKek` (zeroes it in place) as its last step, so the
- * caller's copy of the raw KEK cannot outlive the import — precedent:
- * keychain.ts's lock() self-zeroes the KEK it owns rather than trusting a
- * caller to do it.
- */
+// Imports as non-extractable, scoped to wrapKey/unwrapKey only (a KEK never encrypts application data directly). Zeroes `rawKek` in place as its last step, so the caller's copy cannot outlive the import.
 export async function importKek(rawKek: Uint8Array<ArrayBuffer>): Promise<WebCryptoKey> {
   assertAes256KeyLength(rawKek)
   const kek = await crypto.subtle.importKey('raw', rawKek, { name: 'AES-GCM' }, false, ['wrapKey', 'unwrapKey'])
@@ -75,15 +51,7 @@ export async function importKek(rawKek: Uint8Array<ArrayBuffer>): Promise<WebCry
   return kek
 }
 
-/**
- * Generates a fresh DEK and returns it already wrapped under `kek`, as an
- * atomic operation. subtle.wrapKey() requires the key being wrapped to be
- * extractable, so a standalone generateDek() returning a non-extractable key
- * could never subsequently be wrapped — this function generates an
- * extractable DEK in a local variable, wraps it, then immediately re-derives
- * a fresh NON-extractable handle from the same bytes via unwrapKey(). The
- * extractable handle never crosses this function's return boundary.
- */
+// subtle.wrapKey() requires an extractable key, so this generates an extractable DEK, wraps it, then re-derives a NON-extractable handle from the same bytes via unwrapKey(); the extractable handle never crosses this function's return boundary.
 export async function generateWrappedDek(
   kek: WebCryptoKey,
   aad: Uint8Array<ArrayBuffer>,
@@ -111,13 +79,7 @@ export async function generateWrappedDek(
   return { dek, wrapped: concat(iv, new Uint8Array(wrappedBody)) }
 }
 
-/**
- * Unwraps a DEK blob produced by generateWrappedDek()/rewrapDek() into a
- * non-extractable CryptoKey. No manual length pre-check on `wrapped` —
- * subtle.unwrapKey() itself fails closed (rejects) on a too-short/truncated
- * blob, same philosophy as aes-gcm.ts not duplicating validation the
- * underlying primitive already performs.
- */
+// No manual length pre-check on `wrapped` — subtle.unwrapKey() itself fails closed on a too-short/truncated blob, same philosophy as aes-gcm.ts not duplicating validation the underlying primitive already performs.
 export async function unwrapDek(
   kek: WebCryptoKey,
   wrapped: Uint8Array<ArrayBuffer>,
@@ -136,13 +98,7 @@ export async function unwrapDek(
   )
 }
 
-/**
- * Re-wraps a DEK blob under a new KEK without ever exposing its raw bytes —
- * used when a professional changes their password (parent Spec's "Pronto
- * quando": password change rewraps DEKs without touching a single byte of
- * record data). The extractable intermediate handle produced by unwrapKey()
- * here never leaves this function.
- */
+// Re-wraps a DEK blob under a new KEK without ever exposing its raw bytes; the extractable intermediate handle produced by unwrapKey() here never leaves this function.
 export async function rewrapDek(
   oldKek: WebCryptoKey,
   newKek: WebCryptoKey,
@@ -170,7 +126,7 @@ export async function rewrapDek(
   return concat(newIv, new Uint8Array(newWrappedBody))
 }
 
-/** Encrypts application data with a DEK CryptoKey. Wire format: iv(12) || ciphertext || tag(16). */
+// Wire format: iv(12) || ciphertext || tag(16).
 export async function encrypt(
   dek: WebCryptoKey,
   plaintext: Uint8Array<ArrayBuffer>,
@@ -185,7 +141,7 @@ export async function encrypt(
   return concat(iv, new Uint8Array(ciphertext))
 }
 
-/** Decrypts a blob produced by encrypt(). No manual length pre-check — subtle fails closed on malformed input. */
+// No manual length pre-check — subtle fails closed on malformed input.
 export async function decrypt(
   dek: WebCryptoKey,
   ciphertext: Uint8Array<ArrayBuffer>,

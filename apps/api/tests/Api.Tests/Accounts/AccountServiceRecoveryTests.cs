@@ -2,12 +2,6 @@ using Api.Accounts;
 
 namespace Api.Tests.Accounts;
 
-/// <summary>
-/// Covers <see cref="AccountService.RegisterRecoveryVerifierAsync"/>/<see cref="AccountService.RecoverAccessAsync"/>
-/// (Spec S02, ticket S02-06: BIP39 recovery-phrase account recovery). A separate file from
-/// <see cref="AccountServiceTests"/> purely for size -- same "one concern per test file"
-/// split as <see cref="AccountServiceMagicLinkTests"/>.
-/// </summary>
 public sealed class AccountServiceRecoveryTests
 {
     private static readonly byte[] SomeVerifier = CreateVerifier(0x01);
@@ -53,10 +47,6 @@ public sealed class AccountServiceRecoveryTests
         Assert.Equal(AccountRecoveryFailureReason.InvalidRecoveryPhrase, result.FailureReason);
     }
 
-    /// <summary>
-    /// Same "no shortcut" discipline as <c>AccountServiceTests.LoginAsync_WithUnknownEmail_StillInvokesComparerOnce_WithSameLengthAsRealVerifier</c>:
-    /// an unknown e-mail must still run the comparer once, against an equal-length stand-in.
-    /// </summary>
     [Fact]
     public async Task RecoverAccessAsync_WithUnknownEmail_StillInvokesComparerOnce_WithSameLengthAsRealVerifier()
     {
@@ -87,11 +77,6 @@ public sealed class AccountServiceRecoveryTests
         Assert.Null(result.TwoFactorTicket);
     }
 
-    /// <summary>
-    /// Mirrors how <c>AccountServiceTests</c> covers <c>LoginAsync</c> for a Professional
-    /// still owing 2FA: recovery re-authenticates the account, but a session is only earned
-    /// once the mandatory TOTP challenge is also cleared.
-    /// </summary>
     [Fact]
     public async Task RecoverAccessAsync_WithCorrectVerifierAndProfessionalTwoFactorPending_ReturnsTicketWithoutSession()
     {
@@ -150,7 +135,6 @@ public sealed class AccountServiceRecoveryTests
         Assert.Equal(SomeVerifier, stored!.RecoveryVerifier);
     }
 
-    /// <summary>Rotation via re-registration (no "already set" failure case) -- same discipline as <c>BeginTotpEnrollmentAsync</c>'s secret overwrite.</summary>
     [Fact]
     public async Task RegisterRecoveryVerifierAsync_CalledTwice_OverwritesThePreviousVerifier()
     {

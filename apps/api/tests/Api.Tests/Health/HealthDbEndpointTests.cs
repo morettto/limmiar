@@ -21,8 +21,7 @@ public sealed class HealthDbEndpointTests
         using var factory = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>
             {
-                // Port 1 refuses connections instantly on loopback -- deterministic,
-                // no container or network flakiness involved.
+                // Port 1 refuses connections instantly on loopback -- deterministic, no flakiness.
                 builder.UseSetting(
                     "ConnectionStrings:AppDb",
                     "Host=127.0.0.1;Port=1;Username=app_role;Password=unused;Timeout=2;");

@@ -3,10 +3,7 @@ using Api.Accounts;
 
 namespace Api.Tests.Accounts;
 
-/// <summary>
-/// RFC 4648 section 10's Base32 test vectors (the padding character stripped, since this
-/// implementation deliberately never pads -- see <see cref="Base32"/>'s own doc comment).
-/// </summary>
+// RFC 4648 section 10 vectors, padding character stripped: this implementation never pads.
 public sealed class Base32Tests
 {
     public static IEnumerable<object[]> RfcVectors() =>

@@ -110,6 +110,89 @@ describe('PairPrimaryDevice', () => {
     expect(decryptedKek).toEqual(KEK)
   })
 
+  it('renders the "delivering" status while the KEK is being fetched and encrypted', async () => {
+    vi.useFakeTimers()
+    createPairingSessionMock.mockResolvedValue({
+      ok: true,
+      sessionId: SESSION_ID,
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    })
+    const newDeviceKeyPair = generateKeyPair()
+    getPairingClaimStatusMock.mockResolvedValue({
+      ok: true,
+      claimed: true,
+      newDevicePublicKey: encodeBase64(newDeviceKeyPair.publicKey),
+    })
+    const getKekForTransfer = vi.fn().mockReturnValue(new Promise<Uint8Array>(() => {}))
+
+    render(
+      <I18nProvider i18n={i18n}>
+        <PairPrimaryDevice
+          baseUrl={BASE_URL}
+          accountId={ACCOUNT_ID}
+          accessToken={ACCESS_TOKEN}
+          getKekForTransfer={getKekForTransfer}
+        />
+      </I18nProvider>,
+    )
+
+    for (let i = 0; i < 50; i++) {
+      await vi.advanceTimersByTimeAsync(0)
+    }
+    await vi.advanceTimersByTimeAsync(1000)
+    for (let i = 0; i < 50; i++) {
+      await vi.advanceTimersByTimeAsync(0)
+    }
+
+    expect(screen.getByRole('status').textContent).toBe('Enviando a chave para o novo dispositivo...')
+    expect(submitPairingPayloadMock).not.toHaveBeenCalled()
+  })
+
+  it('renders a translated error and never calls onDelivered when the server rejects the delivered payload', async () => {
+    vi.useFakeTimers()
+    createPairingSessionMock.mockResolvedValue({
+      ok: true,
+      sessionId: SESSION_ID,
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    })
+    const newDeviceKeyPair = generateKeyPair()
+    getPairingClaimStatusMock.mockResolvedValue({
+      ok: true,
+      claimed: true,
+      newDevicePublicKey: encodeBase64(newDeviceKeyPair.publicKey),
+    })
+    submitPairingPayloadMock.mockResolvedValue({
+      ok: false,
+      code: 'auth.device_pairing_session_not_found',
+      params: {},
+    })
+    const getKekForTransfer = vi.fn().mockResolvedValue(KEK.slice())
+    const onDelivered = vi.fn()
+
+    render(
+      <I18nProvider i18n={i18n}>
+        <PairPrimaryDevice
+          baseUrl={BASE_URL}
+          accountId={ACCOUNT_ID}
+          accessToken={ACCESS_TOKEN}
+          getKekForTransfer={getKekForTransfer}
+          onDelivered={onDelivered}
+        />
+      </I18nProvider>,
+    )
+
+    for (let i = 0; i < 50; i++) {
+      await vi.advanceTimersByTimeAsync(0)
+    }
+    await vi.advanceTimersByTimeAsync(1000)
+    for (let i = 0; i < 50; i++) {
+      await vi.advanceTimersByTimeAsync(0)
+    }
+
+    expect(screen.getByRole('alert')).toBeTruthy()
+    expect(onDelivered).not.toHaveBeenCalled()
+  })
+
   it('renders a translated error and does not submit anything when getKekForTransfer fails', async () => {
     vi.useFakeTimers()
     createPairingSessionMock.mockResolvedValue({

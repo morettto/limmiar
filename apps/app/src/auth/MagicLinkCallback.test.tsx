@@ -306,6 +306,21 @@ describe('MagicLinkCallback', () => {
     expect(onAuthenticated).not.toHaveBeenCalled()
   })
 
+  it('falls back to the real WebAuthn browser functions when createCredential/getCredential are not overridden', async () => {
+    verifyMagicLinkMock.mockResolvedValue({ ok: false, code: 'auth.magic_link_invalid', params: {} })
+
+    render(
+      <I18nProvider i18n={i18n}>
+        <MagicLinkCallback baseUrl={BASE_URL} token={TOKEN} />
+      </I18nProvider>,
+    )
+
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      'Este link de acesso não é mais válido. Solicite um novo.',
+    )
+    expect(completeWebAuthnCeremonyMock).not.toHaveBeenCalled()
+  })
+
   it('ignores a late ceremony rejection after the component unmounted', async () => {
     verifyMagicLinkMock.mockResolvedValue({
       ok: true,

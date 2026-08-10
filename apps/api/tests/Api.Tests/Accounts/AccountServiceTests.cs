@@ -79,16 +79,8 @@ public sealed class AccountServiceTests
         Assert.Null(result.Account);
     }
 
-    /// <summary>
-    /// S02-01 acceptance criterion: "Resposta idêntica, no mesmo tempo, para e-mail
-    /// inexistente e senha errada". Identical response shape is covered by the two tests
-    /// above (both return the single AccountLoginFailureReason.InvalidCredentials value).
-    /// This pair proves the "no shortcut" half of the guarantee: LoginAsync must call the
-    /// comparer exactly once on BOTH paths, with an equal-length stored side both times --
-    /// never skipping the comparison because the account wasn't found. A regression that
-    /// adds `if (account is null) return Failure(...);` before the comparison would fail
-    /// this by dropping the unknown-email call count to zero.
-    /// </summary>
+    // Guards against a shortcut like `if (account is null) return Failure(...);` before the
+    // comparison, which would drop the unknown-email call count to zero.
     [Fact]
     public async Task LoginAsync_WithUnknownEmail_StillInvokesComparerOnce_WithSameLengthAsRealVerifier()
     {
@@ -119,9 +111,6 @@ public sealed class AccountServiceTests
     [Fact]
     public async Task LoginAsync_WithGoogleOnlyAccount_ReturnsInvalidCredentials()
     {
-        // An account created via Google sign-in and never given a password has a null
-        // PasswordVerifier -- attempting e-mail/verifier login against it must fail the
-        // same way as any other wrong-credentials case, not throw or succeed.
         var googleOnlyAccount = new Account(Guid.NewGuid(), "google-only@example.com", AccountRole.Patient, PasswordVerifier: null, "google-subject-1");
         var store = new FakeAccountStore(googleOnlyAccount);
         var comparer = new RecordingPasswordVerifierComparer(result: false);
@@ -135,18 +124,9 @@ public sealed class AccountServiceTests
         Assert.Equal(AccountService.PasswordVerifierLength, comparer.LastStoredLength);
     }
 
-    /// <summary>
-    /// Security-review regression (S02-01): LoginAsync's account-enumeration fallback
-    /// compares against a constant all-zero DummyVerifier whenever there's no real stored
-    /// verifier -- which used to be reachable not just for an unknown e-mail (where
-    /// `account is null` still forces failure) but also for a real, existing Google-only
-    /// account (PasswordVerifier null). Submitting an all-zero verifier used to match
-    /// DummyVerifier byte-for-byte and log in as that account with no password ever set.
-    /// Uses the REAL <see cref="ConstantTimePasswordVerifierComparer"/> deliberately --
-    /// the other Google-only test above stubs the comparer to always return false, which
-    /// would never have caught this (the bug is in what gets compared, not in trusting the
-    /// comparer's stubbed result).
-    /// </summary>
+    // Regression: an all-zero submitted verifier used to match the all-zero DummyVerifier
+    // fallback byte-for-byte for a Google-only account. Uses the real
+    // ConstantTimePasswordVerifierComparer, since a stubbed comparer would not catch this.
     [Fact]
     public async Task LoginAsync_WithGoogleOnlyAccount_AllZeroVerifierDoesNotMatchDummyVerifier()
     {
@@ -179,9 +159,6 @@ public sealed class AccountServiceTests
         Assert.Null(result.Account.PasswordVerifier);
     }
 
-    /// <summary>S02-01 acceptance criterion: "Google resolve o papel sozinho quando o
-    /// e-mail já existe" -- the requestedRole the caller sends must be ignored, and the
-    /// account's existing role returned instead, with no new account created.</summary>
     [Fact]
     public async Task GoogleAuthAsync_WithEmailAlreadyRegistered_ResolvesExistingRole_IgnoringRequestedRole()
     {

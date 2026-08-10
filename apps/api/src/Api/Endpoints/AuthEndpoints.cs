@@ -5,12 +5,6 @@ using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace Api.Endpoints;
 
-/// <summary>
-/// S02-01 backend: cadastro por e-mail, login por e-mail, e cadastro/login por Google.
-/// Owns request validation and HTTP status/Problem+JSON mapping; all actual domain logic
-/// (account enumeration mitigation, Google role resolution) lives in
-/// <see cref="AccountService"/>, which this class only calls into.
-/// </summary>
 public static class AuthEndpoints
 {
     public static void MapAuthEndpoints(this WebApplication app)
@@ -71,13 +65,7 @@ public static class AuthEndpoints
             .Produces<LimmiarProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json");
     }
 
-    /// <summary>
-    /// E2E-only debug route (S02-05): only ever mapped by Program.Composition.cs when
-    /// <c>MagicLink:TestCaptureEndpoint=true</c>, the same flag that swaps
-    /// <see cref="IMagicLinkEmailSender"/>'s DI registration for <see cref="CapturingMagicLinkEmailSender"/>.
-    /// Not called from <see cref="MapAuthEndpoints"/> -- see this method's caller in
-    /// Program.Composition.cs for the gating.
-    /// </summary>
+    // Only mapped by Program.Composition.cs when MagicLink:TestCaptureEndpoint=true.
     public static void MapMagicLinkDebugEndpoints(this WebApplication app)
     {
         app.MapGet("/auth/magic-link/_debug-last", HandleMagicLinkDebugLastAsync)
@@ -173,8 +161,6 @@ public static class AuthEndpoints
         var result = await accountService.RefreshSessionAsync(request.RefreshToken, cancellationToken);
         if (!result.Succeeded)
         {
-            // Deliberately the same 401/code for every failure reason (never issued,
-            // expired, or reuse-detected) -- see RefreshSessionResult's own doc comment.
             return ProblemJson(StatusCodes.Status401Unauthorized, "Invalid refresh token", ProblemCodes.AuthRefreshTokenInvalid);
         }
 
@@ -262,11 +248,6 @@ public static class AuthEndpoints
             account.Id, account.Email, account.Role, session.AccessToken, session.RefreshToken, session.AccessTokenExpiresAt));
     }
 
-    /// <summary>
-    /// Decodes a required base64 field. False for null/empty/not-base64 -- every caller
-    /// treats that as the same "malformed request" 400, so this does not need to distinguish
-    /// missing from merely invalid.
-    /// </summary>
     private static bool TryDecodeBase64(string? value, out byte[]? bytes)
     {
         if (string.IsNullOrEmpty(value))
@@ -287,7 +268,6 @@ public static class AuthEndpoints
         }
     }
 
-    /// <summary>Same as <see cref="TryDecodeBase64"/> but null is a valid, successful outcome -- for the registration/assertion fields that don't apply to the other ceremony.</summary>
     private static bool TryDecodeBase64Optional(string? value, out byte[]? bytes)
     {
         if (value is null)
@@ -299,13 +279,7 @@ public static class AuthEndpoints
         return TryDecodeBase64(value, out bytes);
     }
 
-    /// <summary>
-    /// Shared by register and login: both accept the same (email, passwordVerifier)
-    /// shape. A malformed request (missing email, wrong-length verifier) is a validation
-    /// error (400) -- a distinct failure category from "wrong credentials" (401), so
-    /// rejecting it here, before AccountService is even called, does not touch the
-    /// timing-uniformity guarantee LoginAsync provides for well-formed requests.
-    /// </summary>
+    // Rejecting a malformed shape here (before AccountService) doesn't touch LoginAsync's timing-uniformity guarantee -- 400 and 401 stay distinct failure categories.
     private static bool TryValidateCredentialsShape(
         string? email, byte[]? passwordVerifier, out JsonHttpResult<LimmiarProblemDetails> problem)
     {
@@ -351,30 +325,17 @@ public static class AuthEndpoints
     }
 }
 
-/// <summary>
-/// Refresh-token rotation (Spec S02, ticket S02-08). <see cref="RefreshToken"/> is opaque --
-/// callers must not attempt to decode or interpret it, only present it back verbatim.
-/// </summary>
 public sealed record RefreshTokenRequest(string RefreshToken);
 
-/// <summary>The fresh access/refresh pair issued by a successful rotation. The presented refresh token is no longer valid once this response is returned.</summary>
 public sealed record RefreshTokenResponse(string AccessToken, string RefreshToken, DateTimeOffset AccessTokenExpiresAt);
 
-/// <summary>Magic-link sign-in (S02-05). Always answered with <see cref="MagicLinkRequestResponse"/> regardless of whether this e-mail resolves to anything -- see the route's own <c>WithDescription</c>.</summary>
 public sealed record MagicLinkRequestRequest(string Email);
 
-/// <summary>Deliberately empty -- see <see cref="MagicLinkRequestRequest"/>'s doc comment.</summary>
 public sealed record MagicLinkRequestResponse;
 
 public sealed record VerifyMagicLinkRequest(string Token);
 
-/// <summary>
-/// <see cref="CredentialId"/> (base64) is present only when <see cref="CeremonyType"/> is
-/// <c>Api.Accounts.MagicLinkCeremonyType.Assert</c> -- the caller puts it in
-/// <c>allowCredentials</c> for <c>navigator.credentials.get()</c>. <see cref="Challenge"/> is
-/// base64 raw bytes; the caller passes it to <c>navigator.credentials.create()</c>/<c>.get()</c>
-/// as-is (the browser does its own base64url encoding into clientDataJSON).
-/// </summary>
+// CredentialId is set only for an assertion ceremony (CeremonyType); Challenge is raw base64 bytes for navigator.credentials.create()/.get().
 public sealed record VerifyMagicLinkResponse(
     string MagicLinkTicket,
     MagicLinkCeremonyType CeremonyType,
@@ -382,14 +343,7 @@ public sealed record VerifyMagicLinkResponse(
     string RelyingPartyId,
     string? CredentialId);
 
-/// <summary>
-/// The raw <c>PublicKeyCredential</c> the browser produced, base64-encoded field by field.
-/// <see cref="AttestationObject"/> is set for a registration response;
-/// <see cref="AuthenticatorData"/>/<see cref="Signature"/> are set for an assertion response
-/// -- which pair applies is decided server-side by <see cref="MagicLinkTicket"/>, so exactly
-/// one pair should be populated, but this class does not itself enforce that; see
-/// <see cref="AccountService.CompleteMagicLinkWebAuthnAsync"/>.
-/// </summary>
+// AttestationObject is set for a registration response; AuthenticatorData/Signature for an assertion response -- which pair applies is decided server-side by MagicLinkTicket.
 public sealed record CompleteMagicLinkWebAuthnRequest(
     string MagicLinkTicket,
     string CredentialId,
@@ -398,13 +352,7 @@ public sealed record CompleteMagicLinkWebAuthnRequest(
     string? AuthenticatorData,
     string? Signature);
 
-/// <summary>
-/// A magic-link login always completes immediately -- no <c>TwoFactorRequirement</c>/
-/// <c>TwoFactorTicket</c> pair like <see cref="RegisterResponse"/>/<see cref="LoginResponse"/>,
-/// because every account this response can describe is a <c>Patient</c>, which never owes 2FA.
-/// </summary>
 public sealed record CompleteMagicLinkWebAuthnResponse(
     Guid Id, string Email, AccountRole Role, string AccessToken, string RefreshToken, DateTimeOffset AccessTokenExpiresAt);
 
-/// <summary>E2E-only (see <see cref="AuthEndpoints.MapMagicLinkDebugEndpoints"/>): the token a captured magic-link request "sent" to the requested e-mail.</summary>
 public sealed record MagicLinkDebugLastResponse(string Token);

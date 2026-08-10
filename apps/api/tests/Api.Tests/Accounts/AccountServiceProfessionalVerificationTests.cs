@@ -2,10 +2,6 @@ using Api.Accounts;
 
 namespace Api.Tests.Accounts;
 
-/// <summary>
-/// S02-02: professional credential verification (CRP/CRM auto-check, document human
-/// review queue) and the initial <see cref="AccountVerificationStatus"/> new accounts get.
-/// </summary>
 public sealed class AccountServiceProfessionalVerificationTests
 {
     private static readonly byte[] SomeVerifier = CreateVerifier(0x01);
@@ -151,10 +147,6 @@ public sealed class AccountServiceProfessionalVerificationTests
         Assert.Equal(SubmitProfessionalCredentialFailureReason.InvalidStateForSubmission, result.FailureReason);
     }
 
-    /// <summary>
-    /// Acceptance criterion: "Reprovação mostra motivo legível e caminho de correção" --
-    /// a Rejected account must be allowed to resubmit, not stuck forever.
-    /// </summary>
     [Fact]
     public async Task SubmitProfessionalCredentialAsync_WithRejectedAccount_AllowsResubmission()
     {

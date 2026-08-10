@@ -7,44 +7,16 @@ import { TotpChallenge } from './TotpChallenge'
 import { TotpSetup } from './TotpSetup'
 
 export interface AuthScreenProps {
-  /** Base URL of the Limmiar API (same convention as api/client.ts's other callers). */
   baseUrl: string
-  /**
-   * Not a pre-agreed seam: S02-01's confirmed backend contract only covers
-   * POST /auth/google itself (idToken in, account out) -- how a real Google
-   * ID token gets obtained in the browser (Google Identity Services SDK
-   * loading, popup/One Tap flow, etc.) is a separate integration with no ADR
-   * yet. Accepting it as an injected callback keeps AuthScreen decoupled
-   * from that SDK and directly testable; the real implementation is the
-   * caller's job once that integration lands.
-   */
   getGoogleIdToken: () => Promise<string>
-  /** Called once register()/continueWithGoogle() succeeds. Optional -- see the session-storage note below for the default persistence AuthScreen does on its own. */
   onAuthenticated?: (account: AccountResult) => void
-  /**
-   * Overrides the pre-selected segment (see `DEFAULT_ROLE`'s own doc comment). Optional --
-   * every real caller wants the product default. Exists for magic-link-login.spec.ts (S02-05):
-   * that E2E asserts a password `<input>` never renders anywhere in the Patient magic-link
-   * flow's DOM, which the Professional-first default would falsify for a moment on first
-   * paint even though the test immediately clicks "Paciente" -- landing directly on the
-   * Patient segment is also the more realistic simulation of a returning patient's deep link,
-   * once one exists.
-   */
   initialRole?: AccountRole
 }
 
 const ACCOUNT_SESSION_STORAGE_KEY = 'limmiar:account'
 
-// ADR-S02-01's segmented control default -- "profissional" is listed first
-// in the ticket's own wording, so it's the pre-selected segment.
 const DEFAULT_ROLE: AccountRole = 'Professional'
 
-// Design note (not a pre-agreed seam): the backend issues no session/token
-// yet (that's S02-08's job), so there is nothing richer to store client-side
-// than the account the last successful register/login/Google call returned.
-// sessionStorage (not localStorage) is the simplest reasonable choice for
-// "later screens in THIS session can read who just signed up" without
-// building actual session persistence ahead of the ticket that owns it.
 export function persistAccountSession(account: AccountResult): void {
   window.sessionStorage.setItem(ACCOUNT_SESSION_STORAGE_KEY, JSON.stringify(account))
 }
@@ -55,12 +27,6 @@ type SubmitState =
   | { status: 'error'; message: string }
   | { status: 'success'; account: AccountResult }
   | { status: 'magic-link-sent' }
-  // Professional accounts never reach 'success' directly (Spec S02,
-  // ADR-S02-03/S02-04): a fresh registration/Google sign-up with no confirmed
-  // TOTP enrollment routes through 'totp-setup' first, and one that already
-  // has 2FA confirmed routes through 'totp-challenge' -- handleAuthenticated
-  // (and thus onAuthenticated/session persistence/'success') only runs once
-  // one of those completes.
   | { status: 'totp-setup'; account: AccountResult }
   | { status: 'totp-challenge'; account: AccountResult }
 
@@ -78,9 +44,6 @@ export function AuthScreen({ baseUrl, getGoogleIdToken, onAuthenticated, initial
     setState({ status: 'success', account })
   }
 
-  // Routes a just-registered/just-signed-in account per its
-  // twoFactorRequirement (Spec S02, ADR-S02-03/S02-04) instead of treating
-  // register()/continueWithGoogle() success as immediately authenticated.
   function handleAccountResult(account: AccountResult) {
     switch (account.twoFactorRequirement) {
       case 'SetupRequired':
@@ -128,9 +91,6 @@ export function AuthScreen({ baseUrl, getGoogleIdToken, onAuthenticated, initial
     setState({ status: 'submitting' })
 
     const idToken = await getGoogleIdToken()
-    // ADR-S02-01: requestedRole only takes effect when the Google identity's
-    // e-mail has no existing account; otherwise the backend's response.role
-    // wins and is used as-is below -- this screen never asks again.
     const result = await continueWithGoogle(baseUrl, { idToken, requestedRole: role })
 
     if (result.ok) {
@@ -141,10 +101,8 @@ export function AuthScreen({ baseUrl, getGoogleIdToken, onAuthenticated, initial
   }
 
   if (state.status === 'totp-setup') {
-    // Non-null assertion: handleAccountResult only reaches 'totp-setup' when
-    // twoFactorRequirement is 'SetupRequired', and the backend guarantees a non-null
-    // twoFactorTicket whenever twoFactorRequirement isn't 'NotApplicable' (security-review
-    // fix -- see api/client.ts's AccountResult doc comment).
+    // twoFactorTicket is non-null here: the backend always sets it when
+    // twoFactorRequirement is not 'NotApplicable'.
     return (
       <TotpSetup
         baseUrl={baseUrl}

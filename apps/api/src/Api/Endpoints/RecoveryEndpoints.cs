@@ -6,15 +6,6 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Api.Endpoints;
 
-/// <summary>
-/// S02-06 backend: BIP39 recovery-phrase account recovery for
-/// <see cref="AccountRole.Professional"/> accounts. Owns request validation and HTTP
-/// status/Problem+JSON mapping; all domain logic lives in <see cref="AccountService"/>,
-/// which this class only calls into -- same split as <see cref="AuthEndpoints"/> and
-/// <see cref="ProfessionalVerificationEndpoints"/>. The Bearer-token account-scoping check
-/// on <c>POST /accounts/{accountId}/recovery-phrase</c> mirrors
-/// <see cref="ProfessionalVerificationEndpoints.HandleSubmitAsync"/> exactly.
-/// </summary>
 public static class RecoveryEndpoints
 {
     public static void MapRecoveryEndpoints(this WebApplication app)
@@ -90,7 +81,6 @@ public static class RecoveryEndpoints
         return TypedResults.Ok(new RegisterRecoveryVerifierResponse(result.Account!.Id));
     }
 
-    /// <summary>Same shape check as <see cref="AuthEndpoints.TryValidateCredentialsShape"/>, over the recovery verifier instead of the password verifier.</summary>
     private static bool TryValidateRecoverShape(
         string? email, byte[]? recoveryVerifier, out JsonHttpResult<LimmiarProblemDetails> problem)
     {
@@ -110,12 +100,6 @@ public static class RecoveryEndpoints
         return true;
     }
 
-    /// <summary>
-    /// True only if <paramref name="authorizationHeader"/> is a well-formed
-    /// <c>Bearer &lt;token&gt;</c> value whose token <see cref="ISessionTokenIssuer.ValidateAccess"/>
-    /// resolves to EXACTLY <paramref name="accountId"/> -- same account-scoping discipline
-    /// as <see cref="ProfessionalVerificationEndpoints.HandleSubmitAsync"/>.
-    /// </summary>
     private const string BearerPrefix = "Bearer ";
 
     private static bool IsAuthorizedForAccount(string? authorizationHeader, Guid accountId, ISessionTokenIssuer sessionTokenIssuer)
@@ -158,15 +142,8 @@ public static class RecoveryEndpoints
     }
 }
 
-/// <summary>
-/// BIP39 recovery-phrase account recovery (Spec S02, ticket S02-06). Same "no plaintext
-/// secret field" contract as <see cref="LoginRequest"/> -- the client derives
-/// <see cref="RecoveryVerifier"/> locally and this is the only recovery-phrase-shaped field
-/// this contract accepts.
-/// </summary>
 public sealed record RecoverAccessRequest(string Email, byte[] RecoveryVerifier);
 
-/// <summary>Same field shape/meaning as <see cref="LoginResponse"/> -- a successful recovery re-authenticates the account exactly like a successful login.</summary>
 public sealed record RecoverAccessResponse(
     Guid Id,
     string Email,
@@ -177,7 +154,6 @@ public sealed record RecoverAccessResponse(
     string? RefreshToken = null,
     DateTimeOffset? AccessTokenExpiresAt = null);
 
-/// <summary>Client-derived verifier for the recovery phrase, same contract as <see cref="RecoverAccessRequest.RecoveryVerifier"/>.</summary>
 public sealed record RegisterRecoveryVerifierRequest(byte[] RecoveryVerifier);
 
 public sealed record RegisterRecoveryVerifierResponse(Guid AccountId);

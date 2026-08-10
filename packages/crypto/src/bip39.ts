@@ -7,20 +7,10 @@ import {
 } from '@scure/bip39'
 import { wordlist } from '@scure/bip39/wordlists/english.js'
 
-// ADR-S01-05: same actively-maintained, audited @scure/@noble family already
-// used for Argon2id, AES-GCM and X25519 in this package. English-only
-// wordlist for now — other BIP39 languages are out of this ticket's scope.
+// ADR-S01-05: same audited @scure/@noble family as Argon2id, AES-GCM and X25519 in this package; English-only wordlist, other BIP39 languages are out of scope for now.
 export type Bip39Strength = 128 | 160 | 192 | 224 | 256
 
-// Unlike Argon2Params (plain `number` fields, so out-of-range values are
-// invisible to the type checker and need a runtime guard of their own — see
-// argon2id.ts), Bip39Strength is a literal union covering the full BIP39
-// domain: TypeScript itself already rejects every invalid value at compile
-// time, so there is no business rule left for a runtime guard to add. A
-// caller can still reach an invalid value only by bypassing the type system
-// (e.g. `as any`), in which case @scure/bip39's own RangeError already fails
-// closed — see the "invalid strength" test locking that library behavior in,
-// same discipline as the X25519 all-zero peer-key guard.
+// Unlike Argon2Params, Bip39Strength is a literal union TypeScript already rejects invalid values for at compile time, so there is no runtime guard here (unlike argon2id.ts); a value that bypasses the type system still fails closed via @scure/bip39's own RangeError.
 export function generateMnemonic(strengthBits: Bip39Strength): string {
   return scureGenerateMnemonic(wordlist, strengthBits)
 }
@@ -37,10 +27,7 @@ export function validateMnemonic(mnemonic: string): boolean {
   return scureValidateMnemonic(mnemonic, wordlist)
 }
 
-// BIP39 seed derivation is deliberately independent from checksum validation
-// (spec behavior, not a gap): mnemonicToSeed never verifies the mnemonic's
-// checksum or wordlist membership. Reject invalid mnemonics before deriving
-// a seed with mnemonicToEntropy/validateMnemonic first.
+// mnemonicToSeed never verifies the mnemonic's checksum or wordlist membership (BIP39 spec behavior, not a gap): validate with validateMnemonic/mnemonicToEntropy before calling this.
 export function mnemonicToSeed(mnemonic: string, passphrase = ''): Promise<Uint8Array> {
   return scureMnemonicToSeed(mnemonic, passphrase)
 }

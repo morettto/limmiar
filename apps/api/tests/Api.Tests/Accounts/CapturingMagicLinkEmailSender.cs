@@ -3,14 +3,8 @@ using Api.Accounts;
 
 namespace Api.Tests.Accounts;
 
-/// <summary>
-/// Test-only <see cref="IMagicLinkEmailSender"/> that records the last token sent per e-mail
-/// instead of ever sending anything. Not nested inside a single test class (unlike e.g. each
-/// test file's own private <c>StubGoogleIdentityProvider</c>) because both
-/// <see cref="AccountServiceMagicLinkTests"/> and <c>Api.Tests.Auth.AuthEndpointsTests</c> need
-/// one, and this one is stateful enough (a whole capture dictionary) that duplicating it would
-/// be worse than one shared, internal class.
-/// </summary>
+// Shared across test files (not nested) because both AccountServiceMagicLinkTests and
+// Api.Tests.Auth.AuthEndpointsTests need this capture dictionary.
 internal sealed class CapturingMagicLinkEmailSender : IMagicLinkEmailSender
 {
     private readonly ConcurrentDictionary<string, string> _lastTokenByEmail = new(StringComparer.Ordinal);

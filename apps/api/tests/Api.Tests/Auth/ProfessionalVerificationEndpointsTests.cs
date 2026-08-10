@@ -11,21 +11,11 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Api.Tests.Auth;
 
-/// <summary>
-/// Security-review fix: <c>GET .../queue</c> and <c>POST .../decision</c> are staff-only
-/// (see <see cref="ProfessionalVerificationEndpoints"/>'s own doc comment) and now require
-/// the <c>X-Staff-Api-Key</c> header to match <see cref="TestStaffApiKey"/>, configured for
-/// this test host the same way <c>ConnectionStrings:AppDb</c> already is. Every test that
-/// reaches those two endpoints attaches the header via <see cref="WithStaffApiKey"/>;
-/// <see cref="PostDecision_WithoutStaffApiKey_Returns401WithProblemDetails"/> and
-/// <see cref="GetQueue_WithoutStaffApiKey_Returns401WithProblemDetails"/> are the regression
-/// tests proving the gate itself (no header, and a wrong key).
-/// </summary>
+/// <summary>Security-review fix: GET .../queue and POST .../decision are staff-only and require the X-Staff-Api-Key header to match TestStaffApiKey; PostDecision_WithoutStaffApiKey_Returns401WithProblemDetails and GetQueue_WithoutStaffApiKey_Returns401WithProblemDetails are the regression tests proving the gate itself.</summary>
 public sealed class ProfessionalVerificationEndpointsTests
 {
     private const string TestStaffApiKey = "test-staff-api-key";
 
-    /// <summary>Fixed code the stub TOTP provider always treats as valid -- same override pattern TwoFactorEndpointsTests uses.</summary>
     private const string ValidStubCode = "111111";
 
     private static readonly byte[] SomeVerifier = CreateVerifier(0x01);
@@ -160,16 +150,7 @@ public sealed class ProfessionalVerificationEndpointsTests
         Assert.Equal("auth.account_not_found", doc.RootElement.GetProperty("code").GetString());
     }
 
-    /// <summary>
-    /// Security-review fix side effect: a caller can no longer reach this endpoint's
-    /// AccountService-level 404 without a valid access token, and a real access token can
-    /// only ever resolve to an account that actually exists -- "unknown account" is
-    /// therefore unreachable through a properly-scoped credential. Uses the same
-    /// bypass-stub pattern <c>TwoFactorEndpointsTests</c> uses for its analogous
-    /// "unknown accountId still returns 404" case: <see cref="AlwaysValidSessionTokenIssuer"/>
-    /// accepts any GUID-shaped bearer token as proof for that exact account, so this test
-    /// can still exercise the downstream 404 mapping in isolation.
-    /// </summary>
+    /// <summary>A real access token can never resolve to an unknown account, so this uses AlwaysValidSessionTokenIssuer (accepts any GUID-shaped bearer token) to reach the downstream 404 mapping in isolation.</summary>
     [Fact]
     public async Task PostSubmit_WithUnknownAccountId_Returns404WithProblemDetails()
     {
@@ -200,8 +181,7 @@ public sealed class ProfessionalVerificationEndpointsTests
             new RegisterRequest("patient-submits@example.com", SomeVerifier, AccountRole.Patient),
             ApiJsonSerializerContext.Default.RegisterRequest);
         var registered = await registerResponse.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.RegisterResponse);
-        // A Patient's TwoFactorRequirement is always NotApplicable (ADR-S02-03), so
-        // register already returned a real session -- no TOTP flow to complete first.
+        // A Patient's TwoFactorRequirement is always NotApplicable (ADR-S02-03), so register already returned a real session.
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", registered!.AccessToken);
 
         var response = await client.PostAsJsonAsync(
@@ -215,11 +195,7 @@ public sealed class ProfessionalVerificationEndpointsTests
         Assert.Equal("auth.not_a_professional_account", doc.RootElement.GetProperty("code").GetString());
     }
 
-    /// <summary>
-    /// Security-review regression: without a valid access token bound to this exact
-    /// account, a caller who merely knows (or guesses) another professional's account id
-    /// must not be able to submit a credential on their behalf.
-    /// </summary>
+    /// <summary>Security-review regression: a caller who merely knows another professional's account id must not submit a credential on their behalf without a valid access token.</summary>
     [Fact]
     public async Task PostSubmit_WithoutAccessToken_Returns401WithProblemDetails()
     {
@@ -246,9 +222,7 @@ public sealed class ProfessionalVerificationEndpointsTests
         using var factory = CreateFactory(new StubCouncilRegistryVerifier(verified: true));
         using var client = factory.CreateClient();
         var victimAccountId = await RegisterProfessionalAsync(client, "submit-victim@example.com");
-        // RegisterProfessionalAsync's side effect leaves the client carrying THIS account's
-        // own real, valid access token -- registering the attacker last means the client now
-        // carries the attacker's token, not the victim's.
+        // RegisterProfessionalAsync leaves the client carrying the LAST registered account's token, so registering the attacker last makes the client the attacker.
         await RegisterProfessionalAsync(client, "submit-attacker@example.com");
 
         var response = await client.PostAsJsonAsync(
@@ -370,11 +344,7 @@ public sealed class ProfessionalVerificationEndpointsTests
         Assert.Equal("auth.not_in_review", doc.RootElement.GetProperty("code").GetString());
     }
 
-    /// <summary>
-    /// Security-review regression: without a valid X-Staff-Api-Key, a professional could
-    /// approve their own document review by calling this endpoint on their own account
-    /// (self-approval). Covers both "no header" and "wrong key".
-    /// </summary>
+    /// <summary>Security-review regression: without a valid X-Staff-Api-Key, a professional could approve their own document review (self-approval). Covers both "no header" and "wrong key".</summary>
     [Fact]
     public async Task PostDecision_WithoutStaffApiKey_Returns401WithProblemDetails()
     {
@@ -430,16 +400,7 @@ public sealed class ProfessionalVerificationEndpointsTests
         Assert.Equal("staff.unauthorized", wrongKeyDoc.RootElement.GetProperty("code").GetString());
     }
 
-    /// <summary>
-    /// Registers a fresh Professional account AND completes its mandatory TOTP enrollment
-    /// (ADR-S02-03) -- a Professional never gets a session at register time (2FA is always
-    /// pending first), so a real access token for it only exists once enrollment confirms.
-    /// Side effect: leaves <paramref name="client"/> carrying THIS account's real access
-    /// token as its default <c>Authorization: Bearer</c> header, exactly like a real client
-    /// would after completing login -- every existing caller of this helper that goes on to
-    /// call <c>POST .../professional-verification</c> on the SAME client keeps working
-    /// unchanged (security-review fix: that endpoint now requires it).
-    /// </summary>
+    /// <summary>Registers a Professional and completes mandatory TOTP enrollment (ADR-S02-03), leaving client carrying the real access token as its default Bearer header.</summary>
     private static async Task<Guid> RegisterProfessionalAsync(HttpClient client, string email)
     {
         var registerResponse = await client.PostAsJsonAsync(
@@ -468,41 +429,24 @@ public sealed class ProfessionalVerificationEndpointsTests
         new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>
             {
-                // Same reasoning as AuthEndpointsTests.CreateFactory: these endpoints never
-                // touch Postgres, but app startup still needs a syntactically valid
-                // ConnectionStrings:AppDb to construct the NpgsqlDataSource singleton.
+                // Same reasoning as AuthEndpointsTests.CreateFactory: never touches Postgres, but
+                // startup still needs a syntactically valid ConnectionStrings:AppDb.
                 builder.UseSetting("ConnectionStrings:AppDb", "Host=127.0.0.1;Port=1;Username=app_role;Password=unused;");
                 builder.UseSetting("StaffAccess:ApiKey", TestStaffApiKey);
                 builder.UseSetting("WebAuthn:RelyingPartyId", "limmiar.test");
                 builder.UseSetting("WebAuthn:ExpectedOrigin", "https://limmiar.test");
-                // TOTP itself is already covered by Api.Tests/Accounts/TotpProviderTests --
-                // these tests only need a deterministic code (ValidStubCode) to drive
-                // RegisterProfessionalAsync's real begin/confirm flow over HTTP, same
-                // override pattern as TwoFactorEndpointsTests.
                 builder.ConfigureTestServices(services => services.AddSingleton<ITotpProvider>(new StubTotpProvider()));
             });
 
-    /// <summary>
-    /// For the one test that needs to reach the AccountService-level 404 for an account
-    /// that doesn't exist -- a real access token can never do that (it only ever resolves
-    /// to an account <see cref="Api.Accounts.SessionTokenIssuer"/> actually issued it for),
-    /// so this swaps in a stub that treats any GUID-shaped bearer token as proof for that
-    /// exact account. Same bypass-for-an-unreachable-downstream-case pattern as
-    /// TwoFactorEndpointsTests.CreateFactoryWithTicketBypass.
-    /// </summary>
+    /// <summary>A real access token can never resolve to an unknown account, so this swaps in a stub that treats any GUID-shaped bearer token as proof for that exact account.</summary>
     private static WebApplicationFactory<Program> CreateFactoryWithSessionBypass(ICouncilRegistryVerifier councilRegistryVerifier) =>
         CreateFactory(councilRegistryVerifier).WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services => services.AddSingleton<ISessionTokenIssuer>(new AlwaysValidSessionTokenIssuer())));
 
-    /// <summary>Attaches the correct staff API key so a test can reach the staff-only handlers.</summary>
     private static void AddStaffApiKey(HttpClient client) =>
         client.DefaultRequestHeaders.Add("X-Staff-Api-Key", TestStaffApiKey);
 
-    /// <summary>
-    /// Real CRP/CRM verification is out of scope for S02-02 (see CouncilRegistryVerifier's
-    /// own TODO) -- every test that reaches the CRP/CRM submission path overrides the
-    /// production ICouncilRegistryVerifier registration with this fake.
-    /// </summary>
+    /// <summary>Real CRP/CRM verification is out of scope for S02-02; overrides the production ICouncilRegistryVerifier registration with a fake.</summary>
     private static WebApplicationFactory<Program> CreateFactory(ICouncilRegistryVerifier councilRegistryVerifier) =>
         CreateFactory().WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services =>
@@ -536,7 +480,6 @@ public sealed class ProfessionalVerificationEndpointsTests
         public bool ValidateCode(string secret, string code, DateTimeOffset timestamp) => code == ValidStubCode;
     }
 
-    /// <summary>See <see cref="CreateFactoryWithSessionBypass"/>.</summary>
     private sealed class AlwaysValidSessionTokenIssuer : ISessionTokenIssuer
     {
         public SessionTokenPair IssuePair(Guid accountId) => throw new NotSupportedException("not needed by the one test that uses this stub");

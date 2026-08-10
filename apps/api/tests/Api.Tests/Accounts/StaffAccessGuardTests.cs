@@ -2,10 +2,6 @@ using Api.Accounts;
 
 namespace Api.Tests.Accounts;
 
-/// <summary>
-/// Covers <see cref="StaffAccessGuard"/> directly -- see its own doc comment and
-/// <see cref="IStaffAccessGuard"/>'s for why this is a shared-secret stopgap, not real RBAC.
-/// </summary>
 public sealed class StaffAccessGuardTests
 {
     [Fact]
@@ -32,11 +28,7 @@ public sealed class StaffAccessGuardTests
         Assert.False(guard.IsAuthorized(null));
     }
 
-    /// <summary>
-    /// A shorter/longer candidate must not throw (CryptographicOperations.FixedTimeEquals
-    /// would throw on mismatched span lengths if the keys were compared raw) and must not
-    /// authorize.
-    /// </summary>
+    // Must not throw (FixedTimeEquals throws on mismatched span lengths if compared raw) and must not authorize.
     [Theory]
     [InlineData("short")]
     [InlineData("a-much-longer-candidate-than-the-real-key")]

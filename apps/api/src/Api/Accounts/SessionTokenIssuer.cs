@@ -3,53 +3,22 @@ using System.Security.Cryptography;
 
 namespace Api.Accounts;
 
-/// <summary>
-/// In-memory <see cref="ISessionTokenIssuer"/> -- same placeholder fidelity as
-/// <see cref="InMemoryAccountStore"/>/<see cref="TwoFactorTicketIssuer"/> (does not survive
-/// a process restart or work across multiple instances; TODO follow-up ticket once this
-/// backend has a real Postgres-backed session store).
-/// </summary>
 public sealed class SessionTokenIssuer : ISessionTokenIssuer
 {
-    /// <summary>How long an access token remains valid after issuance.</summary>
     public static readonly TimeSpan AccessTokenLifetime = TimeSpan.FromMinutes(15);
 
-    /// <summary>How long a refresh token remains valid after issuance (per rotation).</summary>
     public static readonly TimeSpan RefreshTokenLifetime = TimeSpan.FromDays(30);
 
-    /// <summary>
-    /// Immutable per-token record (same "reassign the dictionary slot instead of mutating
-    /// a shared object" discipline as <see cref="TwoFactorTicketIssuer"/>'s tuple values):
-    /// marking a token <see cref="Used"/> replaces the dictionary entry with a `with`-copy
-    /// rather than mutating a reference multiple readers might hold.
-    /// </summary>
     private readonly record struct RefreshTokenRecord(Guid AccountId, Guid FamilyId, DateTimeOffset ExpiresAt, bool Used);
 
-    /// <summary>
-    /// Carries <see cref="FamilyId"/> (not just <see cref="AccountId"/>) precisely so
-    /// <see cref="ValidateAccess"/> can honour family revocation -- security-review finding:
-    /// without it, an access token minted just before a refresh-token reuse revoked its
-    /// family would keep validating for its own remaining lifetime (up to
-    /// <see cref="AccessTokenLifetime"/>) even though the family that issued it is
-    /// confirmed compromised.
-    /// </summary>
     private readonly record struct AccessTokenRecord(Guid AccountId, Guid FamilyId, DateTimeOffset ExpiresAt);
 
     private readonly Func<DateTimeOffset> _clock;
     private readonly ConcurrentDictionary<string, AccessTokenRecord> _accessTokens = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, RefreshTokenRecord> _refreshTokens = new(StringComparer.Ordinal);
 
-    /// <summary>
-    /// Families whose tokens must never validate again, regardless of expiry. A
-    /// <see cref="ConcurrentDictionary{TKey,TValue}"/> used as a set (value is unused) gives
-    /// O(1) revocation-check without iterating every token this issuer has ever handed out.
-    /// </summary>
     private readonly ConcurrentDictionary<Guid, byte> _revokedFamilies = new();
 
-    /// <param name="clock">
-    /// Defaults to <see cref="DateTimeOffset.UtcNow"/>. Overridable so tests can prove
-    /// expiry without a real <c>Thread.Sleep</c> -- same pattern as <see cref="TwoFactorTicketIssuer"/>.
-    /// </param>
     public SessionTokenIssuer(Func<DateTimeOffset>? clock = null)
     {
         _clock = clock ?? (() => DateTimeOffset.UtcNow);
@@ -76,11 +45,8 @@ public sealed class SessionTokenIssuer : ISessionTokenIssuer
 
         if (record.Used)
         {
-            // Reuse detected: this exact token was already exchanged once, so a second
-            // presentation of it means a copy is circulating somewhere. The whole family
-            // dies here -- not just this token -- because there is no way to tell which of
-            // its other members (already-issued-but-not-yet-presented tokens included) the
-            // same copy has, or will, reach.
+            // Reuse of an already-exchanged token revokes the whole family: a copy is
+            // circulating and any other token in the family may already be compromised.
             _revokedFamilies[record.FamilyId] = 0;
             return RefreshSessionResult.Failure();
         }

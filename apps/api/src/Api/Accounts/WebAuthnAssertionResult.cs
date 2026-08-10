@@ -4,13 +4,7 @@ public sealed class WebAuthnAssertionResult
 {
     public required bool Succeeded { get; init; }
 
-    /// <summary>
-    /// The counter value to write back over
-    /// <see cref="WebAuthnAssertionCeremony.StoredSignCount"/> so the next assertion has a
-    /// fresh baseline. Meaningless when <see cref="Succeeded"/> is false. Persisting it is
-    /// what makes clone detection work at all -- a caller that verifies and then forgets to
-    /// store this value has a verifier that can never notice a replay.
-    /// </summary>
+    // Caller must persist this over the old stored sign count, or clone detection never has a fresh baseline.
     public uint? NewSignCount { get; init; }
 
     public WebAuthnCeremonyFailureReason? FailureReason { get; init; }

@@ -2,10 +2,6 @@ using Api.Accounts;
 
 namespace Api.Tests.Accounts;
 
-/// <summary>
-/// Covers <see cref="TwoFactorTicketIssuer"/> directly, including expiry -- driven by an
-/// injected fake clock rather than a real <c>Thread.Sleep</c>.
-/// </summary>
 public sealed class TwoFactorTicketIssuerTests
 {
     [Fact]
@@ -27,10 +23,6 @@ public sealed class TwoFactorTicketIssuerTests
         Assert.False(issuer.Validate("never-issued", Guid.NewGuid()));
     }
 
-    /// <summary>
-    /// Core account-takeover regression: a ticket issued for one account must not validate
-    /// for a different account, even though the ticket itself is real and unexpired.
-    /// </summary>
     [Fact]
     public void Validate_WithTicketIssuedForAnotherAccount_ReturnsFalse()
     {

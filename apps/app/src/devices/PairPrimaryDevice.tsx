@@ -10,15 +10,6 @@ export interface PairPrimaryDeviceProps {
   baseUrl: string
   accountId: string
   accessToken: string
-  /**
-   * Produces the account's raw KEK bytes, specifically for this transfer. Mirrors
-   * `Keychain.unlock`'s own `deriveKek` callback shape on purpose: `Keychain` never exposes
-   * the KEK it holds (see keychain.ts -- `lock()` zeroes it, there is no getter), so rather
-   * than adding an escape hatch to that abstraction this flow asks the CALLER -- which
-   * already knows how to derive/re-derive a KEK (Argon2id from password, BIP39 seed,
-   * whatever this account used to unlock in the first place) -- for a fresh copy meant only
-   * for this transfer.
-   */
   getKekForTransfer: () => Promise<Uint8Array>
   onDelivered?: () => void
 }
@@ -29,14 +20,6 @@ type DeliveryState =
   | { status: 'delivered' }
   | { status: 'error'; message: string }
 
-/**
- * Wires PairingQr's relay-only handshake to the actual secure channel: generates this
- * device's ephemeral X25519 keypair, hands PairingQr the public half to publish in the QR,
- * and -- once a new device claims the session -- derives the shared channel key
- * (HKDF-SHA256 over the ECDH secret, salted with the session id, see
- * device-pairing-channel.ts), encrypts the KEK to it, and submits the ciphertext. The
- * server only ever sees the two public keys and this one opaque ciphertext.
- */
 export function PairPrimaryDevice({
   baseUrl,
   accountId,

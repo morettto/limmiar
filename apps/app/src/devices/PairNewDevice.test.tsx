@@ -22,6 +22,8 @@ const fetchPairingPayloadMock = vi.mocked(client.fetchPairingPayload)
 const SESSION_ID = 'session-new-device-flow'
 const BASE_URL = 'http://api.test'
 const KEK = new Uint8Array(32).fill(0x99)
+// Mirrors PairNewDevice.tsx's own (unexported) PAYLOAD_POLL_TIMEOUT_MS.
+const PAYLOAD_POLL_TIMEOUT_MS = 2 * 60 * 1000
 
 describe('PairNewDevice', () => {
   beforeAll(async () => {
@@ -70,6 +72,120 @@ describe('PairNewDevice', () => {
     await vi.waitFor(() => expect(onKekAdopted).toHaveBeenCalledTimes(1))
     expect(onKekAdopted.mock.calls[0]![0]).toEqual(KEK)
     expect(fetchPairingPayloadMock).toHaveBeenCalledWith(BASE_URL, SESSION_ID)
+  })
+
+  it('renders a translated error and never calls onKekAdopted when the delivered KEK cannot be decrypted', async () => {
+    const decode = vi.fn().mockResolvedValue(
+      JSON.stringify({ s: SESSION_ID, k: encodeBase64(generateKeyPair().publicKey), u: BASE_URL }),
+    )
+    claimPairingSessionMock.mockResolvedValue({ ok: true, primaryPublicKey: encodeBase64(generateKeyPair().publicKey) })
+    fetchPairingPayloadMock.mockResolvedValue({ ok: true, encryptedKek: encodeBase64(new Uint8Array(48).fill(0x11)) })
+    const onKekAdopted = vi.fn()
+
+    render(
+      <I18nProvider i18n={i18n}>
+        <PairNewDevice baseUrl={BASE_URL} decode={decode} onKekAdopted={onKekAdopted} />
+      </I18nProvider>,
+    )
+
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      'Não foi possível decifrar a chave recebida. Tente parear novamente.',
+    )
+    expect(onKekAdopted).not.toHaveBeenCalled()
+  })
+
+  it('polls fetchPairingPayload again after a not-yet-ready response, until it succeeds', async () => {
+    const primaryKeyPair = generateKeyPair()
+    const decode = vi.fn().mockResolvedValue(
+      JSON.stringify({ s: SESSION_ID, k: encodeBase64(primaryKeyPair.publicKey), u: BASE_URL }),
+    )
+    claimPairingSessionMock.mockResolvedValue({ ok: true, primaryPublicKey: encodeBase64(primaryKeyPair.publicKey) })
+    fetchPairingPayloadMock.mockResolvedValue({
+      ok: false,
+      code: 'auth.device_pairing_session_not_found',
+      params: {},
+    })
+    const onKekAdopted = vi.fn()
+
+    render(
+      <I18nProvider i18n={i18n}>
+        <PairNewDevice baseUrl={BASE_URL} decode={decode} onKekAdopted={onKekAdopted} />
+      </I18nProvider>,
+    )
+
+    await vi.waitFor(() => expect(claimPairingSessionMock).toHaveBeenCalledTimes(1))
+    const newDevicePublicKeyBase64 = claimPairingSessionMock.mock.calls[0]![2]
+    const newDevicePublicKey = decodeBase64(newDevicePublicKeyBase64)
+    const sharedSecret = getSharedSecret(primaryKeyPair.privateKey, newDevicePublicKey)
+    const salt = new TextEncoder().encode(SESSION_ID)
+    const channelKey = deriveChannelKey(sharedSecret, salt)
+    const encryptedKek = encrypt(channelKey, KEK, salt)
+
+    await vi.waitFor(() => expect(fetchPairingPayloadMock).toHaveBeenCalledTimes(1))
+    fetchPairingPayloadMock.mockResolvedValue({ ok: true, encryptedKek: encodeBase64(encryptedKek) })
+
+    await vi.waitFor(() => expect(onKekAdopted).toHaveBeenCalledTimes(1), { timeout: 3000 })
+    expect(onKekAdopted.mock.calls[0]![0]).toEqual(KEK)
+    expect(fetchPairingPayloadMock.mock.calls.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('gives up and shows a translated error once polling exceeds the pairing session lifetime', async () => {
+    const dateNowSpy = vi.spyOn(Date, 'now')
+    let dateNowCalls = 0
+    dateNowSpy.mockImplementation(() => {
+      dateNowCalls += 1
+      return dateNowCalls === 1 ? 0 : PAYLOAD_POLL_TIMEOUT_MS + 1
+    })
+
+    const decode = vi.fn().mockResolvedValue(
+      JSON.stringify({ s: SESSION_ID, k: encodeBase64(generateKeyPair().publicKey), u: BASE_URL }),
+    )
+    claimPairingSessionMock.mockResolvedValue({ ok: true, primaryPublicKey: encodeBase64(generateKeyPair().publicKey) })
+    fetchPairingPayloadMock.mockResolvedValue({
+      ok: false,
+      code: 'auth.device_pairing_session_not_found',
+      params: {},
+    })
+    const onKekAdopted = vi.fn()
+
+    render(
+      <I18nProvider i18n={i18n}>
+        <PairNewDevice baseUrl={BASE_URL} decode={decode} onKekAdopted={onKekAdopted} />
+      </I18nProvider>,
+    )
+
+    expect(await screen.findByRole('alert')).toBeTruthy()
+    expect(onKekAdopted).not.toHaveBeenCalled()
+
+    dateNowSpy.mockRestore()
+  })
+
+  it('ignores a fetchPairingPayload resolution that arrives after the component unmounted', async () => {
+    const decode = vi.fn().mockResolvedValue(
+      JSON.stringify({ s: SESSION_ID, k: encodeBase64(generateKeyPair().publicKey), u: BASE_URL }),
+    )
+    claimPairingSessionMock.mockResolvedValue({ ok: true, primaryPublicKey: encodeBase64(generateKeyPair().publicKey) })
+    let resolvePayload!: (value: Awaited<ReturnType<typeof client.fetchPairingPayload>>) => void
+    fetchPairingPayloadMock.mockReturnValue(
+      new Promise((resolve) => {
+        resolvePayload = resolve
+      }),
+    )
+    const onKekAdopted = vi.fn()
+
+    const { unmount } = render(
+      <I18nProvider i18n={i18n}>
+        <PairNewDevice baseUrl={BASE_URL} decode={decode} onKekAdopted={onKekAdopted} />
+      </I18nProvider>,
+    )
+
+    await vi.waitFor(() => expect(fetchPairingPayloadMock).toHaveBeenCalledTimes(1))
+    unmount()
+
+    resolvePayload({ ok: true, encryptedKek: encodeBase64(new Uint8Array(48).fill(0x22)) })
+
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(onKekAdopted).not.toHaveBeenCalled()
   })
 
   it('renders an error and never calls onKekAdopted when the claim itself is rejected', async () => {

@@ -10,18 +10,7 @@ export interface Keychain {
   unwrapDek(wrappedDek: Uint8Array, aad: Uint8Array): Uint8Array
 }
 
-// Key-vault session state machine: locked (no KEK in memory) -> unlocking
-// (KEK derivation in flight) -> unlocked (KEK held, DEKs can be
-// wrapped/unwrapped) -> locked again. unlock() takes a callback that
-// PRODUCES the KEK rather than a password itself: this package has no ADR
-// deciding how e.g. a BIP39 seed or an X25519 shared secret becomes a
-// KEK-wrapping key, so the keychain stays agnostic to *how* it's derived —
-// that's the caller's call. This also means the FSM never gains an "is this
-// password right?" check of its own: the only place a wrong KEK can ever
-// surface is later, at unwrapDek's GCM tag check, which is EXACTLY what
-// keeps wrong-password and tampered-ciphertext indistinguishable (same
-// throw, same code path, same rough cost). Don't add a verification step to
-// unlock() — it would break that guarantee.
+// State machine: locked -> unlocking -> unlocked -> locked. unlock() takes a callback that PRODUCES the KEK, keeping the keychain agnostic to how it's derived (BIP39 seed, X25519 secret, etc). Do not add an "is this KEK right?" check to unlock(): a wrong KEK must surface only later, at unwrapDek's GCM tag check, so wrong-password and tampered-ciphertext stay indistinguishable (same throw, same path, same cost).
 export function createKeychain(): Keychain {
   let state: KeychainState = 'locked'
   let kek: Uint8Array | null = null
@@ -30,12 +19,7 @@ export function createKeychain(): Keychain {
     return state
   }
 
-  // Deliberately not declared `async function`: the guard clause below must
-  // throw synchronously to a caller who doesn't await (a plain try/catch
-  // around a bare `keychain.unlock(...)` call) — an async function would
-  // instead swallow it into a rejected Promise. The actual derivation and
-  // its race handling live in an inner async function so `await` is still
-  // available where it's needed.
+  // Deliberately not `async function`: the guard clause below must throw synchronously for a caller who doesn't await (plain try/catch around a bare call), not swallow into a rejected Promise; the inner async run() handles derivation and its race.
   function unlock(deriveKek: () => Promise<Uint8Array>): Promise<void> {
     if (state !== 'locked') {
       throw new Error(`cannot unlock keychain while it is "${state}"`)
@@ -51,10 +35,7 @@ export function createKeychain(): Keychain {
         throw error
       }
 
-      // lock() may have run while deriveKek() was in flight. If so, state is
-      // no longer 'unlocking' (lock() already forced it back to 'locked')
-      // and this just-resolved KEK is stale — it must never become live.
-      // Zero it in place and leave state exactly as lock() left it.
+      // lock() may have run while deriveKek() was in flight; if state is no longer 'unlocking', this just-resolved KEK is stale and must never become live.
       if (state !== 'unlocking') {
         derivedKek.fill(0)
         return
@@ -67,11 +48,7 @@ export function createKeychain(): Keychain {
     return run()
   }
 
-  // Callable from any state, always succeeds. Zeroing the KEK's actual
-  // bytes (not just dropping the reference) is what closes every path to a
-  // wrapped DEK's plaintext — including a reference to this same array held
-  // outside this module — since the only thing standing between a wrapped
-  // DEK and its plaintext is this array's live bytes.
+  // Zeroing the KEK's actual bytes (not just dropping the reference) closes every path to a wrapped DEK's plaintext, including a reference to this same array held outside this module.
   function lock(): void {
     if (kek !== null) {
       kek.fill(0)
@@ -84,8 +61,7 @@ export function createKeychain(): Keychain {
     if (state !== 'unlocked') {
       throw new Error(`cannot ${action} DEK while keychain is "${state}"`)
     }
-    // Invariant: state is 'unlocked' only while kek holds the live KEK set
-    // by unlock() above — lock() always clears both together.
+    // Invariant: state is 'unlocked' only while kek holds the live KEK; lock() always clears both together.
     return kek as Uint8Array
   }
 

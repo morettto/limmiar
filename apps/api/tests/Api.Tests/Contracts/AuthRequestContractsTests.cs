@@ -3,13 +3,7 @@ using Api.Accounts;
 
 namespace Api.Tests.Contracts;
 
-/// <summary>
-/// S02-01 acceptance criterion: "Nenhum endpoint aceita senha em claro -- nem sequer tem
-/// campo password/senha no contrato de request". Operationalized here as a reflection
-/// check over the actual request DTO types AuthEndpoints binds from the HTTP body -- not
-/// a manual read of the source, so it fails the moment anyone adds a "Password"/"Senha"
-/// property back, in either language, in any casing.
-/// </summary>
+/// <summary>S02-01 AC: no endpoint accepts a plaintext password field, in either language or casing. Checked by reflection over the actual request DTO types, not a manual source read, so it fails the moment anyone adds one back.</summary>
 public sealed class AuthRequestContractsTests
 {
     [Theory]

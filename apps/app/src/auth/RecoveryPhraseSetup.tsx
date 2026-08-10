@@ -7,30 +7,17 @@ import { deriveEmailSalt } from './password-verifier'
 import { deriveRecoveryVerifier } from './recovery-verifier'
 
 export interface RecoveryPhraseSetupProps {
-  /** Base URL of the Limmiar API (same convention as api/client.ts's other callers). */
   baseUrl: string
-  /** The account (must be AccountRole.Professional) enrolling a recovery phrase. */
   accountId: string
-  /** The account's e-mail -- deriveEmailSalt(email) must match the same salt login/register use. */
   email: string
-  /** The account's bearer access token -- sent as `Authorization: Bearer` (registerRecoveryPhrase). */
   accessToken: string
-  /** Called once the user has confirmed they saved their recovery phrase (the "done" button). */
   onDone: () => void
 }
 
-// BIP39 strength for the recovery phrase (packages/crypto/src/bip39.ts's Bip39Strength
-// union). This is the first real call site for generateMnemonic in this repo, so there is
-// no existing precedent to follow -- 256 (24 words) is chosen deliberately over the 128-bit
-// minimum: a recovery phrase guards full account access the same way a password does
-// (ADR-S02-02), so it gets the union's maximum strength.
+// A recovery phrase guards full account access, the same as a password. It gets the
+// strongest BIP39 option (256 bits, 24 words) instead of the 128-bit minimum.
 const RECOVERY_PHRASE_STRENGTH_BITS = 256
 
-// 2-step flow, deliberately simpler than TotpSetup's (no code-confirmation round trip --
-// unlike a TOTP secret, there is nothing here for the user to type back to prove they wrote
-// it down): generating (mnemonic generation + derivation + POST, all happen together, with
-// nothing meaningful to show mid-flight) -> phrase-ready (dedicated screen, shown exactly
-// once) | save-error.
 type Step = { status: 'generating' } | { status: 'save-error' } | { status: 'phrase-ready' }
 
 export function RecoveryPhraseSetup({ baseUrl, accountId, email, accessToken, onDone }: RecoveryPhraseSetupProps) {
@@ -87,10 +74,6 @@ export function RecoveryPhraseSetup({ baseUrl, accountId, email, accessToken, on
     )
   }
 
-  // Dedicated screen -- deliberately not stacked with anything else, since this phrase is
-  // shown in clear text this one time only (same discipline as TotpSetup's backup-codes
-  // screen). Numbered word grid, not a paragraph: recovery phrases are copy-error-prone, and
-  // a numbered list is the standard UX for confirming word order and catching a missed word.
   const words = mnemonic.split(' ')
 
   return (

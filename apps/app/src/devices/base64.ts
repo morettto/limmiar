@@ -1,10 +1,3 @@
-// Wire-format helpers for this module only -- everything in packages/crypto and the
-// PairingQr/PairingScan components above works in raw Uint8Array; only the boundary that
-// actually talks to the backend (createPairingSession/claimPairingSession/etc., all
-// base64-string fields per api/client.ts's own convention) needs to cross to/from text.
-// Mirrors api/client.ts's `passwordVerifierToBase64` (btoa/atob, not `Buffer` -- this runs
-// in the browser).
-
 export function encodeBase64(bytes: Uint8Array): string {
   let binary = ''
   for (const byte of bytes) {

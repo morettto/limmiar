@@ -2,15 +2,8 @@ using Api.Accounts;
 
 namespace Api.Tests.Accounts;
 
-/// <summary>
-/// Covers the production placeholder <see cref="NewDeviceAlertSender"/> directly. No S02-07
-/// test ever exercises this class in production: every test that reaches
-/// <see cref="AccountService.NotifyNewDeviceLinkedAsync"/> either overrides
-/// <see cref="INewDeviceAlertSender"/> with <see cref="CapturingNewDeviceAlertSender"/>, or
-/// relies on the swallow-on-failure behavior around this exact placeholder (see
-/// <see cref="AccountServiceNewDeviceAlertTests"/>). Same "provably intentional, not
-/// accidentally untested" precedent as <see cref="MagicLinkEmailSenderTests"/>.
-/// </summary>
+// Real device-alert delivery is out of scope for S02-07; this proves that is intentional,
+// not an accidentally-untested code path.
 public sealed class NewDeviceAlertSenderTests
 {
     [Fact]

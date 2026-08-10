@@ -6,32 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Api.Endpoints;
 
-/// <summary>
-/// S02-02 backend: comprovação profissional (CRP/CRM auto-verificado, documento em fila
-/// de revisão humana). Owns request validation and HTTP status/Problem+JSON mapping; all
-/// domain logic lives in <see cref="AccountService"/>, which this class only calls into --
-/// same split as <see cref="AuthEndpoints"/>.
-///
-/// Security-review fix: <see cref="HandleListQueueAsync"/> and <see cref="HandleDecideAsync"/>
-/// are exclusively human-reviewer/staff actions, but had no authentication at all -- any
-/// professional could approve their own document review by calling the decision endpoint
-/// on their own account. This backend has no staff/admin account concept yet (Spec S02
-/// marks team invites/RBAC as Out of Scope, owned by S14), so both handlers now require a
-/// shared-secret <c>X-Staff-Api-Key</c> header, checked via <see cref="IStaffAccessGuard"/>
-/// -- a minimal containment stopgap, not real RBAC.
-///
-/// Second security-review fix (found while implementing S02-08, applied retroactively --
-/// confirmed with the human before touching this already-Done ticket's endpoint):
-/// <see cref="HandleSubmitAsync"/> had the exact same class of bug as the two handlers
-/// above -- it trusted the <c>accountId</c> URL segment alone, with no proof the caller
-/// was ever authenticated as that account. A caller who merely knew (or guessed) a
-/// professional's account id could submit a forged credential on that professional's
-/// behalf, driving their <see cref="Account.VerificationStatus"/> through the reviewer
-/// queue. Now gated by the <c>Authorization: Bearer &lt;access token&gt;</c> issued by
-/// S02-08's <see cref="ISessionTokenIssuer"/> -- the first real consumer of
-/// <see cref="ISessionTokenIssuer.ValidateAccess"/>, which existed as a ready seam with no
-/// caller until now (see that method's own doc comment).
-/// </summary>
+// HandleListQueueAsync/HandleDecideAsync are staff-only (X-Staff-Api-Key, IStaffAccessGuard); HandleSubmitAsync is account-scoped via Bearer access token -- both gates closed security-review findings against forged/unauthenticated calls.
 public static class ProfessionalVerificationEndpoints
 {
     public static void MapProfessionalVerificationEndpoints(this WebApplication app)
@@ -152,12 +127,6 @@ public static class ProfessionalVerificationEndpoints
         return TypedResults.Ok(new ProfessionalVerificationDecisionResponse(account.Id, account.VerificationStatus, account.RejectionReason));
     }
 
-    /// <summary>
-    /// CRP/CRM require a registry number + UF; a document requires a reference. A
-    /// malformed request (wrong fields for the chosen type) is a 400 validation error --
-    /// distinct from the 409s <see cref="AccountService.SubmitProfessionalCredentialAsync"/>
-    /// returns for a well-formed request the account's state doesn't allow.
-    /// </summary>
     private static bool TryValidateSubmission(
         SubmitProfessionalCredentialRequest request, out JsonHttpResult<LimmiarProblemDetails> problem)
     {
@@ -195,13 +164,6 @@ public static class ProfessionalVerificationEndpoints
     private static JsonHttpResult<LimmiarProblemDetails> StaffUnauthorizedProblem() =>
         ProblemJson(StatusCodes.Status401Unauthorized, "Missing or invalid staff API key", ProblemCodes.StaffUnauthorized);
 
-    /// <summary>
-    /// True only if <paramref name="authorizationHeader"/> is a well-formed
-    /// <c>Bearer &lt;token&gt;</c> value whose token <see cref="ISessionTokenIssuer.ValidateAccess"/>
-    /// resolves to EXACTLY <paramref name="accountId"/> -- a valid access token for a
-    /// DIFFERENT account must not authorize this call (same account-scoping discipline as
-    /// <see cref="Accounts.ITwoFactorTicketIssuer.Validate"/>).
-    /// </summary>
     private const string BearerPrefix = "Bearer ";
 
     private static bool IsAuthorizedForAccount(string? authorizationHeader, Guid accountId, ISessionTokenIssuer sessionTokenIssuer)
@@ -237,5 +199,4 @@ public static class ProfessionalVerificationEndpoints
     }
 }
 
-/// <summary>One entry in the human review queue -- deliberately narrower than <see cref="Account"/> (no credential material, no verifier).</summary>
 public sealed record ProfessionalVerificationQueueEntry(Guid AccountId, string Email, DateTimeOffset SubmittedAt);

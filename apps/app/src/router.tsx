@@ -56,7 +56,7 @@ function MagicLinkCallbackRouteComponent() {
 
 interface AuthScreenE2ESearch {
   baseUrl: string
-  /** 'Professional' | 'Patient' | '' (unset -- AuthScreen falls back to its own default). */
+  // '' means unset -- AuthScreen falls back to its own default.
   role: string
 }
 
@@ -143,7 +143,7 @@ interface PairPrimarySearch {
   baseUrl: string
   accountId: string
   accessToken: string
-  /** Base64 of a fixed 32-byte test KEK -- see the file-level doc comment above. */
+  // Base64 of a fixed 32-byte test KEK -- see the file-level doc comment above.
   kek: string
 }
 

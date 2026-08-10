@@ -10,26 +10,11 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Api.Tests.Auth;
 
-/// <summary>
-/// S02-03/S02-04 endpoint tests: mandatory TOTP enrollment (begin/confirm) and login
-/// challenge (code or backup code), plus the negative regression proving no support-side
-/// 2FA reset/disable route exists (ADR-S02-04).
-///
-/// Security-review fix: every call into these 3 endpoints now needs a valid two-factor
-/// ticket (see <see cref="ITwoFactorTicketIssuer"/>) for the target accountId, minted by
-/// /auth/register or /auth/login. Most tests below thread the real ticket through the real
-/// flow (register/login -> ticket -> begin/confirm/challenge) using the production
-/// <see cref="TwoFactorTicketIssuer"/>. A handful of tests only care about a downstream
-/// AccountService mapping (e.g. "unknown accountId still returns 404") that a ticket bound
-/// to a real account could never reach -- those use <see cref="CreateFactoryWithTicketBypass"/>,
-/// which swaps in a stub <see cref="ITwoFactorTicketIssuer"/> that treats any ticket as
-/// valid, the same way the other stub providers in this file work.
-/// </summary>
+/// <summary>S02-03/S02-04 endpoint tests: mandatory TOTP enrollment (begin/confirm), login challenge (code or backup code), and the regression proving no support-side 2FA reset/disable route exists (ADR-S02-04). Every call into begin/confirm/challenge needs a valid two-factor ticket for the target accountId; a handful of tests that only care about a downstream AccountService mapping unreachable by a real ticket use CreateFactoryWithTicketBypass instead.</summary>
 public sealed class TwoFactorEndpointsTests
 {
     private static readonly byte[] SomeVerifier = CreateVerifier(0x01);
 
-    /// <summary>Fixed code the stub provider always treats as valid, regardless of secret/timestamp -- same override pattern the other endpoint tests use for external providers.</summary>
     private const string ValidStubCode = "111111";
 
     [Fact]
@@ -92,8 +77,7 @@ public sealed class TwoFactorEndpointsTests
         await PostBeginAsync(client, accountId, ticket);
         await PostConfirmAsync(client, accountId, ticket, ValidStubCode);
 
-        // The registration ticket was invalidated by the successful confirm above --
-        // logging in again mints a fresh one, exactly like a real caller would need to.
+        // The registration ticket was invalidated by the successful confirm above; logging in again mints a fresh one.
         var secondTicket = await LoginAsync(client, email);
         var response = await PostBeginAsync(client, accountId, secondTicket);
 
@@ -288,11 +272,7 @@ public sealed class TwoFactorEndpointsTests
         Assert.Equal("auth.totp_not_enabled", doc.RootElement.GetProperty("code").GetString());
     }
 
-    /// <summary>
-    /// Security-review regression: without this check, any caller who could
-    /// guess/discover a professional's accountId could hit begin/confirm/challenge with no
-    /// ticket at all and no proof they ever passed register/login/Google for that account.
-    /// </summary>
+    /// <summary>Security-review regression: without this check, a caller who could guess a professional's accountId could hit begin/confirm/challenge with no proof they ever passed register/login/Google for that account.</summary>
     [Fact]
     public async Task PostTotp_WithoutValidTicket_Returns401WithProblemDetails()
     {
@@ -342,13 +322,7 @@ public sealed class TwoFactorEndpointsTests
         Assert.Equal("auth.totp_ticket_invalid", doc.RootElement.GetProperty("code").GetString());
     }
 
-    /// <summary>
-    /// THE core account-takeover regression (security-review finding): a ticket minted for
-    /// account A must not authorize a begin/confirm/challenge call against account B's
-    /// accountId, even though the ticket is otherwise valid (issued, unexpired). Without
-    /// this check, <see cref="ITwoFactorTicketIssuer.Validate"/> could be reduced to "does
-    /// any ticket exist", which would not close the original vulnerability at all.
-    /// </summary>
+    /// <summary>The core account-takeover regression: a ticket minted for account A must not authorize a call against account B's accountId, even though it's otherwise valid.</summary>
     [Fact]
     public async Task PostTotp_WithTicketIssuedForAnotherAccount_Returns401WithProblemDetails()
     {
@@ -402,11 +376,7 @@ public sealed class TwoFactorEndpointsTests
         Assert.Equal("auth.totp_ticket_invalid", doc.RootElement.GetProperty("code").GetString());
     }
 
-    /// <summary>
-    /// ADR-S02-04 regression: there is deliberately no support-side way to reset or disable
-    /// 2FA -- the only account-recovery path is a single-use backup code. No route template
-    /// for a "reset" action exists at all, so it's simply unmapped (404).
-    /// </summary>
+    /// <summary>ADR-S02-04 regression: there is deliberately no support-side way to reset 2FA -- the only account-recovery path is a single-use backup code.</summary>
     [Fact]
     public async Task NoSupportSideTotpResetRouteExists()
     {
@@ -419,13 +389,7 @@ public sealed class TwoFactorEndpointsTests
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    /// <summary>
-    /// Same ADR-S02-04 guarantee, RESTful-DELETE flavor. This path template DOES exist (it's
-    /// the same one <c>POST /accounts/{accountId}/totp</c> is mapped on), so ASP.NET Core's
-    /// routing correctly reports 405 Method Not Allowed rather than 404 for the mismatched
-    /// verb -- but 405 proves the same thing 404 would: there is no endpoint that actually
-    /// disables/resets 2FA here. Only a real 200 would be cause for concern.
-    /// </summary>
+    /// <summary>Same ADR-S02-04 guarantee via DELETE: the path template exists (same one POST maps on), so routing reports 405 rather than 404 -- either way, no endpoint disables 2FA here.</summary>
     [Fact]
     public async Task NoSupportSideTotpDisableRouteExists()
     {
@@ -467,7 +431,6 @@ public sealed class TwoFactorEndpointsTests
         return (body!.Id, body.TwoFactorTicket!);
     }
 
-    /// <summary>Mints a fresh two-factor ticket the same way a real client would: by logging in again.</summary>
     private static async Task<string> LoginAsync(HttpClient client, string email)
     {
         var response = await client.PostAsJsonAsync(
@@ -478,20 +441,13 @@ public sealed class TwoFactorEndpointsTests
         return body!.TwoFactorTicket!;
     }
 
-    /// <summary>
-    /// Every test here overrides the production <see cref="ITotpProvider"/> registration
-    /// with <see cref="StubTotpProvider"/> -- TOTP itself is real and already covered by
-    /// Api.Tests/Accounts/TotpProviderTests; these tests only need a deterministic code
-    /// (<see cref="ValidStubCode"/>) to drive the HTTP layer, not to re-verify RFC 6238 math
-    /// over HTTP.
-    /// </summary>
+    /// <summary>Overrides the production ITotpProvider registration with StubTotpProvider -- TOTP itself is already covered by Api.Tests/Accounts/TotpProviderTests.</summary>
     private static WebApplicationFactory<Program> CreateFactory() =>
         new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>
             {
-                // Same reasoning as AuthEndpointsTests.CreateFactory: these endpoints never
-                // touch Postgres, but app startup still needs a syntactically valid
-                // ConnectionStrings:AppDb to construct the NpgsqlDataSource singleton.
+                // Same reasoning as AuthEndpointsTests.CreateFactory: never touches Postgres, but
+                // startup still needs a syntactically valid ConnectionStrings:AppDb.
                 builder.UseSetting("ConnectionStrings:AppDb", "Host=127.0.0.1;Port=1;Username=app_role;Password=unused;");
                 builder.UseSetting("StaffAccess:ApiKey", "test-staff-api-key");
                 builder.UseSetting("WebAuthn:RelyingPartyId", "limmiar.test");
@@ -499,12 +455,7 @@ public sealed class TwoFactorEndpointsTests
                 builder.ConfigureTestServices(services => services.AddSingleton<ITotpProvider>(new StubTotpProvider()));
             });
 
-    /// <summary>
-    /// For tests that only care about a downstream AccountService mapping (e.g. "unknown
-    /// accountId returns 404") a ticket bound to a real account can never reach -- swaps in
-    /// a stub <see cref="ITwoFactorTicketIssuer"/> that treats any ticket as valid, so the
-    /// call passes straight through to <see cref="Api.Accounts.AccountService"/>.
-    /// </summary>
+    /// <summary>For tests that only care about a downstream AccountService mapping a ticket bound to a real account can never reach -- swaps in a stub that treats any ticket as valid.</summary>
     private static WebApplicationFactory<Program> CreateFactoryWithTicketBypass() =>
         CreateFactory().WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services => services.AddSingleton<ITwoFactorTicketIssuer>(new AlwaysValidTwoFactorTicketIssuer())));

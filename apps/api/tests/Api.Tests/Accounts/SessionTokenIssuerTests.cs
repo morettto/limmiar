@@ -2,11 +2,6 @@ using Api.Accounts;
 
 namespace Api.Tests.Accounts;
 
-/// <summary>
-/// Covers <see cref="SessionTokenIssuer"/> directly -- issuance, rotation, reuse-detected
-/// family revocation, and expiry (driven by an injected fake clock, same discipline as
-/// <see cref="TwoFactorTicketIssuerTests"/>, never a real <c>Thread.Sleep</c>).
-/// </summary>
 public sealed class SessionTokenIssuerTests
 {
     [Fact]
@@ -56,11 +51,6 @@ public sealed class SessionTokenIssuerTests
         Assert.Equal(RefreshSessionFailureReason.InvalidToken, result.FailureReason);
     }
 
-    /// <summary>
-    /// Core rotation rule (Notion AC: "Refresh token usado uma vez nunca é aceito de
-    /// novo"): once a refresh token has been exchanged, presenting THAT SAME token again
-    /// must not succeed a second time.
-    /// </summary>
     [Fact]
     public void Refresh_WithAlreadyUsedToken_FailsOnSecondPresentation()
     {
@@ -73,12 +63,8 @@ public sealed class SessionTokenIssuerTests
         Assert.False(second.Succeeded);
     }
 
-    /// <summary>
-    /// Core reuse-detection rule (Notion AC: "Reapresentação de token já usado revoga
-    /// todos os tokens daquela família de sessão, não só o token em si"): the fresh token
-    /// issued by the FIRST refresh -- which was never itself presented, let alone reused --
-    /// must also die once the family it belongs to is caught being replayed.
-    /// </summary>
+    // The fresh token issued by the first refresh, never itself presented, must also die
+    // once the family it belongs to is caught being replayed.
     [Fact]
     public void Refresh_ReuseOfBurnedToken_RevokesTheEntireFamily()
     {
@@ -86,7 +72,6 @@ public sealed class SessionTokenIssuerTests
         var issued = issuer.IssuePair(Guid.NewGuid());
         var afterFirstRefresh = issuer.Refresh(issued.RefreshToken).TokenPair!;
 
-        // Replays the already-burned original token -- reuse detected.
         issuer.Refresh(issued.RefreshToken);
 
         var attemptWithLatestToken = issuer.Refresh(afterFirstRefresh.RefreshToken);

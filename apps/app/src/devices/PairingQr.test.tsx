@@ -1,6 +1,7 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { I18nProvider } from '@lingui/react'
+import QRCode from 'qrcode'
 import { i18n, dynamicActivate } from '../i18n'
 import * as client from '../api/client'
 import { PairingQr } from './PairingQr'
@@ -192,5 +193,76 @@ describe('PairingQr', () => {
     renderPairingQr()
 
     expect((await screen.findByRole('alert')).textContent).toBe('Ocorreu um erro inesperado. Tente novamente.')
+  })
+
+  it('renders a translated error and stops polling when getPairingClaimStatus fails', async () => {
+    vi.useFakeTimers()
+    const now = Date.now()
+    createPairingSessionMock.mockResolvedValue({
+      ok: true,
+      sessionId: SESSION_ID,
+      expiresAt: new Date(now + 60_000).toISOString(),
+    })
+    getPairingClaimStatusMock.mockResolvedValue({ ok: false, code: 'auth.access_token_invalid', params: {} })
+    renderPairingQr()
+
+    await flushMicrotasks()
+    screen.getByRole('img')
+
+    await vi.advanceTimersByTimeAsync(1000)
+    await flushMicrotasks()
+
+    expect(screen.getByRole('alert').textContent).toBe('Ocorreu um erro inesperado. Tente novamente.')
+
+    const callsAfterError = getPairingClaimStatusMock.mock.calls.length
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(getPairingClaimStatusMock.mock.calls.length).toBe(callsAfterError)
+  })
+
+  it('ignores a createPairingSession resolution that arrives after the component unmounted', async () => {
+    let resolveCreate: (result: client.CreatePairingSessionResult) => void = () => {}
+    createPairingSessionMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveCreate = resolve
+        }),
+    )
+
+    const { unmount } = renderPairingQr()
+    await waitFor(() => expect(createPairingSessionMock).toHaveBeenCalledTimes(1))
+    unmount()
+
+    resolveCreate({ ok: true, sessionId: SESSION_ID, expiresAt: new Date(Date.now() + 60_000).toISOString() })
+
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(getPairingClaimStatusMock).not.toHaveBeenCalled()
+  })
+
+  it('ignores a QRCode.toDataURL resolution that arrives after the component unmounted', async () => {
+    createPairingSessionMock.mockResolvedValue({
+      ok: true,
+      sessionId: SESSION_ID,
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    })
+    let resolveToDataUrl: (value: string) => void = () => {}
+    const toDataURLSpy = vi
+      .spyOn(QRCode, 'toDataURL')
+      .mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolveToDataUrl = resolve
+          }) as unknown as ReturnType<typeof QRCode.toDataURL>,
+      )
+
+    const { unmount } = renderPairingQr()
+    await waitFor(() => expect(toDataURLSpy).toHaveBeenCalledTimes(1))
+    unmount()
+
+    resolveToDataUrl('data:image/png;base64,fake')
+
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(getPairingClaimStatusMock).not.toHaveBeenCalled()
+
+    toDataURLSpy.mockRestore()
   })
 })

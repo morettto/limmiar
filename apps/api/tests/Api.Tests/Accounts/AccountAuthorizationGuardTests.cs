@@ -2,12 +2,7 @@ using Api.Accounts;
 
 namespace Api.Tests.Accounts;
 
-/// <summary>
-/// S02-02 acceptance criterion: "Conta pendente de validação não consegue criar
-/// paciente." No patient-creation endpoint exists yet (Spec S03, ticket S03-01, not
-/// started) -- this proves the guard itself, pure, so S03-01 has a tested primitive to
-/// call from day one. See <see cref="AccountAuthorizationGuard"/>'s own doc comment.
-/// </summary>
+// No patient-creation endpoint exists yet (S03-01); this tests the guard in isolation.
 public sealed class AccountAuthorizationGuardTests
 {
     [Theory]
@@ -36,8 +31,6 @@ public sealed class AccountAuthorizationGuardTests
     [InlineData(AccountVerificationStatus.Rejected)]
     public void CanCreatePatientRecords_WithPatientAccount_AlwaysReturnsFalse(AccountVerificationStatus status)
     {
-        // A patient account is never authorized to create patient records, regardless of
-        // its (normally-always-Active) VerificationStatus -- this is a professional-only action.
         var account = new Account(Guid.NewGuid(), "patient@example.com", AccountRole.Patient, PasswordVerifier: null, GoogleSubjectId: null, status);
 
         Assert.False(AccountAuthorizationGuard.CanCreatePatientRecords(account));

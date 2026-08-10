@@ -2,14 +2,6 @@ using Api.Accounts;
 
 namespace Api.Tests.Accounts;
 
-/// <summary>
-/// RFC 4226 Appendix D known-answer vectors (the HOTP algorithm TOTP is built on top of).
-/// The RFC's test secret is the 20 ASCII bytes "12345678901234567890"; since
-/// <see cref="ITotpProvider"/> only accepts a Base32 secret, this test Base32-encodes it
-/// once via <see cref="Base32"/> itself before exercising <see cref="TotpProvider.ValidateCode"/>
-/// through a <see cref="DateTimeOffset"/> chosen so <c>unixtime/30</c> lands exactly on the
-/// desired counter.
-/// </summary>
 public sealed class TotpProviderTests
 {
     // RFC 4226 Appendix D: HOTP(secret, counter) for counter 0..9.
@@ -51,10 +43,6 @@ public sealed class TotpProviderTests
         Assert.False(provider.ValidateCode(RfcSecretBase32, "000000", timestamp));
     }
 
-    /// <summary>
-    /// Counter 5 is four steps (120s) away from counter 1 -- well outside the +/-1 step
-    /// tolerance window -- so counter 1's code must not validate against counter 5's timestamp.
-    /// </summary>
     [Fact]
     public void ValidateCode_OutsideToleranceWindow_ReturnsFalse()
     {
@@ -64,17 +52,12 @@ public sealed class TotpProviderTests
         Assert.False(provider.ValidateCode(RfcSecretBase32, "287082", farTimestamp));
     }
 
-    /// <summary>
-    /// One step (30s) of clock drift on either side must still validate -- this is exactly
-    /// what the tolerance window exists for.
-    /// </summary>
     [Theory]
     [InlineData(-1)]
     [InlineData(1)]
     public void ValidateCode_OneStepOfClockDrift_StillReturnsTrue(int stepOffset)
     {
         var provider = new TotpProvider();
-        // Counter 5's code, checked against a timestamp landing on an adjacent counter.
         var driftedTimestamp = TimestampForCounter(5 + stepOffset);
 
         Assert.True(provider.ValidateCode(RfcSecretBase32, "254676", driftedTimestamp));
@@ -107,10 +90,6 @@ public sealed class TotpProviderTests
         Assert.Contains("period=30", uri);
     }
 
-    /// <summary>
-    /// Chooses a <see cref="DateTimeOffset"/> whose <c>unixtime/30</c> (truncated) equals
-    /// exactly <paramref name="counter"/> -- picks the first second of that 30-second step.
-    /// </summary>
     private static DateTimeOffset TimestampForCounter(int counter) =>
         DateTimeOffset.FromUnixTimeSeconds(counter * 30L);
 }

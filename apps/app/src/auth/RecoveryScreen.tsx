@@ -10,16 +10,10 @@ import { TotpChallenge } from './TotpChallenge'
 import { TotpSetup } from './TotpSetup'
 
 export interface RecoveryScreenProps {
-  /** Base URL of the Limmiar API (same convention as api/client.ts's other callers). */
   baseUrl: string
-  /** Called once recoverAccess() (and, if applicable, the following TOTP step) succeeds. */
   onRecovered?: (account: AccountResult) => void
 }
 
-// Same status union as AuthScreen's SubmitState, minus register/Google-only states
-// ('magic-link-sent'): recovery re-authenticates an existing account, so it only ever needs
-// idle/submitting/error, plus AuthScreen's identical post-authentication branch into
-// TotpSetup/TotpChallenge/success.
 type SubmitState =
   | { status: 'idle' }
   | { status: 'submitting' }
@@ -40,9 +34,6 @@ export function RecoveryScreen({ baseUrl, onRecovered }: RecoveryScreenProps) {
     setState({ status: 'success', account })
   }
 
-  // Same branching AuthScreen's handleAccountResult does on twoFactorRequirement -- a
-  // recovered account goes through the exact same TotpSetup/TotpChallenge steps a
-  // fresh register/login would.
   function handleAccountResult(account: AccountResult) {
     switch (account.twoFactorRequirement) {
       case 'SetupRequired':
@@ -62,10 +53,8 @@ export function RecoveryScreen({ baseUrl, onRecovered }: RecoveryScreenProps) {
 
     const trimmedMnemonic = mnemonic.trim()
     if (!validateMnemonic(trimmedMnemonic)) {
-      // Deliberately generic (explicit acceptance criterion): this must never name which
-      // word is wrong, or even hint that a checksum vs. wordlist-membership problem was
-      // found -- a per-word hint would let an attacker brute-force the phrase one word at a
-      // time instead of needing the whole sequence at once.
+      // Keep this message generic. Naming the wrong word would let an attacker
+      // brute-force the phrase one word at a time.
       setState({
         status: 'error',
         message: t`Frase de recuperação inválida. Verifique se você digitou todas as palavras corretamente.`,
@@ -82,8 +71,6 @@ export function RecoveryScreen({ baseUrl, onRecovered }: RecoveryScreenProps) {
     if (result.ok) {
       handleAccountResult(result.account)
     } else {
-      // Server-side rejection (auth.invalid_recovery_phrase) is just as generic --
-      // see problem-messages.ts's own doc comment on that code.
       setState({ status: 'error', message: translateProblemCode(result.code, result.params, i18n) })
     }
   }

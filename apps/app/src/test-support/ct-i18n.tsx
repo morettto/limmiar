@@ -25,7 +25,6 @@ import { messages } from '../locales/pt-BR/messages.po'
 // separate scope better done as its own ticket/AC than assumed here.
 i18n.loadAndActivate({ locale: 'pt-BR', messages })
 
-/** Wraps a mounted component with the same I18nProvider apps/app's real component tree uses, pre-activated with the pt-BR catalog (see module doc above). */
 export function CtI18nProvider({ children }: { children: ReactNode }) {
   return <I18nProvider i18n={i18n}>{children}</I18nProvider>
 }

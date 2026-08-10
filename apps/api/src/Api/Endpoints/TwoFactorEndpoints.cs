@@ -5,26 +5,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace Api.Endpoints;
 
-/// <summary>
-/// S02-03/S02-04 backend: mandatory TOTP 2FA enrollment and login challenge for
-/// <see cref="AccountRole.Professional"/> accounts. Owns request validation and HTTP
-/// status/Problem+JSON mapping; all domain logic lives in <see cref="AccountService"/>,
-/// which this class only calls into -- same split as <see cref="AuthEndpoints"/> and
-/// <see cref="ProfessionalVerificationEndpoints"/>.
-///
-/// Deliberately does NOT expose any reset/disable-2FA endpoint (ADR-S02-04): the only way
-/// to recover a lost authenticator device is a single-use backup code issued at enrollment
-/// confirmation. There is no support-side override, by design -- see
-/// Api.Tests/Auth/TwoFactorEndpointsTests's regression test proving no such route exists.
-///
-/// Security-review fix: every handler here first validates an <see cref="ITwoFactorTicketIssuer"/>
-/// ticket against the <c>accountId</c> URL segment, BEFORE calling <see cref="AccountService"/>.
-/// Without this, these endpoints trusted <c>accountId</c> alone -- anyone who could
-/// guess/discover a professional's accountId could enroll or confirm a new TOTP secret for
-/// that account (account takeover, since ADR-S02-04 has no 2FA reset) or "authenticate" via
-/// the challenge endpoint with no proof they ever passed <see cref="AccountService.LoginAsync"/>
-/// (or register/Google) for that specific account.
-/// </summary>
+// No reset/disable-2FA endpoint by design (ADR-S02-04) -- lost-authenticator recovery is the single-use backup code only. Every handler validates the ITwoFactorTicketIssuer ticket against accountId before calling AccountService.
 public static class TwoFactorEndpoints
 {
     public static void MapTwoFactorEndpoints(this WebApplication app)
@@ -109,8 +90,6 @@ public static class TwoFactorEndpoints
             };
         }
 
-        // The ticket must not survive past the flow step it was proving (it does not
-        // outlive enrollment confirmation).
         ticketIssuer.Invalidate(request.Ticket);
         var session = result.Session!;
         return TypedResults.Ok(new ConfirmTotpEnrollmentResponse(
@@ -143,8 +122,6 @@ public static class TwoFactorEndpoints
             };
         }
 
-        // Same single-use rule as HandleConfirmAsync: the ticket that proved this login's
-        // identity must not be reusable once the challenge it exists for has passed.
         ticketIssuer.Invalidate(request.Ticket);
 
         var account = result.Account!;
@@ -183,38 +160,14 @@ public static class TwoFactorEndpoints
     }
 }
 
-/// <summary>
-/// Starts (or restarts) a TOTP enrollment. <see cref="Ticket"/> is the two-factor ticket
-/// (see <see cref="ITwoFactorTicketIssuer"/>) proving the caller already passed
-/// register/login/Google for this exact account -- security-review fix (this endpoint used
-/// to trust the <c>accountId</c> URL segment with no proof at all).
-/// </summary>
 public sealed record BeginTotpEnrollmentRequest(string Ticket);
 
-/// <summary>Response of <see cref="TwoFactorEndpoints.HandleBeginAsync"/> -- everything an authenticator app needs to add the account.</summary>
 public sealed record BeginTotpEnrollmentResponse(string Secret, string ProvisioningUri);
 
-/// <summary>
-/// Confirms a pending enrollment with a code from the authenticator app.
-/// <see cref="Ticket"/> is the two-factor ticket for this account -- see
-/// <see cref="BeginTotpEnrollmentRequest.Ticket"/>.
-/// </summary>
 public sealed record ConfirmTotpEnrollmentRequest(string Ticket, string Code);
 
-/// <summary>
-/// The 10 single-use backup codes, in clear text. This is the only response in the entire
-/// API that ever exposes them -- the caller must display them once and tell the user to
-/// store them safely (ADR-S02-04: they are the sole account-recovery path).
-/// <see cref="AccessToken"/>/<see cref="RefreshToken"/>/<see cref="AccessTokenExpiresAt"/>
-/// (Spec S02, ticket S02-08) are always present here -- confirming enrollment is one of the
-/// two points where a professional account's login actually completes.
-/// </summary>
+// The only response in the API that ever exposes the backup codes in clear -- ADR-S02-04.
 public sealed record ConfirmTotpEnrollmentResponse(
     IReadOnlyList<string> BackupCodes, string AccessToken, string RefreshToken, DateTimeOffset AccessTokenExpiresAt);
 
-/// <summary>
-/// Exactly one of <see cref="Code"/>/<see cref="BackupCode"/> is expected to be set.
-/// <see cref="Ticket"/> is the two-factor ticket for this account -- see
-/// <see cref="BeginTotpEnrollmentRequest.Ticket"/>.
-/// </summary>
 public sealed record TotpChallengeRequest(string Ticket, string? Code, string? BackupCode);

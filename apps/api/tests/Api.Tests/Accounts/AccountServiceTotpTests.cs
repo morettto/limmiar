@@ -2,12 +2,6 @@ using Api.Accounts;
 
 namespace Api.Tests.Accounts;
 
-/// <summary>
-/// S02-03/S02-04: mandatory TOTP 2FA enrollment (begin/confirm) and login challenge
-/// (code or single-use backup code) for <see cref="AccountRole.Professional"/> accounts,
-/// plus the <see cref="TwoFactorRequirement"/> now carried by <see cref="AccountService.RegisterAsync"/>,
-/// <see cref="AccountService.LoginAsync"/>, and <see cref="AccountService.GoogleAuthAsync"/>.
-/// </summary>
 public sealed class AccountServiceTotpTests
 {
     private static readonly byte[] SomeVerifier = CreateVerifier(0x01);
@@ -87,8 +81,6 @@ public sealed class AccountServiceTotpTests
         Assert.NotNull(result.Account!.TotpEnabledAt);
         Assert.Equal(10, result.Account.TotpBackupCodeHashes!.Count);
 
-        // The stored hashes must be the SHA-256 hashes of the returned clear-text codes,
-        // not the codes themselves -- never persist a backup code in a recoverable form.
         var expectedHashes = result.BackupCodes.Select(BackupCodeGenerator.Hash).ToHashSet();
         Assert.Equal(expectedHashes, result.Account.TotpBackupCodeHashes.ToHashSet());
         Assert.All(result.Account.TotpBackupCodeHashes, hash => Assert.DoesNotContain(hash, result.BackupCodes));
@@ -178,10 +170,6 @@ public sealed class AccountServiceTotpTests
         Assert.Equal(VerifyTotpChallengeFailureReason.InvalidCode, result.FailureReason);
     }
 
-    /// <summary>
-    /// Core single-use guarantee (ADR-S02-04): consuming a backup code must remove it, so a
-    /// second attempt with the SAME backup code fails even though it was valid the first time.
-    /// </summary>
     [Fact]
     public async Task VerifyTotpChallengeAsync_WithBackupCode_SucceedsOnce_ThenFailsOnReuse()
     {
@@ -219,12 +207,8 @@ public sealed class AccountServiceTotpTests
         Assert.Equal(VerifyTotpChallengeFailureReason.InvalidCode, result.FailureReason);
     }
 
-    /// <summary>
-    /// Defensive edge case: an enabled account whose <see cref="Account.TotpBackupCodeHashes"/>
-    /// is null (never reachable through <see cref="AccountService.ConfirmTotpEnrollmentAsync"/>,
-    /// which always sets a non-null list, but not a state the null-coalescing fallback in
-    /// <see cref="AccountService.VerifyTotpChallengeAsync"/> should crash on).
-    /// </summary>
+    // TotpBackupCodeHashes null is unreachable via ConfirmTotpEnrollmentAsync, but the
+    // null-coalescing fallback in VerifyTotpChallengeAsync must not crash on it.
     [Fact]
     public async Task VerifyTotpChallengeAsync_WithBackupCode_WhenHashesListIsNull_ReturnsInvalidCode()
     {
@@ -287,11 +271,6 @@ public sealed class AccountServiceTotpTests
         Assert.Equal(TwoFactorRequirement.NotApplicable, result.TwoFactorRequirement);
     }
 
-    /// <summary>
-    /// Security-review fix: a Patient account's <see cref="TwoFactorRequirement"/> is
-    /// NotApplicable, so no two-factor ticket should ever be minted for it -- there is no
-    /// TOTP flow for this account to prove identity for.
-    /// </summary>
     [Fact]
     public async Task RegisterAsync_WithPatientRole_DoesNotIssueTwoFactorTicket()
     {
@@ -314,11 +293,6 @@ public sealed class AccountServiceTotpTests
         Assert.Equal(TwoFactorRequirement.SetupRequired, result.TwoFactorRequirement);
     }
 
-    /// <summary>
-    /// Security-review fix: a Professional account's registration must mint a two-factor
-    /// ticket bound to exactly this account -- the TOTP begin/confirm endpoints require it
-    /// as proof this caller passed RegisterAsync for this specific account.
-    /// </summary>
     [Fact]
     public async Task RegisterAsync_WithProfessionalRole_IssuesTwoFactorTicketBoundToNewAccount()
     {
@@ -434,11 +408,6 @@ public sealed class AccountServiceTotpTests
         Assert.Null(result.TwoFactorTicket);
     }
 
-    /// <summary>
-    /// S02-01 acceptance criterion ("Google resolve o papel sozinho") intersects with the
-    /// ticket fix here: an EXISTING professional account signing in via Google must also get
-    /// a ticket bound to that existing account, not just brand-new Google sign-ups.
-    /// </summary>
     [Fact]
     public async Task GoogleAuthAsync_WithExistingProfessionalAccount_IssuesTwoFactorTicketBoundToExistingAccount()
     {
@@ -454,8 +423,6 @@ public sealed class AccountServiceTotpTests
         Assert.True(ticketIssuer.Validate(result.TwoFactorTicket!, existingAccount.Id));
     }
 
-    // --- Spec S02, ticket S02-08: session issuance -----------------------------------
-
     [Fact]
     public async Task RegisterAsync_WithPatientRole_IssuesSession()
     {
@@ -469,11 +436,6 @@ public sealed class AccountServiceTotpTests
         Assert.NotEmpty(result.Session.RefreshToken);
     }
 
-    /// <summary>
-    /// A professional with 2FA still pending is not logged in yet (ADR-S02-03) -- no
-    /// session exists until <see cref="AccountService.ConfirmTotpEnrollmentAsync"/> or
-    /// <see cref="AccountService.VerifyTotpChallengeAsync"/> completes the login.
-    /// </summary>
     [Fact]
     public async Task RegisterAsync_WithProfessionalRole_DoesNotIssueSession()
     {
@@ -533,12 +495,6 @@ public sealed class AccountServiceTotpTests
         Assert.Null(result.Session);
     }
 
-    /// <summary>
-    /// First-time TOTP enrollment confirmation completes a professional's login
-    /// (ADR-S02-03: no separate challenge required this once) -- the session issued here
-    /// must resolve, via <see cref="ISessionTokenIssuer.ValidateAccess"/>, to exactly this
-    /// account.
-    /// </summary>
     [Fact]
     public async Task ConfirmTotpEnrollmentAsync_WithValidCode_IssuesSessionBoundToThatAccount()
     {

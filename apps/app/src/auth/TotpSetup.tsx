@@ -4,32 +4,15 @@ import { beginTotpEnrollment, confirmTotpEnrollment } from '../api/client'
 import { translateProblemCode } from '../errors/problem-messages'
 
 export interface TotpSetupProps {
-  /** Base URL of the Limmiar API (same convention as api/client.ts's other callers). */
   baseUrl: string
-  /** The account (must be AccountRole.Professional) enrolling in mandatory TOTP 2FA. */
   accountId: string
-  /**
-   * Security-review fix: the two-factor ticket register/login/google issued for this
-   * account, proving the caller already passed one of those before reaching this screen.
-   * Required by both beginTotpEnrollment and confirmTotpEnrollment -- see api/client.ts.
-   */
   ticket: string
-  /** Called once the user has confirmed they saved their backup codes (step 3's "done" button). */
   onDone: () => void
 }
 
-// 3-step enrollment flow (Spec S02, ADR-S02-03/S02-04):
-//   loading -> enter-code (secret + otpauth URI to add to an authenticator app) ->
-//   confirming -> backup-codes (shown exactly once, dedicated screen) | back to
-//   enter-code with a confirm error on an invalid code. `secret`/`provisioningUri`/
-//   `backupCodes`/`errorMessage` live in their own state (not folded into this status
-//   union) so rendering never needs to re-narrow `step` to reach them.
-// Wrapped in `{ status }` (same shape as AuthScreen/TotpChallenge's SubmitState)
-// rather than a bare string-literal union: eslint.config.mjs's
-// lingui/no-unlocalized-strings exemption for internal state-machine tags only
-// covers the `status` property name, not bare useState<T>(literal)/setStep(literal)
-// call arguments -- these tags are never rendered as-is, only branched on to pick
-// real <Trans> copy, so they need no translation either way.
+// Wrapped in `{ status }` instead of a bare string-literal union: eslint's
+// lingui/no-unlocalized-strings exemption for state-machine tags only covers the
+// `status` property name, not a bare literal passed to useState/setStep.
 type Step =
   | { status: 'loading' }
   | { status: 'begin-error' }
@@ -108,9 +91,6 @@ export function TotpSetup({ baseUrl, accountId, ticket, onDone }: TotpSetupProps
     )
   }
 
-  // Dedicated screen -- deliberately not stacked with step 2's form or
-  // anything else, since these codes are shown in clear text this one time
-  // only (ADR-S02-04).
   if (step.status === 'backup-codes') {
     return (
       <div className="mx-auto max-w-sm p-4">

@@ -2,12 +2,6 @@ using Api.Accounts;
 
 namespace Api.Tests.Accounts;
 
-/// <summary>
-/// Covers <see cref="AccountService.NotifyNewDeviceLinkedAsync"/> (Spec S02, ticket S02-07).
-/// A separate file from <see cref="AccountServiceTests"/>/<see cref="AccountServiceMagicLinkTests"/>
-/// purely for size -- same "one concern per test file" split as
-/// <see cref="AccountServiceTotpTests"/>/<see cref="AccountServiceProfessionalVerificationTests"/>.
-/// </summary>
 public sealed class AccountServiceNewDeviceAlertTests
 {
     [Fact]
@@ -33,14 +27,8 @@ public sealed class AccountServiceNewDeviceAlertTests
         Assert.False(sender.WasSentTo("owner@example.com"));
     }
 
-    /// <summary>
-    /// Same swallow-on-failure discipline as <see cref="AccountService.RequestMagicLinkAsync"/>
-    /// around <c>_magicLinkEmailSender.SendAsync</c>: a failure to deliver this alert must
-    /// never surface as an exception out of the device-pairing handshake it is called from.
-    /// Uses the REAL, NotSupportedException-throwing <see cref="NewDeviceAlertSender"/>
-    /// placeholder rather than a fake that throws, proving the swallow wraps the actual
-    /// production implementation's failure mode.
-    /// </summary>
+    // Uses the real, NotSupportedException-throwing NewDeviceAlertSender placeholder, not a
+    // fake, so the swallow-on-failure is proven against the actual production failure mode.
     [Fact]
     public async Task NotifyNewDeviceLinkedAsync_WhenAlertSenderThrows_CompletesWithoutThrowing()
     {

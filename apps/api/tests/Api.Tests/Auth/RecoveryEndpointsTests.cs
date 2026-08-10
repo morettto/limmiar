@@ -11,12 +11,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Api.Tests.Auth;
 
-/// <summary>
-/// S02-06 backend: BIP39 recovery-phrase account recovery. Same split as
-/// <see cref="AuthEndpointsTests"/>/<see cref="ProfessionalVerificationEndpointsTests"/> --
-/// HTTP-layer coverage; <see cref="Api.Tests.Accounts.AccountServiceRecoveryTests"/> already
-/// covers the domain layer.
-/// </summary>
+/// <summary>S02-06 backend: BIP39 recovery-phrase account recovery, HTTP-layer coverage (AccountServiceRecoveryTests covers the domain layer).</summary>
 public sealed class RecoveryEndpointsTests
 {
     private const string ValidStubCode = "111111";
@@ -87,9 +82,7 @@ public sealed class RecoveryEndpointsTests
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
         var victimAccountId = await RegisterProfessionalAsync(client, "recovery-victim@example.com");
-        // RegisterProfessionalAsync's side effect leaves the client carrying THIS account's
-        // own real, valid access token -- registering the attacker last means the client now
-        // carries the attacker's token, not the victim's.
+        // RegisterProfessionalAsync leaves the client carrying the LAST registered account's token, so registering the attacker last makes the client the attacker.
         await RegisterProfessionalAsync(client, "recovery-attacker@example.com");
 
         var response = await client.PostAsJsonAsync(
@@ -133,8 +126,7 @@ public sealed class RecoveryEndpointsTests
             new RegisterRequest("recovery-patient@example.com", SomeVerifier, AccountRole.Patient),
             ApiJsonSerializerContext.Default.RegisterRequest);
         var registered = await registerResponse.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.RegisterResponse);
-        // A Patient's TwoFactorRequirement is always NotApplicable (ADR-S02-03), so
-        // register already returned a real session -- no TOTP flow to complete first.
+        // A Patient's TwoFactorRequirement is always NotApplicable (ADR-S02-03), so register already returned a real session.
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", registered!.AccessToken);
 
         var response = await client.PostAsJsonAsync(
@@ -148,14 +140,7 @@ public sealed class RecoveryEndpointsTests
         Assert.Equal("auth.not_a_professional_account", doc.RootElement.GetProperty("code").GetString());
     }
 
-    /// <summary>
-    /// Same bypass-for-an-unreachable-downstream-case pattern as
-    /// <c>ProfessionalVerificationEndpointsTests.PostSubmit_WithUnknownAccountId_Returns404WithProblemDetails</c>:
-    /// a real access token can never resolve to an account that doesn't exist, so this
-    /// swaps in <see cref="AlwaysValidSessionTokenIssuer"/>, which accepts any GUID-shaped
-    /// bearer token as proof for that exact account, to exercise the downstream 404 mapping
-    /// in isolation.
-    /// </summary>
+    /// <summary>A real access token can never resolve to an unknown account, so this swaps in AlwaysValidSessionTokenIssuer (accepts any GUID-shaped bearer token) to reach the downstream 404 mapping in isolation.</summary>
     [Fact]
     public async Task PostAccountRecoveryPhrase_WithUnknownAccountId_Returns404WithProblemDetails()
     {
@@ -175,12 +160,7 @@ public sealed class RecoveryEndpointsTests
         Assert.Equal("auth.account_not_found", doc.RootElement.GetProperty("code").GetString());
     }
 
-    /// <summary>
-    /// Covers the "field present in JSON but null" shape, distinct from the
-    /// wrong-length-array case already covered by
-    /// PostAccountRecoveryPhrase_WithWrongLengthVerifier_Returns400WithValidationProblemDetails
-    /// -- same precedent as AuthEndpointsTests.PostRegister_WithNullVerifier_Returns400WithValidationProblemDetails.
-    /// </summary>
+    /// <summary>Covers "field present but null", a separate validation branch from the wrong-length-array case in PostAccountRecoveryPhrase_WithWrongLengthVerifier_Returns400WithValidationProblemDetails.</summary>
     [Fact]
     public async Task PostAccountRecoveryPhrase_WithNullVerifier_Returns400WithValidationProblemDetails()
     {
@@ -223,10 +203,7 @@ public sealed class RecoveryEndpointsTests
         Assert.NotNull(body);
         Assert.Equal("recover-ok@example.com", body!.Email);
         Assert.Equal(AccountRole.Professional, body.Role);
-        // 2FA is mandatory on every login for a Professional, even one that already
-        // confirmed enrollment (ADR-S02-03/S02-04) -- recovery re-authenticates the account
-        // but still owes a fresh TOTP challenge before a session is issued, same as
-        // AccountService.LoginAsync would for this same account.
+        // 2FA is mandatory on every login for a Professional (ADR-S02-03/S02-04); recovery re-authenticates but still owes a fresh TOTP challenge before a session is issued.
         Assert.Equal(TwoFactorRequirement.ChallengeRequired, body.TwoFactorRequirement);
         Assert.NotNull(body.TwoFactorTicket);
         Assert.Null(body.AccessToken);
@@ -316,11 +293,7 @@ public sealed class RecoveryEndpointsTests
         Assert.Equal("recoveryVerifier", doc.RootElement.GetProperty("params").GetProperty("field").GetString());
     }
 
-    /// <summary>
-    /// Covers the "field present in JSON but null" shape, distinct from the
-    /// wrong-length-array case above -- same precedent as
-    /// AuthEndpointsTests.PostRegister_WithNullVerifier_Returns400WithValidationProblemDetails.
-    /// </summary>
+    /// <summary>Covers "field present but null", a separate validation branch from the wrong-length-array case above.</summary>
     [Fact]
     public async Task PostAuthRecover_WithNullVerifier_Returns400WithValidationProblemDetails()
     {
@@ -341,13 +314,7 @@ public sealed class RecoveryEndpointsTests
         Assert.Equal("recoveryVerifier", doc.RootElement.GetProperty("params").GetProperty("field").GetString());
     }
 
-    /// <summary>
-    /// Registers a fresh Professional account AND completes its mandatory TOTP enrollment
-    /// (ADR-S02-03), same helper precedent as
-    /// <c>ProfessionalVerificationEndpointsTests.RegisterProfessionalAsync</c>. Side effect:
-    /// leaves <paramref name="client"/> carrying THIS account's real access token as its
-    /// default <c>Authorization: Bearer</c> header.
-    /// </summary>
+    /// <summary>Registers a Professional and completes mandatory TOTP enrollment (ADR-S02-03), leaving client carrying the real access token as its default Bearer header.</summary>
     private static async Task<Guid> RegisterProfessionalAsync(HttpClient client, string email)
     {
         var registerResponse = await client.PostAsJsonAsync(
@@ -380,14 +347,9 @@ public sealed class RecoveryEndpointsTests
                 builder.UseSetting("StaffAccess:ApiKey", "test-staff-api-key");
                 builder.UseSetting("WebAuthn:RelyingPartyId", "limmiar.test");
                 builder.UseSetting("WebAuthn:ExpectedOrigin", "https://limmiar.test");
-                // TOTP itself is already covered by Api.Tests/Accounts/TotpProviderTests --
-                // these tests only need a deterministic code to drive RegisterProfessionalAsync's
-                // real begin/confirm flow over HTTP, same override pattern as
-                // ProfessionalVerificationEndpointsTests.
                 builder.ConfigureTestServices(services => services.AddSingleton<ITotpProvider>(new StubTotpProvider()));
             });
 
-    /// <summary>For the one test that needs to reach the AccountService-level 404 for an account that doesn't exist. See <see cref="AlwaysValidSessionTokenIssuer"/>.</summary>
     private static WebApplicationFactory<Program> CreateFactoryWithSessionBypass() =>
         CreateFactory().WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services => services.AddSingleton<ISessionTokenIssuer>(new AlwaysValidSessionTokenIssuer())));
@@ -409,7 +371,6 @@ public sealed class RecoveryEndpointsTests
         public bool ValidateCode(string secret, string code, DateTimeOffset timestamp) => code == ValidStubCode;
     }
 
-    /// <summary>Same bypass stub as <c>ProfessionalVerificationEndpointsTests</c>'s own copy: treats any GUID-shaped bearer token as proof for that exact account.</summary>
     private sealed class AlwaysValidSessionTokenIssuer : ISessionTokenIssuer
     {
         public SessionTokenPair IssuePair(Guid accountId) => throw new NotSupportedException("not needed by the one test that uses this stub");

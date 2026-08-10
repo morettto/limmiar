@@ -2,13 +2,6 @@ using Api.Accounts;
 
 namespace Api.Tests.Accounts;
 
-/// <summary>
-/// Covers <see cref="DevicePairingIssuer"/> directly -- session creation, the two
-/// independent single-use surfaces (claiming the QR session and fetching the payload), and
-/// expiry (driven by an injected fake clock, same discipline as
-/// <see cref="TwoFactorTicketIssuerTests"/>/<see cref="SessionTokenIssuerTests"/>, never a
-/// real <c>Thread.Sleep</c>).
-/// </summary>
 public sealed class DevicePairingIssuerTests
 {
     private static readonly byte[] PrimaryPublicKey = [1, 2, 3, 4];
@@ -61,13 +54,8 @@ public sealed class DevicePairingIssuerTests
         Assert.Equal(PrimaryPublicKey, result.PrimaryPublicKey);
     }
 
-    /// <summary>
-    /// Core QR-replay rule: a pairing QR code is worth exactly one claim. Anyone who
-    /// photographs, screenshots, or shoulder-surfs the code and scans it after the
-    /// legitimate device already did must be indistinguishable from someone who made the
-    /// session id up -- hence <see cref="ClaimPairingSessionFailureReason.NotFound"/>, not
-    /// an "already claimed" tell.
-    /// </summary>
+    // A replayed claim must be indistinguishable from a made-up session id, so this returns
+    // NotFound, not an "already claimed" tell.
     [Fact]
     public void Claim_CalledTwice_SecondCallReturnsNotFound()
     {
@@ -137,12 +125,8 @@ public sealed class DevicePairingIssuerTests
         Assert.Equal(NewDevicePublicKey, status.NewDevicePublicKey);
     }
 
-    /// <summary>
-    /// The primary device polls this in a loop while the QR is on screen, so unlike
-    /// <see cref="IDevicePairingIssuer.Claim"/> and
-    /// <see cref="IDevicePairingIssuer.FetchPayload"/> it must NOT consume anything --
-    /// polling twice has to keep answering the same thing.
-    /// </summary>
+    // Polled in a loop by the primary device, so unlike Claim/FetchPayload this must not
+    // consume anything.
     [Fact]
     public void GetClaimStatus_PolledRepeatedlyAfterClaim_KeepsReturningClaimed()
     {
@@ -170,12 +154,8 @@ public sealed class DevicePairingIssuerTests
         Assert.Equal(PairingClaimStatusFailureReason.NotFound, status.FailureReason);
     }
 
-    /// <summary>
-    /// Account-scoping/anti-leak: a session id polled by an account that does not own it
-    /// must be indistinguishable from one that was never issued -- otherwise polling is a
-    /// free oracle for "does this pairing session exist," and worse, hands a stranger the
-    /// claiming device's public key.
-    /// </summary>
+    // A session polled by a non-owning account must look identical to a nonexistent one, or
+    // polling becomes an oracle that leaks the claiming device's public key.
     [Fact]
     public void GetClaimStatus_WithAnotherAccountsId_ReturnsNotFound()
     {
@@ -243,12 +223,8 @@ public sealed class DevicePairingIssuerTests
         Assert.Equal(SubmitPairingPayloadFailureReason.AlreadySubmitted, second.FailureReason);
     }
 
-    /// <summary>
-    /// Account-scoping: only the account that opened the session may hand over the KEK
-    /// ciphertext for it. Reported as <see cref="SubmitPairingPayloadFailureReason.NotFound"/>,
-    /// not a distinct "not yours" -- same anti-enumeration discipline as
-    /// <see cref="GetClaimStatus_WithAnotherAccountsId_ReturnsNotFound"/>.
-    /// </summary>
+    // Same anti-enumeration discipline as GetClaimStatus_WithAnotherAccountsId_ReturnsNotFound:
+    // reported as NotFound, not a distinct "not yours".
     [Fact]
     public void SubmitPayload_WithAnotherAccountsId_ReturnsNotFound()
     {
@@ -290,11 +266,8 @@ public sealed class DevicePairingIssuerTests
         Assert.Equal(FetchPairingPayloadFailureReason.NotFound, result.FailureReason);
     }
 
-    /// <summary>
-    /// The claiming device polls this while the primary is still encrypting, so "nothing
-    /// submitted yet" is an ordinary, expected answer -- and it is reported with the same
-    /// code as a made-up session id, so polling can never confirm that a session exists.
-    /// </summary>
+    // Reported with the same code as a made-up session id, so polling can never confirm a
+    // session exists.
     [Fact]
     public void FetchPayload_BeforeThePayloadIsSubmitted_ReturnsNotFound()
     {
@@ -324,13 +297,8 @@ public sealed class DevicePairingIssuerTests
         Assert.Equal(EncryptedKek, result.EncryptedKek);
     }
 
-    /// <summary>
-    /// Core payload-replay rule, and the second of the two INDEPENDENT single-use surfaces
-    /// this issuer protects (the first being <see cref="Claim_CalledTwice_SecondCallReturnsNotFound"/>):
-    /// the wrapped KEK is handed over exactly once. Anyone who later replays the session id
-    /// -- including the legitimate device retrying after it already got the bytes -- gets
-    /// nothing, so a captured session id can never be redeemed for key material twice.
-    /// </summary>
+    // The wrapped KEK is handed over exactly once, even to the legitimate device retrying;
+    // a captured session id can never be redeemed for key material twice.
     [Fact]
     public void FetchPayload_CalledTwice_SecondCallReturnsNotFound()
     {
@@ -348,11 +316,8 @@ public sealed class DevicePairingIssuerTests
         Assert.Null(second.EncryptedKek);
     }
 
-    /// <summary>
-    /// The consumed session is gone for every surface, not just <c>FetchPayload</c> -- the
-    /// primary's poll must stop resolving it too, rather than leaving a spent session id
-    /// answering questions about an account.
-    /// </summary>
+    // A consumed session is gone for every surface, not just FetchPayload: the primary's
+    // poll must stop resolving it too.
     [Fact]
     public void GetClaimStatus_AfterThePayloadIsFetched_ReturnsNotFound()
     {

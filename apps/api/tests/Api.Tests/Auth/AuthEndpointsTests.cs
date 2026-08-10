@@ -118,14 +118,7 @@ public sealed class AuthEndpointsTests
         Assert.Equal(AccountRole.Professional, body.Role);
     }
 
-    /// <summary>
-    /// S02-01 acceptance criterion: "Resposta idêntica, no mesmo tempo, para e-mail
-    /// inexistente e senha errada". Asserts the two failure responses are byte-identical
-    /// at the HTTP layer -- status, content-type, and body -- so a client (or an attacker
-    /// probing for registered e-mails) cannot distinguish the two cases from the response
-    /// alone. AccountServiceTests separately proves the domain layer does equal
-    /// computational work (comparer invoked once, same length) on both paths.
-    /// </summary>
+    /// <summary>S02-01 AC: wrong password and unknown e-mail return byte-identical responses so a client can't distinguish the cases; AccountServiceTests proves equal computational work domain-side.</summary>
     [Fact]
     public async Task PostLogin_WithWrongPasswordAndWithUnknownEmail_ReturnIdenticalResponses()
     {
@@ -178,12 +171,7 @@ public sealed class AuthEndpointsTests
         Assert.Equal("email", doc.RootElement.GetProperty("params").GetProperty("field").GetString());
     }
 
-    /// <summary>
-    /// Covers the "field present in JSON but null" shape, distinct from the
-    /// wrong-length-array case already covered by
-    /// PostRegister_WithWrongLengthVerifier_Returns400WithValidationProblemDetails --
-    /// TryValidateCredentialsShape's null-check and length-check are separate branches.
-    /// </summary>
+    /// <summary>Covers "field present but null", a separate validation branch from the wrong-length-array case in PostRegister_WithWrongLengthVerifier_Returns400WithValidationProblemDetails.</summary>
     [Fact]
     public async Task PostRegister_WithNullVerifier_Returns400WithValidationProblemDetails()
     {
@@ -225,11 +213,7 @@ public sealed class AuthEndpointsTests
         Assert.True(body.IsNewAccount);
     }
 
-    /// <summary>S02-01 acceptance criterion: "Google resolve o papel sozinho quando o
-    /// e-mail já existe" -- registers a professional by e-mail first, then signs in via
-    /// Google with the SAME e-mail but requesting the "patient" role; the response must
-    /// carry the account's real (professional) role, not the requested one, and must not
-    /// report a new account.</summary>
+    /// <summary>S02-01 AC: Google resolves the account's existing role and ignores the requested one when the e-mail is already registered.</summary>
     [Fact]
     public async Task PostGoogle_WithEmailAlreadyRegistered_ResolvesExistingRole_IgnoringRequestedRole()
     {
@@ -308,11 +292,7 @@ public sealed class AuthEndpointsTests
         Assert.NotNull(body.RefreshToken);
     }
 
-    /// <summary>
-    /// A professional still owes 2FA at register time (ADR-S02-03) -- no session exists
-    /// yet, mirroring the existing "no two-factor ticket for a Patient" pairing above but
-    /// for the opposite role/field.
-    /// </summary>
+    /// <summary>A professional still owes 2FA at register time (ADR-S02-03), so no session exists yet.</summary>
     [Fact]
     public async Task PostRegister_WithProfessionalRole_DoesNotReturnSessionTokens()
     {
@@ -353,10 +333,7 @@ public sealed class AuthEndpointsTests
         Assert.NotEqual(issued.AccessToken, body.AccessToken);
     }
 
-    /// <summary>
-    /// Notion AC: "Refresh token usado uma vez nunca é aceito de novo" -- proven here at
-    /// the HTTP layer (SessionTokenIssuerTests already covers it at the domain layer).
-    /// </summary>
+    /// <summary>Notion AC: a refresh token used once is never accepted again -- proven here at the HTTP layer (SessionTokenIssuerTests covers the domain layer).</summary>
     [Fact]
     public async Task PostRefresh_WithAlreadyUsedRefreshToken_Returns401WithProblemDetails()
     {
@@ -380,11 +357,7 @@ public sealed class AuthEndpointsTests
         Assert.Equal("auth.refresh_token_invalid", doc.RootElement.GetProperty("code").GetString());
     }
 
-    /// <summary>
-    /// Same account-enumeration-style discipline as PostLogin's identical-response test:
-    /// "never issued" and "already used" (reuse-detected) must be indistinguishable to a
-    /// caller, both status and body.
-    /// </summary>
+    /// <summary>Same account-enumeration discipline as PostLogin's identical-response test: "never issued" and "already used" must be indistinguishable to a caller.</summary>
     [Fact]
     public async Task PostRefresh_WithUnknownToken_ReturnsSameResponseAsReusedToken()
     {
@@ -424,11 +397,7 @@ public sealed class AuthEndpointsTests
         Assert.Equal("refreshToken", doc.RootElement.GetProperty("params").GetProperty("field").GetString());
     }
 
-    /// <summary>
-    /// Must match what <see cref="CreateMagicLinkAuthenticator"/>'s callers sign their fake
-    /// WebAuthn responses with -- same relying party id/origin
-    /// <see cref="WebAuthnRelyingPartyId"/>/<see cref="WebAuthnOrigin"/>.
-    /// </summary>
+    // Must match what CreateMagicLinkAuthenticator's callers sign fake WebAuthn responses with.
     private const string WebAuthnRelyingPartyId = "limmiar.test";
     private const string WebAuthnOrigin = "https://limmiar.test";
 
@@ -684,7 +653,6 @@ public sealed class AuthEndpointsTests
         Assert.Equal("signature", doc.RootElement.GetProperty("params").GetProperty("field").GetString());
     }
 
-    /// <summary>Full happy path over real HTTP: request the link, verify it, complete a REGISTRATION ceremony with a real ES256 credential, and land a session.</summary>
     [Fact]
     public async Task MagicLinkFlow_RegistrationCeremony_EndToEnd_ReturnsSessionForNewPatientAccount()
     {
@@ -732,7 +700,6 @@ public sealed class AuthEndpointsTests
         Assert.NotEmpty(completeBody.RefreshToken);
     }
 
-    /// <summary>Full happy path over real HTTP for a SECOND login: same credential re-asserted via an ASSERTION ceremony.</summary>
     [Fact]
     public async Task MagicLinkFlow_AssertionCeremony_EndToEnd_ReturnsSessionForReturningPatient()
     {
@@ -776,7 +743,7 @@ public sealed class AuthEndpointsTests
         Assert.NotEmpty(completeBody.AccessToken);
     }
 
-    /// <summary>A tampered signature over real HTTP must surface as the collapsed WebAuthn-ceremony problem code.</summary>
+    /// <summary>A tampered signature must surface as the collapsed WebAuthn-ceremony problem code.</summary>
     [Fact]
     public async Task MagicLinkFlow_AssertionCeremony_WithTamperedSignature_Returns401WithCeremonyFailedProblemDetails()
     {
@@ -845,14 +812,7 @@ public sealed class AuthEndpointsTests
         Assert.Equal(HttpStatusCode.OK, completeResponse.StatusCode);
     }
 
-    /// <summary>
-    /// GET /auth/magic-link/_debug-last is only mapped when this flag is true -- proves the
-    /// route is genuinely absent (not just "unauthorized"/"empty") without it, and exercises
-    /// the real Program.Composition.cs CapturingMagicLinkEmailSender wiring (not the test
-    /// project's own <see cref="CapturingMagicLinkEmailSender"/>, a different class of the
-    /// same name/shape in a different assembly -- see that E2E debug route's own doc comment)
-    /// with it.
-    /// </summary>
+    /// <summary>The route is only mapped when MagicLink:TestCaptureEndpoint is true; proves it is genuinely unmapped, not merely unauthorized or empty.</summary>
     [Fact]
     public async Task GetMagicLinkDebugLast_WithoutTestCaptureFlag_RouteIsNotMapped()
     {
@@ -904,20 +864,13 @@ public sealed class AuthEndpointsTests
         Assert.NotNull(debugBody);
         Assert.False(string.IsNullOrWhiteSpace(debugBody!.Token));
 
-        // Not just "looks like a token" -- the exact token a real /auth/magic-link/verify call
-        // accepts, same as what a real E2E would receive via this same route.
+        // Not just "looks like a token" -- the exact token a real /auth/magic-link/verify call accepts.
         var verifyResponse = await client.PostAsJsonAsync(
             "/auth/magic-link/verify", new VerifyMagicLinkRequest(debugBody.Token), ApiJsonSerializerContext.Default.VerifyMagicLinkRequest);
         Assert.Equal(HttpStatusCode.OK, verifyResponse.StatusCode);
     }
 
-    /// <summary>
-    /// Sets MagicLink:TestCaptureEndpoint=true (Program.Composition.cs) instead of overriding
-    /// IMagicLinkEmailSender's DI registration directly (unlike
-    /// <see cref="CreateFactoryWithMagicLinkCapture"/>) -- these three tests are specifically
-    /// about the config-gated wiring itself, not just about having some capturing sender
-    /// present.
-    /// </summary>
+    /// <summary>Sets MagicLink:TestCaptureEndpoint=true instead of overriding IMagicLinkEmailSender directly -- these tests are specifically about that config-gated wiring.</summary>
     private static WebApplicationFactory<Program> CreateFactoryWithTestCaptureEndpoint() =>
         CreateFactory().WithWebHostBuilder(builder =>
             builder.UseSetting("MagicLink:TestCaptureEndpoint", "true"));
@@ -926,22 +879,15 @@ public sealed class AuthEndpointsTests
         new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>
             {
-                // Auth endpoints under test here never touch Postgres (IAccountStore's
-                // default DI registration is the in-memory placeholder), but app startup
-                // still needs a syntactically valid ConnectionStrings:AppDb to construct
-                // the NpgsqlDataSource singleton -- same reasoning as HealthEndpointTests.
+                // Never touches Postgres, but startup still needs a syntactically valid
+                // ConnectionStrings:AppDb to construct the NpgsqlDataSource singleton.
                 builder.UseSetting("ConnectionStrings:AppDb", "Host=127.0.0.1;Port=1;Username=app_role;Password=unused;");
                 builder.UseSetting("StaffAccess:ApiKey", "test-staff-api-key");
                 builder.UseSetting("WebAuthn:RelyingPartyId", WebAuthnRelyingPartyId);
                 builder.UseSetting("WebAuthn:ExpectedOrigin", WebAuthnOrigin);
             });
 
-    /// <summary>
-    /// Every magic-link test needs a way to read back the token
-    /// <c>POST /auth/magic-link/request</c> "sent" -- overrides the production
-    /// <see cref="IMagicLinkEmailSender"/> registration with the capturing fake, same
-    /// "override at the DI level" precedent as <see cref="CreateFactory(IGoogleIdentityProvider)"/>.
-    /// </summary>
+    /// <summary>Overrides the production IMagicLinkEmailSender registration with a capturing fake so a test can read back the token a request "sent".</summary>
     private static (WebApplicationFactory<Program> Factory, CapturingMagicLinkEmailSender Sender) CreateFactoryWithMagicLinkCapture()
     {
         var sender = new CapturingMagicLinkEmailSender();
@@ -950,11 +896,7 @@ public sealed class AuthEndpointsTests
         return (factory, sender);
     }
 
-    /// <summary>
-    /// Real Google ID token verification is out of scope for S02-01 (see
-    /// GoogleIdentityProvider's own TODO) -- every test that reaches /auth/google
-    /// overrides the production IGoogleIdentityProvider registration with this fake.
-    /// </summary>
+    /// <summary>Real Google ID token verification is out of scope for S02-01; overrides the production IGoogleIdentityProvider registration with a fake.</summary>
     private static WebApplicationFactory<Program> CreateFactory(IGoogleIdentityProvider googleIdentityProvider) =>
         CreateFactory().WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services =>

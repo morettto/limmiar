@@ -82,4 +82,93 @@ describe('PairingScan', () => {
     await screen.findByRole('alert')
     expect(claimPairingSessionMock).not.toHaveBeenCalled()
   })
+
+  it('renders an error and never calls claimPairingSession when the decoded JSON does not match the pairing payload shape', async () => {
+    const decode = vi.fn().mockResolvedValue(JSON.stringify({ s: SESSION_ID }))
+
+    renderPairingScan(decode)
+
+    await screen.findByRole('alert')
+    expect(claimPairingSessionMock).not.toHaveBeenCalled()
+  })
+
+  it('falls back to the real decodeFromCamera implementation when decode is not overridden', async () => {
+    render(
+      <I18nProvider i18n={i18n}>
+        <PairingScan newDevicePublicKeyBase64={NEW_DEVICE_PUBLIC_KEY} onClaimed={vi.fn()} />
+      </I18nProvider>,
+    )
+
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      'Não foi possível acessar a câmera para escanear o código.',
+    )
+    expect(claimPairingSessionMock).not.toHaveBeenCalled()
+  })
+
+  it('renders a camera-access error when decode rejects', async () => {
+    const decode = vi.fn().mockRejectedValue(new Error('NotAllowedError'))
+
+    renderPairingScan(decode)
+
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      'Não foi possível acessar a câmera para escanear o código.',
+    )
+    expect(claimPairingSessionMock).not.toHaveBeenCalled()
+  })
+
+  it('ignores a decode rejection that arrives after the component unmounted', async () => {
+    let rejectDecode!: (reason: unknown) => void
+    const decode = vi.fn().mockReturnValue(
+      new Promise<string>((_resolve, reject) => {
+        rejectDecode = reject
+      }),
+    )
+
+    const { unmount } = renderPairingScan(decode)
+    await waitFor(() => expect(decode).toHaveBeenCalledTimes(1))
+    unmount()
+
+    rejectDecode(new Error('NotAllowedError'))
+
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(claimPairingSessionMock).not.toHaveBeenCalled()
+  })
+
+  it('ignores a decode resolution that arrives after the component unmounted', async () => {
+    let resolveDecode!: (text: string) => void
+    const decode = vi.fn().mockReturnValue(
+      new Promise<string>((resolve) => {
+        resolveDecode = resolve
+      }),
+    )
+
+    const { unmount } = renderPairingScan(decode)
+    await waitFor(() => expect(decode).toHaveBeenCalledTimes(1))
+    unmount()
+
+    resolveDecode(VALID_QR_TEXT)
+
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(claimPairingSessionMock).not.toHaveBeenCalled()
+  })
+
+  it('ignores a claimPairingSession resolution that arrives after the component unmounted', async () => {
+    const decode = vi.fn().mockResolvedValue(VALID_QR_TEXT)
+    let resolveClaim!: (value: Awaited<ReturnType<typeof client.claimPairingSession>>) => void
+    claimPairingSessionMock.mockReturnValue(
+      new Promise((resolve) => {
+        resolveClaim = resolve
+      }),
+    )
+    const onClaimed = vi.fn()
+
+    const { unmount } = renderPairingScan(decode, onClaimed)
+    await waitFor(() => expect(claimPairingSessionMock).toHaveBeenCalledTimes(1))
+    unmount()
+
+    resolveClaim({ ok: true, primaryPublicKey: PRIMARY_PUBLIC_KEY })
+
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(onClaimed).not.toHaveBeenCalled()
+  })
 })

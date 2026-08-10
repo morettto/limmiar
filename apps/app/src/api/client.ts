@@ -1,10 +1,5 @@
 export type HealthDbResult = { ok: true } | { ok: false; code: string; params: Record<string, string> }
 
-// GET /health/db on the .NET API: 200 with an empty body when the database
-// is reachable; a non-2xx `application/problem+json` body (RFC 9457) with a
-// machine-readable `code` + `params` otherwise. Deliberately minimal — this
-// is the only HTTP call in the app so far, no shared client/retry layer to
-// fit into.
 export async function getHealthDb(baseUrl: string): Promise<HealthDbResult> {
   const response = await fetch(`${baseUrl}/health/db`)
 
@@ -16,21 +11,13 @@ export async function getHealthDb(baseUrl: string): Promise<HealthDbResult> {
   return { ok: false, code: problem.code, params: problem.params }
 }
 
-// Mirrors Api.Accounts.AccountRole (apps/api/src/Api/Accounts/AccountRole.cs) --
-// the two account kinds S02-01's segmented control chooses between.
 export type AccountRole = 'Professional' | 'Patient'
 
-// Mirrors Api.Accounts.TwoFactorRequirement (apps/api/src/Api/Accounts/TwoFactorRequirement.cs).
-// 'NotApplicable' is the pre-existing behavior (always true for Patient accounts); a
-// Professional account comes back as 'SetupRequired' (never confirmed a TOTP enrollment) or
-// 'ChallengeRequired' (already has one) -- see AuthScreen's wiring of TotpSetup/TotpChallenge.
 export type TwoFactorRequirement = 'NotApplicable' | 'SetupRequired' | 'ChallengeRequired'
 
-// Security-review fix (backend): register/login/google now mint an opaque, single-use,
-// 10-minute two-factor ticket alongside `twoFactorRequirement` -- `null` when
-// `twoFactorRequirement` is 'NotApplicable', a string otherwise. The TOTP begin/confirm/
-// challenge endpoints require it back (proof the caller actually passed register/login/
-// Google for this exact account) instead of trusting the accountId URL segment alone.
+// twoFactorTicket proves the caller already passed register, login, or google for this
+// account. The TOTP begin/confirm/challenge endpoints require it; they do not trust the
+// accountId URL segment alone.
 export interface AccountResult {
   id: string
   email: string
@@ -45,9 +32,8 @@ export type RegisterResult = { ok: true; account: AccountResult } | ProblemResul
 export type LoginResult = { ok: true; account: AccountResult } | ProblemResult
 export type GoogleAuthResult = { ok: true; account: AccountResult; isNewAccount: boolean } | ProblemResult
 
-// System.Text.Json's default byte[] converter is a base64 string -- this is
-// the ONLY place in the app that knows the wire shape of a passwordVerifier;
-// callers (password-verifier.ts, AuthScreen) work in raw bytes throughout.
+// The only place that converts a passwordVerifier to base64 for the wire. Callers work in
+// raw bytes throughout.
 function passwordVerifierToBase64(passwordVerifier: Uint8Array): string {
   let binary = ''
   for (const byte of passwordVerifier) {
@@ -56,9 +42,6 @@ function passwordVerifierToBase64(passwordVerifier: Uint8Array): string {
   return btoa(binary)
 }
 
-// `accessToken`, when passed, is sent as `Authorization: Bearer <token>` -- the device-pairing
-// endpoints (S02-04) are the first callers in this file that need it; every pre-existing caller
-// omits it and gets the exact same request it always has (no Authorization header).
 async function postJson(baseUrl: string, path: string, body: unknown, accessToken?: string): Promise<Response> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (accessToken !== undefined) {
@@ -71,8 +54,6 @@ async function postJson(baseUrl: string, path: string, body: unknown, accessToke
   })
 }
 
-// Mirrors postJson's accessToken convention above, for the pairing endpoints that are GETs
-// instead of POSTs. With no token, this is a bare `fetch(url)` -- same shape as getHealthDb.
 async function getJson(baseUrl: string, path: string, accessToken?: string): Promise<Response> {
   if (accessToken === undefined) {
     return fetch(`${baseUrl}${path}`)
@@ -85,11 +66,6 @@ async function readProblem(response: Response): Promise<ProblemResult> {
   return { ok: false, code: problem.code, params: problem.params }
 }
 
-/**
- * POST /auth/register (ADR-S02-02: `passwordVerifier` is a client-derived
- * Argon2id output -- see auth/password-verifier.ts -- never the plaintext
- * password). 201 -> the created account; 400/409 -> Problem+JSON code+params.
- */
 export async function register(
   baseUrl: string,
   params: { email: string; passwordVerifier: Uint8Array; role: AccountRole },
@@ -108,12 +84,8 @@ export async function register(
   return { ok: true, account }
 }
 
-/**
- * POST /auth/login. 200 -> the account; 400/401 -> Problem+JSON code+params
- * (401 is deliberately identical for "unknown e-mail" and "wrong password" --
- * see AccountService.LoginAsync -- this client does not and must not try to
- * tell those two cases apart).
- */
+// The backend returns the same error for an unknown email and a wrong password. This
+// client must not try to tell them apart.
 export async function login(
   baseUrl: string,
   params: { email: string; passwordVerifier: Uint8Array },
@@ -131,12 +103,6 @@ export async function login(
   return { ok: true, account }
 }
 
-/**
- * POST /auth/google. `requestedRole` only takes effect when the Google
- * identity's e-mail has no existing account -- when it does, the response's
- * `role` is the backend-resolved one and this client passes it straight
- * through unchanged (ADR-S02-01: the UI never asks again).
- */
 export async function continueWithGoogle(
   baseUrl: string,
   params: { idToken: string; requestedRole: AccountRole },
@@ -164,15 +130,6 @@ export async function continueWithGoogle(
   }
 }
 
-/**
- * POST /accounts/{accountId}/totp (S02-03/S02-04: mandatory TOTP enrollment for
- * Professional accounts). Security-review fix: `ticket` is the two-factor ticket from
- * register/login/google for this exact account -- the backend rejects a missing or
- * mismatched ticket with 401 `auth.totp_ticket_invalid` instead of trusting the accountId
- * URL segment alone. 200 -> the Base32 secret and the otpauth:// URI for the user to add
- * manually to an authenticator app (no QR code generation in this repo); 401/404/409 ->
- * Problem+JSON code+params.
- */
 export type BeginTotpEnrollmentResult = { ok: true; secret: string; provisioningUri: string } | ProblemResult
 
 export async function beginTotpEnrollment(
@@ -190,12 +147,6 @@ export async function beginTotpEnrollment(
   return { ok: true, secret: body.secret, provisioningUri: body.provisioningUri }
 }
 
-/**
- * POST /accounts/{accountId}/totp/confirm. `ticket` is the same two-factor ticket passed
- * to beginTotpEnrollment -- see its doc comment. 200 -> the 10 single-use backup codes in
- * clear text -- the only response that ever exposes them (ADR-S02-04), the caller must
- * show them to the user now; 400/401/404/409 -> Problem+JSON code+params.
- */
 export type ConfirmTotpEnrollmentResult = { ok: true; backupCodes: string[] } | ProblemResult
 
 export async function confirmTotpEnrollment(
@@ -214,12 +165,6 @@ export async function confirmTotpEnrollment(
   return { ok: true, backupCodes: body.backupCodes }
 }
 
-/**
- * POST /accounts/{accountId}/totp/challenge (exactly one of `code`/`backupCode` in the
- * request, plus `ticket` -- see beginTotpEnrollment's doc comment). 200 -> the
- * LoginResponse shape, now genuinely authenticated; 400/401/404/409 -> Problem+JSON
- * code+params.
- */
 export type TotpChallengeResult = { ok: true; account: AccountResult } | ProblemResult
 
 export async function verifyTotpChallenge(
@@ -238,23 +183,6 @@ export async function verifyTotpChallenge(
   return { ok: true, account }
 }
 
-// S02-04 device-pairing-by-QR handshake. Five calls, in the order the handshake actually
-// happens: the already-paired primary device opens a session and shows it as a QR code
-// (createPairingSession); the new device scans it and claims the session with its own public
-// key, no auth yet -- it has no account session (claimPairingSession); the primary device polls
-// for the claim (getPairingClaimStatus), then -- once claimed -- encrypts the account's KEK to
-// the new device's public key and uploads it (submitPairingPayload); the new device polls for
-// and downloads that payload, again with no auth (fetchPairingPayload). Binary fields
-// (X25519 public keys, encrypted KEK ciphertext) are plain base64 strings on this side --
-// System.Text.Json serializes .NET byte[] that way automatically, same as passwordVerifier
-// above, but these are passed straight through as opaque strings instead of raw bytes: the
-// crypto (encoding/decoding, actually encrypting the KEK) is wired in a later slice.
-
-/**
- * POST /accounts/{accountId}/devices/pairing-sessions. `accessToken` is the account's bearer
- * access token (Authorization: Bearer). 201 -> a session id (opaque, embedded in the QR code)
- * and its expiry; 401 -> Problem+JSON code+params (e.g. `auth.access_token_invalid`).
- */
 export type CreatePairingSessionResult = { ok: true; sessionId: string; expiresAt: string } | ProblemResult
 
 export async function createPairingSession(
@@ -278,12 +206,6 @@ export async function createPairingSession(
   return { ok: true, sessionId: body.sessionId, expiresAt: body.expiresAt }
 }
 
-/**
- * POST /devices/pairing-sessions/{sessionId}/claim. No auth -- the new device has no account
- * session yet, only the sessionId it scanned off the QR code. 200 -> the primary device's
- * public key, so the new device can address the KEK it's about to receive; 404 -> Problem+JSON
- * code+params (`auth.device_pairing_session_not_found`, e.g. expired or already claimed).
- */
 export type ClaimPairingSessionResult = { ok: true; primaryPublicKey: string } | ProblemResult
 
 export async function claimPairingSession(
@@ -301,12 +223,6 @@ export async function claimPairingSession(
   return { ok: true, primaryPublicKey: body.primaryPublicKey }
 }
 
-/**
- * GET /accounts/{accountId}/devices/pairing-sessions/{sessionId}/claim-status. `accessToken` is
- * the primary device's bearer access token. 200 -> whether the new device has claimed the
- * session yet, and its public key once it has (null until then); 401/404 -> Problem+JSON
- * code+params (404 is `auth.device_pairing_session_not_found`).
- */
 export type PairingClaimStatusResult =
   | { ok: true; claimed: boolean; newDevicePublicKey: string | null }
   | ProblemResult
@@ -331,14 +247,6 @@ export async function getPairingClaimStatus(
   return { ok: true, claimed: body.claimed, newDevicePublicKey: body.newDevicePublicKey }
 }
 
-/**
- * POST /accounts/{accountId}/devices/pairing-sessions/{sessionId}/payload. `accessToken` is the
- * primary device's bearer access token; `encryptedKek` is the account's KEK, already encrypted
- * to the new device's public key by the caller (crypto wiring lands in a later slice). 204, no
- * body, on success; 401/404/409 -> Problem+JSON code+params (404
- * `auth.device_pairing_session_not_found`, 409 `auth.device_pairing_payload_not_ready` -- the
- * session hasn't been claimed yet).
- */
 export type SubmitPairingPayloadResult = { ok: true } | ProblemResult
 
 export async function submitPairingPayload(
@@ -362,12 +270,6 @@ export async function submitPairingPayload(
   return { ok: true }
 }
 
-/**
- * GET /devices/pairing-sessions/{sessionId}/payload. No auth -- same as claimPairingSession,
- * the new device only has the sessionId. 200 -> the encrypted KEK the primary device uploaded;
- * 404 -> Problem+JSON code+params (`auth.device_pairing_payload_not_delivered` -- the primary
- * device hasn't uploaded it yet).
- */
 export type FetchPairingPayloadResult = { ok: true; encryptedKek: string } | ProblemResult
 
 export async function fetchPairingPayload(baseUrl: string, sessionId: string): Promise<FetchPairingPayloadResult> {
@@ -430,15 +332,8 @@ export async function verifyMagicLink(baseUrl: string, params: { token: string }
   }
 }
 
-/**
- * POST /auth/recover (S02-06: BIP39 recovery-phrase account recovery). `recoveryVerifier` is
- * the client-derived Argon2id output of the recovery phrase -- see
- * auth/recovery-verifier.ts -- never the mnemonic itself, same discipline as `login()`'s
- * passwordVerifier. 200 -> the same LoginResponse shape login() returns (twoFactorTicket set
- * whenever a Professional account still needs its TOTP challenge); 401 -> Problem+JSON
- * `auth.invalid_recovery_phrase` (deliberately generic -- see problem-messages.ts -- for
- * either an unknown e-mail or a wrong recovery phrase); 400 -> `validation.invalid_field`.
- */
+// auth.invalid_recovery_phrase covers both an unknown email and a wrong recovery phrase.
+// This client must not try to tell them apart.
 export async function recoverAccess(
   baseUrl: string,
   params: { email: string; recoveryVerifier: Uint8Array },
@@ -456,14 +351,6 @@ export async function recoverAccess(
   return { ok: true, account }
 }
 
-/**
- * POST /accounts/{accountId}/recovery-phrase (S02-06). `accessToken` is the account's bearer
- * access token (Authorization: Bearer, same convention as createPairingSession above);
- * `recoveryVerifier` is the client-derived Argon2id output -- see recoverAccess's doc comment.
- * Only a Professional account can call this. 200, empty-ish body, on success; 401 ->
- * Problem+JSON code+params (`auth.access_token_invalid` for a missing/invalid/mismatched
- * bearer token), 404/409 -> `auth.account_not_found`/`auth.not_a_professional_account`.
- */
 export type RegisterRecoveryPhraseResult = { ok: true } | ProblemResult
 
 export async function registerRecoveryPhrase(

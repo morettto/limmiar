@@ -1,14 +1,9 @@
 export { deriveKey, type Argon2Params } from './argon2id'
-// __setNonceSourceForTests / __resetNonceSourceForTests are a test-only seam
-// (ADR-S01-02) — deliberately not re-exported here, so the package's public
-// surface never offers a way to control the nonce.
+// __setNonceSourceForTests / __resetNonceSourceForTests are a test-only seam (ADR-S01-02) deliberately not re-exported here, so the public surface never offers control over the nonce.
 export { decrypt, encrypt } from './aes-gcm'
 export { unwrapDek, wrapDek } from './dek-kek'
 export { createKeychain, type Keychain, type KeychainState } from './keychain'
-// __setIvSourceForTests / __resetIvSourceForTests are a test-only seam
-// (ADR-S01-02, same discipline as aes-gcm.ts's nonce seam above) — curated
-// export below on purpose, NOT `export * as webcrypto`, so those two never
-// reach the package's public surface.
+// Curated export below, NOT `export * as webcrypto`, so __setIvSourceForTests / __resetIvSourceForTests (ADR-S01-02 test-only seam, same discipline as aes-gcm.ts) never reach the public surface.
 import * as webcryptoInternal from './webcrypto'
 export type { WebCryptoKey as CryptoKey } from './webcrypto'
 export const webcrypto = {
@@ -20,8 +15,6 @@ export const webcrypto = {
   decrypt: webcryptoInternal.decrypt,
 }
 export { generateKeyPair, getPublicKey, getSharedSecret } from './x25519'
-// Grouped with x25519 above rather than sorted on its own: deriveChannelKey
-// only ever consumes a getSharedSecret() output, so the two read as one API.
 export { deriveChannelKey } from './device-pairing-channel'
 export {
   type Bip39Strength,

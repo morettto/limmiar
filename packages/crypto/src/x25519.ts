@@ -1,13 +1,7 @@
 import { x25519 } from '@noble/curves/ed25519.js'
 
-// ADR-S01-05: same actively-maintained, audited @noble family already used
-// for Argon2id and AES-GCM. x25519 here conforms to RFC 7748 (getPublicKey,
-// getSharedSecret and the underlying scalarMult all cross-checked byte-for-
-// byte against the RFC's own test vectors before being trusted — see
-// x25519.test.ts).
-// @noble/curves' keygen() returns { secretKey, publicKey }; renamed to
-// privateKey here to match RFC 7748 and this package's own vocabulary
-// (getPublicKey/getSharedSecret below both say "privateKey" too).
+// ADR-S01-05: same audited @noble family as Argon2id and AES-GCM; cross-checked against RFC 7748's own test vectors in x25519.test.ts.
+// @noble/curves' keygen() returns { secretKey, publicKey }; renamed to privateKey here to match RFC 7748 and this package's own vocabulary (getPublicKey/getSharedSecret below both say "privateKey" too).
 export function generateKeyPair(): { privateKey: Uint8Array; publicKey: Uint8Array } {
   const { secretKey, publicKey } = x25519.keygen()
   return { privateKey: secretKey, publicKey }
