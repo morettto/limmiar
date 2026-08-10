@@ -57,8 +57,11 @@ describe('TotpSetup', () => {
 
     // Both read-only fields select their full contents on focus, so a tap/click
     // on either lets the user copy the value in one gesture.
+    const selectSpy = vi.spyOn(HTMLInputElement.prototype, 'select')
     fireEvent.focus(secretInput)
     fireEvent.focus(uriInput)
+    expect(selectSpy).toHaveBeenCalledTimes(2)
+    selectSpy.mockRestore()
   })
 
   it('does not update state after unmounting while beginTotpEnrollment is still pending', async () => {

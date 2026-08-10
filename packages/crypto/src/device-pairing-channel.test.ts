@@ -46,6 +46,19 @@ describe('deriveChannelKey — determinism', () => {
   })
 })
 
+describe('deriveChannelKey — known-answer test', () => {
+  it('matches the precomputed HKDF-SHA256 output for a fixed secret and salt', () => {
+    const secret = new Uint8Array(32).fill(0x01)
+    const salt = new TextEncoder().encode('session=known-answer-test')
+
+    const key = deriveChannelKey(secret, salt)
+
+    expect(Buffer.from(key).toString('hex')).toBe(
+      '2f3e092d5f3054ba4e9b268ec3c17db219301653df5307b06e2c7521b2155ebe',
+    )
+  })
+})
+
 describe('deriveChannelKey — output length', () => {
   // aes-gcm.ts rejects anything other than a 32-byte key, so this length is
   // the whole contract between the two modules.

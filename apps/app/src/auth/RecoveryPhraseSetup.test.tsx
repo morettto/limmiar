@@ -57,12 +57,38 @@ describe('RecoveryPhraseSetup', () => {
     vi.clearAllMocks()
   })
 
+  it('shows a generating status before setup completes, with no duplicate list-item keys once ready', async () => {
+    generateMnemonicMock.mockReturnValue(FIXED_MNEMONIC)
+    let resolveRegister: (result: { ok: true }) => void = () => {}
+    registerRecoveryPhraseMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveRegister = resolve
+        }),
+    )
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    renderRecoveryPhraseSetup()
+    expect(screen.getByRole('status').textContent).toBe('Gerando sua frase de recuperação...')
+
+    await waitFor(() => expect(registerRecoveryPhraseMock).toHaveBeenCalled())
+    resolveRegister({ ok: true })
+    await screen.findAllByRole('listitem')
+
+    expect(
+      consoleErrorSpy.mock.calls.some((call) => String(call[0]).includes('same key')),
+    ).toBe(false)
+    consoleErrorSpy.mockRestore()
+  }, 15000)
+
   it('generates a mnemonic, registers its verifier, and shows the phrase as a numbered word grid', async () => {
     generateMnemonicMock.mockReturnValue(FIXED_MNEMONIC)
     registerRecoveryPhraseMock.mockResolvedValue({ ok: true })
     renderRecoveryPhraseSetup()
 
     await waitFor(() => expect(registerRecoveryPhraseMock).toHaveBeenCalledTimes(1))
+
+    expect(screen.getByRole('heading', { name: 'Guarde sua frase de recuperação' })).toBeTruthy()
 
     const call = registerRecoveryPhraseMock.mock.calls[0]
     expect(call?.[0]).toBe('http://api.test')
@@ -113,7 +139,9 @@ describe('RecoveryPhraseSetup', () => {
     })
     renderRecoveryPhraseSetup()
 
-    expect(await screen.findByRole('alert')).toBeTruthy()
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      'Ocorreu um erro inesperado. Tente novamente.',
+    )
     expect(screen.queryByText('letter')).toBeNull()
   }, 15000)
 

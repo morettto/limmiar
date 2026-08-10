@@ -76,6 +76,8 @@ describe('PairPrimaryDevice', () => {
       </I18nProvider>,
     )
 
+    expect(screen.getByRole('status').textContent).toBe('Preparando o código para parear o novo dispositivo...')
+
     // Flush the QR-mount effect (createPairingSession -> toDataURL), same technique as
     // PairingQr.test.tsx -- QRCode's Node renderer schedules via setImmediate, which fake
     // timers intercept, so a single microtask flush isn't enough.
@@ -95,6 +97,7 @@ describe('PairPrimaryDevice', () => {
     // hasn't happened by now, waiting longer under fake time wouldn't help either).
     expect(submitPairingPayloadMock).toHaveBeenCalledTimes(1)
     expect(onDelivered).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('status').textContent).toBe('Dispositivo pareado com sucesso.')
 
     // The primary's own public key was whatever it sent to createPairingSession.
     const primaryPublicKeyBase64 = createPairingSessionMock.mock.calls[0]![3]
@@ -227,7 +230,47 @@ describe('PairPrimaryDevice', () => {
       await vi.advanceTimersByTimeAsync(0)
     }
 
-    expect(screen.getByRole('alert')).toBeTruthy()
+    expect(screen.getByRole('alert').textContent).toBe(
+      'Não foi possível concluir o pareamento com segurança. Tente novamente.',
+    )
     expect(submitPairingPayloadMock).not.toHaveBeenCalled()
+  })
+
+  it('does not throw when the delivery succeeds without an onDelivered callback', async () => {
+    vi.useFakeTimers()
+    createPairingSessionMock.mockResolvedValue({
+      ok: true,
+      sessionId: SESSION_ID,
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    })
+    const newDeviceKeyPair = generateKeyPair()
+    getPairingClaimStatusMock.mockResolvedValue({
+      ok: true,
+      claimed: true,
+      newDevicePublicKey: encodeBase64(newDeviceKeyPair.publicKey),
+    })
+    submitPairingPayloadMock.mockResolvedValue({ ok: true })
+    const getKekForTransfer = vi.fn().mockResolvedValue(KEK.slice())
+
+    render(
+      <I18nProvider i18n={i18n}>
+        <PairPrimaryDevice
+          baseUrl={BASE_URL}
+          accountId={ACCOUNT_ID}
+          accessToken={ACCESS_TOKEN}
+          getKekForTransfer={getKekForTransfer}
+        />
+      </I18nProvider>,
+    )
+
+    for (let i = 0; i < 50; i++) {
+      await vi.advanceTimersByTimeAsync(0)
+    }
+    await vi.advanceTimersByTimeAsync(1000)
+    for (let i = 0; i < 50; i++) {
+      await vi.advanceTimersByTimeAsync(0)
+    }
+
+    expect(screen.getByRole('status').textContent).toBe('Dispositivo pareado com sucesso.')
   })
 })

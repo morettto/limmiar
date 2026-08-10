@@ -85,9 +85,10 @@ describe('MagicLinkCallback', () => {
 
     renderCallback({ createCredential, getCredential, onAuthenticated })
 
-    expect(await screen.findByRole('status')).toBeTruthy()
+    expect(screen.getByRole('status').textContent).toBe('Confirmando seu acesso...')
 
     await vi.waitFor(() => expect(onAuthenticated).toHaveBeenCalledTimes(1))
+    expect(screen.getByRole('status').textContent).toBe('Login realizado com sucesso.')
 
     expect(verifyMagicLinkMock).toHaveBeenCalledWith(BASE_URL, { token: TOKEN })
 
@@ -256,8 +257,9 @@ describe('MagicLinkCallback', () => {
         resolveVerify = resolve
       }),
     )
+    const createCredential = vi.fn()
 
-    const { unmount } = renderCallback()
+    const { unmount } = renderCallback({ createCredential })
     unmount()
 
     resolveVerify({
@@ -270,6 +272,8 @@ describe('MagicLinkCallback', () => {
     })
 
     await vi.waitFor(() => expect(verifyMagicLinkMock).toHaveBeenCalledTimes(1))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(createCredential).not.toHaveBeenCalled()
     expect(completeWebAuthnCeremonyMock).not.toHaveBeenCalled()
   })
 
@@ -304,6 +308,28 @@ describe('MagicLinkCallback', () => {
 
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(onAuthenticated).not.toHaveBeenCalled()
+  })
+
+  it('does not throw when the ceremony succeeds without an onAuthenticated callback', async () => {
+    verifyMagicLinkMock.mockResolvedValue({
+      ok: true,
+      magicLinkTicket: MAGIC_LINK_TICKET,
+      ceremonyType: 'Register',
+      challenge: encodeBase64(CHALLENGE),
+      relyingPartyId: RELYING_PARTY_ID,
+      credentialId: null,
+    })
+    const createCredential = vi.fn().mockResolvedValue({
+      credentialId: CREDENTIAL_ID,
+      clientDataJson: CLIENT_DATA_JSON,
+      attestationObject: ATTESTATION_OBJECT,
+    })
+    const getCredential = vi.fn()
+    completeWebAuthnCeremonyMock.mockResolvedValue({ ok: true, account: COMPLETED_ACCOUNT })
+
+    renderCallback({ createCredential, getCredential })
+
+    await vi.waitFor(() => expect(screen.getByRole('status').textContent).toBe('Login realizado com sucesso.'))
   })
 
   it('falls back to the real WebAuthn browser functions when createCredential/getCredential are not overridden', async () => {

@@ -36,6 +36,36 @@ describe('TotpChallenge', () => {
     vi.clearAllMocks()
   })
 
+  it('renders an empty, enabled form with no alert on mount', () => {
+    renderTotpChallenge()
+
+    expect((screen.getByLabelText(/código/i) as HTMLInputElement).value).toBe('')
+    expect(screen.getByPlaceholderText('Código ou código de backup')).toBeTruthy()
+    expect((screen.getByRole('button', { name: /verificar/i }) as HTMLButtonElement).disabled).toBe(false)
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('disables the submit button while the verification request is in flight', async () => {
+    let resolveVerify!: (value: Awaited<ReturnType<typeof client.verifyTotpChallenge>>) => void
+    verifyTotpChallengeMock.mockReturnValue(
+      new Promise((resolve) => {
+        resolveVerify = resolve
+      }),
+    )
+    renderTotpChallenge()
+
+    fireEvent.change(screen.getByLabelText(/código/i), { target: { value: '123456' } })
+    fireEvent.click(screen.getByRole('button', { name: /verificar/i }))
+
+    await waitFor(() =>
+      expect((screen.getByRole('button', { name: /verificar/i }) as HTMLButtonElement).disabled).toBe(true),
+    )
+
+    resolveVerify({ ok: false, code: 'auth.totp_invalid_code', params: {} })
+    await screen.findByRole('alert')
+    expect((screen.getByRole('button', { name: /verificar/i }) as HTMLButtonElement).disabled).toBe(false)
+  })
+
   it('submits a 6-digit code as { code } (with the ticket) and calls onVerified with the authenticated account', async () => {
     const account: client.AccountResult = {
       id: ACCOUNT_ID,
@@ -55,6 +85,27 @@ describe('TotpChallenge', () => {
       expect(verifyTotpChallengeMock).toHaveBeenCalledWith('http://api.test', ACCOUNT_ID, TICKET, { code: '123456' }),
     )
     expect(onVerified).toHaveBeenCalledWith(account)
+  })
+
+  it('submits a value with a trailing 6-digit run but a non-digit prefix as { backupCode }, not { code }', async () => {
+    const account: client.AccountResult = {
+      id: ACCOUNT_ID,
+      email: 'user@example.com',
+      role: 'Professional',
+      twoFactorRequirement: 'ChallengeRequired',
+      twoFactorTicket: null,
+    }
+    verifyTotpChallengeMock.mockResolvedValue({ ok: true, account })
+    renderTotpChallenge()
+
+    fireEvent.change(screen.getByLabelText(/código/i), { target: { value: 'abc123456' } })
+    fireEvent.click(screen.getByRole('button', { name: /verificar/i }))
+
+    await waitFor(() =>
+      expect(verifyTotpChallengeMock).toHaveBeenCalledWith('http://api.test', ACCOUNT_ID, TICKET, {
+        backupCode: 'abc123456',
+      }),
+    )
   })
 
   it('submits a hyphenated backup code as { backupCode } (with the ticket) and calls onVerified', async () => {

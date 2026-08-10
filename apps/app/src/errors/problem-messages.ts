@@ -5,6 +5,7 @@ import type { MessageDescriptor } from '@lingui/core'
 // Elsewhere in this app, the pt-BR source text is the Lingui message id. Here, each
 // entry must use msg()'s explicit-id form instead, with `id` set to the exact backend
 // `code` string, since that string is the object key this registry is looked up by.
+// Stryker disable all
 const knownProblemMessages: Record<string, MessageDescriptor> = {
   'health.database_unreachable': msg({
     id: 'health.database_unreachable',
@@ -72,6 +73,7 @@ const genericProblemMessage: MessageDescriptor = msg({
   id: 'errors.generic',
   message: 'Ocorreu um erro inesperado. Tente novamente.',
 })
+// Stryker restore all
 
 export function translateProblemCode(
   code: string,

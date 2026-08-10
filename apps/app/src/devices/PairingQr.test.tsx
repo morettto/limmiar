@@ -95,10 +95,28 @@ describe('PairingQr', () => {
       expiresAt: new Date(Date.now() + 60_000).toISOString(),
     })
     getPairingClaimStatusMock.mockResolvedValue({ ok: true, claimed: false, newDevicePublicKey: null })
+    const toDataURLSpy = vi.spyOn(QRCode, 'toDataURL')
     renderPairingQr()
 
     const img = await screen.findByRole('img')
     expect((img as HTMLImageElement).src.startsWith('data:image')).toBe(true)
+    expect(img.getAttribute('alt')).toBe('Código QR para parear novo dispositivo')
+    expect(toDataURLSpy).toHaveBeenCalledWith(
+      JSON.stringify({ s: SESSION_ID, k: PRIMARY_PUBLIC_KEY, u: 'http://api.test' }),
+    )
+    toDataURLSpy.mockRestore()
+  })
+
+  it('does not poll while still creating the session or after it errors', async () => {
+    vi.useFakeTimers()
+    createPairingSessionMock.mockResolvedValue({ ok: false, code: 'auth.access_token_invalid', params: {} })
+    renderPairingQr()
+
+    await flushMicrotasks()
+    expect(screen.getByRole('alert')).toBeTruthy()
+
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(getPairingClaimStatusMock).not.toHaveBeenCalled()
   })
 
   it('polls getPairingClaimStatus every second while displaying the QR', async () => {
@@ -152,6 +170,8 @@ describe('PairingQr', () => {
 
     await vi.advanceTimersByTimeAsync(1000)
     expect(onClaimed).toHaveBeenCalledWith(NEW_DEVICE_PUBLIC_KEY, SESSION_ID)
+    await flushMicrotasks()
+    expect(screen.getByRole('status').textContent).toBe('Dispositivo pareado com sucesso.')
 
     const callsAfterClaim = getPairingClaimStatusMock.mock.calls.length
     await vi.advanceTimersByTimeAsync(5000)
@@ -186,6 +206,66 @@ describe('PairingQr', () => {
     const callsAfterExpiry = getPairingClaimStatusMock.mock.calls.length
     await vi.advanceTimersByTimeAsync(5000)
     expect(getPairingClaimStatusMock.mock.calls.length).toBe(callsAfterExpiry)
+  })
+
+  it('treats the exact expiry instant as expired', async () => {
+    vi.useFakeTimers()
+    const now = Date.now()
+    createPairingSessionMock.mockResolvedValue({
+      ok: true,
+      sessionId: SESSION_ID,
+      expiresAt: new Date(now + 1000).toISOString(),
+    })
+    getPairingClaimStatusMock.mockResolvedValue({ ok: true, claimed: false, newDevicePublicKey: null })
+    const onExpired = vi.fn()
+    renderPairingQr(vi.fn(), onExpired)
+
+    await flushMicrotasks()
+    screen.getByRole('img')
+
+    await vi.advanceTimersByTimeAsync(1000)
+    await flushMicrotasks()
+    expect(onExpired).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not throw when expiry fires without an onExpired callback', async () => {
+    vi.useFakeTimers()
+    const now = Date.now()
+    createPairingSessionMock.mockResolvedValue({
+      ok: true,
+      sessionId: SESSION_ID,
+      expiresAt: new Date(now + 1000).toISOString(),
+    })
+    getPairingClaimStatusMock.mockResolvedValue({ ok: true, claimed: false, newDevicePublicKey: null })
+    renderPairingQr(vi.fn(), undefined)
+
+    await flushMicrotasks()
+    screen.getByRole('img')
+
+    await vi.advanceTimersByTimeAsync(1000)
+    await flushMicrotasks()
+    expect(screen.getByRole('alert').textContent).toBe('Este código expirou. Volte para gerar um novo.')
+  })
+
+  it('never calls QRCode.toDataURL when unmounted before createPairingSession resolves', async () => {
+    let resolveCreate: (result: client.CreatePairingSessionResult) => void = () => {}
+    createPairingSessionMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveCreate = resolve
+        }),
+    )
+    const toDataURLSpy = vi.spyOn(QRCode, 'toDataURL')
+
+    const { unmount } = renderPairingQr()
+    await waitFor(() => expect(createPairingSessionMock).toHaveBeenCalledTimes(1))
+    unmount()
+
+    resolveCreate({ ok: true, sessionId: SESSION_ID, expiresAt: new Date(Date.now() + 60_000).toISOString() })
+
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(toDataURLSpy).not.toHaveBeenCalled()
+    toDataURLSpy.mockRestore()
   })
 
   it('renders a translated error when createPairingSession fails', async () => {

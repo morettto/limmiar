@@ -27,10 +27,14 @@ describe('decodeFromCamera', () => {
     const { stream, track } = makeFakeStream()
     stubGetUserMedia(stream)
     vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined)
-    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
+    const setAttributeSpy = vi.spyOn(HTMLVideoElement.prototype, 'setAttribute')
+    const getContextSpy = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
 
     await expect(decodeFromCamera()).rejects.toThrow('Canvas 2D context unavailable for QR scanning')
     expect(track.stop).toHaveBeenCalledTimes(1)
+    expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledWith({ video: { facingMode: 'environment' } })
+    expect(setAttributeSpy).toHaveBeenCalledWith('playsinline', 'true')
+    expect(getContextSpy).toHaveBeenCalledWith('2d')
   })
 
   it('resolves with the decoded QR text once jsQR finds a code, retrying frames until then', async () => {
@@ -55,10 +59,11 @@ describe('decodeFromCamera', () => {
       fakeContext as unknown as CanvasRenderingContext2D,
     )
 
-    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+    const requestAnimationFrameMock = vi.fn((cb: FrameRequestCallback) => {
       cb(0)
       return 0
     })
+    vi.stubGlobal('requestAnimationFrame', requestAnimationFrameMock)
 
     const jsQRMock = vi.mocked(jsQR)
     jsQRMock.mockReturnValueOnce(null).mockReturnValueOnce({
@@ -72,5 +77,6 @@ describe('decodeFromCamera', () => {
     expect(fakeContext.getImageData).toHaveBeenCalled()
     expect(jsQRMock).toHaveBeenCalledTimes(2)
     expect(track.stop).toHaveBeenCalledTimes(1)
+    expect(requestAnimationFrameMock).toHaveBeenCalledTimes(2)
   })
 })

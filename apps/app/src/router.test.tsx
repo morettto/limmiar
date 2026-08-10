@@ -41,6 +41,15 @@ describe('router', () => {
     delete (window as unknown as Record<string, unknown>).__e2eKekAdopted
   })
 
+  it('does not register the E2E-only routes when VITE_ENABLE_E2E_TEST_ROUTES is unset', async () => {
+    const router = await loadRouterAt('/auth/screen?baseUrl=http%3A%2F%2Fapi.test&role=Professional')
+
+    render(<RouterProvider router={router} />)
+
+    expect(screen.queryByTestId('auth-screen')).toBeNull()
+    expect(router.state.matches.some((match) => match.routeId === '/auth/screen')).toBe(false)
+  })
+
   it('resolves the index route ("/") and renders the app shell', async () => {
     const router = await loadRouterAt('/')
 

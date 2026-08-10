@@ -11,7 +11,13 @@ export default {
   // from coverage in vite.config.ts for the same reason: no branching logic
   // of its own to assert on. Test files are mutated targets' specs, not
   // targets themselves.
-  mutate: ['src/**/*.{ts,tsx}', '!src/main.tsx', '!src/**/*.test.{ts,tsx}'],
+  mutate: [
+    'src/**/*.{ts,tsx}',
+    '!src/main.tsx',
+    '!src/**/*.test.{ts,tsx}',
+    '!src/**/*.spec.{ts,tsx}',
+    '!src/test-support/**',
+  ],
   coverageAnalysis: 'perTest',
   reporters: ['html', 'clear-text', 'progress'],
   thresholds: {

@@ -59,6 +59,34 @@ describe('PairingScan', () => {
     renderPairingScan(decode, onClaimed)
 
     await waitFor(() => expect(onClaimed).toHaveBeenCalledWith(PRIMARY_PUBLIC_KEY, SESSION_ID))
+    expect(screen.getByRole('status').textContent).toBe('Dispositivo pareado com sucesso.')
+  })
+
+  it('shows the scanning prompt before decode resolves, then the claiming message while the claim is in flight', async () => {
+    let resolveDecode!: (text: string) => void
+    const decode = vi.fn().mockReturnValue(
+      new Promise<string>((resolve) => {
+        resolveDecode = resolve
+      }),
+    )
+    let resolveClaim!: (value: Awaited<ReturnType<typeof client.claimPairingSession>>) => void
+    claimPairingSessionMock.mockReturnValue(
+      new Promise((resolve) => {
+        resolveClaim = resolve
+      }),
+    )
+
+    renderPairingScan(decode)
+
+    expect(screen.getByRole('status').textContent).toBe(
+      'Aponte a câmera para o código QR exibido no outro dispositivo.',
+    )
+
+    resolveDecode(VALID_QR_TEXT)
+    await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Concluindo o pareamento...'))
+
+    resolveClaim({ ok: true, primaryPublicKey: PRIMARY_PUBLIC_KEY })
+    await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Dispositivo pareado com sucesso.'))
   })
 
   it('renders an error when the claim is rejected (expired or already-claimed session)', async () => {
@@ -85,6 +113,24 @@ describe('PairingScan', () => {
 
   it('renders an error and never calls claimPairingSession when the decoded JSON does not match the pairing payload shape', async () => {
     const decode = vi.fn().mockResolvedValue(JSON.stringify({ s: SESSION_ID }))
+
+    renderPairingScan(decode)
+
+    expect((await screen.findByRole('alert')).textContent).toBe('Código QR inválido. Tente escanear novamente.')
+    expect(claimPairingSessionMock).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['a JSON array instead of an object', JSON.stringify(['not', 'an', 'object'])],
+    ['a JSON null', JSON.stringify(null)],
+    ['missing s', JSON.stringify({ k: PRIMARY_PUBLIC_KEY, u: BASE_URL })],
+    ['s not a string', JSON.stringify({ s: 1, k: PRIMARY_PUBLIC_KEY, u: BASE_URL })],
+    ['missing k', JSON.stringify({ s: SESSION_ID, u: BASE_URL })],
+    ['k not a string', JSON.stringify({ s: SESSION_ID, k: 1, u: BASE_URL })],
+    ['missing u', JSON.stringify({ s: SESSION_ID, k: PRIMARY_PUBLIC_KEY })],
+    ['u not a string', JSON.stringify({ s: SESSION_ID, k: PRIMARY_PUBLIC_KEY, u: 1 })],
+  ])('renders an error and never calls claimPairingSession when the decoded JSON is %s', async (_label, text) => {
+    const decode = vi.fn().mockResolvedValue(text)
 
     renderPairingScan(decode)
 
