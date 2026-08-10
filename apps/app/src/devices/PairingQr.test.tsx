@@ -24,13 +24,18 @@ const PRIMARY_PUBLIC_KEY = 'cHJpbWFyeS1wdWJsaWMta2V5'
 const NEW_DEVICE_PUBLIC_KEY = 'bmV3LWRldmljZS1wdWJsaWMta2V5'
 const SESSION_ID = 'session-abc'
 
-// The mount effect chains two `await`s (createPairingSession, then QRCode.toDataURL)
-// before it calls setState -- and QRCode's Node renderer schedules its own work via
-// setImmediate, which vi.useFakeTimers() fakes by default same as setTimeout/setInterval.
-// A single `vi.advanceTimersByTimeAsync(0)` only flushes ONE step of that chain (whatever
-// is already due), so a promise-then-setImmediate-then-promise chain needs repeated calls,
-// each one both firing whatever fake timer/immediate is now due AND draining the
-// microtasks that scheduling produces, until the chain bottoms out at setState.
+// Tests that run under vi.useFakeTimers() must not depend on QRCode.toDataURL's real
+// implementation: it's the `qrcode` library's Node renderer, which schedules its own
+// work via setImmediate, and how many setImmediate/promise hops that takes is an
+// implementation detail of that library that has already shifted across Node versions
+// and made this suite flaky under fake timers. mockToDataURLForFakeTimers replaces it
+// with a promise that resolves on the microtask queue only, so a single
+// `vi.advanceTimersByTimeAsync(0)` reliably drains the mount effect's
+// createPairingSession -> toDataURL -> setState chain.
+function mockToDataURLForFakeTimers() {
+  return vi.spyOn(QRCode, 'toDataURL').mockResolvedValue('data:image/png;base64,mock')
+}
+
 async function flushMicrotasks() {
   for (let i = 0; i < 50; i++) {
     await vi.advanceTimersByTimeAsync(0)
@@ -128,6 +133,7 @@ describe('PairingQr', () => {
       expiresAt: new Date(now + 60_000).toISOString(),
     })
     getPairingClaimStatusMock.mockResolvedValue({ ok: true, claimed: false, newDevicePublicKey: null })
+    const toDataURLSpy = mockToDataURLForFakeTimers()
     renderPairingQr()
 
     // findByRole's own retry loop uses a real setTimeout, which never fires under fake
@@ -143,6 +149,7 @@ describe('PairingQr', () => {
 
     await vi.advanceTimersByTimeAsync(1000)
     expect(getPairingClaimStatusMock).toHaveBeenCalledTimes(2)
+    toDataURLSpy.mockRestore()
   })
 
   it('calls onClaimed once claimed is detected and stops polling', async () => {
@@ -160,6 +167,7 @@ describe('PairingQr', () => {
       newDevicePublicKey: NEW_DEVICE_PUBLIC_KEY,
     })
     const onClaimed = vi.fn()
+    const toDataURLSpy = mockToDataURLForFakeTimers()
     renderPairingQr(onClaimed)
 
     await flushMicrotasks()
@@ -176,6 +184,7 @@ describe('PairingQr', () => {
     const callsAfterClaim = getPairingClaimStatusMock.mock.calls.length
     await vi.advanceTimersByTimeAsync(5000)
     expect(getPairingClaimStatusMock.mock.calls.length).toBe(callsAfterClaim)
+    toDataURLSpy.mockRestore()
   })
 
   it('calls onExpired and stops polling once expiresAt has passed', async () => {
@@ -188,6 +197,7 @@ describe('PairingQr', () => {
     })
     getPairingClaimStatusMock.mockResolvedValue({ ok: true, claimed: false, newDevicePublicKey: null })
     const onExpired = vi.fn()
+    const toDataURLSpy = mockToDataURLForFakeTimers()
     renderPairingQr(vi.fn(), onExpired)
 
     await flushMicrotasks()
@@ -206,6 +216,7 @@ describe('PairingQr', () => {
     const callsAfterExpiry = getPairingClaimStatusMock.mock.calls.length
     await vi.advanceTimersByTimeAsync(5000)
     expect(getPairingClaimStatusMock.mock.calls.length).toBe(callsAfterExpiry)
+    toDataURLSpy.mockRestore()
   })
 
   it('treats the exact expiry instant as expired', async () => {
@@ -218,6 +229,7 @@ describe('PairingQr', () => {
     })
     getPairingClaimStatusMock.mockResolvedValue({ ok: true, claimed: false, newDevicePublicKey: null })
     const onExpired = vi.fn()
+    const toDataURLSpy = mockToDataURLForFakeTimers()
     renderPairingQr(vi.fn(), onExpired)
 
     await flushMicrotasks()
@@ -226,6 +238,7 @@ describe('PairingQr', () => {
     await vi.advanceTimersByTimeAsync(1000)
     await flushMicrotasks()
     expect(onExpired).toHaveBeenCalledTimes(1)
+    toDataURLSpy.mockRestore()
   })
 
   it('does not throw when expiry fires without an onExpired callback', async () => {
@@ -237,6 +250,7 @@ describe('PairingQr', () => {
       expiresAt: new Date(now + 1000).toISOString(),
     })
     getPairingClaimStatusMock.mockResolvedValue({ ok: true, claimed: false, newDevicePublicKey: null })
+    const toDataURLSpy = mockToDataURLForFakeTimers()
     renderPairingQr(vi.fn(), undefined)
 
     await flushMicrotasks()
@@ -245,6 +259,7 @@ describe('PairingQr', () => {
     await vi.advanceTimersByTimeAsync(1000)
     await flushMicrotasks()
     expect(screen.getByRole('alert').textContent).toBe('Este código expirou. Volte para gerar um novo.')
+    toDataURLSpy.mockRestore()
   })
 
   it('never calls QRCode.toDataURL when unmounted before createPairingSession resolves', async () => {
@@ -284,6 +299,7 @@ describe('PairingQr', () => {
       expiresAt: new Date(now + 60_000).toISOString(),
     })
     getPairingClaimStatusMock.mockResolvedValue({ ok: false, code: 'auth.access_token_invalid', params: {} })
+    const toDataURLSpy = mockToDataURLForFakeTimers()
     renderPairingQr()
 
     await flushMicrotasks()
@@ -297,6 +313,7 @@ describe('PairingQr', () => {
     const callsAfterError = getPairingClaimStatusMock.mock.calls.length
     await vi.advanceTimersByTimeAsync(5000)
     expect(getPairingClaimStatusMock.mock.calls.length).toBe(callsAfterError)
+    toDataURLSpy.mockRestore()
   })
 
   it('ignores a createPairingSession resolution that arrives after the component unmounted', async () => {

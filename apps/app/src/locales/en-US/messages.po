@@ -14,12 +14,12 @@ msgstr ""
 "Plural-Forms: \n"
 
 #. js-lingui-explicit-id
-#: src/errors/problem-messages.ts:49
+#: src/errors/problem-messages.ts:50
 msgid "auth.totp_not_enabled"
 msgstr "Two-factor verification has not been enabled for this account yet."
 
 #. js-lingui-explicit-id
-#: src/errors/problem-messages.ts:35
+#: src/errors/problem-messages.ts:36
 msgid "auth.totp_already_enabled"
 msgstr "Two-factor verification is already enabled for this account."
 
@@ -44,7 +44,7 @@ msgid "Aponte a câmera para o código QR exibido no outro dispositivo."
 msgstr "Point the camera at the QR code shown on the other device."
 
 #. js-lingui-explicit-id
-#: src/errors/problem-messages.ts:9
+#: src/errors/problem-messages.ts:10
 msgid "health.database_unreachable"
 msgstr "Database unavailable at the moment."
 
@@ -53,7 +53,7 @@ msgid "Bem-vindo ao Limmiar"
 msgstr "Welcome to Limmiar"
 
 #. js-lingui-explicit-id
-#: src/errors/problem-messages.ts:31
+#: src/errors/problem-messages.ts:32
 msgid "validation.invalid_field"
 msgstr "Invalid field: {field}."
 
@@ -66,7 +66,7 @@ msgid "Código de verificação"
 msgstr "Verification code"
 
 #. js-lingui-explicit-id
-#: src/errors/problem-messages.ts:45
+#: src/errors/problem-messages.ts:46
 msgid "auth.totp_invalid_code"
 msgstr "Invalid code. Check your authenticator app or use a backup code."
 
@@ -143,12 +143,12 @@ msgid "E-mail"
 msgstr "E-mail"
 
 #. js-lingui-explicit-id
-#: src/errors/problem-messages.ts:63
+#: src/errors/problem-messages.ts:64
 msgid "auth.invalid_recovery_phrase"
 msgstr "Invalid e-mail or recovery phrase."
 
 #. js-lingui-explicit-id
-#: src/errors/problem-messages.ts:23
+#: src/errors/problem-messages.ts:24
 msgid "auth.invalid_credentials"
 msgstr "Invalid e-mail or password."
 
@@ -173,12 +173,12 @@ msgid "Este código expirou. Volte para gerar um novo."
 msgstr "This code has expired. Go back to generate a new one."
 
 #. js-lingui-explicit-id
-#: src/errors/problem-messages.ts:17
+#: src/errors/problem-messages.ts:18
 msgid "auth.email_already_registered"
 msgstr "This e-mail is already registered."
 
 #. js-lingui-explicit-id
-#: src/errors/problem-messages.ts:53
+#: src/errors/problem-messages.ts:54
 msgid "auth.magic_link_invalid"
 msgstr "This access link is no longer valid. Request a new one."
 
@@ -235,12 +235,12 @@ msgid "Não foi possível concluir o pareamento com segurança. Tente novamente.
 msgstr "Could not securely complete the pairing. Try again."
 
 #. js-lingui-explicit-id
-#: src/errors/problem-messages.ts:57
+#: src/errors/problem-messages.ts:58
 msgid "auth.webauthn_ceremony_failed"
 msgstr "Could not confirm your identity on this device. Try again."
 
 #. js-lingui-explicit-id
-#: src/errors/problem-messages.ts:27
+#: src/errors/problem-messages.ts:28
 msgid "auth.google_token_invalid"
 msgstr "Could not continue with Google. Please try again."
 
@@ -249,17 +249,17 @@ msgid "Não foi possível decifrar a chave recebida. Tente parear novamente."
 msgstr "Could not decrypt the received key. Try pairing again."
 
 #. js-lingui-explicit-id
-#: src/errors/problem-messages.ts:39
+#: src/errors/problem-messages.ts:40
 msgid "auth.totp_not_pending"
 msgstr "There is no pending two-factor verification setup for this account."
 
 #. js-lingui-explicit-id
-#: src/errors/problem-messages.ts:13
+#: src/errors/problem-messages.ts:14
 msgid "unexpected_error"
 msgstr "An unexpected server error occurred."
 
 #. js-lingui-explicit-id
-#: src/errors/problem-messages.ts:71
+#: src/errors/problem-messages.ts:72
 msgid "errors.generic"
 msgstr "An unexpected error occurred. Please try again."
 
