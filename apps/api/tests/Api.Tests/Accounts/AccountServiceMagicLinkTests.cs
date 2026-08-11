@@ -16,7 +16,7 @@ public sealed class AccountServiceMagicLinkTests
     public async Task RequestMagicLinkAsync_WithUnknownEmail_SendsToken()
     {
         var sender = new CapturingMagicLinkEmailSender();
-        var service = CreateService(new FakeAccountStore(), sender);
+        var service = CreateHarness(new FakeAccountStore(), sender);
 
         await service.RequestMagicLinkAsync("ghost@example.com", CancellationToken.None);
 
@@ -28,7 +28,7 @@ public sealed class AccountServiceMagicLinkTests
     {
         var patient = new Account(Guid.NewGuid(), "patient@example.com", AccountRole.Patient, null, null);
         var sender = new CapturingMagicLinkEmailSender();
-        var service = CreateService(new FakeAccountStore(patient), sender);
+        var service = CreateHarness(new FakeAccountStore(patient), sender);
 
         await service.RequestMagicLinkAsync("patient@example.com", CancellationToken.None);
 
@@ -42,7 +42,7 @@ public sealed class AccountServiceMagicLinkTests
     {
         var professional = new Account(Guid.NewGuid(), "pro@example.com", AccountRole.Professional, [1], null);
         var sender = new CapturingMagicLinkEmailSender();
-        var service = CreateService(new FakeAccountStore(professional), sender);
+        var service = CreateHarness(new FakeAccountStore(professional), sender);
 
         await service.RequestMagicLinkAsync("pro@example.com", CancellationToken.None);
 
@@ -52,7 +52,7 @@ public sealed class AccountServiceMagicLinkTests
     [Fact]
     public async Task RequestMagicLinkAsync_WhenEmailSenderThrows_StillReturnsSuccess()
     {
-        var service = CreateService(new FakeAccountStore(), new MagicLinkEmailSender());
+        var service = CreateHarness(new FakeAccountStore(), new MagicLinkEmailSender());
 
         var result = await service.RequestMagicLinkAsync("unregistered@example.com", CancellationToken.None);
 
@@ -66,7 +66,7 @@ public sealed class AccountServiceMagicLinkTests
     {
         var patient = new Account(Guid.NewGuid(), "patient2@example.com", AccountRole.Patient, null, null);
         var professional = new Account(Guid.NewGuid(), "pro2@example.com", AccountRole.Professional, [1], null);
-        var service = CreateService(new FakeAccountStore(patient, professional), new CapturingMagicLinkEmailSender());
+        var service = CreateHarness(new FakeAccountStore(patient, professional), new CapturingMagicLinkEmailSender());
 
         var unknownResult = await service.RequestMagicLinkAsync("ghost2@example.com", CancellationToken.None);
         var patientResult = await service.RequestMagicLinkAsync("patient2@example.com", CancellationToken.None);
@@ -80,7 +80,7 @@ public sealed class AccountServiceMagicLinkTests
     [Fact]
     public async Task VerifyMagicLinkAsync_WithInvalidToken_ReturnsFailure()
     {
-        var service = CreateService(new FakeAccountStore(), new CapturingMagicLinkEmailSender());
+        var service = CreateHarness(new FakeAccountStore(), new CapturingMagicLinkEmailSender());
 
         var result = await service.VerifyMagicLinkAsync("never-issued", CancellationToken.None);
 
@@ -93,7 +93,7 @@ public sealed class AccountServiceMagicLinkTests
         var now = DateTimeOffset.UtcNow;
         var issuer = new MagicLinkIssuer(clock: () => now);
         var sender = new CapturingMagicLinkEmailSender();
-        var service = CreateService(new FakeAccountStore(), sender, issuer);
+        var service = CreateHarness(new FakeAccountStore(), sender, issuer);
         await service.RequestMagicLinkAsync("expiring@example.com", CancellationToken.None);
         var token = sender.LastTokenSentTo("expiring@example.com")!;
 
@@ -107,7 +107,7 @@ public sealed class AccountServiceMagicLinkTests
     public async Task VerifyMagicLinkAsync_WithNoExistingAccount_ReturnsRegisterCeremonyWithNoCredentialId()
     {
         var sender = new CapturingMagicLinkEmailSender();
-        var service = CreateService(new FakeAccountStore(), sender);
+        var service = CreateHarness(new FakeAccountStore(), sender);
         await service.RequestMagicLinkAsync("new-patient@example.com", CancellationToken.None);
         var token = sender.LastTokenSentTo("new-patient@example.com")!;
 
@@ -128,7 +128,7 @@ public sealed class AccountServiceMagicLinkTests
             Guid.NewGuid(), "returning@example.com", AccountRole.Patient, null, null,
             WebAuthnCredentialId: credentialId, WebAuthnCosePublicKey: [4, 5], WebAuthnSignCount: 0u, WebAuthnAaGuid: Guid.Empty);
         var sender = new CapturingMagicLinkEmailSender();
-        var service = CreateService(new FakeAccountStore(account), sender);
+        var service = CreateHarness(new FakeAccountStore(account), sender);
         await service.RequestMagicLinkAsync("returning@example.com", CancellationToken.None);
         var token = sender.LastTokenSentTo("returning@example.com")!;
 
@@ -143,7 +143,7 @@ public sealed class AccountServiceMagicLinkTests
     public async Task VerifyMagicLinkAsync_TokenIsSingleUse()
     {
         var sender = new CapturingMagicLinkEmailSender();
-        var service = CreateService(new FakeAccountStore(), sender);
+        var service = CreateHarness(new FakeAccountStore(), sender);
         await service.RequestMagicLinkAsync("single-use@example.com", CancellationToken.None);
         var token = sender.LastTokenSentTo("single-use@example.com")!;
 
@@ -156,7 +156,7 @@ public sealed class AccountServiceMagicLinkTests
     [Fact]
     public async Task CompleteMagicLinkWebAuthnAsync_WithUnknownTicket_ReturnsFailure()
     {
-        var service = CreateService(new FakeAccountStore(), new CapturingMagicLinkEmailSender());
+        var service = CreateHarness(new FakeAccountStore(), new CapturingMagicLinkEmailSender());
 
         var result = await service.CompleteMagicLinkWebAuthnAsync(
             "never-issued", [1], [2], [3], null, null, CancellationToken.None);
@@ -168,7 +168,7 @@ public sealed class AccountServiceMagicLinkTests
     public async Task CompleteMagicLinkWebAuthnAsync_RegistrationPath_CreatesPatientAccountAndIssuesSession()
     {
         var sender = new CapturingMagicLinkEmailSender();
-        var service = CreateService(new FakeAccountStore(), sender);
+        var service = CreateHarness(new FakeAccountStore(), sender);
         const string email = "register-flow@example.com";
 
         await service.RequestMagicLinkAsync(email, CancellationToken.None);
@@ -202,7 +202,7 @@ public sealed class AccountServiceMagicLinkTests
     public async Task CompleteMagicLinkWebAuthnAsync_AssertionPath_UpdatesSignCountAndIssuesSession()
     {
         var sender = new CapturingMagicLinkEmailSender();
-        var service = CreateService(new FakeAccountStore(), sender);
+        var service = CreateHarness(new FakeAccountStore(), sender);
         const string email = "assert-flow@example.com";
         var authenticator = new SoftwareAuthenticator();
 
@@ -231,7 +231,7 @@ public sealed class AccountServiceMagicLinkTests
     public async Task CompleteMagicLinkWebAuthnAsync_AssertionPath_WithTamperedSignature_ReturnsFailure()
     {
         var sender = new CapturingMagicLinkEmailSender();
-        var service = CreateService(new FakeAccountStore(), sender);
+        var service = CreateHarness(new FakeAccountStore(), sender);
         const string email = "tampered-flow@example.com";
         var authenticator = new SoftwareAuthenticator();
 
@@ -258,7 +258,7 @@ public sealed class AccountServiceMagicLinkTests
     public async Task CompleteMagicLinkWebAuthnAsync_RegistrationPath_WithMissingAttestationObject_ReturnsFailure()
     {
         var sender = new CapturingMagicLinkEmailSender();
-        var service = CreateService(new FakeAccountStore(), sender);
+        var service = CreateHarness(new FakeAccountStore(), sender);
         const string email = "missing-attestation@example.com";
         await service.RequestMagicLinkAsync(email, CancellationToken.None);
         var token = sender.LastTokenSentTo(email)!;
@@ -274,7 +274,7 @@ public sealed class AccountServiceMagicLinkTests
     public async Task CompleteMagicLinkWebAuthnAsync_RegistrationPath_WithWrongChallenge_ReturnsFailure()
     {
         var sender = new CapturingMagicLinkEmailSender();
-        var service = CreateService(new FakeAccountStore(), sender);
+        var service = CreateHarness(new FakeAccountStore(), sender);
         const string email = "wrong-challenge@example.com";
         await service.RequestMagicLinkAsync(email, CancellationToken.None);
         var token = sender.LastTokenSentTo(email)!;
@@ -295,7 +295,7 @@ public sealed class AccountServiceMagicLinkTests
     public async Task CompleteMagicLinkWebAuthnAsync_AssertionPath_WithMissingAuthenticatorData_ReturnsFailure()
     {
         var sender = new CapturingMagicLinkEmailSender();
-        var service = CreateService(new FakeAccountStore(), sender);
+        var service = CreateHarness(new FakeAccountStore(), sender);
         const string email = "missing-authdata@example.com";
         var authenticator = new SoftwareAuthenticator();
         await RegisterViaMagicLink(service, sender, email, authenticator);
@@ -314,7 +314,7 @@ public sealed class AccountServiceMagicLinkTests
     public async Task CompleteMagicLinkWebAuthnAsync_AssertionPath_WithMissingSignature_ReturnsFailure()
     {
         var sender = new CapturingMagicLinkEmailSender();
-        var service = CreateService(new FakeAccountStore(), sender);
+        var service = CreateHarness(new FakeAccountStore(), sender);
         const string email = "missing-signature@example.com";
         var authenticator = new SoftwareAuthenticator();
         await RegisterViaMagicLink(service, sender, email, authenticator);
@@ -335,7 +335,7 @@ public sealed class AccountServiceMagicLinkTests
     public async Task CompleteMagicLinkWebAuthnAsync_AssertionPath_WithAccountNoLongerInStore_ReturnsFailure()
     {
         var issuer = new MagicLinkIssuer();
-        var service = CreateService(new FakeAccountStore(), new CapturingMagicLinkEmailSender(), issuer);
+        var service = CreateHarness(new FakeAccountStore(), new CapturingMagicLinkEmailSender(), issuer);
         var ticketData = new MagicLinkTicketData(
             "ghost-account@example.com", MagicLinkCeremonyType.Assert, RandomNumberGenerator.GetBytes(32),
             Guid.NewGuid(), [1, 2, 3], [4, 5], 0u);
@@ -351,7 +351,7 @@ public sealed class AccountServiceMagicLinkTests
     public async Task CompleteMagicLinkWebAuthnAsync_TicketIsSingleUse()
     {
         var sender = new CapturingMagicLinkEmailSender();
-        var service = CreateService(new FakeAccountStore(), sender);
+        var service = CreateHarness(new FakeAccountStore(), sender);
         const string email = "single-use-ticket@example.com";
         var authenticator = new SoftwareAuthenticator();
 
@@ -372,7 +372,7 @@ public sealed class AccountServiceMagicLinkTests
     }
 
     private static async Task RegisterViaMagicLink(
-        AccountService service, CapturingMagicLinkEmailSender sender, string email, SoftwareAuthenticator authenticator)
+        MagicLinkTestHarness service, CapturingMagicLinkEmailSender sender, string email, SoftwareAuthenticator authenticator)
     {
         await service.RequestMagicLinkAsync(email, CancellationToken.None);
         var token = sender.LastTokenSentTo(email)!;
@@ -386,17 +386,35 @@ public sealed class AccountServiceMagicLinkTests
         Assert.True(result.Succeeded);
     }
 
-    private static AccountService CreateService(
-        IAccountStore store, IMagicLinkEmailSender sender, IMagicLinkIssuer? magicLinkIssuer = null) =>
-        new(
-            store,
-            new NeverMatchesPasswordVerifierComparer(),
-            new NullGoogleIdentityProvider(),
-            magicLinkIssuer: magicLinkIssuer,
-            magicLinkEmailSender: sender,
-            webAuthnCeremonyVerifier: new WebAuthnCeremonyVerifier(),
-            webAuthnRelyingPartyId: RelyingPartyId,
-            webAuthnExpectedOrigin: Origin);
+    private static MagicLinkTestHarness CreateHarness(
+        IAccountStore store, IMagicLinkEmailSender sender, IMagicLinkIssuer? magicLinkIssuer = null)
+    {
+        var issuer = magicLinkIssuer ?? new MagicLinkIssuer();
+        var relyingPartyOptions = new WebAuthnRelyingPartyOptions(RelyingPartyId, Origin);
+        return new MagicLinkTestHarness(
+            new RequestMagicLinkHandler(store, issuer, sender),
+            new VerifyMagicLinkHandler(store, issuer),
+            new CompleteMagicLinkWebAuthnHandler(issuer, new WebAuthnCeremonyVerifier(), store, new SessionTokenIssuer(), relyingPartyOptions));
+    }
+
+    // Test-only facade so each test body can chain Request/Verify/Complete against the same
+    // in-memory magic-link issuer, mirroring the shape of the former AccountService methods.
+    private sealed class MagicLinkTestHarness(
+        RequestMagicLinkHandler requestHandler, VerifyMagicLinkHandler verifyHandler, CompleteMagicLinkWebAuthnHandler completeHandler)
+    {
+        public Task<RequestMagicLinkResult> RequestMagicLinkAsync(string email, CancellationToken cancellationToken) =>
+            requestHandler.Handle(new RequestMagicLinkCommand(email), cancellationToken).AsTask();
+
+        public Task<VerifyMagicLinkResult> VerifyMagicLinkAsync(string token, CancellationToken cancellationToken) =>
+            verifyHandler.Handle(new VerifyMagicLinkCommand(token), cancellationToken).AsTask();
+
+        public Task<CompleteMagicLinkResult> CompleteMagicLinkWebAuthnAsync(
+            string magicLinkTicket, byte[] credentialId, byte[] clientDataJson, byte[]? attestationObject,
+            byte[]? authenticatorData, byte[]? signature, CancellationToken cancellationToken) =>
+            completeHandler.Handle(
+                new CompleteMagicLinkWebAuthnCommand(magicLinkTicket, credentialId, clientDataJson, attestationObject, authenticatorData, signature),
+                cancellationToken).AsTask();
+    }
 
     private sealed class FakeAccountStore : IAccountStore
     {
@@ -430,16 +448,5 @@ public sealed class AccountServiceMagicLinkTests
 
         public Task<IReadOnlyList<Account>> ListPendingDocumentReviewAsync(CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<Account>>([]);
-    }
-
-    private sealed class NeverMatchesPasswordVerifierComparer : IPasswordVerifierComparer
-    {
-        public bool Matches(byte[] submitted, byte[] stored) => false;
-    }
-
-    private sealed class NullGoogleIdentityProvider : IGoogleIdentityProvider
-    {
-        public Task<GoogleIdentity?> VerifyIdTokenAsync(string idToken, CancellationToken cancellationToken) =>
-            Task.FromResult<GoogleIdentity?>(null);
     }
 }

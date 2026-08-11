@@ -2,7 +2,6 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Api.Accounts;
-using Api.Endpoints;
 using Api.Serialization;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -27,7 +26,7 @@ public sealed class TwoFactorEndpointsTests
         var response = await PostBeginAsync(client, accountId, ticket);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.BeginTotpEnrollmentResponse);
+        var body = await response.Content.ReadFromJsonAsync(AccountsJsonContext.Default.BeginTotpEnrollmentResponse);
         Assert.NotNull(body);
         Assert.False(string.IsNullOrWhiteSpace(body!.Secret));
         Assert.Contains(body.Secret, body.ProvisioningUri);
@@ -56,8 +55,8 @@ public sealed class TwoFactorEndpointsTests
         var registerResponse = await client.PostAsJsonAsync(
             "/auth/register",
             new RegisterRequest("totp-patient@example.com", SomeVerifier, AccountRole.Patient),
-            ApiJsonSerializerContext.Default.RegisterRequest);
-        var registered = await registerResponse.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.RegisterResponse);
+            AccountsJsonContext.Default.RegisterRequest);
+        var registered = await registerResponse.Content.ReadFromJsonAsync(AccountsJsonContext.Default.RegisterResponse);
 
         var response = await PostBeginAsync(client, registered!.Id, "any-ticket");
 
@@ -98,7 +97,7 @@ public sealed class TwoFactorEndpointsTests
         var response = await PostConfirmAsync(client, accountId, ticket, ValidStubCode);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.ConfirmTotpEnrollmentResponse);
+        var body = await response.Content.ReadFromJsonAsync(AccountsJsonContext.Default.ConfirmTotpEnrollmentResponse);
         Assert.NotNull(body);
         Assert.Equal(10, body!.BackupCodes.Count);
     }
@@ -179,7 +178,7 @@ public sealed class TwoFactorEndpointsTests
         var response = await PostChallengeAsync(client, accountId, loginTicket, ValidStubCode, null);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.LoginResponse);
+        var body = await response.Content.ReadFromJsonAsync(AccountsJsonContext.Default.LoginResponse);
         Assert.NotNull(body);
         Assert.Equal(accountId, body!.Id);
     }
@@ -193,14 +192,14 @@ public sealed class TwoFactorEndpointsTests
         var (accountId, ticket) = await RegisterProfessionalAsync(client, email);
         await PostBeginAsync(client, accountId, ticket);
         var confirmResponse = await PostConfirmAsync(client, accountId, ticket, ValidStubCode);
-        var confirmed = await confirmResponse.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.ConfirmTotpEnrollmentResponse);
+        var confirmed = await confirmResponse.Content.ReadFromJsonAsync(AccountsJsonContext.Default.ConfirmTotpEnrollmentResponse);
         var backupCode = confirmed!.BackupCodes[0];
         var loginTicket = await LoginAsync(client, email);
 
         var response = await PostChallengeAsync(client, accountId, loginTicket, null, backupCode);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.LoginResponse);
+        var body = await response.Content.ReadFromJsonAsync(AccountsJsonContext.Default.LoginResponse);
         Assert.NotNull(body);
         Assert.Equal(accountId, body!.Id);
     }
@@ -407,27 +406,27 @@ public sealed class TwoFactorEndpointsTests
         client.PostAsJsonAsync(
             $"/accounts/{accountId}/totp",
             new BeginTotpEnrollmentRequest(ticket),
-            ApiJsonSerializerContext.Default.BeginTotpEnrollmentRequest);
+            AccountsJsonContext.Default.BeginTotpEnrollmentRequest);
 
     private static Task<HttpResponseMessage> PostConfirmAsync(HttpClient client, Guid accountId, string ticket, string code) =>
         client.PostAsJsonAsync(
             $"/accounts/{accountId}/totp/confirm",
             new ConfirmTotpEnrollmentRequest(ticket, code),
-            ApiJsonSerializerContext.Default.ConfirmTotpEnrollmentRequest);
+            AccountsJsonContext.Default.ConfirmTotpEnrollmentRequest);
 
     private static Task<HttpResponseMessage> PostChallengeAsync(HttpClient client, Guid accountId, string ticket, string? code, string? backupCode) =>
         client.PostAsJsonAsync(
             $"/accounts/{accountId}/totp/challenge",
             new TotpChallengeRequest(ticket, code, backupCode),
-            ApiJsonSerializerContext.Default.TotpChallengeRequest);
+            AccountsJsonContext.Default.TotpChallengeRequest);
 
     private static async Task<(Guid Id, string Ticket)> RegisterProfessionalAsync(HttpClient client, string email)
     {
         var response = await client.PostAsJsonAsync(
             "/auth/register",
             new RegisterRequest(email, SomeVerifier, AccountRole.Professional),
-            ApiJsonSerializerContext.Default.RegisterRequest);
-        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.RegisterResponse);
+            AccountsJsonContext.Default.RegisterRequest);
+        var body = await response.Content.ReadFromJsonAsync(AccountsJsonContext.Default.RegisterResponse);
         return (body!.Id, body.TwoFactorTicket!);
     }
 
@@ -436,8 +435,8 @@ public sealed class TwoFactorEndpointsTests
         var response = await client.PostAsJsonAsync(
             "/auth/login",
             new LoginRequest(email, SomeVerifier),
-            ApiJsonSerializerContext.Default.LoginRequest);
-        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.LoginResponse);
+            AccountsJsonContext.Default.LoginRequest);
+        var body = await response.Content.ReadFromJsonAsync(AccountsJsonContext.Default.LoginResponse);
         return body!.TwoFactorTicket!;
     }
 
@@ -483,7 +482,7 @@ public sealed class TwoFactorEndpointsTests
 
     private static byte[] CreateVerifier(byte fill)
     {
-        var verifier = new byte[AccountService.PasswordVerifierLength];
+        var verifier = new byte[AccountVerifierLengths.PasswordVerifierLength];
         Array.Fill(verifier, fill);
         return verifier;
     }

@@ -1,9 +1,9 @@
 using Api.Problems;
-using Api.Serialization;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Npgsql;
+using static Api.Problems.ProblemResults;
 
-namespace Api.Endpoints;
+namespace Api.Health;
 
 public static class HealthEndpoints
 {
@@ -44,18 +44,10 @@ public static class HealthEndpoints
         }
         catch (Exception ex) when (ex is NpgsqlException or TimeoutException or OperationCanceledException)
         {
-            var problem = new LimmiarProblemDetails
-            {
-                Status = StatusCodes.Status503ServiceUnavailable,
-                Title = "Database unreachable",
-                Code = ProblemCodes.HealthDatabaseUnreachable,
-            };
-
-            result = TypedResults.Json(
-                problem,
-                ApiJsonSerializerContext.Default.LimmiarProblemDetails,
-                contentType: "application/problem+json",
-                statusCode: StatusCodes.Status503ServiceUnavailable);
+            result = ProblemJson(
+                StatusCodes.Status503ServiceUnavailable,
+                "Database unreachable",
+                HealthProblemCodes.HealthDatabaseUnreachable);
         }
 
         return result;

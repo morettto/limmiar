@@ -1,10 +1,13 @@
-using Api.Accounts;
 using Api.Problems;
 using Api.Serialization;
+using Mediator;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using static Api.Accounts.AccountsProblemResults;
+using static Api.Accounts.SessionTokenIssuerAuthorization;
+using static Api.Problems.ProblemResults;
 
-namespace Api.Endpoints;
+namespace Api.Accounts;
 
 // HandleListQueueAsync/HandleDecideAsync are staff-only (X-Staff-Api-Key, IStaffAccessGuard); HandleSubmitAsync is account-scoped via Bearer access token -- both gates closed security-review findings against forged/unauthenticated calls.
 public static class ProfessionalVerificationEndpoints
@@ -44,7 +47,7 @@ public static class ProfessionalVerificationEndpoints
         SubmitProfessionalCredentialRequest request,
         [FromHeader(Name = "Authorization")] string? authorization,
         ISessionTokenIssuer sessionTokenIssuer,
-        AccountService accountService,
+        ISender sender,
         CancellationToken cancellationToken)
     {
         if (!IsAuthorizedForAccount(authorization, accountId, sessionTokenIssuer))
@@ -57,18 +60,19 @@ public static class ProfessionalVerificationEndpoints
             return validationProblem;
         }
 
-        var result = await accountService.SubmitProfessionalCredentialAsync(
-            accountId, request.Type, request.RegistryNumber, request.RegistryUf, request.DocumentReference, cancellationToken);
+        var result = await sender.Send(
+            new SubmitProfessionalCredentialCommand(accountId, request.Type, request.RegistryNumber, request.RegistryUf, request.DocumentReference),
+            cancellationToken);
 
         if (!result.Succeeded)
         {
             return result.FailureReason switch
             {
                 SubmitProfessionalCredentialFailureReason.AccountNotFound =>
-                    ProblemJson(StatusCodes.Status404NotFound, "Account not found", ProblemCodes.AuthAccountNotFound),
+                    ProblemJson(StatusCodes.Status404NotFound, "Account not found", AccountsProblemCodes.AuthAccountNotFound),
                 SubmitProfessionalCredentialFailureReason.NotAProfessionalAccount =>
-                    ProblemJson(StatusCodes.Status409Conflict, "Account is not a professional account", ProblemCodes.AuthNotAProfessionalAccount),
-                _ => ProblemJson(StatusCodes.Status409Conflict, "Account cannot submit a credential in its current state", ProblemCodes.AuthInvalidVerificationState),
+                    ProblemJson(StatusCodes.Status409Conflict, "Account is not a professional account", AccountsProblemCodes.AuthNotAProfessionalAccount),
+                _ => ProblemJson(StatusCodes.Status409Conflict, "Account cannot submit a credential in its current state", AccountsProblemCodes.AuthInvalidVerificationState),
             };
         }
 
@@ -78,14 +82,14 @@ public static class ProfessionalVerificationEndpoints
     }
 
     private static async Task<Results<Ok<IReadOnlyList<ProfessionalVerificationQueueEntry>>, JsonHttpResult<LimmiarProblemDetails>>> HandleListQueueAsync(
-        [FromHeader(Name = "X-Staff-Api-Key")] string? staffApiKey, IStaffAccessGuard staffAccessGuard, AccountService accountService, CancellationToken cancellationToken)
+        [FromHeader(Name = "X-Staff-Api-Key")] string? staffApiKey, IStaffAccessGuard staffAccessGuard, IAccountStore store, CancellationToken cancellationToken)
     {
         if (!staffAccessGuard.IsAuthorized(staffApiKey))
         {
             return StaffUnauthorizedProblem();
         }
 
-        var queue = await accountService.ListPendingProfessionalVerificationsAsync(cancellationToken);
+        var queue = await store.ListPendingDocumentReviewAsync(cancellationToken);
         IReadOnlyList<ProfessionalVerificationQueueEntry> entries = queue
             .Select(account => new ProfessionalVerificationQueueEntry(account.Id, account.Email, account.VerificationSubmittedAt!.Value))
             .ToList();
@@ -97,7 +101,7 @@ public static class ProfessionalVerificationEndpoints
         ProfessionalVerificationDecisionRequest request,
         [FromHeader(Name = "X-Staff-Api-Key")] string? staffApiKey,
         IStaffAccessGuard staffAccessGuard,
-        AccountService accountService,
+        ISender sender,
         CancellationToken cancellationToken)
     {
         if (!staffAccessGuard.IsAuthorized(staffApiKey))
@@ -110,16 +114,15 @@ public static class ProfessionalVerificationEndpoints
             return ValidationProblem("rejectionReason");
         }
 
-        var result = await accountService.DecideProfessionalVerificationAsync(
-            accountId, request.Approved, request.RejectionReason, cancellationToken);
+        var result = await sender.Send(new DecideProfessionalVerificationCommand(accountId, request.Approved, request.RejectionReason), cancellationToken);
 
         if (!result.Succeeded)
         {
             return result.FailureReason switch
             {
                 ProfessionalVerificationDecisionFailureReason.AccountNotFound =>
-                    ProblemJson(StatusCodes.Status404NotFound, "Account not found", ProblemCodes.AuthAccountNotFound),
-                _ => ProblemJson(StatusCodes.Status409Conflict, "Account is not awaiting review", ProblemCodes.AuthNotInReview),
+                    ProblemJson(StatusCodes.Status404NotFound, "Account not found", AccountsProblemCodes.AuthAccountNotFound),
+                _ => ProblemJson(StatusCodes.Status409Conflict, "Account is not awaiting review", AccountsProblemCodes.AuthNotInReview),
             };
         }
 
@@ -154,49 +157,9 @@ public static class ProfessionalVerificationEndpoints
         return true;
     }
 
-    private static JsonHttpResult<LimmiarProblemDetails> ValidationProblem(string field) =>
-        ProblemJson(
-            StatusCodes.Status400BadRequest,
-            "Invalid request",
-            ProblemCodes.ValidationInvalidField,
-            new Dictionary<string, string> { ["field"] = field });
-
     private static JsonHttpResult<LimmiarProblemDetails> StaffUnauthorizedProblem() =>
-        ProblemJson(StatusCodes.Status401Unauthorized, "Missing or invalid staff API key", ProblemCodes.StaffUnauthorized);
+        ProblemJson(StatusCodes.Status401Unauthorized, "Missing or invalid staff API key", AccountsProblemCodes.StaffUnauthorized);
 
-    private const string BearerPrefix = "Bearer ";
-
-    private static bool IsAuthorizedForAccount(string? authorizationHeader, Guid accountId, ISessionTokenIssuer sessionTokenIssuer)
-    {
-        if (authorizationHeader is null || !authorizationHeader.StartsWith(BearerPrefix, StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        var accessToken = authorizationHeader[BearerPrefix.Length..];
-        return sessionTokenIssuer.ValidateAccess(accessToken) == accountId;
-    }
-
-    private static JsonHttpResult<LimmiarProblemDetails> AccessTokenUnauthorizedProblem() =>
-        ProblemJson(StatusCodes.Status401Unauthorized, "Missing or invalid access token", ProblemCodes.AuthAccessTokenInvalid);
-
-    private static JsonHttpResult<LimmiarProblemDetails> ProblemJson(
-        int status, string title, string code, Dictionary<string, string>? paramsDict = null)
-    {
-        var problem = new LimmiarProblemDetails
-        {
-            Status = status,
-            Title = title,
-            Code = code,
-            Params = paramsDict ?? new Dictionary<string, string>(),
-        };
-
-        return TypedResults.Json(
-            problem,
-            ApiJsonSerializerContext.Default.LimmiarProblemDetails,
-            contentType: "application/problem+json",
-            statusCode: status);
-    }
 }
 
 public sealed record ProfessionalVerificationQueueEntry(Guid AccountId, string Email, DateTimeOffset SubmittedAt);

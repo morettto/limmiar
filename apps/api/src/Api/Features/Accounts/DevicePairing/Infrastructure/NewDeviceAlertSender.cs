@@ -1,7 +1,7 @@
 namespace Api.Accounts;
 
 // Placeholder: real transactional e-mail delivery is not wired up yet.
-// AccountService.NotifyNewDeviceLinkedAsync swallows whatever this throws.
+// NewDeviceAlertNotifier.NotifyNewDeviceLinkedAsync swallows whatever this throws.
 public sealed class NewDeviceAlertSender : INewDeviceAlertSender
 {
     public Task SendAsync(string email, CancellationToken cancellationToken) =>

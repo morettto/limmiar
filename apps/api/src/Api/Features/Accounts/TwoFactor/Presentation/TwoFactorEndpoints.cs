@@ -1,11 +1,13 @@
-using Api.Accounts;
 using Api.Problems;
 using Api.Serialization;
+using Mediator;
 using Microsoft.AspNetCore.Http.HttpResults;
+using static Api.Accounts.AccountsProblemResults;
+using static Api.Problems.ProblemResults;
 
-namespace Api.Endpoints;
+namespace Api.Accounts;
 
-// No reset/disable-2FA endpoint by design (ADR-S02-04) -- lost-authenticator recovery is the single-use backup code only. Every handler validates the ITwoFactorTicketIssuer ticket against accountId before calling AccountService.
+// No reset/disable-2FA endpoint by design (ADR-S02-04) -- lost-authenticator recovery is the single-use backup code only. Every handler validates the ITwoFactorTicketIssuer ticket against accountId before dispatching.
 public static class TwoFactorEndpoints
 {
     public static void MapTwoFactorEndpoints(this WebApplication app)
@@ -41,23 +43,23 @@ public static class TwoFactorEndpoints
     }
 
     private static async Task<Results<Ok<BeginTotpEnrollmentResponse>, JsonHttpResult<LimmiarProblemDetails>>> HandleBeginAsync(
-        Guid accountId, BeginTotpEnrollmentRequest request, AccountService accountService, ITwoFactorTicketIssuer ticketIssuer, CancellationToken cancellationToken)
+        Guid accountId, BeginTotpEnrollmentRequest request, ISender sender, ITwoFactorTicketIssuer ticketIssuer, CancellationToken cancellationToken)
     {
         if (!ticketIssuer.Validate(request.Ticket, accountId))
         {
             return TicketInvalidProblem();
         }
 
-        var result = await accountService.BeginTotpEnrollmentAsync(accountId, cancellationToken);
+        var result = await sender.Send(new BeginTotpEnrollmentCommand(accountId), cancellationToken);
         if (!result.Succeeded)
         {
             return result.FailureReason switch
             {
                 BeginTotpEnrollmentFailureReason.AccountNotFound =>
-                    ProblemJson(StatusCodes.Status404NotFound, "Account not found", ProblemCodes.AuthAccountNotFound),
+                    ProblemJson(StatusCodes.Status404NotFound, "Account not found", AccountsProblemCodes.AuthAccountNotFound),
                 BeginTotpEnrollmentFailureReason.NotAProfessionalAccount =>
-                    ProblemJson(StatusCodes.Status409Conflict, "Account is not a professional account", ProblemCodes.AuthNotAProfessionalAccount),
-                _ => ProblemJson(StatusCodes.Status409Conflict, "TOTP is already enabled for this account", ProblemCodes.AuthTotpAlreadyEnabled),
+                    ProblemJson(StatusCodes.Status409Conflict, "Account is not a professional account", AccountsProblemCodes.AuthNotAProfessionalAccount),
+                _ => ProblemJson(StatusCodes.Status409Conflict, "TOTP is already enabled for this account", AccountsProblemCodes.AuthTotpAlreadyEnabled),
             };
         }
 
@@ -65,7 +67,7 @@ public static class TwoFactorEndpoints
     }
 
     private static async Task<Results<Ok<ConfirmTotpEnrollmentResponse>, JsonHttpResult<LimmiarProblemDetails>>> HandleConfirmAsync(
-        Guid accountId, ConfirmTotpEnrollmentRequest request, AccountService accountService, ITwoFactorTicketIssuer ticketIssuer, CancellationToken cancellationToken)
+        Guid accountId, ConfirmTotpEnrollmentRequest request, ISender sender, ITwoFactorTicketIssuer ticketIssuer, CancellationToken cancellationToken)
     {
         if (!ticketIssuer.Validate(request.Ticket, accountId))
         {
@@ -77,16 +79,16 @@ public static class TwoFactorEndpoints
             return ValidationProblem("code");
         }
 
-        var result = await accountService.ConfirmTotpEnrollmentAsync(accountId, request.Code, cancellationToken);
+        var result = await sender.Send(new ConfirmTotpEnrollmentCommand(accountId, request.Code), cancellationToken);
         if (!result.Succeeded)
         {
             return result.FailureReason switch
             {
                 ConfirmTotpEnrollmentFailureReason.AccountNotFound =>
-                    ProblemJson(StatusCodes.Status404NotFound, "Account not found", ProblemCodes.AuthAccountNotFound),
+                    ProblemJson(StatusCodes.Status404NotFound, "Account not found", AccountsProblemCodes.AuthAccountNotFound),
                 ConfirmTotpEnrollmentFailureReason.NotPending =>
-                    ProblemJson(StatusCodes.Status409Conflict, "No pending TOTP enrollment for this account", ProblemCodes.AuthTotpNotPending),
-                _ => ProblemJson(StatusCodes.Status409Conflict, "Invalid TOTP code", ProblemCodes.AuthTotpInvalidCode),
+                    ProblemJson(StatusCodes.Status409Conflict, "No pending TOTP enrollment for this account", AccountsProblemCodes.AuthTotpNotPending),
+                _ => ProblemJson(StatusCodes.Status409Conflict, "Invalid TOTP code", AccountsProblemCodes.AuthTotpInvalidCode),
             };
         }
 
@@ -97,7 +99,7 @@ public static class TwoFactorEndpoints
     }
 
     private static async Task<Results<Ok<LoginResponse>, JsonHttpResult<LimmiarProblemDetails>>> HandleChallengeAsync(
-        Guid accountId, TotpChallengeRequest request, AccountService accountService, ITwoFactorTicketIssuer ticketIssuer, CancellationToken cancellationToken)
+        Guid accountId, TotpChallengeRequest request, ISender sender, ITwoFactorTicketIssuer ticketIssuer, CancellationToken cancellationToken)
     {
         if (!ticketIssuer.Validate(request.Ticket, accountId))
         {
@@ -109,16 +111,16 @@ public static class TwoFactorEndpoints
             return ValidationProblem("code");
         }
 
-        var result = await accountService.VerifyTotpChallengeAsync(accountId, request.Code, request.BackupCode, cancellationToken);
+        var result = await sender.Send(new VerifyTotpChallengeCommand(accountId, request.Code, request.BackupCode), cancellationToken);
         if (!result.Succeeded)
         {
             return result.FailureReason switch
             {
                 VerifyTotpChallengeFailureReason.AccountNotFound =>
-                    ProblemJson(StatusCodes.Status404NotFound, "Account not found", ProblemCodes.AuthAccountNotFound),
+                    ProblemJson(StatusCodes.Status404NotFound, "Account not found", AccountsProblemCodes.AuthAccountNotFound),
                 VerifyTotpChallengeFailureReason.NotEnabled =>
-                    ProblemJson(StatusCodes.Status409Conflict, "TOTP was never enabled for this account", ProblemCodes.AuthTotpNotEnabled),
-                _ => ProblemJson(StatusCodes.Status401Unauthorized, "Invalid TOTP code or backup code", ProblemCodes.AuthTotpInvalidCode),
+                    ProblemJson(StatusCodes.Status409Conflict, "TOTP was never enabled for this account", AccountsProblemCodes.AuthTotpNotEnabled),
+                _ => ProblemJson(StatusCodes.Status401Unauthorized, "Invalid TOTP code or backup code", AccountsProblemCodes.AuthTotpInvalidCode),
             };
         }
 
@@ -132,32 +134,8 @@ public static class TwoFactorEndpoints
     }
 
     private static JsonHttpResult<LimmiarProblemDetails> TicketInvalidProblem() =>
-        ProblemJson(StatusCodes.Status401Unauthorized, "Invalid or missing two-factor ticket", ProblemCodes.AuthTotpTicketInvalid);
+        ProblemJson(StatusCodes.Status401Unauthorized, "Invalid or missing two-factor ticket", AccountsProblemCodes.AuthTotpTicketInvalid);
 
-    private static JsonHttpResult<LimmiarProblemDetails> ValidationProblem(string field) =>
-        ProblemJson(
-            StatusCodes.Status400BadRequest,
-            "Invalid request",
-            ProblemCodes.ValidationInvalidField,
-            new Dictionary<string, string> { ["field"] = field });
-
-    private static JsonHttpResult<LimmiarProblemDetails> ProblemJson(
-        int status, string title, string code, Dictionary<string, string>? paramsDict = null)
-    {
-        var problem = new LimmiarProblemDetails
-        {
-            Status = status,
-            Title = title,
-            Code = code,
-            Params = paramsDict ?? new Dictionary<string, string>(),
-        };
-
-        return TypedResults.Json(
-            problem,
-            ApiJsonSerializerContext.Default.LimmiarProblemDetails,
-            contentType: "application/problem+json",
-            statusCode: status);
-    }
 }
 
 public sealed record BeginTotpEnrollmentRequest(string Ticket);

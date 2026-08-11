@@ -1,10 +1,13 @@
-using Api.Accounts;
 using Api.Problems;
 using Api.Serialization;
+using Mediator;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using static Api.Accounts.AccountsProblemResults;
+using static Api.Accounts.SessionTokenIssuerAuthorization;
+using static Api.Problems.ProblemResults;
 
-namespace Api.Endpoints;
+namespace Api.Accounts;
 
 public static class DevicePairingEndpoints
 {
@@ -49,7 +52,7 @@ public static class DevicePairingEndpoints
             .Produces<LimmiarProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json");
     }
 
-    // The one async handler of the five -- it alone awaits AccountService.NotifyNewDeviceLinkedAsync (S02-07 alert) after the handshake completes.
+    // The one async handler of the five -- it alone awaits the SubmitPairingPayload handler's new-device alert (S02-07) after the handshake completes.
     private static Results<Created<CreatePairingSessionResponse>, JsonHttpResult<LimmiarProblemDetails>> HandleCreate(
         Guid accountId,
         CreatePairingSessionRequest request,
@@ -109,8 +112,7 @@ public static class DevicePairingEndpoints
         SubmitPairingPayloadRequest request,
         [FromHeader(Name = "Authorization")] string? authorization,
         ISessionTokenIssuer sessionTokenIssuer,
-        IDevicePairingIssuer pairingIssuer,
-        AccountService accountService,
+        ISender sender,
         CancellationToken cancellationToken)
     {
         if (!IsAuthorizedForAccount(authorization, accountId, sessionTokenIssuer))
@@ -118,17 +120,15 @@ public static class DevicePairingEndpoints
             return AccessTokenUnauthorizedProblem();
         }
 
-        var result = pairingIssuer.SubmitPayload(sessionId, accountId, request.EncryptedKek);
+        var result = await sender.Send(new SubmitPairingPayloadCommand(sessionId, accountId, request.EncryptedKek), cancellationToken);
         if (!result.Succeeded)
         {
             return result.FailureReason switch
             {
                 SubmitPairingPayloadFailureReason.NotFound => SessionNotFoundProblem(),
-                _ => ProblemJson(StatusCodes.Status409Conflict, "Pairing session is not ready for a payload", ProblemCodes.DevicePairingPayloadNotReady),
+                _ => ProblemJson(StatusCodes.Status409Conflict, "Pairing session is not ready for a payload", AccountsProblemCodes.DevicePairingPayloadNotReady),
             };
         }
-
-        await accountService.NotifyNewDeviceLinkedAsync(accountId, cancellationToken);
 
         return TypedResults.NoContent();
     }
@@ -141,47 +141,15 @@ public static class DevicePairingEndpoints
         if (!result.Succeeded)
         {
             return ProblemJson(
-                StatusCodes.Status404NotFound, "No pairing payload to deliver", ProblemCodes.DevicePairingPayloadNotDelivered);
+                StatusCodes.Status404NotFound, "No pairing payload to deliver", AccountsProblemCodes.DevicePairingPayloadNotDelivered);
         }
 
         return TypedResults.Ok(new PairingSessionPayloadResponse(result.EncryptedKek!));
     }
 
-    private const string BearerPrefix = "Bearer ";
-
-    private static bool IsAuthorizedForAccount(string? authorizationHeader, Guid accountId, ISessionTokenIssuer sessionTokenIssuer)
-    {
-        if (authorizationHeader is null || !authorizationHeader.StartsWith(BearerPrefix, StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        var accessToken = authorizationHeader[BearerPrefix.Length..];
-        return sessionTokenIssuer.ValidateAccess(accessToken) == accountId;
-    }
-
     private static JsonHttpResult<LimmiarProblemDetails> SessionNotFoundProblem() =>
-        ProblemJson(StatusCodes.Status404NotFound, "Pairing session not found", ProblemCodes.DevicePairingSessionNotFound);
+        ProblemJson(StatusCodes.Status404NotFound, "Pairing session not found", AccountsProblemCodes.DevicePairingSessionNotFound);
 
-    private static JsonHttpResult<LimmiarProblemDetails> AccessTokenUnauthorizedProblem() =>
-        ProblemJson(StatusCodes.Status401Unauthorized, "Missing or invalid access token", ProblemCodes.AuthAccessTokenInvalid);
-
-    private static JsonHttpResult<LimmiarProblemDetails> ProblemJson(int status, string title, string code)
-    {
-        var problem = new LimmiarProblemDetails
-        {
-            Status = status,
-            Title = title,
-            Code = code,
-            Params = new Dictionary<string, string>(),
-        };
-
-        return TypedResults.Json(
-            problem,
-            ApiJsonSerializerContext.Default.LimmiarProblemDetails,
-            contentType: "application/problem+json",
-            statusCode: status);
-    }
 }
 
 public sealed record CreatePairingSessionRequest(byte[] PrimaryPublicKey);

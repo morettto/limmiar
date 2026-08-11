@@ -18,7 +18,7 @@ public sealed class InMemoryAccountStoreTests
     public async Task InsertAsync_ThenFindByEmailAsync_ReturnsInsertedAccount()
     {
         var store = new InMemoryAccountStore();
-        var account = new Account(Guid.NewGuid(), "someone@example.com", AccountRole.Patient, new byte[AccountService.PasswordVerifierLength], null);
+        var account = new Account(Guid.NewGuid(), "someone@example.com", AccountRole.Patient, new byte[AccountVerifierLengths.PasswordVerifierLength], null);
 
         await store.InsertAsync(account, CancellationToken.None);
         var found = await store.FindByEmailAsync("someone@example.com", CancellationToken.None);
@@ -40,7 +40,7 @@ public sealed class InMemoryAccountStoreTests
     public async Task InsertAsync_ThenFindByIdAsync_ReturnsInsertedAccount()
     {
         var store = new InMemoryAccountStore();
-        var account = new Account(Guid.NewGuid(), "by-id@example.com", AccountRole.Professional, new byte[AccountService.PasswordVerifierLength], null);
+        var account = new Account(Guid.NewGuid(), "by-id@example.com", AccountRole.Professional, new byte[AccountVerifierLengths.PasswordVerifierLength], null);
 
         await store.InsertAsync(account, CancellationToken.None);
         var found = await store.FindByIdAsync(account.Id, CancellationToken.None);
@@ -53,7 +53,7 @@ public sealed class InMemoryAccountStoreTests
     {
         var store = new InMemoryAccountStore();
         var account = new Account(
-            Guid.NewGuid(), "to-update@example.com", AccountRole.Professional, new byte[AccountService.PasswordVerifierLength], null,
+            Guid.NewGuid(), "to-update@example.com", AccountRole.Professional, new byte[AccountVerifierLengths.PasswordVerifierLength], null,
             AccountVerificationStatus.Pending);
         await store.InsertAsync(account, CancellationToken.None);
 
@@ -69,15 +69,15 @@ public sealed class InMemoryAccountStoreTests
     {
         var store = new InMemoryAccountStore();
         var newer = new Account(
-            Guid.NewGuid(), "newer@example.com", AccountRole.Professional, new byte[AccountService.PasswordVerifierLength], null,
+            Guid.NewGuid(), "newer@example.com", AccountRole.Professional, new byte[AccountVerifierLengths.PasswordVerifierLength], null,
             AccountVerificationStatus.InReview, VerificationSubmittedAt: DateTimeOffset.UtcNow);
         var older = new Account(
-            Guid.NewGuid(), "older@example.com", AccountRole.Professional, new byte[AccountService.PasswordVerifierLength], null,
+            Guid.NewGuid(), "older@example.com", AccountRole.Professional, new byte[AccountVerifierLengths.PasswordVerifierLength], null,
             AccountVerificationStatus.InReview, VerificationSubmittedAt: DateTimeOffset.UtcNow.AddDays(-1));
         var activeProfessional = new Account(
-            Guid.NewGuid(), "active@example.com", AccountRole.Professional, new byte[AccountService.PasswordVerifierLength], null,
+            Guid.NewGuid(), "active@example.com", AccountRole.Professional, new byte[AccountVerifierLengths.PasswordVerifierLength], null,
             AccountVerificationStatus.Active);
-        var patient = new Account(Guid.NewGuid(), "patient@example.com", AccountRole.Patient, new byte[AccountService.PasswordVerifierLength], null);
+        var patient = new Account(Guid.NewGuid(), "patient@example.com", AccountRole.Patient, new byte[AccountVerifierLengths.PasswordVerifierLength], null);
 
         await store.InsertAsync(newer, CancellationToken.None);
         await store.InsertAsync(older, CancellationToken.None);

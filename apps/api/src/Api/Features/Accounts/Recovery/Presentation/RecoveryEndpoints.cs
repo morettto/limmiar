@@ -1,10 +1,13 @@
-using Api.Accounts;
 using Api.Problems;
 using Api.Serialization;
+using Mediator;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using static Api.Accounts.AccountsProblemResults;
+using static Api.Accounts.SessionTokenIssuerAuthorization;
+using static Api.Problems.ProblemResults;
 
-namespace Api.Endpoints;
+namespace Api.Accounts;
 
 public static class RecoveryEndpoints
 {
@@ -30,17 +33,17 @@ public static class RecoveryEndpoints
     }
 
     private static async Task<Results<Ok<RecoverAccessResponse>, JsonHttpResult<LimmiarProblemDetails>>> HandleRecoverAsync(
-        RecoverAccessRequest request, AccountService accountService, CancellationToken cancellationToken)
+        RecoverAccessRequest request, ISender sender, CancellationToken cancellationToken)
     {
         if (!TryValidateRecoverShape(request.Email, request.RecoveryVerifier, out var validationProblem))
         {
             return validationProblem;
         }
 
-        var result = await accountService.RecoverAccessAsync(request.Email, request.RecoveryVerifier, cancellationToken);
+        var result = await sender.Send(new RecoverAccessCommand(request.Email, request.RecoveryVerifier), cancellationToken);
         if (!result.Succeeded)
         {
-            return ProblemJson(StatusCodes.Status401Unauthorized, "Invalid recovery phrase", ProblemCodes.AuthInvalidRecoveryPhrase);
+            return ProblemJson(StatusCodes.Status401Unauthorized, "Invalid recovery phrase", AccountsProblemCodes.AuthInvalidRecoveryPhrase);
         }
 
         var account = result.Account!;
@@ -54,7 +57,7 @@ public static class RecoveryEndpoints
         RegisterRecoveryVerifierRequest request,
         [FromHeader(Name = "Authorization")] string? authorization,
         ISessionTokenIssuer sessionTokenIssuer,
-        AccountService accountService,
+        ISender sender,
         CancellationToken cancellationToken)
     {
         if (!IsAuthorizedForAccount(authorization, accountId, sessionTokenIssuer))
@@ -62,19 +65,19 @@ public static class RecoveryEndpoints
             return AccessTokenUnauthorizedProblem();
         }
 
-        if (request.RecoveryVerifier is not { Length: AccountService.PasswordVerifierLength })
+        if (request.RecoveryVerifier is not { Length: AccountVerifierLengths.PasswordVerifierLength })
         {
             return ValidationProblem("recoveryVerifier");
         }
 
-        var result = await accountService.RegisterRecoveryVerifierAsync(accountId, request.RecoveryVerifier, cancellationToken);
+        var result = await sender.Send(new RegisterRecoveryVerifierCommand(accountId, request.RecoveryVerifier), cancellationToken);
         if (!result.Succeeded)
         {
             return result.FailureReason switch
             {
                 RegisterRecoveryVerifierFailureReason.AccountNotFound =>
-                    ProblemJson(StatusCodes.Status404NotFound, "Account not found", ProblemCodes.AuthAccountNotFound),
-                _ => ProblemJson(StatusCodes.Status409Conflict, "Account is not a professional account", ProblemCodes.AuthNotAProfessionalAccount),
+                    ProblemJson(StatusCodes.Status404NotFound, "Account not found", AccountsProblemCodes.AuthAccountNotFound),
+                _ => ProblemJson(StatusCodes.Status409Conflict, "Account is not a professional account", AccountsProblemCodes.AuthNotAProfessionalAccount),
             };
         }
 
@@ -90,7 +93,7 @@ public static class RecoveryEndpoints
             return false;
         }
 
-        if (recoveryVerifier is not { Length: AccountService.PasswordVerifierLength })
+        if (recoveryVerifier is not { Length: AccountVerifierLengths.PasswordVerifierLength })
         {
             problem = ValidationProblem("recoveryVerifier");
             return false;
@@ -100,46 +103,6 @@ public static class RecoveryEndpoints
         return true;
     }
 
-    private const string BearerPrefix = "Bearer ";
-
-    private static bool IsAuthorizedForAccount(string? authorizationHeader, Guid accountId, ISessionTokenIssuer sessionTokenIssuer)
-    {
-        if (authorizationHeader is null || !authorizationHeader.StartsWith(BearerPrefix, StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        var accessToken = authorizationHeader[BearerPrefix.Length..];
-        return sessionTokenIssuer.ValidateAccess(accessToken) == accountId;
-    }
-
-    private static JsonHttpResult<LimmiarProblemDetails> AccessTokenUnauthorizedProblem() =>
-        ProblemJson(StatusCodes.Status401Unauthorized, "Missing or invalid access token", ProblemCodes.AuthAccessTokenInvalid);
-
-    private static JsonHttpResult<LimmiarProblemDetails> ValidationProblem(string field) =>
-        ProblemJson(
-            StatusCodes.Status400BadRequest,
-            "Invalid request",
-            ProblemCodes.ValidationInvalidField,
-            new Dictionary<string, string> { ["field"] = field });
-
-    private static JsonHttpResult<LimmiarProblemDetails> ProblemJson(
-        int status, string title, string code, Dictionary<string, string>? paramsDict = null)
-    {
-        var problem = new LimmiarProblemDetails
-        {
-            Status = status,
-            Title = title,
-            Code = code,
-            Params = paramsDict ?? new Dictionary<string, string>(),
-        };
-
-        return TypedResults.Json(
-            problem,
-            ApiJsonSerializerContext.Default.LimmiarProblemDetails,
-            contentType: "application/problem+json",
-            statusCode: status);
-    }
 }
 
 public sealed record RecoverAccessRequest(string Email, byte[] RecoveryVerifier);
