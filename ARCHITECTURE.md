@@ -4,7 +4,7 @@ Monorepo (pnpm workspaces: `apps/*`, `packages/*`) for Limmiar: a .NET API, a Re
 
 ## apps
 
-- `apps/api` — .NET solution (`Api.sln`), the backend API. No module README yet.
+- `apps/api` — .NET solution (`Api.sln`), the backend API. See [apps/api/README.md](./apps/api/README.md).
 - `apps/app` — React + TypeScript SPA (Vite), the product's client application. See [apps/app/README.md](./apps/app/README.md).
 - `apps/site` — Astro public site (locale-routed). No module README yet.
 

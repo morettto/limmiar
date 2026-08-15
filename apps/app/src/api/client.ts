@@ -1,3 +1,5 @@
+import { decodeBase64, encodeBase64 } from '../devices/base64'
+
 export type HealthDbResult = { ok: true } | { ok: false; code: string; params: Record<string, string> }
 
 export async function getHealthDb(baseUrl: string): Promise<HealthDbResult> {
@@ -32,16 +34,6 @@ export type RegisterResult = { ok: true; account: AccountResult } | ProblemResul
 export type LoginResult = { ok: true; account: AccountResult } | ProblemResult
 export type GoogleAuthResult = { ok: true; account: AccountResult; isNewAccount: boolean } | ProblemResult
 
-// The only place that converts a passwordVerifier to base64 for the wire. Callers work in
-// raw bytes throughout.
-function passwordVerifierToBase64(passwordVerifier: Uint8Array): string {
-  let binary = ''
-  for (const byte of passwordVerifier) {
-    binary += String.fromCharCode(byte)
-  }
-  return btoa(binary)
-}
-
 async function postJson(baseUrl: string, path: string, body: unknown, accessToken?: string): Promise<Response> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (accessToken !== undefined) {
@@ -72,7 +64,7 @@ export async function register(
 ): Promise<RegisterResult> {
   const response = await postJson(baseUrl, '/auth/register', {
     email: params.email,
-    passwordVerifier: passwordVerifierToBase64(params.passwordVerifier),
+    passwordVerifier: encodeBase64(params.passwordVerifier),
     role: params.role,
   })
 
@@ -92,7 +84,7 @@ export async function login(
 ): Promise<LoginResult> {
   const response = await postJson(baseUrl, '/auth/login', {
     email: params.email,
-    passwordVerifier: passwordVerifierToBase64(params.passwordVerifier),
+    passwordVerifier: encodeBase64(params.passwordVerifier),
   })
 
   if (!response.ok) {
@@ -340,7 +332,7 @@ export async function recoverAccess(
 ): Promise<LoginResult> {
   const response = await postJson(baseUrl, '/auth/recover', {
     email: params.email,
-    recoveryVerifier: passwordVerifierToBase64(params.recoveryVerifier),
+    recoveryVerifier: encodeBase64(params.recoveryVerifier),
   })
 
   if (!response.ok) {
@@ -349,6 +341,112 @@ export async function recoverAccess(
 
   const account = (await response.json()) as AccountResult
   return { ok: true, account }
+}
+
+export type CreatePatientResult = { ok: true; patientId: string; createdAt: string } | ProblemResult
+
+// wrappedDek/ciphertext are opaque bytes end to end -- no clinical field is ever a request/response property of its own, everything clinical lives inside ciphertext.
+export async function createPatient(
+  baseUrl: string,
+  accountId: string,
+  accessToken: string,
+  params: { patientId: string; wrappedDek: Uint8Array<ArrayBuffer>; ciphertext: Uint8Array<ArrayBuffer> },
+): Promise<CreatePatientResult> {
+  const response = await postJson(
+    baseUrl,
+    `/accounts/${accountId}/patients`,
+    {
+      patientId: params.patientId,
+      wrappedDek: encodeBase64(params.wrappedDek),
+      ciphertext: encodeBase64(params.ciphertext),
+    },
+    accessToken,
+  )
+
+  if (!response.ok) {
+    return readProblem(response)
+  }
+
+  const body = (await response.json()) as { patientId: string; createdAt: string }
+  return { ok: true, patientId: body.patientId, createdAt: body.createdAt }
+}
+
+export type AppendPatientEntryResult =
+  | { ok: true; entryId: string; sequence: number; createdAt: string }
+  | ProblemResult
+
+export async function appendPatientEntry(
+  baseUrl: string,
+  accountId: string,
+  accessToken: string,
+  patientId: string,
+  params: { sequence: number; ciphertext: Uint8Array<ArrayBuffer> },
+): Promise<AppendPatientEntryResult> {
+  const response = await postJson(
+    baseUrl,
+    `/accounts/${accountId}/patients/${patientId}/entries`,
+    { sequence: params.sequence, ciphertext: encodeBase64(params.ciphertext) },
+    accessToken,
+  )
+
+  if (!response.ok) {
+    return readProblem(response)
+  }
+
+  const body = (await response.json()) as { entryId: string; sequence: number; createdAt: string }
+  return { ok: true, entryId: body.entryId, sequence: body.sequence, createdAt: body.createdAt }
+}
+
+export interface PatientRecordEntryResult {
+  entryId: string
+  sequence: number
+  ciphertext: Uint8Array<ArrayBuffer>
+  createdAt: string
+}
+
+export type GetPatientRecordResult =
+  | {
+      ok: true
+      patientId: string
+      wrappedDek: Uint8Array<ArrayBuffer>
+      createdAt: string
+      lastEntryAt: string
+      entries: PatientRecordEntryResult[]
+    }
+  | ProblemResult
+
+export async function getPatientRecord(
+  baseUrl: string,
+  accountId: string,
+  accessToken: string,
+  patientId: string,
+): Promise<GetPatientRecordResult> {
+  const response = await getJson(baseUrl, `/accounts/${accountId}/patients/${patientId}`, accessToken)
+
+  if (!response.ok) {
+    return readProblem(response)
+  }
+
+  const body = (await response.json()) as {
+    patientId: string
+    wrappedDek: string
+    createdAt: string
+    lastEntryAt: string
+    entries: { entryId: string; sequence: number; ciphertext: string; createdAt: string }[]
+  }
+  return {
+    ok: true,
+    patientId: body.patientId,
+    wrappedDek: decodeBase64(body.wrappedDek),
+    createdAt: body.createdAt,
+    lastEntryAt: body.lastEntryAt,
+    entries: body.entries.map((entry) => ({
+      entryId: entry.entryId,
+      sequence: entry.sequence,
+      ciphertext: decodeBase64(entry.ciphertext),
+      createdAt: entry.createdAt,
+    })),
+  }
 }
 
 export type RegisterRecoveryPhraseResult = { ok: true } | ProblemResult
@@ -362,7 +460,7 @@ export async function registerRecoveryPhrase(
   const response = await postJson(
     baseUrl,
     `/accounts/${accountId}/recovery-phrase`,
-    { recoveryVerifier: passwordVerifierToBase64(recoveryVerifier) },
+    { recoveryVerifier: encodeBase64(recoveryVerifier) },
     accessToken,
   )
 

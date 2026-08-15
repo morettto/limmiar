@@ -2,6 +2,7 @@ using Api.Accounts;
 using Api.Data;
 using Api.Endpoints;
 using Api.ExceptionHandling;
+using Api.Patients;
 using Api.Serialization;
 using Microsoft.AspNetCore.Cors.Infrastructure;
 
@@ -110,6 +111,11 @@ public partial class Program
         }
         builder.Services.AddSingleton<IStaffAccessGuard>(new StaffAccessGuard(staffApiKey));
 
+        builder.Services.AddSingleton<PatientRecordStore>();
+        builder.Services.AddSingleton(sp => new PatientService(
+            sp.GetRequiredService<IAccountStore>(),
+            sp.GetRequiredService<PatientRecordStore>()));
+
         var app = builder.Build();
 
         if (app.Environment.IsDevelopment())
@@ -127,6 +133,7 @@ public partial class Program
         app.MapTwoFactorEndpoints();
         app.MapDevicePairingEndpoints();
         app.MapRecoveryEndpoints();
+        app.MapPatientEndpoints();
 
         if (magicLinkTestCaptureEndpoint)
         {

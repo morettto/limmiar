@@ -54,4 +54,10 @@ public static class ProblemCodes
     public const string AuthWebAuthnCeremonyFailed = "auth.webauthn_ceremony_failed";
 
     public const string AuthInvalidRecoveryPhrase = "auth.invalid_recovery_phrase";
+
+    public const string PatientsNotFound = "patients.not_found";
+
+    public const string PatientsNotAuthorizedToCreateRecords = "patients.not_authorized_to_create_records";
+
+    public const string PatientsEntrySequenceConflict = "patients.entry_sequence_conflict";
 }

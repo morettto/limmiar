@@ -44,6 +44,12 @@ namespace Api.Serialization;
 [JsonSerializable(typeof(RecoverAccessResponse))]
 [JsonSerializable(typeof(RegisterRecoveryVerifierRequest))]
 [JsonSerializable(typeof(RegisterRecoveryVerifierResponse))]
+[JsonSerializable(typeof(CreatePatientRequest))]
+[JsonSerializable(typeof(CreatePatientResponse))]
+[JsonSerializable(typeof(AppendPatientEntryRequest))]
+[JsonSerializable(typeof(AppendPatientEntryResponse))]
+[JsonSerializable(typeof(PatientRecordResponse))]
+[JsonSerializable(typeof(PatientEntryResponse))]
 public partial class ApiJsonSerializerContext : JsonSerializerContext
 {
 }
