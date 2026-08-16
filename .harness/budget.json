@@ -1,0 +1,6 @@
+{
+  "tickets_per_turn": 3,
+  "timeout_minutes_per_ticket": 45,
+  "push": false,
+  "open_pr": false
+}

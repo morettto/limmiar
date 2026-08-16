@@ -1,0 +1,6 @@
+{
+  "turno_iniciado": "2026-08-16",
+  "tickets_planejados": ["S05-01", "S03-02", "S04-02"],
+  "tickets_concluidos": ["S05-01"],
+  "ticket_atual": null
+}
