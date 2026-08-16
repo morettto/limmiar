@@ -50,6 +50,8 @@ namespace Api.Serialization;
 [JsonSerializable(typeof(AppendPatientEntryResponse))]
 [JsonSerializable(typeof(PatientRecordResponse))]
 [JsonSerializable(typeof(PatientEntryResponse))]
+[JsonSerializable(typeof(PatientSummaryResponse))]
+[JsonSerializable(typeof(ListPatientsResponse))]
 public partial class ApiJsonSerializerContext : JsonSerializerContext
 {
 }

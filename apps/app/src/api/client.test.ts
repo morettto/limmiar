@@ -13,6 +13,7 @@ import {
   getHealthDb,
   getPairingClaimStatus,
   getPatientRecord,
+  listPatients,
   login,
   recoverAccess,
   register,
@@ -1202,5 +1203,58 @@ describe('getPatientRecord', () => {
     const result = await getPatientRecord('http://api.test', ACCOUNT_ID, ACCESS_TOKEN, PATIENT_ID)
 
     expect(result).toEqual({ ok: false, code: 'patients.not_found', params: {} })
+  })
+})
+
+describe('listPatients', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('GETs the wallet with a bearer token and base64-decodes wrappedDek + ciphertext per patient', async () => {
+    const otherPatientId = '77777777-7777-7777-7777-777777777777'
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          patients: [
+            { patientId: PATIENT_ID, wrappedDek: WRAPPED_DEK_BASE64, ciphertext: CIPHERTEXT_BASE64, createdAt: '2026-08-14T10:00:00Z' },
+            { patientId: otherPatientId, wrappedDek: WRAPPED_DEK_BASE64, ciphertext: CIPHERTEXT_BASE64, createdAt: '2026-08-15T10:00:00Z' },
+          ],
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await listPatients('http://api.test', ACCOUNT_ID, ACCESS_TOKEN)
+
+    expect(result).toEqual({
+      ok: true,
+      patients: [
+        { patientId: PATIENT_ID, wrappedDek: WRAPPED_DEK, ciphertext: CIPHERTEXT, createdAt: '2026-08-14T10:00:00Z' },
+        { patientId: otherPatientId, wrappedDek: WRAPPED_DEK, ciphertext: CIPHERTEXT, createdAt: '2026-08-15T10:00:00Z' },
+      ],
+    })
+    expect(fetchMock).toHaveBeenCalledWith(`http://api.test/accounts/${ACCOUNT_ID}/patients`, {
+      headers: { Authorization: `Bearer ${ACCESS_TOKEN}` },
+    })
+  })
+
+  it('returns { ok: false, code, params } parsed from problem+json on a non-2xx response', async () => {
+    const problem = {
+      type: 'about:blank',
+      title: 'Forbidden',
+      status: 403,
+      code: 'auth.forbidden',
+      params: {},
+    }
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(problem), { status: 403, headers: { 'Content-Type': 'application/problem+json' } }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await listPatients('http://api.test', ACCOUNT_ID, ACCESS_TOKEN)
+
+    expect(result).toEqual({ ok: false, code: 'auth.forbidden', params: {} })
   })
 })

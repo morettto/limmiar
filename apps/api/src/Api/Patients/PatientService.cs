@@ -94,4 +94,13 @@ public sealed class PatientService(IAccountStore accounts, PatientRecordStore st
         var entries = await store.ListAsync(professionalId, patientId, cancellationToken);
         return PatientRecordProjection.Project(entries);
     }
+
+    /// <summary>
+    /// The carteira listing -- one row per patient (the creation entry). Same read-access
+    /// decision as <see cref="GetPatientAsync"/>: no AccountAuthorizationGuard check, since a
+    /// professional keeps read access to patients they already created even if their
+    /// verification status later changes.
+    /// </summary>
+    public Task<IReadOnlyList<PatientRecordEntry>> ListPatientsAsync(Guid professionalId, CancellationToken cancellationToken) =>
+        store.ListCreationEntriesAsync(professionalId, cancellationToken);
 }

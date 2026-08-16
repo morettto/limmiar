@@ -40,6 +40,13 @@ public static class PatientEndpoints
             .Produces<PatientRecordResponse>(StatusCodes.Status200OK)
             .Produces<LimmiarProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json");
+
+        app.MapGet("/accounts/{accountId:guid}/patients", HandleListPatientsAsync)
+            .WithName("ListPatients")
+            .WithSummary("List the calling professional's patients (carteira)")
+            .WithDescription("Returns one row per patient -- the sequence-1 (creation) entry only, never subsequent entries. No pagination, filter, or server-side ordering: the client sorts by risk. RLS scopes this to the calling professional's own tenant. Requires an Authorization: Bearer access token for this exact account. Always 200, even with zero patients (empty array) -- there is no 404 for the account itself, the token already ties accountId to a real account. Same read-access decision as GetPatient: does NOT require AccountAuthorizationGuard.CanCreatePatientRecords.")
+            .Produces<ListPatientsResponse>(StatusCodes.Status200OK)
+            .Produces<LimmiarProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json");
     }
 
     private static async Task<Results<Created<CreatePatientResponse>, JsonHttpResult<LimmiarProblemDetails>>> HandleCreatePatientAsync(
@@ -135,6 +142,28 @@ public static class PatientEndpoints
             record.CreatedAt,
             record.LastEntryAt,
             record.Entries.Select(e => new PatientEntryResponse(e.Id, e.Sequence, e.Ciphertext, e.CreatedAt)).ToList()));
+    }
+
+    private static async Task<Results<Ok<ListPatientsResponse>, JsonHttpResult<LimmiarProblemDetails>>> HandleListPatientsAsync(
+        Guid accountId,
+        [FromHeader(Name = "Authorization")] string? authorization,
+        ISessionTokenIssuer sessionTokenIssuer,
+        PatientService patientService,
+        CancellationToken cancellationToken)
+    {
+        if (!IsAuthorizedForAccount(authorization, accountId, sessionTokenIssuer))
+        {
+            return AccessTokenUnauthorizedProblem();
+        }
+
+        var entries = await patientService.ListPatientsAsync(accountId, cancellationToken);
+
+        // WrappedDek is null-forgiven, not null-checked: entries here only ever come from
+        // ListCreationEntriesAsync's `WHERE sequence = 1`, and migration 0002's
+        // wrapped_dek_only_on_sequence_1 CHECK constraint makes a sequence-1 row with a null
+        // wrapped_dek impossible to persist in the first place -- see PatientRecordEntry's docs.
+        return TypedResults.Ok(new ListPatientsResponse(
+            entries.Select(e => new PatientSummaryResponse(e.PatientId, e.WrappedDek!, e.Ciphertext, e.CreatedAt)).ToList()));
     }
 
     // AES-256-GCM wire format is iv(12) || ciphertext || tag(16) -- 28 bytes is the floor even
@@ -285,3 +314,7 @@ public sealed record PatientRecordResponse(
     DateTimeOffset CreatedAt,
     DateTimeOffset LastEntryAt,
     IReadOnlyList<PatientEntryResponse> Entries);
+
+public sealed record PatientSummaryResponse(Guid PatientId, byte[] WrappedDek, byte[] Ciphertext, DateTimeOffset CreatedAt);
+
+public sealed record ListPatientsResponse(IReadOnlyList<PatientSummaryResponse> Patients);

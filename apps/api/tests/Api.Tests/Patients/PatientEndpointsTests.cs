@@ -242,6 +242,85 @@ public sealed class PatientEndpointsTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    /// <summary>Same auth guard as every other patients route -- missing bearer token is rejected before ever reaching PatientService.</summary>
+    [Fact]
+    public async Task ListPatients_WithoutBearerToken_Returns401WithProblemDetails()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+
+        var response = await client.GetAsync($"/accounts/{Guid.NewGuid()}/patients");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    /// <summary>A valid bearer token for a different account than the one in the route must not authorize -- same wrong-owner shape as PostPatient_WithValidTokenForDifferentAccount_Returns401WithProblemDetails, so the listing doesn't even attempt to read.</summary>
+    [Fact]
+    public async Task ListPatients_WithValidTokenForDifferentAccount_Returns401WithProblemDetails()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        await RegisterActiveProfessionalAsync(client, "list-patients-wrong-owner@example.com");
+
+        using var otherClient = factory.CreateClient();
+        var otherAccountId = await RegisterProfessionalWithoutVerificationAsync(otherClient, "list-patients-wrong-owner-target@example.com");
+
+        var response = await client.GetAsync($"/accounts/{otherAccountId}/patients");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    /// <summary>A professional with no patients yet gets 200 + an empty array, never a 404 -- the token already ties accountId to a real account.</summary>
+    [Fact]
+    public async Task ListPatients_WithNoPatients_Returns200WithEmptyArray()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        var accountId = await RegisterActiveProfessionalAsync(client, "list-patients-empty@example.com");
+
+        var response = await client.GetAsync($"/accounts/{accountId}/patients");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.ListPatientsResponse);
+        Assert.NotNull(body);
+        Assert.Empty(body!.Patients);
+    }
+
+    /// <summary>Listing returns only sequence-1 (creation) entries -- a patient with appended entries beyond sequence 1 still contributes exactly one row, and that row's ciphertext is the creation entry's, never a later one.</summary>
+    [Fact]
+    public async Task ListPatients_ReturnsOnlyCreationEntries_NotSubsequentAppends()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        var accountId = await RegisterActiveProfessionalAsync(client, "list-patients-creation-only@example.com");
+
+        var patientWithAppend = Guid.NewGuid();
+        var creationCiphertext = SomeSealedBlob(0x01);
+        await client.PostAsJsonAsync(
+            $"/accounts/{accountId}/patients",
+            new CreatePatientRequest(patientWithAppend, SomeSealedBlob(0x02), creationCiphertext),
+            ApiJsonSerializerContext.Default.CreatePatientRequest);
+        await client.PostAsJsonAsync(
+            $"/accounts/{accountId}/patients/{patientWithAppend}/entries",
+            new AppendPatientEntryRequest(2, SomeSealedBlob(0x03)),
+            ApiJsonSerializerContext.Default.AppendPatientEntryRequest);
+
+        var patientWithoutAppend = Guid.NewGuid();
+        await client.PostAsJsonAsync(
+            $"/accounts/{accountId}/patients",
+            new CreatePatientRequest(patientWithoutAppend, SomeSealedBlob(0x04), SomeSealedBlob(0x05)),
+            ApiJsonSerializerContext.Default.CreatePatientRequest);
+
+        var response = await client.GetAsync($"/accounts/{accountId}/patients");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.ListPatientsResponse);
+        Assert.NotNull(body);
+        Assert.Equal(2, body!.Patients.Count);
+        var summary = Assert.Single(body.Patients, p => p.PatientId == patientWithAppend);
+        Assert.Equal(creationCiphertext, summary.Ciphertext);
+    }
+
     /// <summary>Bearer prefix present but the token itself doesn't resolve to any session (garbage value) -- ValidateAccess returns null, exercising the `Guid? == Guid` comparison's null branch. Distinct from both the missing-header case (line 138, never reaches ValidateAccess) and the wrong-owner case below (ValidateAccess succeeds but returns a mismatched id).</summary>
     [Fact]
     public async Task PostPatient_WithGarbageBearerToken_Returns401WithProblemDetails()

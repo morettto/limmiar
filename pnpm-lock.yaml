@@ -26,6 +26,9 @@ importers:
       '@limmiar/i18n':
         specifier: workspace:*
         version: link:../../packages/i18n
+      '@limmiar/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       '@lingui/core':
         specifier: ^6.6.0
         version: 6.6.0(@babel/core@7.29.7)(@babel/types@7.29.8)
@@ -103,6 +106,9 @@ importers:
         specifier: ^6.0.4
         version: 6.0.5(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.2.1)(vite@8.2.0(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)))(vite@8.2.0(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0))
       '@vitest/coverage-istanbul':
+        specifier: 4.1.10
+        version: 4.1.10(vitest@4.1.10)
+      '@vitest/web-worker':
         specifier: 4.1.10
         version: 4.1.10(vitest@4.1.10)
       eslint:
@@ -2172,6 +2178,11 @@ packages:
 
   '@vitest/utils@4.1.10':
     resolution: {integrity: sha512-fy9am/HWxbaGt/Sawrp90vt6Y6jQwf1RX77cz3uwoJwJVMli/e1IEwRPnMNJ7vKfPTwo0diXifkpPvwH9v7nGA==}
+
+  '@vitest/web-worker@4.1.10':
+    resolution: {integrity: sha512-b9LiAHvkBMh0YKSDYSdw4+L1F6cUShNdUxJaIKdvZQBgeuDT9ws1nE9k29i437j6vt9U7V94czxcbBm+JwpWvA==}
+    peerDependencies:
+      vitest: 4.1.10
 
   '@xstate/graph@2.0.0-beta.6':
     resolution: {integrity: sha512-nqwn1U92rj8e68ZuvV9cig78QUqzxvld55Xf4ca9v1cYcaJufot6WbcsNjVtE+y7C2rZ2zyMN8myU5iVKgvFHA==}
@@ -6312,6 +6323,11 @@ snapshots:
       '@vitest/pretty-format': 4.1.10
       convert-source-map: 2.0.0
       tinyrainbow: 3.1.1
+
+  '@vitest/web-worker@4.1.10(vitest@4.1.10)':
+    dependencies:
+      obug: 2.1.4
+      vitest: 4.1.10(@types/node@24.13.3)(@vitest/coverage-istanbul@4.1.10)(jsdom@30.0.1(@noble/hashes@2.2.0))(vite@8.2.0(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0))
 
   '@xstate/graph@2.0.0-beta.6(xstate@5.32.5)':
     dependencies:

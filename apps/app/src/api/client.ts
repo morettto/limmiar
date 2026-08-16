@@ -449,6 +449,40 @@ export async function getPatientRecord(
   }
 }
 
+export interface PatientSummaryResult {
+  patientId: string
+  wrappedDek: Uint8Array<ArrayBuffer>
+  ciphertext: Uint8Array<ArrayBuffer>
+  createdAt: string
+}
+
+export type ListPatientsResult = { ok: true; patients: PatientSummaryResult[] } | ProblemResult
+
+export async function listPatients(
+  baseUrl: string,
+  accountId: string,
+  accessToken: string,
+): Promise<ListPatientsResult> {
+  const response = await getJson(baseUrl, `/accounts/${accountId}/patients`, accessToken)
+
+  if (!response.ok) {
+    return readProblem(response)
+  }
+
+  const body = (await response.json()) as {
+    patients: { patientId: string; wrappedDek: string; ciphertext: string; createdAt: string }[]
+  }
+  return {
+    ok: true,
+    patients: body.patients.map((patient) => ({
+      patientId: patient.patientId,
+      wrappedDek: decodeBase64(patient.wrappedDek),
+      ciphertext: decodeBase64(patient.ciphertext),
+      createdAt: patient.createdAt,
+    })),
+  }
+}
+
 export type RegisterRecoveryPhraseResult = { ok: true } | ProblemResult
 
 export async function registerRecoveryPhrase(

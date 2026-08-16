@@ -76,6 +76,20 @@ public sealed class PatientRecordEntriesRlsTests : IAsyncLifetime
         Assert.Empty(entries);
     }
 
+    /// <summary>ListCreationEntriesAsync has no WHERE tenant_id clause of its own -- this proves the RLS policy alone keeps professional B's listing from seeing professional A's patients.</summary>
+    [Fact]
+    public async Task ProfessionalB_ListsCreationEntries_SeesNoRowsFromProfessionalA()
+    {
+        var store = CreateStore();
+        await store.AppendAsync(
+            new PatientRecordEntry(Guid.NewGuid(), ProfessionalA, Guid.NewGuid(), 1, [0x01], [0xAA], DateTimeOffset.UtcNow),
+            CancellationToken.None);
+
+        var entries = await store.ListCreationEntriesAsync(ProfessionalB, CancellationToken.None);
+
+        Assert.Empty(entries);
+    }
+
     [Fact]
     public async Task AsAppRole_DirectUpdate_FailsWithPermissionDenied()
     {

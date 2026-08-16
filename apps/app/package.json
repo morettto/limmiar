@@ -24,6 +24,7 @@
   "dependencies": {
     "@limmiar/crypto": "workspace:*",
     "@limmiar/i18n": "workspace:*",
+    "@limmiar/ui": "workspace:*",
     "@lingui/core": "^6.6.0",
     "@lingui/react": "^6.6.0",
     "@tanstack/react-router": "^1.170.18",
@@ -52,6 +53,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.4",
     "@vitest/coverage-istanbul": "4.1.10",
+    "@vitest/web-worker": "4.1.10",
     "eslint": "^10.8.0",
     "eslint-plugin-lingui": "^0.14.0",
     "jsdom": "^30.0.1",

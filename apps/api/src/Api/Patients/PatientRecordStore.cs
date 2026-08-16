@@ -96,6 +96,50 @@ public sealed class PatientRecordStore(NpgsqlDataSource dataSource)
     }
 
     /// <summary>
+    /// Every patient's sequence-1 (creation) entry, newest first -- the raw material for the
+    /// carteira listing. Tenant isolation comes from the same RLS policy as <see cref="ListAsync"/>
+    /// (via <see cref="NpgsqlDataSourceTenantExtensions.OpenTenantScopedTransactionAsync"/>), not
+    /// from a WHERE tenant_id clause here.
+    /// </summary>
+    /// <remarks>
+    /// Unlike <see cref="ListAsync"/>, this never needs the <c>WrappedDek</c> null check -- the
+    /// <c>WHERE sequence = 1</c> filter plus migration 0002's <c>wrapped_dek_only_on_sequence_1</c>
+    /// check constraint guarantee every row here has a non-null wrapped DEK.
+    /// </remarks>
+    public async Task<IReadOnlyList<PatientRecordEntry>> ListCreationEntriesAsync(Guid tenantId, CancellationToken cancellationToken)
+    {
+        await using var scope = await dataSource.OpenTenantScopedTransactionAsync(tenantId, cancellationToken);
+
+        await using var selectCommand = scope.Connection.CreateCommand();
+        selectCommand.Transaction = scope.Transaction;
+        selectCommand.CommandText = """
+            SELECT id, tenant_id, patient_id, sequence, wrapped_dek, ciphertext, created_at
+            FROM patient_record_entries
+            WHERE sequence = 1
+            ORDER BY created_at DESC
+            """;
+
+        var results = new List<PatientRecordEntry>();
+        await using (var reader = await selectCommand.ExecuteReaderAsync(cancellationToken))
+        {
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                results.Add(new PatientRecordEntry(
+                    reader.GetGuid(0),
+                    reader.GetGuid(1),
+                    reader.GetGuid(2),
+                    reader.GetInt32(3),
+                    (byte[])reader[4],
+                    (byte[])reader[5],
+                    reader.GetFieldValue<DateTimeOffset>(6)));
+            }
+        }
+
+        await scope.Transaction.CommitAsync(cancellationToken);
+        return results;
+    }
+
+    /// <summary>
     /// Highest existing sequence for one patient, or null if the patient has no entries
     /// (doesn't exist under this tenant). Used to check existence and to enforce strict
     /// "next sequence must be lastSequence + 1" without paying to fetch every prior
