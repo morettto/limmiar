@@ -6,7 +6,8 @@
     "S04-02"
   ],
   "tickets_concluidos": [
-    "S05-01"
+    "S05-01",
+    "S03-02"
   ],
-  "ticket_atual": "S03-02"
+  "ticket_atual": "S04-02"
 }
