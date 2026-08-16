@@ -58,6 +58,6 @@ O que fica em aberto, documentado em `packages/session/README.md` ("Decisão em 
 
 ## Estado no cérebro (vault)
 
-Ticket `S05-01`: `status: em-curso` → a atualizar para `pronto` (fica pendente de commit local + confirmação, ver nota abaixo).
+Ticket `S05-01`: `status: pronto`, `pronto: pronto`, `commit: "6cafb14"`, `rondas_review: 1`. Checkboxes dos 3 critérios de aceite marcados.
 
-Commit local criado nesta sessão, sem push, sem PR (regra do turno).
+Commit local `6cafb14` (branch `feat/S03-01-modelo-append-only-paciente`, já em curso quando a sessão começou), sem push, sem PR — regra do turno.
