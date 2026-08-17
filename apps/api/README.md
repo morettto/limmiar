@@ -32,10 +32,20 @@ tentar arrancar o container, não passam silenciosamente. Os testes puramente un
   tenant, usar `Api/Data`'s `OpenTenantScopedTransactionAsync` (ver abaixo), não reescrever o
   `SET LOCAL app.tenant_id` à mão; `PatientService`'s mapeamento de exceção de conflito de
   unicidade para resultado de falha continua a ser o padrão a seguir para esse caso.
+- `src/Api/Scheduling` -- agenda: agendar, mover e cancelar sessões (`scheduled_sessions`,
+  migração `0004_create_scheduled_sessions.sql`), RLS por tenant via a mesma
+  `OpenTenantScopedTransactionAsync` que Patients usa. Ao contrário de Patients, `starts_at`/
+  `duration_minutes` ficam em claro no servidor -- ver
+  `docs/adr/ADR-S04-02-horario-em-claro-servidor-zero-knowledge.md` e o README do módulo
+  (`src/Api/Scheduling/README.md`).
 - `src/Api/Endpoints` -- Minimal API, um ficheiro por área (`AuthEndpoints`,
-  `DevicePairingEndpoints`, `PatientEndpoints`, etc.), cada um com o seu próprio par de
-  helpers `IsAuthorizedForAccount`/`ProblemJson` (duplicado deliberadamente entre ficheiros,
-  ver comentário em `PatientEndpoints.cs` -- não há abstração partilhada ainda).
+  `DevicePairingEndpoints`, `PatientEndpoints`, `ProfessionalVerificationEndpoints`,
+  `RecoveryEndpoints`, `SchedulingEndpoints`, `TwoFactorEndpoints`). Todos os seis ficheiros
+  de endpoints partilham a única cópia de `IsAuthorizedForAccount`, `ProblemJson`,
+  `ValidationProblem` e `AccessTokenUnauthorizedProblem` em `EndpointHelpers.cs` (`internal
+  static class`, só usado dentro deste assembly) -- não há cópia local de nenhum destes em
+  nenhum ficheiro de endpoints; cada ficheiro só mantém o helper que de facto é só seu (ex.
+  `TwoFactorEndpoints.TicketInvalidProblem`, `ProfessionalVerificationEndpoints.StaffUnauthorizedProblem`).
 - `src/Api/Problems` -- `LimmiarProblemDetails` (RFC 7807 + `code` + `params` estruturado,
   nunca a mensagem de exceção crua) e o catálogo central `ProblemCodes`.
 - `src/Api/Data` -- `MigrationRunner` (executor de `*.sql` sem framework, AOT-safe),

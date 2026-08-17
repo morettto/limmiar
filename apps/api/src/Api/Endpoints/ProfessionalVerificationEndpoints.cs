@@ -1,8 +1,8 @@
 using Api.Accounts;
 using Api.Problems;
-using Api.Serialization;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using static Api.Endpoints.EndpointHelpers;
 
 namespace Api.Endpoints;
 
@@ -154,49 +154,8 @@ public static class ProfessionalVerificationEndpoints
         return true;
     }
 
-    private static JsonHttpResult<LimmiarProblemDetails> ValidationProblem(string field) =>
-        ProblemJson(
-            StatusCodes.Status400BadRequest,
-            "Invalid request",
-            ProblemCodes.ValidationInvalidField,
-            new Dictionary<string, string> { ["field"] = field });
-
     private static JsonHttpResult<LimmiarProblemDetails> StaffUnauthorizedProblem() =>
         ProblemJson(StatusCodes.Status401Unauthorized, "Missing or invalid staff API key", ProblemCodes.StaffUnauthorized);
-
-    private const string BearerPrefix = "Bearer ";
-
-    private static bool IsAuthorizedForAccount(string? authorizationHeader, Guid accountId, ISessionTokenIssuer sessionTokenIssuer)
-    {
-        if (authorizationHeader is null || !authorizationHeader.StartsWith(BearerPrefix, StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        var accessToken = authorizationHeader[BearerPrefix.Length..];
-        return sessionTokenIssuer.ValidateAccess(accessToken) == accountId;
-    }
-
-    private static JsonHttpResult<LimmiarProblemDetails> AccessTokenUnauthorizedProblem() =>
-        ProblemJson(StatusCodes.Status401Unauthorized, "Missing or invalid access token", ProblemCodes.AuthAccessTokenInvalid);
-
-    private static JsonHttpResult<LimmiarProblemDetails> ProblemJson(
-        int status, string title, string code, Dictionary<string, string>? paramsDict = null)
-    {
-        var problem = new LimmiarProblemDetails
-        {
-            Status = status,
-            Title = title,
-            Code = code,
-            Params = paramsDict ?? new Dictionary<string, string>(),
-        };
-
-        return TypedResults.Json(
-            problem,
-            ApiJsonSerializerContext.Default.LimmiarProblemDetails,
-            contentType: "application/problem+json",
-            statusCode: status);
-    }
 }
 
 public sealed record ProfessionalVerificationQueueEntry(Guid AccountId, string Email, DateTimeOffset SubmittedAt);

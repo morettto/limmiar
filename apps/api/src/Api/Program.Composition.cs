@@ -3,6 +3,7 @@ using Api.Data;
 using Api.Endpoints;
 using Api.ExceptionHandling;
 using Api.Patients;
+using Api.Scheduling;
 using Api.Serialization;
 using Microsoft.AspNetCore.Cors.Infrastructure;
 
@@ -116,6 +117,11 @@ public partial class Program
             sp.GetRequiredService<IAccountStore>(),
             sp.GetRequiredService<PatientRecordStore>()));
 
+        builder.Services.AddSingleton<ScheduledSessionStore>();
+        builder.Services.AddSingleton(sp => new SchedulingService(
+            sp.GetRequiredService<IAccountStore>(),
+            sp.GetRequiredService<ScheduledSessionStore>()));
+
         var app = builder.Build();
 
         if (app.Environment.IsDevelopment())
@@ -134,6 +140,7 @@ public partial class Program
         app.MapDevicePairingEndpoints();
         app.MapRecoveryEndpoints();
         app.MapPatientEndpoints();
+        app.MapSchedulingEndpoints();
 
         if (magicLinkTestCaptureEndpoint)
         {

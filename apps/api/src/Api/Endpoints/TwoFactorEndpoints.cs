@@ -1,7 +1,7 @@
 using Api.Accounts;
 using Api.Problems;
-using Api.Serialization;
 using Microsoft.AspNetCore.Http.HttpResults;
+using static Api.Endpoints.EndpointHelpers;
 
 namespace Api.Endpoints;
 
@@ -133,31 +133,6 @@ public static class TwoFactorEndpoints
 
     private static JsonHttpResult<LimmiarProblemDetails> TicketInvalidProblem() =>
         ProblemJson(StatusCodes.Status401Unauthorized, "Invalid or missing two-factor ticket", ProblemCodes.AuthTotpTicketInvalid);
-
-    private static JsonHttpResult<LimmiarProblemDetails> ValidationProblem(string field) =>
-        ProblemJson(
-            StatusCodes.Status400BadRequest,
-            "Invalid request",
-            ProblemCodes.ValidationInvalidField,
-            new Dictionary<string, string> { ["field"] = field });
-
-    private static JsonHttpResult<LimmiarProblemDetails> ProblemJson(
-        int status, string title, string code, Dictionary<string, string>? paramsDict = null)
-    {
-        var problem = new LimmiarProblemDetails
-        {
-            Status = status,
-            Title = title,
-            Code = code,
-            Params = paramsDict ?? new Dictionary<string, string>(),
-        };
-
-        return TypedResults.Json(
-            problem,
-            ApiJsonSerializerContext.Default.LimmiarProblemDetails,
-            contentType: "application/problem+json",
-            statusCode: status);
-    }
 }
 
 public sealed record BeginTotpEnrollmentRequest(string Ticket);

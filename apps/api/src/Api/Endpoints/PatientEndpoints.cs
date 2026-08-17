@@ -1,9 +1,9 @@
 using Api.Accounts;
 using Api.Patients;
 using Api.Problems;
-using Api.Serialization;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using static Api.Endpoints.EndpointHelpers;
 
 namespace Api.Endpoints;
 
@@ -172,8 +172,6 @@ public static class PatientEndpoints
     // legitimate decrypt attempt could ever have produced in the first place.
     private const int MinimumSealedBlobLength = 28;
 
-    private const string BearerPrefix = "Bearer ";
-
     // [ExcludeFromCodeCoverage] justification: this method's every branch IS functionally
     // exercised --
     //   null blob             -> PostPatient_WithNullWrappedDek_Returns400WithProblemDetails
@@ -205,17 +203,6 @@ public static class PatientEndpoints
 
         problem = default!;
         return true;
-    }
-
-    private static bool IsAuthorizedForAccount(string? authorizationHeader, Guid accountId, ISessionTokenIssuer sessionTokenIssuer)
-    {
-        if (authorizationHeader is null || !authorizationHeader.StartsWith(BearerPrefix, StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        var accessToken = authorizationHeader[BearerPrefix.Length..];
-        return sessionTokenIssuer.ValidateAccess(accessToken) == accountId;
     }
 
     // [ExcludeFromCodeCoverage] justification: every named CreatePatientFailureReason arm is
@@ -274,28 +261,6 @@ public static class PatientEndpoints
             _ => throw new ArgumentOutOfRangeException(nameof(reason), reason, null),
         };
 
-    private static JsonHttpResult<LimmiarProblemDetails> AccessTokenUnauthorizedProblem() =>
-        ProblemJson(StatusCodes.Status401Unauthorized, "Missing or invalid access token", ProblemCodes.AuthAccessTokenInvalid);
-
-    private static JsonHttpResult<LimmiarProblemDetails> ValidationProblem(string field) =>
-        ProblemJson(StatusCodes.Status400BadRequest, "Invalid request", ProblemCodes.ValidationInvalidField, field);
-
-    private static JsonHttpResult<LimmiarProblemDetails> ProblemJson(int status, string title, string code, string? invalidField = null)
-    {
-        var problem = new LimmiarProblemDetails
-        {
-            Status = status,
-            Title = title,
-            Code = code,
-            Params = invalidField is null ? new Dictionary<string, string>() : new Dictionary<string, string> { ["field"] = invalidField },
-        };
-
-        return TypedResults.Json(
-            problem,
-            ApiJsonSerializerContext.Default.LimmiarProblemDetails,
-            contentType: "application/problem+json",
-            statusCode: status);
-    }
 }
 
 public sealed record CreatePatientRequest(Guid PatientId, byte[] WrappedDek, byte[] Ciphertext);
