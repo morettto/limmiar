@@ -7,6 +7,7 @@ export type Falha =
   | { tipo: 'gpu-perdida' }
   | { tipo: 'disco-cheio'; bytesLivres: number }
   | { tipo: 'recuperacao-falhou'; motivo: string }
+  | { tipo: 'passe-canonico-falhou'; motivo: string }
 
 export interface SessaoContexto {
   chunksPersistidos: number
@@ -33,6 +34,8 @@ export type SessaoEvento =
   | { type: 'RECUPERACAO_CONCLUIDA'; chunksRecuperados: number }
   | { type: 'RECUPERACAO_FALHOU'; motivo: string }
   | { type: 'FILA_DRENADA' }
+  | { type: 'PASSE_CANONICO_CONCLUIDO' }
+  | { type: 'PASSE_CANONICO_FALHOU'; motivo: string }
 
 export interface CriarMaquinaSessaoOpcoes {
   chunksOrfaos?: number

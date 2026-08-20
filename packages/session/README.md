@@ -12,12 +12,13 @@ Statechart da sessão de atendimento (consentimento → aquecimento de modelo �
 4. `pausado.RETOMAR` volta a `gravando.historico` (estado history raso), não a `gravando.online` fixo — preserva se a sessão estava online ou offline antes da pausa.
 5. `recuperando` (entrada só quando `chunksOrfaos > 0`) resolve em `RECUPERACAO_CONCLUIDA` (para `ativa.pausado`, regista `chunksPersistidos`) ou `RECUPERACAO_FALHOU` (para `interrompido`).
 6. `interrompido` é o destino comum das quatro falhas (três de `ativa` mais `RECUPERACAO_FALHOU`); `TENTAR_NOVAMENTE` limpa `ultimaFalha` e volta a `ativa.aquecendoModelo`.
-7. `encerrando` aguarda `FILA_DRENADA` para chegar a `encerrado`, estado final que absorve qualquer evento seguinte.
+7. `encerrando` é composto: `drenandoFila` aguarda `FILA_DRENADA` e passa a `passeCanonico`, que aguarda o passe canónico (merge de diarização + timestamps, corre fora da máquina) via `PASSE_CANONICO_CONCLUIDO` ou `PASSE_CANONICO_FALHOU` (regista `ultimaFalha: { tipo: 'passe-canonico-falhou', motivo }`) — ambos os ramos chegam a `encerrado`, estado final que absorve qualquer evento seguinte. Falha do passe não volta a `interrompido`: a gravação já está em disco e `TENTAR_NOVAMENTE` reabriria `ativa.aquecendoModelo` (e o microfone) à toa — decisão do ticket S06-02.
 
 ## Pontos de entrada
 
 - `criarMaquinaSessao(opcoes?: CriarMaquinaSessaoOpcoes)` — constrói a máquina XState v5 (`setup` + `createMachine`), pronta para `createActor(...).start()`. `opcoes.consentimentoEm`, se passado, semeia o contexto inicial (ver "Decisão em aberto").
 - Tipos: `SessaoContexto`, `SessaoEvento`, `Falha`, `Marco`, `CriarMaquinaSessaoOpcoes` (`src/types.ts`, zero import de `xstate` — regra aplicada por `pnpm lint:arch`, que casa contra o caminho resolvido em `node_modules/`, não contra o especificador bare).
+- `state.matches('encerrando')` continua a valer nos dois sub-estados (`drenandoFila`, `passeCanonico`) — usar `matches`, não igualdade direta com `snapshot.value`, para código que só precisa saber que a sessão está a encerrar sem se importar em que sub-estado.
 
 ## Decisões recentes relevantes
 

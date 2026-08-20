@@ -55,6 +55,8 @@ namespace Api.Serialization;
 [JsonSerializable(typeof(ScheduleSessionRequest))]
 [JsonSerializable(typeof(MoveSessionRequest))]
 [JsonSerializable(typeof(ScheduledSessionResponse))]
+[JsonSerializable(typeof(VoiceEnrollmentRequest))]
+[JsonSerializable(typeof(VoiceEnrollmentResponse))]
 public partial class ApiJsonSerializerContext : JsonSerializerContext
 {
 }

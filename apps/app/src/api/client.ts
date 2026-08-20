@@ -28,7 +28,7 @@ export interface AccountResult {
   twoFactorTicket: string | null
 }
 
-type ProblemResult = { ok: false; code: string; params: Record<string, string> }
+export type ProblemResult = { ok: false; code: string; params: Record<string, string> }
 
 export type RegisterResult = { ok: true; account: AccountResult } | ProblemResult
 export type LoginResult = { ok: true; account: AccountResult } | ProblemResult
@@ -46,14 +46,26 @@ async function postJson(baseUrl: string, path: string, body: unknown, accessToke
   })
 }
 
-async function getJson(baseUrl: string, path: string, accessToken?: string): Promise<Response> {
+export async function putJson(baseUrl: string, path: string, body: unknown, accessToken: string): Promise<Response> {
+  return fetch(`${baseUrl}${path}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify(body),
+  })
+}
+
+export async function getJson(baseUrl: string, path: string, accessToken?: string): Promise<Response> {
   if (accessToken === undefined) {
     return fetch(`${baseUrl}${path}`)
   }
   return fetch(`${baseUrl}${path}`, { headers: { Authorization: `Bearer ${accessToken}` } })
 }
 
-async function readProblem(response: Response): Promise<ProblemResult> {
+export async function deleteRequest(baseUrl: string, path: string, accessToken: string): Promise<Response> {
+  return fetch(`${baseUrl}${path}`, { method: 'DELETE', headers: { Authorization: `Bearer ${accessToken}` } })
+}
+
+export async function readProblem(response: Response): Promise<ProblemResult> {
   const problem = (await response.json()) as { code: string; params: Record<string, string> }
   return { ok: false, code: problem.code, params: problem.params }
 }

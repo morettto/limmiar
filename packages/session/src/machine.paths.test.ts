@@ -25,6 +25,8 @@ const exemplos: { [K in SessaoEvento['type']]: Extract<SessaoEvento, { type: K }
   RECUPERACAO_CONCLUIDA: { type: 'RECUPERACAO_CONCLUIDA', chunksRecuperados: 7 },
   RECUPERACAO_FALHOU: { type: 'RECUPERACAO_FALHOU', motivo: 'chunk-corrompido' },
   FILA_DRENADA: { type: 'FILA_DRENADA' },
+  PASSE_CANONICO_CONCLUIDO: { type: 'PASSE_CANONICO_CONCLUIDO' },
+  PASSE_CANONICO_FALHOU: { type: 'PASSE_CANONICO_FALHOU', motivo: 'transcricao-invalida' },
 }
 const eventosDeExemplo: SessaoEvento[] = Object.values(exemplos)
 
@@ -76,7 +78,8 @@ describe('cobertura de estados exigida pelo critério de aceite', () => {
     expect(estadosAlcancados).toContain(JSON.stringify({ ativa: { gravando: 'online' } }))
     expect(estadosAlcancados).toContain(JSON.stringify({ ativa: { gravando: 'offline' } }))
     expect(estadosAlcancados).toContain(JSON.stringify({ ativa: 'pausado' }))
-    expect(estadosAlcancados).toContain(JSON.stringify('encerrando'))
+    expect(estadosAlcancados).toContain(JSON.stringify({ encerrando: 'drenandoFila' }))
+    expect(estadosAlcancados).toContain(JSON.stringify({ encerrando: 'passeCanonico' }))
     expect(estadosAlcancados).toContain(JSON.stringify('encerrado'))
   })
 })

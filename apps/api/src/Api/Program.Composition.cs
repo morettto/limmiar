@@ -117,6 +117,8 @@ public partial class Program
             sp.GetRequiredService<IAccountStore>(),
             sp.GetRequiredService<PatientRecordStore>()));
 
+        builder.Services.AddSingleton(sp => new VoiceEnrollmentService(sp.GetRequiredService<IAccountStore>()));
+
         builder.Services.AddSingleton<ScheduledSessionStore>();
         builder.Services.AddSingleton(sp => new SchedulingService(
             sp.GetRequiredService<IAccountStore>(),
@@ -141,6 +143,7 @@ public partial class Program
         app.MapRecoveryEndpoints();
         app.MapPatientEndpoints();
         app.MapSchedulingEndpoints();
+        app.MapVoiceEnrollmentEndpoints();
 
         if (magicLinkTestCaptureEndpoint)
         {

@@ -114,7 +114,7 @@ describe('ativa.gravando.online', () => {
   it('22. ENCERRAR leva a encerrando', () => {
     const actor = criarGravandoOnline()
     actor.send({ type: 'ENCERRAR' })
-    expect(actor.getSnapshot().value).toBe('encerrando')
+    expect(actor.getSnapshot().matches('encerrando')).toBe(true)
   })
 })
 
@@ -174,7 +174,7 @@ describe('interrompido', () => {
   it('17. ENCERRAR leva a encerrando', () => {
     const actor = criarInterrompido()
     actor.send({ type: 'ENCERRAR' })
-    expect(actor.getSnapshot().value).toBe('encerrando')
+    expect(actor.getSnapshot().matches('encerrando')).toBe(true)
   })
 })
 
@@ -198,18 +198,43 @@ describe('recuperando', () => {
   it('21. ENCERRAR leva a encerrando', () => {
     const actor = iniciar({ chunksOrfaos: 7 })
     actor.send({ type: 'ENCERRAR' })
-    expect(actor.getSnapshot().value).toBe('encerrando')
+    expect(actor.getSnapshot().matches('encerrando')).toBe(true)
   })
 })
 
 describe('encerrando', () => {
-  it('23. FILA_DRENADA leva a encerrado (estado final)', () => {
+  function criarEncerrandoDrenandoFila() {
     const actor = criarGravandoOnline()
     actor.send({ type: 'ENCERRAR' })
+    return actor
+  }
+
+  it('23. FILA_DRENADA leva a encerrando.passeCanonico, ainda não a encerrado', () => {
+    const actor = criarEncerrandoDrenandoFila()
     actor.send({ type: 'FILA_DRENADA' })
+    const snapshot = actor.getSnapshot()
+    expect(snapshot.value).toEqual({ encerrando: 'passeCanonico' })
+    expect(snapshot.matches('encerrando')).toBe(true)
+    expect(snapshot.status).toBe('active')
+  })
+
+  it('25. PASSE_CANONICO_CONCLUIDO leva a encerrado (estado final)', () => {
+    const actor = criarEncerrandoDrenandoFila()
+    actor.send({ type: 'FILA_DRENADA' })
+    actor.send({ type: 'PASSE_CANONICO_CONCLUIDO' })
     const snapshot = actor.getSnapshot()
     expect(snapshot.value).toBe('encerrado')
     expect(snapshot.status).toBe('done')
+  })
+
+  it('26. PASSE_CANONICO_FALHOU leva a encerrado com a falha registada', () => {
+    const actor = criarEncerrandoDrenandoFila()
+    actor.send({ type: 'FILA_DRENADA' })
+    actor.send({ type: 'PASSE_CANONICO_FALHOU', motivo: 'transcricao-invalida' })
+    const snapshot = actor.getSnapshot()
+    expect(snapshot.value).toBe('encerrado')
+    expect(snapshot.status).toBe('done')
+    expect(snapshot.context.ultimaFalha).toEqual({ tipo: 'passe-canonico-falhou', motivo: 'transcricao-invalida' })
   })
 })
 
@@ -218,6 +243,7 @@ describe('encerrado', () => {
     const actor = criarGravandoOnline()
     actor.send({ type: 'ENCERRAR' })
     actor.send({ type: 'FILA_DRENADA' })
+    actor.send({ type: 'PASSE_CANONICO_CONCLUIDO' })
     actor.send({ type: 'ENCERRAR' })
     actor.send({ type: 'MODELO_PRONTO' })
     expect(actor.getSnapshot().value).toBe('encerrado')

@@ -113,7 +113,25 @@ export function criarMaquinaSessao(opcoes: CriarMaquinaSessaoOpcoes = {}) {
         },
       },
       encerrando: {
-        on: { FILA_DRENADA: 'encerrado' },
+        // A gravação já está em disco e o passe corre fora da máquina — falha aqui
+        // não reabre `ativa` (TENTAR_NOVAMENTE reabriria o microfone à toa).
+        initial: 'drenandoFila',
+        states: {
+          drenandoFila: {
+            on: { FILA_DRENADA: 'passeCanonico' },
+          },
+          passeCanonico: {
+            on: {
+              PASSE_CANONICO_CONCLUIDO: '#sessao.encerrado',
+              PASSE_CANONICO_FALHOU: {
+                target: '#sessao.encerrado',
+                actions: assign({
+                  ultimaFalha: ({ event }) => ({ tipo: 'passe-canonico-falhou' as const, motivo: event.motivo }),
+                }),
+              },
+            },
+          },
+        },
       },
       encerrado: { type: 'final' },
     },

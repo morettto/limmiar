@@ -70,4 +70,6 @@ public static class ProblemCodes
     public const string AgendaSessionCancelled = "agenda.session_cancelled";
 
     public const string AgendaRecordingActive = "agenda.recording_active";
+
+    public const string VoiceEnrollmentNotFound = "voice.enrollment_not_found";
 }

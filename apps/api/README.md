@@ -22,8 +22,11 @@ tentar arrancar o container, não passam silenciosamente. Os testes puramente un
 ## Estrutura
 
 - `src/Api/Accounts` -- contas, autenticação (senha, Google, WebAuthn, magic link, TOTP),
-  verificação profissional. Armazenamento em memória (`InMemoryAccountStore`) -- ainda não
-  persistido em Postgres.
+  verificação profissional, cadastro de voz (`VoiceEnrollmentService`: `EnrollAsync`/
+  `GetAsync`/`DeleteAsync` sobre `Account.VoiceEnrollment`, um único `VoiceEnrollment?` que
+  agrupa `WrappedDek`/`SealedEmbedding` -- o compilador, não uma invariante em prosa, é quem
+  garante que os dois campos viajam sempre juntos). Armazenamento em memória
+  (`InMemoryAccountStore`) -- ainda não persistido em Postgres.
 - `src/Api/Patients` -- prontuário do paciente: modelo append-only cifrado sobre Postgres
   (`patient_record_entries`, migração `0002_create_patient_record_entries.sql`), RLS por
   tenant, sem UPDATE/DELETE possível (nem por grant de DB, nem por rota HTTP). É a primeira
@@ -40,14 +43,25 @@ tentar arrancar o container, não passam silenciosamente. Os testes puramente un
   (`src/Api/Scheduling/README.md`).
 - `src/Api/Endpoints` -- Minimal API, um ficheiro por área (`AuthEndpoints`,
   `DevicePairingEndpoints`, `PatientEndpoints`, `ProfessionalVerificationEndpoints`,
-  `RecoveryEndpoints`, `SchedulingEndpoints`, `TwoFactorEndpoints`). Todos os seis ficheiros
-  de endpoints partilham a única cópia de `IsAuthorizedForAccount`, `ProblemJson`,
-  `ValidationProblem` e `AccessTokenUnauthorizedProblem` em `EndpointHelpers.cs` (`internal
-  static class`, só usado dentro deste assembly) -- não há cópia local de nenhum destes em
-  nenhum ficheiro de endpoints; cada ficheiro só mantém o helper que de facto é só seu (ex.
-  `TwoFactorEndpoints.TicketInvalidProblem`, `ProfessionalVerificationEndpoints.StaffUnauthorizedProblem`).
+  `RecoveryEndpoints`, `SchedulingEndpoints`, `TwoFactorEndpoints`, `VoiceEnrollmentEndpoints`).
+  Todos os oito ficheiros de endpoints partilham a única cópia de `IsAuthorizedForAccount`,
+  `ProblemJson`, `ValidationProblem` e `AccessTokenUnauthorizedProblem` em `EndpointHelpers.cs`
+  (`internal static class`, só usado dentro deste assembly) -- não há cópia local de nenhum
+  destes em nenhum ficheiro de endpoints; cada ficheiro só mantém o helper que de facto é só
+  seu (ex. `TwoFactorEndpoints.TicketInvalidProblem`,
+  `ProfessionalVerificationEndpoints.StaffUnauthorizedProblem`). `TryValidateSealedBlobShape`
+  (piso de 28 bytes para um blob AES-256-GCM selado) também mora em `EndpointHelpers.cs` desde
+  o S06-02 -- `PatientEndpoints` e `VoiceEnrollmentEndpoints` chamam a mesma cópia, nenhum dos
+  dois mantém a sua própria. `PUT /accounts/{accountId}/voice-enrollment` é idempotente
+  (re-cadastro substitui, `204`, nunca `409`); `DELETE` é `404` (não `204` silencioso) quando
+  não há cadastro para remover. Nenhuma das três rotas usa
+  `AccountAuthorizationGuard.CanCreatePatientRecords` -- cadastro de voz é a própria conta do
+  profissional, não um registo de paciente, então a única guarda é
+  `IsAuthorizedForAccount` (o token pertence a esta conta).
 - `src/Api/Problems` -- `LimmiarProblemDetails` (RFC 7807 + `code` + `params` estruturado,
-  nunca a mensagem de exceção crua) e o catálogo central `ProblemCodes`.
+  nunca a mensagem de exceção crua) e o catálogo central `ProblemCodes` (ex.:
+  `voice.enrollment_not_found` para o `GET`/`DELETE` de cadastro de voz sem cadastro
+  prévio, distinto de `auth.account_not_found`).
 - `src/Api/Data` -- `MigrationRunner` (executor de `*.sql` sem framework, AOT-safe),
   `NpgsqlDataSourceFactory`, e `OpenTenantScopedTransactionAsync` (extensão de
   `NpgsqlDataSource`): abre ligação + transação e já corre o `set_config('app.tenant_id',
