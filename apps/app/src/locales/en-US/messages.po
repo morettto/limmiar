@@ -52,10 +52,22 @@ msgstr "Database unavailable at the moment."
 msgid "Bem-vindo ao Limmiar"
 msgstr "Welcome to Limmiar"
 
+#: src/copilot/CopilotKeySetup.tsx:52
+msgid "Cadastrar chave de API de IA"
+msgstr ""
+
 #. js-lingui-explicit-id
 #: src/errors/problem-messages.ts:32
 msgid "validation.invalid_field"
 msgstr "Invalid field: {field}."
+
+#: src/copilot/CopilotKeySetup.tsx:76
+msgid "Chave de API"
+msgstr ""
+
+#: src/copilot/CopilotKeySetup.tsx:28
+msgid "Chaveiro bloqueado. Desbloqueie para cadastrar sua chave de API."
+msgstr ""
 
 #: src/auth/TotpSetup.tsx:158
 msgid "Código de 6 dígitos do aplicativo autenticador"
@@ -186,6 +198,10 @@ msgstr "This access link is no longer valid. Request a new one."
 msgid "Estes códigos não serão exibidos novamente. Guarde-os em um local seguro: eles são a única forma de recuperar o acesso à sua conta caso você perca o aplicativo autenticador."
 msgstr "These codes will not be shown again. Store them somewhere safe: they are the only way to recover access to your account if you lose your authenticator app."
 
+#: src/copilot/CopilotKeySetup.tsx:61
+msgid "Fornecedor"
+msgstr ""
+
 #: src/auth/RecoveryScreen.tsx:136
 msgid "Frase de recuperação"
 msgstr "Recovery phrase"
@@ -218,6 +234,10 @@ msgstr "I've saved my codes"
 msgid "Guardei minha frase"
 msgstr "I've saved my phrase"
 
+#: src/copilot/CopilotKeySetup.tsx:93
+msgid "Lembrar neste dispositivo"
+msgstr ""
+
 #: src/auth/TotpSetup.tsx:144
 msgid "Link de provisionamento"
 msgstr "Provisioning link"
@@ -247,6 +267,10 @@ msgstr "Could not continue with Google. Please try again."
 #: src/devices/PairNewDevice.tsx:57
 msgid "Não foi possível decifrar a chave recebida. Tente parear novamente."
 msgstr "Could not decrypt the received key. Try pairing again."
+
+#: src/copilot/CopilotKeySetup.tsx:56
+msgid "Não foi possível salvar a chave. Tente novamente."
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/errors/problem-messages.ts:40
@@ -283,6 +307,10 @@ msgstr "Preparing the code to pair the new device..."
 msgid "Profissional"
 msgstr "Professional"
 
+#: src/copilot/CopilotKeySetup.tsx:105
+msgid "Pular"
+msgstr ""
+
 #: src/auth/RecoveryScreen.tsx:156
 msgid "Recuperar acesso"
 msgstr "Recover access"
@@ -290,6 +318,10 @@ msgstr "Recover access"
 #: src/auth/RecoveryScreen.tsx:115
 msgid "Recuperar acesso à conta"
 msgstr "Recover account access"
+
+#: src/copilot/CopilotKeySetup.tsx:102
+msgid "Salvar"
+msgstr ""
 
 #: src/auth/AuthScreen.tsx:202
 msgid "Senha"

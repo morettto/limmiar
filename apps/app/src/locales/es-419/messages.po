@@ -52,10 +52,22 @@ msgstr "Base de datos no disponible en este momento."
 msgid "Bem-vindo ao Limmiar"
 msgstr "Bienvenido a Limmiar"
 
+#: src/copilot/CopilotKeySetup.tsx:52
+msgid "Cadastrar chave de API de IA"
+msgstr ""
+
 #. js-lingui-explicit-id
 #: src/errors/problem-messages.ts:32
 msgid "validation.invalid_field"
 msgstr "Campo inválido: {field}."
+
+#: src/copilot/CopilotKeySetup.tsx:76
+msgid "Chave de API"
+msgstr ""
+
+#: src/copilot/CopilotKeySetup.tsx:28
+msgid "Chaveiro bloqueado. Desbloqueie para cadastrar sua chave de API."
+msgstr ""
 
 #: src/auth/TotpSetup.tsx:158
 msgid "Código de 6 dígitos do aplicativo autenticador"
@@ -186,6 +198,10 @@ msgstr "Este enlace de acceso ya no es válido. Solicita uno nuevo."
 msgid "Estes códigos não serão exibidos novamente. Guarde-os em um local seguro: eles são a única forma de recuperar o acesso à sua conta caso você perca o aplicativo autenticador."
 msgstr "Estos códigos no se mostrarán de nuevo. Guárdalos en un lugar seguro: son la única forma de recuperar el acceso a tu cuenta si pierdes tu app autenticadora."
 
+#: src/copilot/CopilotKeySetup.tsx:61
+msgid "Fornecedor"
+msgstr ""
+
 #: src/auth/RecoveryScreen.tsx:136
 msgid "Frase de recuperação"
 msgstr "Frase de recuperación"
@@ -218,6 +234,10 @@ msgstr "Guardé mis códigos"
 msgid "Guardei minha frase"
 msgstr "Guardé mi frase"
 
+#: src/copilot/CopilotKeySetup.tsx:93
+msgid "Lembrar neste dispositivo"
+msgstr ""
+
 #: src/auth/TotpSetup.tsx:144
 msgid "Link de provisionamento"
 msgstr "Enlace de aprovisionamiento"
@@ -247,6 +267,10 @@ msgstr "No se pudo continuar con Google. Inténtalo de nuevo."
 #: src/devices/PairNewDevice.tsx:57
 msgid "Não foi possível decifrar a chave recebida. Tente parear novamente."
 msgstr "No se pudo descifrar la clave recibida. Intenta vincular de nuevo."
+
+#: src/copilot/CopilotKeySetup.tsx:56
+msgid "Não foi possível salvar a chave. Tente novamente."
+msgstr ""
 
 #. js-lingui-explicit-id
 #: src/errors/problem-messages.ts:40
@@ -283,6 +307,10 @@ msgstr "Preparando el código para vincular el nuevo dispositivo..."
 msgid "Profissional"
 msgstr "Profesional"
 
+#: src/copilot/CopilotKeySetup.tsx:105
+msgid "Pular"
+msgstr ""
+
 #: src/auth/RecoveryScreen.tsx:156
 msgid "Recuperar acesso"
 msgstr "Recuperar acceso"
@@ -290,6 +318,10 @@ msgstr "Recuperar acceso"
 #: src/auth/RecoveryScreen.tsx:115
 msgid "Recuperar acesso à conta"
 msgstr "Recuperar acceso a la cuenta"
+
+#: src/copilot/CopilotKeySetup.tsx:102
+msgid "Salvar"
+msgstr ""
 
 #: src/auth/AuthScreen.tsx:202
 msgid "Senha"
