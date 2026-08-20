@@ -48,6 +48,9 @@ jobs:
       - name: Unit tests + coverage (crypto)
         run: pnpm --filter crypto test:unit
 
+      - name: Unit tests + coverage (diarization)
+        run: pnpm --filter diarization test:unit
+
       - name: Unit tests + coverage (site)
         run: pnpm --filter site test:unit
 
@@ -131,6 +134,9 @@ jobs:
 
       - name: Dependency rules (crypto)
         run: pnpm --filter crypto lint:arch
+
+      - name: Dependency rules (diarization)
+        run: pnpm --filter diarization lint:arch
 
   # S00.5-03 gate 1: custom ESLint config enforcing i18n-safe source — no
   # hardcoded JSX text outside a translation macro
@@ -466,6 +472,7 @@ jobs:
             packages/i18n/.stryker-tmp/incremental.json
             packages/ui/.stryker-tmp/incremental.json
             packages/crypto/.stryker-tmp/incremental.json
+            packages/diarization/.stryker-tmp/incremental.json
           # Deliberately unique per run so this primary key never hits —
           # every PR run falls through to restore-keys, which always
           # resolves to whatever the nightly job most recently published.
@@ -488,6 +495,9 @@ jobs:
       - name: Mutation testing (incremental, crypto)
         run: pnpm --filter crypto test:mutation:incremental
 
+      - name: Mutation testing (incremental, diarization)
+        run: pnpm --filter diarization test:mutation:incremental
+
       - name: Save Stryker incremental cache
         if: always()
         uses: actions/cache/save@v6
@@ -497,6 +507,7 @@ jobs:
             packages/i18n/.stryker-tmp/incremental.json
             packages/ui/.stryker-tmp/incremental.json
             packages/crypto/.stryker-tmp/incremental.json
+            packages/diarization/.stryker-tmp/incremental.json
           key: stryker-incremental-pr-${{ github.run_id }}
 
   sast:

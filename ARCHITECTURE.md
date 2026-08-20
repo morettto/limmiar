@@ -15,3 +15,4 @@ Monorepo (pnpm workspaces: `apps/*`, `packages/*`) for Limmiar: a .NET API, a Re
 - `packages/ui` — shared UI primitives. No module README yet.
 - `packages/agenda` — time model: IANA time zone validation and RRULE recurrence expansion, pure TypeScript, no UI. See [packages/agenda/README.md](./packages/agenda/README.md).
 - `packages/session` — session lifecycle statechart (XState v5, no `invoke`, no audio, no UI), testable in Node. See [packages/session/README.md](./packages/session/README.md).
+- `packages/diarization` — pure diarization merge (`atribuirLocutores`): joins ASR words with diarizer speaker turns by summed overlap per word, zero runtime dependencies. See [packages/diarization/README.md](./packages/diarization/README.md).

@@ -58,6 +58,9 @@ jobs:
       - name: Mutation testing (full run, refresh incremental baseline, crypto)
         run: pnpm --filter crypto exec stryker run --incremental --force
 
+      - name: Mutation testing (full run, refresh incremental baseline, diarization)
+        run: pnpm --filter diarization exec stryker run --incremental --force
+
       # Explicit save (not the combined `actions/cache` action's automatic
       # post-step) so this still runs even if the mutation score threshold
       # broke and the step above failed — the baseline is worth publishing
@@ -72,6 +75,7 @@ jobs:
             packages/i18n/.stryker-tmp/incremental.json
             packages/ui/.stryker-tmp/incremental.json
             packages/crypto/.stryker-tmp/incremental.json
+            packages/diarization/.stryker-tmp/incremental.json
           # Unique per run on purpose: every nightly run creates a new cache
           # entry (never collides/"already exists"). The PR job's
           # restore-keys (`stryker-incremental-main-`) prefix-matches
