@@ -22,8 +22,8 @@ export interface RunAsrLoopOptions {
   engine: TranscriptionEngine
   signal: AbortSignal
   windowFrames?: number
-  onSegments: (segments: TranscriptionSegment[]) => void
-  onStats: (stats: AsrLoopStats) => void
+  onSegments: (segments: TranscriptionSegment[]) => void | Promise<void>
+  onStats: (stats: AsrLoopStats) => void | Promise<void>
   now?: () => number
 }
 
@@ -80,8 +80,8 @@ export async function runAsrLoop({
     audioMs += (windowFrames / SAMPLE_RATE_HZ) * 1000
     windows += 1
 
-    onSegments(segments)
-    onStats(statsSnapshot(ring, processingMs, audioMs, windows))
+    await onSegments(segments)
+    await onStats(statsSnapshot(ring, processingMs, audioMs, windows))
   }
 
   return statsSnapshot(ring, processingMs, audioMs, windows)

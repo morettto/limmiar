@@ -85,8 +85,13 @@ token de blank (índice `0` do vocabulário). Pura, sem estado.
 3. Puxa a janela (`pull`), mede o tempo de processamento com `now()` (por
    omissão `Date.now`, injetável em teste) à volta de `engine.transcribe`,
    acumula tempo de processamento e tempo de áudio processado.
-4. Chama `onSegments(segments)` com os segmentos da janela e
-   `onStats(stats)` com o `AsrLoopStats` corrente a cada janela.
+4. Chama `await onSegments(segments)` com os segmentos da janela e
+   `await onStats(stats)` com o `AsrLoopStats` corrente a cada janela —
+   `onSegments`/`onStats` podem ser síncronos ou devolver `Promise<void>`; se
+   um deles rejeitar, o loop para e a promise devolvida por `runAsrLoop`
+   rejeita com o mesmo erro (não é engolido). É o seam que a fatia seguinte
+   (`live-session.ts`) usa para ligar `persistChunk` a `onSegments` sem
+   perder uma falha de persistência em silêncio.
 5. Devolve o `AsrLoopStats` final quando `signal.aborted`.
 
 `AsrLoopStats { rtf: number; droppedFrames: number; windows: number }` —

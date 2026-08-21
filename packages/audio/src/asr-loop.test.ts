@@ -135,4 +135,27 @@ describe('runAsrLoop', () => {
     expect(stats.windows).toBe(1)
     expect(stats.rtf).toBeGreaterThanOrEqual(0)
   })
+
+  it('propagates a rejection from an async onSegments instead of swallowing it', async () => {
+    const ring = attachRing(createRingSab(CAPACITY))
+    const windowFrames = 16
+    push(ring, new Float32Array(windowFrames).fill(0.5))
+
+    const controller = new AbortController()
+    const boom = new Error('persistence failed')
+
+    const loop = runAsrLoop({
+      ring,
+      engine: fakeEngine(),
+      signal: controller.signal,
+      windowFrames,
+      onSegments: async () => {
+        controller.abort() // stops the loop even if the rejection is (wrongly) swallowed
+        throw boom
+      },
+      onStats: () => {},
+    })
+
+    await expect(loop).rejects.toThrow(boom)
+  })
 })
