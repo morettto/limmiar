@@ -554,27 +554,68 @@ public sealed class AccountServiceTotpTests
     private static Account EnabledProfessionalAccount(string email) =>
         ProfessionalAccount(email) with { TotpSecret = "ENABLEDSECRET", TotpEnabledAt = DateTimeOffset.UtcNow };
 
-    private static AccountService CreateService(
+    private static AccountServiceTotpTestHarness CreateService(
         FakeAccountStore store,
         GoogleIdentity? googleIdentity = null,
         ITotpProvider? totpProvider = null,
         bool comparerAlwaysMatches = false,
         ITwoFactorTicketIssuer? ticketIssuer = null,
-        ISessionTokenIssuer? sessionTokenIssuer = null) =>
-        new(
-            store,
-            new StubPasswordVerifierComparer(comparerAlwaysMatches),
-            new StubGoogleIdentityProvider(googleIdentity),
-            councilRegistryVerifier: null,
-            totpProvider: totpProvider ?? new StubTotpProvider(validCode: true),
-            twoFactorTicketIssuer: ticketIssuer,
-            sessionTokenIssuer: sessionTokenIssuer);
+        ISessionTokenIssuer? sessionTokenIssuer = null)
+    {
+        var comparer = new StubPasswordVerifierComparer(comparerAlwaysMatches);
+        var googleProvider = new StubGoogleIdentityProvider(googleIdentity);
+        var totp = totpProvider ?? new StubTotpProvider(validCode: true);
+        var tickets = ticketIssuer ?? new TwoFactorTicketIssuer();
+        var sessions = sessionTokenIssuer ?? new SessionTokenIssuer();
+
+        return new AccountServiceTotpTestHarness(
+            new RegisterHandler(store, tickets, sessions),
+            new LoginHandler(store, comparer, tickets, sessions),
+            new ContinueWithGoogleHandler(googleProvider, store, tickets, sessions),
+            new BeginTotpEnrollmentHandler(store, totp),
+            new ConfirmTotpEnrollmentHandler(store, totp, sessions),
+            new VerifyTotpChallengeHandler(store, totp, sessions),
+            sessions);
+    }
 
     private static byte[] CreateVerifier(byte fill)
     {
-        var verifier = new byte[AccountService.PasswordVerifierLength];
+        var verifier = new byte[AccountVerifierLengths.PasswordVerifierLength];
         Array.Fill(verifier, fill);
         return verifier;
+    }
+
+    // Test-only facade sharing one ticket issuer / session issuer across every handler,
+    // mirroring the shape of the former AccountService's single instance per test.
+    private sealed class AccountServiceTotpTestHarness(
+        RegisterHandler registerHandler,
+        LoginHandler loginHandler,
+        ContinueWithGoogleHandler googleHandler,
+        BeginTotpEnrollmentHandler beginHandler,
+        ConfirmTotpEnrollmentHandler confirmHandler,
+        VerifyTotpChallengeHandler verifyHandler,
+        ISessionTokenIssuer sessions)
+    {
+        public Task<AccountRegistrationResult> RegisterAsync(string email, byte[] verifier, AccountRole role, CancellationToken cancellationToken) =>
+            registerHandler.Handle(new RegisterCommand(email, verifier, role), cancellationToken).AsTask();
+
+        public Task<AccountLoginResult> LoginAsync(string email, byte[] verifier, CancellationToken cancellationToken) =>
+            loginHandler.Handle(new LoginCommand(email, verifier), cancellationToken).AsTask();
+
+        public Task<AccountGoogleAuthResult> GoogleAuthAsync(string idToken, AccountRole role, CancellationToken cancellationToken) =>
+            googleHandler.Handle(new ContinueWithGoogleCommand(idToken, role), cancellationToken).AsTask();
+
+        public Task<BeginTotpEnrollmentResult> BeginTotpEnrollmentAsync(Guid accountId, CancellationToken cancellationToken) =>
+            beginHandler.Handle(new BeginTotpEnrollmentCommand(accountId), cancellationToken).AsTask();
+
+        public Task<ConfirmTotpEnrollmentResult> ConfirmTotpEnrollmentAsync(Guid accountId, string code, CancellationToken cancellationToken) =>
+            confirmHandler.Handle(new ConfirmTotpEnrollmentCommand(accountId, code), cancellationToken).AsTask();
+
+        public Task<VerifyTotpChallengeResult> VerifyTotpChallengeAsync(Guid accountId, string? code, string? backupCode, CancellationToken cancellationToken) =>
+            verifyHandler.Handle(new VerifyTotpChallengeCommand(accountId, code, backupCode), cancellationToken).AsTask();
+
+        public Task<RefreshSessionResult> RefreshSessionAsync(string refreshToken, CancellationToken cancellationToken) =>
+            Task.FromResult(sessions.Refresh(refreshToken));
     }
 
     private sealed class FakeAccountStore : IAccountStore

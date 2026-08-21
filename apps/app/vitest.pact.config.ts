@@ -15,7 +15,7 @@ export default defineConfig({
   plugins: [lingui(), babel({ presets: [linguiTransformerBabelPreset()] })],
   test: {
     environment: 'jsdom',
-    include: ['src/api/client.pact.test.ts'],
+    include: ['src/shared/api/client.pact.test.ts', 'src/entities/account/api.pact.test.ts'],
     execArgv: ['--experimental-require-module'],
   },
 })

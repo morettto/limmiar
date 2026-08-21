@@ -29,6 +29,12 @@
          shape and fails to compile against 3.x's read-only Example property. -->
     <PackageReference Include="Microsoft.OpenApi" Version="2.7.6" />
     <PackageReference Include="Npgsql" Version="10.0.3" />
+    <!-- Mediator (martinothamar), not MediatR: handlers are generated at compile time via
+         Mediator.SourceGenerator, so dispatch has zero reflection and stays PublishAot-safe.
+         MediatR's runtime assembly scanning would trip this project's IL2026/IL3050
+         WarningsAsErrors (Directory.Build.props). -->
+    <PackageReference Include="Mediator.Abstractions" Version="3.0.2" />
+    <PackageReference Include="Mediator.SourceGenerator" Version="3.0.2" PrivateAssets="all" />
   </ItemGroup>
   
 </Project>

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { App } from './App'
-import { dynamicActivate } from './i18n'
+import { dynamicActivate } from './shared/i18n'
 
 describe('App — locale switch survives an active recording session (D18)', () => {
   afterEach(() => {

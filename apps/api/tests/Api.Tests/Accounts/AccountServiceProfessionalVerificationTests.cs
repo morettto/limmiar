@@ -10,9 +10,9 @@ public sealed class AccountServiceProfessionalVerificationTests
     public async Task RegisterAsync_WithPatientRole_CreatesAccountAlreadyActive()
     {
         var store = new FakeAccountStore();
-        var service = CreateService(store);
+        var handler = new RegisterHandler(store, new TwoFactorTicketIssuer(), new SessionTokenIssuer());
 
-        var result = await service.RegisterAsync("patient@example.com", SomeVerifier, AccountRole.Patient, CancellationToken.None);
+        var result = await handler.Handle(new RegisterCommand("patient@example.com", SomeVerifier, AccountRole.Patient), CancellationToken.None);
 
         Assert.True(result.Succeeded);
         Assert.Equal(AccountVerificationStatus.Active, result.Account!.VerificationStatus);
@@ -22,9 +22,9 @@ public sealed class AccountServiceProfessionalVerificationTests
     public async Task RegisterAsync_WithProfessionalRole_CreatesAccountPending()
     {
         var store = new FakeAccountStore();
-        var service = CreateService(store);
+        var handler = new RegisterHandler(store, new TwoFactorTicketIssuer(), new SessionTokenIssuer());
 
-        var result = await service.RegisterAsync("pro@example.com", SomeVerifier, AccountRole.Professional, CancellationToken.None);
+        var result = await handler.Handle(new RegisterCommand("pro@example.com", SomeVerifier, AccountRole.Professional), CancellationToken.None);
 
         Assert.True(result.Succeeded);
         Assert.Equal(AccountVerificationStatus.Pending, result.Account!.VerificationStatus);
@@ -35,9 +35,9 @@ public sealed class AccountServiceProfessionalVerificationTests
     {
         var store = new FakeAccountStore();
         var identity = new GoogleIdentity("new-pro-via-google@example.com", "google-subject-1");
-        var service = CreateService(store, identity);
+        var handler = new ContinueWithGoogleHandler(new StubGoogleIdentityProvider(identity), store, new TwoFactorTicketIssuer(), new SessionTokenIssuer());
 
-        var result = await service.GoogleAuthAsync("valid-id-token", AccountRole.Professional, CancellationToken.None);
+        var result = await handler.Handle(new ContinueWithGoogleCommand("valid-id-token", AccountRole.Professional), CancellationToken.None);
 
         Assert.True(result.Succeeded);
         Assert.Equal(AccountVerificationStatus.Pending, result.Account!.VerificationStatus);
@@ -48,9 +48,9 @@ public sealed class AccountServiceProfessionalVerificationTests
     {
         var store = new FakeAccountStore();
         var identity = new GoogleIdentity("new-patient-via-google@example.com", "google-subject-2");
-        var service = CreateService(store, identity);
+        var handler = new ContinueWithGoogleHandler(new StubGoogleIdentityProvider(identity), store, new TwoFactorTicketIssuer(), new SessionTokenIssuer());
 
-        var result = await service.GoogleAuthAsync("valid-id-token", AccountRole.Patient, CancellationToken.None);
+        var result = await handler.Handle(new ContinueWithGoogleCommand("valid-id-token", AccountRole.Patient), CancellationToken.None);
 
         Assert.True(result.Succeeded);
         Assert.Equal(AccountVerificationStatus.Active, result.Account!.VerificationStatus);
@@ -62,10 +62,11 @@ public sealed class AccountServiceProfessionalVerificationTests
         var account = PendingProfessional("pending-crp@example.com");
         var store = new FakeAccountStore(account);
         var verifier = new StubCouncilRegistryVerifier(verified: true);
-        var service = CreateService(store, councilRegistryVerifier: verifier);
+        var handler = new SubmitProfessionalCredentialHandler(store, verifier);
 
-        var result = await service.SubmitProfessionalCredentialAsync(
-            account.Id, ProfessionalCredentialType.Crp, "06/123456", "SP", documentReference: null, CancellationToken.None);
+        var result = await handler.Handle(
+            new SubmitProfessionalCredentialCommand(account.Id, ProfessionalCredentialType.Crp, "06/123456", "SP", DocumentReference: null),
+            CancellationToken.None);
 
         Assert.True(result.Succeeded);
         Assert.Equal(AccountVerificationStatus.Active, result.Account!.VerificationStatus);
@@ -79,10 +80,11 @@ public sealed class AccountServiceProfessionalVerificationTests
         var account = PendingProfessional("pending-crm@example.com");
         var store = new FakeAccountStore(account);
         var verifier = new StubCouncilRegistryVerifier(verified: false, failureReason: "Número de CRM não encontrado na base do conselho.");
-        var service = CreateService(store, councilRegistryVerifier: verifier);
+        var handler = new SubmitProfessionalCredentialHandler(store, verifier);
 
-        var result = await service.SubmitProfessionalCredentialAsync(
-            account.Id, ProfessionalCredentialType.Crm, "123456-SP", "SP", documentReference: null, CancellationToken.None);
+        var result = await handler.Handle(
+            new SubmitProfessionalCredentialCommand(account.Id, ProfessionalCredentialType.Crm, "123456-SP", "SP", DocumentReference: null),
+            CancellationToken.None);
 
         Assert.True(result.Succeeded);
         Assert.Equal(AccountVerificationStatus.Rejected, result.Account!.VerificationStatus);
@@ -95,10 +97,11 @@ public sealed class AccountServiceProfessionalVerificationTests
         var account = PendingProfessional("pending-doc@example.com");
         var store = new FakeAccountStore(account);
         var verifier = new StubCouncilRegistryVerifier(verified: true);
-        var service = CreateService(store, councilRegistryVerifier: verifier);
+        var handler = new SubmitProfessionalCredentialHandler(store, verifier);
 
-        var result = await service.SubmitProfessionalCredentialAsync(
-            account.Id, ProfessionalCredentialType.Document, registryNumber: null, registryUf: null, documentReference: "doc-ref-1", CancellationToken.None);
+        var result = await handler.Handle(
+            new SubmitProfessionalCredentialCommand(account.Id, ProfessionalCredentialType.Document, RegistryNumber: null, RegistryUf: null, "doc-ref-1"),
+            CancellationToken.None);
 
         Assert.True(result.Succeeded);
         Assert.Equal(AccountVerificationStatus.InReview, result.Account!.VerificationStatus);
@@ -110,10 +113,11 @@ public sealed class AccountServiceProfessionalVerificationTests
     public async Task SubmitProfessionalCredentialAsync_WithUnknownAccountId_ReturnsAccountNotFound()
     {
         var store = new FakeAccountStore();
-        var service = CreateService(store);
+        var handler = new SubmitProfessionalCredentialHandler(store, new StubCouncilRegistryVerifier(verified: true));
 
-        var result = await service.SubmitProfessionalCredentialAsync(
-            Guid.NewGuid(), ProfessionalCredentialType.Crp, "06/123456", "SP", documentReference: null, CancellationToken.None);
+        var result = await handler.Handle(
+            new SubmitProfessionalCredentialCommand(Guid.NewGuid(), ProfessionalCredentialType.Crp, "06/123456", "SP", DocumentReference: null),
+            CancellationToken.None);
 
         Assert.False(result.Succeeded);
         Assert.Equal(SubmitProfessionalCredentialFailureReason.AccountNotFound, result.FailureReason);
@@ -124,10 +128,11 @@ public sealed class AccountServiceProfessionalVerificationTests
     {
         var account = new Account(Guid.NewGuid(), "patient@example.com", AccountRole.Patient, SomeVerifier, null);
         var store = new FakeAccountStore(account);
-        var service = CreateService(store);
+        var handler = new SubmitProfessionalCredentialHandler(store, new StubCouncilRegistryVerifier(verified: true));
 
-        var result = await service.SubmitProfessionalCredentialAsync(
-            account.Id, ProfessionalCredentialType.Crp, "06/123456", "SP", documentReference: null, CancellationToken.None);
+        var result = await handler.Handle(
+            new SubmitProfessionalCredentialCommand(account.Id, ProfessionalCredentialType.Crp, "06/123456", "SP", DocumentReference: null),
+            CancellationToken.None);
 
         Assert.False(result.Succeeded);
         Assert.Equal(SubmitProfessionalCredentialFailureReason.NotAProfessionalAccount, result.FailureReason);
@@ -138,10 +143,11 @@ public sealed class AccountServiceProfessionalVerificationTests
     {
         var account = new Account(Guid.NewGuid(), "active-pro@example.com", AccountRole.Professional, SomeVerifier, null, AccountVerificationStatus.Active);
         var store = new FakeAccountStore(account);
-        var service = CreateService(store);
+        var handler = new SubmitProfessionalCredentialHandler(store, new StubCouncilRegistryVerifier(verified: true));
 
-        var result = await service.SubmitProfessionalCredentialAsync(
-            account.Id, ProfessionalCredentialType.Crp, "06/123456", "SP", documentReference: null, CancellationToken.None);
+        var result = await handler.Handle(
+            new SubmitProfessionalCredentialCommand(account.Id, ProfessionalCredentialType.Crp, "06/123456", "SP", DocumentReference: null),
+            CancellationToken.None);
 
         Assert.False(result.Succeeded);
         Assert.Equal(SubmitProfessionalCredentialFailureReason.InvalidStateForSubmission, result.FailureReason);
@@ -155,10 +161,11 @@ public sealed class AccountServiceProfessionalVerificationTests
             AccountVerificationStatus.Rejected, RejectionReason: "motivo anterior");
         var store = new FakeAccountStore(account);
         var verifier = new StubCouncilRegistryVerifier(verified: true);
-        var service = CreateService(store, councilRegistryVerifier: verifier);
+        var handler = new SubmitProfessionalCredentialHandler(store, verifier);
 
-        var result = await service.SubmitProfessionalCredentialAsync(
-            account.Id, ProfessionalCredentialType.Crp, "06/123456", "SP", documentReference: null, CancellationToken.None);
+        var result = await handler.Handle(
+            new SubmitProfessionalCredentialCommand(account.Id, ProfessionalCredentialType.Crp, "06/123456", "SP", DocumentReference: null),
+            CancellationToken.None);
 
         Assert.True(result.Succeeded);
         Assert.Equal(AccountVerificationStatus.Active, result.Account!.VerificationStatus);
@@ -172,9 +179,9 @@ public sealed class AccountServiceProfessionalVerificationTests
             Guid.NewGuid(), "doc-review@example.com", AccountRole.Professional, SomeVerifier, null,
             AccountVerificationStatus.InReview, VerificationSubmittedAt: DateTimeOffset.UtcNow);
         var store = new FakeAccountStore(account);
-        var service = CreateService(store);
+        var handler = new DecideProfessionalVerificationHandler(store);
 
-        var result = await service.DecideProfessionalVerificationAsync(account.Id, approved: true, rejectionReason: null, CancellationToken.None);
+        var result = await handler.Handle(new DecideProfessionalVerificationCommand(account.Id, Approved: true, RejectionReason: null), CancellationToken.None);
 
         Assert.True(result.Succeeded);
         Assert.Equal(AccountVerificationStatus.Active, result.Account!.VerificationStatus);
@@ -187,10 +194,11 @@ public sealed class AccountServiceProfessionalVerificationTests
             Guid.NewGuid(), "doc-review-2@example.com", AccountRole.Professional, SomeVerifier, null,
             AccountVerificationStatus.InReview, VerificationSubmittedAt: DateTimeOffset.UtcNow);
         var store = new FakeAccountStore(account);
-        var service = CreateService(store);
+        var handler = new DecideProfessionalVerificationHandler(store);
 
-        var result = await service.DecideProfessionalVerificationAsync(
-            account.Id, approved: false, rejectionReason: "Documento ilegível, reenvie em PDF.", CancellationToken.None);
+        var result = await handler.Handle(
+            new DecideProfessionalVerificationCommand(account.Id, Approved: false, RejectionReason: "Documento ilegível, reenvie em PDF."),
+            CancellationToken.None);
 
         Assert.True(result.Succeeded);
         Assert.Equal(AccountVerificationStatus.Rejected, result.Account!.VerificationStatus);
@@ -202,9 +210,9 @@ public sealed class AccountServiceProfessionalVerificationTests
     {
         var account = PendingProfessional("not-in-review@example.com");
         var store = new FakeAccountStore(account);
-        var service = CreateService(store);
+        var handler = new DecideProfessionalVerificationHandler(store);
 
-        var result = await service.DecideProfessionalVerificationAsync(account.Id, approved: true, rejectionReason: null, CancellationToken.None);
+        var result = await handler.Handle(new DecideProfessionalVerificationCommand(account.Id, Approved: true, RejectionReason: null), CancellationToken.None);
 
         Assert.False(result.Succeeded);
         Assert.Equal(ProfessionalVerificationDecisionFailureReason.NotInReview, result.FailureReason);
@@ -214,9 +222,9 @@ public sealed class AccountServiceProfessionalVerificationTests
     public async Task DecideProfessionalVerificationAsync_WithUnknownAccountId_ReturnsAccountNotFound()
     {
         var store = new FakeAccountStore();
-        var service = CreateService(store);
+        var handler = new DecideProfessionalVerificationHandler(store);
 
-        var result = await service.DecideProfessionalVerificationAsync(Guid.NewGuid(), approved: true, rejectionReason: null, CancellationToken.None);
+        var result = await handler.Handle(new DecideProfessionalVerificationCommand(Guid.NewGuid(), Approved: true, RejectionReason: null), CancellationToken.None);
 
         Assert.False(result.Succeeded);
         Assert.Equal(ProfessionalVerificationDecisionFailureReason.AccountNotFound, result.FailureReason);
@@ -230,9 +238,8 @@ public sealed class AccountServiceProfessionalVerificationTests
             AccountVerificationStatus.InReview, VerificationSubmittedAt: DateTimeOffset.UtcNow);
         var pending = PendingProfessional("still-pending@example.com");
         var store = new FakeAccountStore(inReview, pending);
-        var service = CreateService(store);
 
-        var queue = await service.ListPendingProfessionalVerificationsAsync(CancellationToken.None);
+        var queue = await store.ListPendingDocumentReviewAsync(CancellationToken.None);
 
         var queuedAccount = Assert.Single(queue);
         Assert.Equal(inReview.Id, queuedAccount.Id);
@@ -241,17 +248,9 @@ public sealed class AccountServiceProfessionalVerificationTests
     private static Account PendingProfessional(string email) =>
         new(Guid.NewGuid(), email, AccountRole.Professional, SomeVerifier, null, AccountVerificationStatus.Pending);
 
-    private static AccountService CreateService(
-        FakeAccountStore store, GoogleIdentity? googleIdentity = null, ICouncilRegistryVerifier? councilRegistryVerifier = null) =>
-        new(
-            store,
-            new StubPasswordVerifierComparer(),
-            new StubGoogleIdentityProvider(googleIdentity),
-            councilRegistryVerifier ?? new StubCouncilRegistryVerifier(verified: true));
-
     private static byte[] CreateVerifier(byte fill)
     {
-        var verifier = new byte[AccountService.PasswordVerifierLength];
+        var verifier = new byte[AccountVerifierLengths.PasswordVerifierLength];
         Array.Fill(verifier, fill);
         return verifier;
     }
@@ -291,11 +290,6 @@ public sealed class AccountServiceProfessionalVerificationTests
                 .Where(a => a.Role == AccountRole.Professional && a.VerificationStatus == AccountVerificationStatus.InReview)
                 .OrderBy(a => a.VerificationSubmittedAt)
                 .ToList());
-    }
-
-    private sealed class StubPasswordVerifierComparer : IPasswordVerifierComparer
-    {
-        public bool Matches(byte[] submitted, byte[] stored) => false;
     }
 
     private sealed class StubGoogleIdentityProvider : IGoogleIdentityProvider

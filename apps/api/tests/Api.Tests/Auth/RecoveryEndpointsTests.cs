@@ -3,7 +3,6 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Api.Accounts;
-using Api.Endpoints;
 using Api.Serialization;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -29,10 +28,10 @@ public sealed class RecoveryEndpointsTests
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/recovery-phrase",
             new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier),
-            ApiJsonSerializerContext.Default.RegisterRecoveryVerifierRequest);
+            AccountsJsonContext.Default.RegisterRecoveryVerifierRequest);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.RegisterRecoveryVerifierResponse);
+        var body = await response.Content.ReadFromJsonAsync(AccountsJsonContext.Default.RegisterRecoveryVerifierResponse);
         Assert.NotNull(body);
         Assert.Equal(accountId, body!.AccountId);
     }
@@ -48,7 +47,7 @@ public sealed class RecoveryEndpointsTests
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/recovery-phrase",
             new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier),
-            ApiJsonSerializerContext.Default.RegisterRecoveryVerifierRequest);
+            AccountsJsonContext.Default.RegisterRecoveryVerifierRequest);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -67,7 +66,7 @@ public sealed class RecoveryEndpointsTests
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/recovery-phrase",
             new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier),
-            ApiJsonSerializerContext.Default.RegisterRecoveryVerifierRequest);
+            AccountsJsonContext.Default.RegisterRecoveryVerifierRequest);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -88,7 +87,7 @@ public sealed class RecoveryEndpointsTests
         var response = await client.PostAsJsonAsync(
             $"/accounts/{victimAccountId}/recovery-phrase",
             new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier),
-            ApiJsonSerializerContext.Default.RegisterRecoveryVerifierRequest);
+            AccountsJsonContext.Default.RegisterRecoveryVerifierRequest);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -106,7 +105,7 @@ public sealed class RecoveryEndpointsTests
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/recovery-phrase",
             new RegisterRecoveryVerifierRequest(new byte[] { 1, 2, 3 }),
-            ApiJsonSerializerContext.Default.RegisterRecoveryVerifierRequest);
+            AccountsJsonContext.Default.RegisterRecoveryVerifierRequest);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -124,15 +123,15 @@ public sealed class RecoveryEndpointsTests
         var registerResponse = await client.PostAsJsonAsync(
             "/auth/register",
             new RegisterRequest("recovery-patient@example.com", SomeVerifier, AccountRole.Patient),
-            ApiJsonSerializerContext.Default.RegisterRequest);
-        var registered = await registerResponse.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.RegisterResponse);
+            AccountsJsonContext.Default.RegisterRequest);
+        var registered = await registerResponse.Content.ReadFromJsonAsync(AccountsJsonContext.Default.RegisterResponse);
         // A Patient's TwoFactorRequirement is always NotApplicable (ADR-S02-03), so register already returned a real session.
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", registered!.AccessToken);
 
         var response = await client.PostAsJsonAsync(
             $"/accounts/{registered.Id}/recovery-phrase",
             new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier),
-            ApiJsonSerializerContext.Default.RegisterRecoveryVerifierRequest);
+            AccountsJsonContext.Default.RegisterRecoveryVerifierRequest);
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -152,7 +151,7 @@ public sealed class RecoveryEndpointsTests
         var response = await client.PostAsJsonAsync(
             $"/accounts/{unknownAccountId}/recovery-phrase",
             new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier),
-            ApiJsonSerializerContext.Default.RegisterRecoveryVerifierRequest);
+            AccountsJsonContext.Default.RegisterRecoveryVerifierRequest);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -191,15 +190,15 @@ public sealed class RecoveryEndpointsTests
         await client.PostAsJsonAsync(
             $"/accounts/{accountId}/recovery-phrase",
             new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier),
-            ApiJsonSerializerContext.Default.RegisterRecoveryVerifierRequest);
+            AccountsJsonContext.Default.RegisterRecoveryVerifierRequest);
 
         var response = await client.PostAsJsonAsync(
             "/auth/recover",
             new RecoverAccessRequest("recover-ok@example.com", SomeRecoveryVerifier),
-            ApiJsonSerializerContext.Default.RecoverAccessRequest);
+            AccountsJsonContext.Default.RecoverAccessRequest);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.RecoverAccessResponse);
+        var body = await response.Content.ReadFromJsonAsync(AccountsJsonContext.Default.RecoverAccessResponse);
         Assert.NotNull(body);
         Assert.Equal("recover-ok@example.com", body!.Email);
         Assert.Equal(AccountRole.Professional, body.Role);
@@ -225,10 +224,10 @@ public sealed class RecoveryEndpointsTests
         var response = await client.PostAsJsonAsync(
             "/auth/recover",
             new RecoverAccessRequest(email, recoveryVerifier),
-            ApiJsonSerializerContext.Default.RecoverAccessRequest);
+            AccountsJsonContext.Default.RecoverAccessRequest);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.RecoverAccessResponse);
+        var body = await response.Content.ReadFromJsonAsync(AccountsJsonContext.Default.RecoverAccessResponse);
         Assert.NotNull(body);
         Assert.Equal(TwoFactorRequirement.NotApplicable, body!.TwoFactorRequirement);
         Assert.Null(body.TwoFactorTicket);
@@ -246,12 +245,12 @@ public sealed class RecoveryEndpointsTests
         await client.PostAsJsonAsync(
             $"/accounts/{accountId}/recovery-phrase",
             new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier),
-            ApiJsonSerializerContext.Default.RegisterRecoveryVerifierRequest);
+            AccountsJsonContext.Default.RegisterRecoveryVerifierRequest);
 
         var response = await client.PostAsJsonAsync(
             "/auth/recover",
             new RecoverAccessRequest("recover-wrong@example.com", CreateVerifier(0xFF)),
-            ApiJsonSerializerContext.Default.RecoverAccessRequest);
+            AccountsJsonContext.Default.RecoverAccessRequest);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -268,16 +267,16 @@ public sealed class RecoveryEndpointsTests
         await client.PostAsJsonAsync(
             $"/accounts/{accountId}/recovery-phrase",
             new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier),
-            ApiJsonSerializerContext.Default.RegisterRecoveryVerifierRequest);
+            AccountsJsonContext.Default.RegisterRecoveryVerifierRequest);
 
         var wrongVerifierResponse = await client.PostAsJsonAsync(
             "/auth/recover",
             new RecoverAccessRequest("recover-compare@example.com", CreateVerifier(0xFF)),
-            ApiJsonSerializerContext.Default.RecoverAccessRequest);
+            AccountsJsonContext.Default.RecoverAccessRequest);
         var unknownEmailResponse = await client.PostAsJsonAsync(
             "/auth/recover",
             new RecoverAccessRequest("nobody-registered@example.com", SomeRecoveryVerifier),
-            ApiJsonSerializerContext.Default.RecoverAccessRequest);
+            AccountsJsonContext.Default.RecoverAccessRequest);
 
         Assert.Equal(HttpStatusCode.Unauthorized, wrongVerifierResponse.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, unknownEmailResponse.StatusCode);
@@ -293,7 +292,7 @@ public sealed class RecoveryEndpointsTests
         var response = await client.PostAsJsonAsync(
             "/auth/recover",
             new RecoverAccessRequest("", SomeRecoveryVerifier),
-            ApiJsonSerializerContext.Default.RecoverAccessRequest);
+            AccountsJsonContext.Default.RecoverAccessRequest);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -311,7 +310,7 @@ public sealed class RecoveryEndpointsTests
         var response = await client.PostAsJsonAsync(
             "/auth/recover",
             new RecoverAccessRequest("someone@example.com", new byte[] { 1, 2, 3 }),
-            ApiJsonSerializerContext.Default.RecoverAccessRequest);
+            AccountsJsonContext.Default.RecoverAccessRequest);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -347,20 +346,20 @@ public sealed class RecoveryEndpointsTests
         var registerResponse = await client.PostAsJsonAsync(
             "/auth/register",
             new RegisterRequest(email, SomeVerifier, AccountRole.Professional),
-            ApiJsonSerializerContext.Default.RegisterRequest);
-        var registered = await registerResponse.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.RegisterResponse);
+            AccountsJsonContext.Default.RegisterRequest);
+        var registered = await registerResponse.Content.ReadFromJsonAsync(AccountsJsonContext.Default.RegisterResponse);
         var accountId = registered!.Id;
         var ticket = registered.TwoFactorTicket!;
 
         await client.PostAsJsonAsync(
             $"/accounts/{accountId}/totp",
             new BeginTotpEnrollmentRequest(ticket),
-            ApiJsonSerializerContext.Default.BeginTotpEnrollmentRequest);
+            AccountsJsonContext.Default.BeginTotpEnrollmentRequest);
         var confirmResponse = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/totp/confirm",
             new ConfirmTotpEnrollmentRequest(ticket, ValidStubCode),
-            ApiJsonSerializerContext.Default.ConfirmTotpEnrollmentRequest);
-        var confirmed = await confirmResponse.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.ConfirmTotpEnrollmentResponse);
+            AccountsJsonContext.Default.ConfirmTotpEnrollmentRequest);
+        var confirmed = await confirmResponse.Content.ReadFromJsonAsync(AccountsJsonContext.Default.ConfirmTotpEnrollmentResponse);
 
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", confirmed!.AccessToken);
         return accountId;
@@ -383,7 +382,7 @@ public sealed class RecoveryEndpointsTests
 
     private static byte[] CreateVerifier(byte fill)
     {
-        var verifier = new byte[AccountService.PasswordVerifierLength];
+        var verifier = new byte[AccountVerifierLengths.PasswordVerifierLength];
         Array.Fill(verifier, fill);
         return verifier;
     }
