@@ -22,8 +22,10 @@
     "test:mutation:incremental": "stryker run --incremental"
   },
   "dependencies": {
+    "@limmiar/audio": "workspace:*",
     "@limmiar/crypto": "workspace:*",
     "@limmiar/i18n": "workspace:*",
+    "@limmiar/session": "workspace:*",
     "@limmiar/ui": "workspace:*",
     "@lingui/core": "^6.6.0",
     "@lingui/react": "^6.6.0",

@@ -20,12 +20,18 @@ importers:
 
   apps/app:
     dependencies:
+      '@limmiar/audio':
+        specifier: workspace:*
+        version: link:../../packages/audio
       '@limmiar/crypto':
         specifier: workspace:*
         version: link:../../packages/crypto
       '@limmiar/i18n':
         specifier: workspace:*
         version: link:../../packages/i18n
+      '@limmiar/session':
+        specifier: workspace:*
+        version: link:../../packages/session
       '@limmiar/ui':
         specifier: workspace:*
         version: link:../../packages/ui

@@ -2,7 +2,11 @@
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
     "target": "es2023",
-    "lib": ["ES2023", "DOM"],
+    // ES2024.SharedMemory only for `Atomics.waitAsync` — `@limmiar/audio`
+    // resolves straight to its .ts sources (see packages/audio/package.json
+    // "types"), so this app's own tsc -b type-checks ring-buffer.ts too;
+    // mirrors packages/audio/tsconfig.json's lib addition for the same API.
+    "lib": ["ES2023", "DOM", "ES2024.SharedMemory"],
     "module": "esnext",
     "types": ["vite/client"],
     "allowArbitraryExtensions": true,
