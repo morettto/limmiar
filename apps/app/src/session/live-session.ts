@@ -4,6 +4,7 @@ import type { CryptoKey } from '@limmiar/crypto'
 import type { SessaoEvento } from '@limmiar/session'
 import { persistChunk } from './chunk-store'
 import type { WriteSealed } from './chunk-store'
+import { ligarTap } from './pcm-tap'
 import type { SegmentStore } from './segment-store'
 
 /** Só o que `live-session` usa de um `GPUDevice` — evita @webgpu/types (não instalado)
@@ -57,6 +58,10 @@ export function ligarSessao(opcoes: LigarSessaoOpcoes): SessaoAoVivo {
   const tracks = stream.getTracks()
   const abort = new AbortController()
   const ring = attachRing(createRingSab(RING_CAPACITY_FRAMES))
+  // Falha do tap não derruba a sessão (decisão 10 do desenho da fatia 4): um
+  // desligar no-op mantém a invariante da tomada B ("best-effort, pode
+  // dropar") mesmo quando o browser não tem AudioWorklet/SAB.
+  const desligarTap = ligarTap(stream, ring).catch(() => () => {})
 
   let seq = 0
   // Fila de escrita encadeada (decisão 13): garante ordem de `seq` e que a
@@ -171,6 +176,8 @@ export function ligarSessao(opcoes: LigarSessaoOpcoes): SessaoAoVivo {
         }
         await engine.close()
 
+        const desligar = await desligarTap
+        desligar()
         tracks.forEach((track) => track.stop())
 
         enviar({ type: 'FILA_DRENADA' })

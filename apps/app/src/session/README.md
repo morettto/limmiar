@@ -4,14 +4,17 @@
 
 Cifra e escrita persistente dos chunks de PCM de uma sessão de captura ao
 vivo, mais o adapter que traduz o mundo real (`MediaRecorder`, ring buffer,
-motor de ASR, hardware) para eventos da máquina de `@limmiar/session`. Mesma
-disciplina de `patients/patient-crypto.ts`/`copilot/copilot-crypto.ts`:
-AAD versionada por contexto, cifra pela primitiva única de
-`@limmiar/crypto`, nunca reinventada aqui. Esta é a fatia 3 de S05-02 --
-cifra + escrita OPFS + adapter (`live-session.ts`) + store de segmentos
-(`segment-store.ts`). `pcm-tap.processor.ts`, `asr.worker.ts`,
-`engine-for.ts`, `nemotron-engine.ts` e `SessaoAoVivo.tsx` ficam para
-fatias seguintes.
+motor de ASR, hardware) para eventos da máquina de `@limmiar/session`, mais
+o pipeline de áudio real (tomada B) que alimenta esse ring: um
+`AudioWorklet` (`pcm-tap.processor.ts`/`pcm-tap.ts`) e um `TranscriptionEngine`
+escolhido por flag de build (`engine-for.ts`), hospedado num Worker
+(`asr.worker.ts`). Mesma disciplina de
+`patients/patient-crypto.ts`/`copilot/copilot-crypto.ts`: AAD versionada
+por contexto, cifra pela primitiva única de `@limmiar/crypto`, nunca
+reinventada aqui. Fatia 3 de S05-02 -- cifra + escrita OPFS + adapter
+(`live-session.ts`) + store de segmentos (`segment-store.ts`). Fatia 4 --
+tap + Worker ASR + motor por flag. `nemotron-engine.ts` e
+`SessaoAoVivo.tsx` ficam para fatias seguintes.
 
 ## Fluxo -- cifra (`audio-crypto.ts`)
 
@@ -64,13 +67,82 @@ diferentes -- ver ADR-0009 (pendente):
   mesmo sob escrita concorrente. Sucesso emite `CHUNK_PERSISTIDO`; falha
   (qualquer motivo, sem ramificar por `err.name`) emite `DISCO_CHEIO` com
   `bytesLivres` de `storage.estimate()`.
-- **Tomada B -- best-effort, pode dropar.** `AudioWorklet` (fatia 4) empurra
-  PCM para o ring de `@limmiar/audio`; `runAsrLoop` consome e entrega
-  segmentos a `segmentos.acrescentar(...)`, que não produz `SessaoEvento` --
-  é conteúdo, não estado.
+- **Tomada B -- best-effort, pode dropar.** `AudioWorklet`
+  (`pcm-tap.processor.ts`/`pcm-tap.ts`) empurra PCM para o ring de
+  `@limmiar/audio`; `runAsrLoop` consome e entrega segmentos a
+  `segmentos.acrescentar(...)`, que não produz `SessaoEvento` -- é
+  conteúdo, não estado. Ver secção seguinte para o protocolo.
 
 A gravação nunca depende de ASR ter sucesso: se o motor atrasar ou o ring
 saturar, a tomada A continua a escrever em disco sem interrupção.
+
+## Tomada B -- tap e motor (`pcm-tap.processor.ts`, `pcm-tap.ts`, `asr.worker.ts`, `engine-for.ts`)
+
+### Tap (`AudioWorklet`)
+
+`ligarTap(stream, ring): Promise<() => void>` (`pcm-tap.ts`, main thread)
+monta `new AudioContext({ sampleRate: 16000 }) → createMediaStreamSource →
+AudioWorkletNode('pcm-tap', { processorOptions: { sab }, channelCount: 1,
+channelCountMode: 'explicit', numberOfOutputs: 0 })`. Resample (16kHz) e
+downmix (mono) são nativos do `AudioContext`/`channelCount` -- zero DSP
+neste módulo. O nó é um sink zero-output (nunca liga a
+`ctx.destination`, ou o microfone voltaria pelas colunas); devolve um
+desligar síncrono (`source.disconnect(); node.disconnect(); ctx.close()`).
+Rejeita se o browser não tiver `AudioWorklet`/SAB -- best-effort, tratado
+pelo chamador.
+
+`PcmTap` (`pcm-tap.processor.ts`, corre na **audio thread**, registada como
+`'pcm-tap'`) acumula quanta de 128 frames até `CHUNK_FRAMES` (320ms
+@16kHz), aplica `isSilent` sobre o bloco inteiro (não sobre 8ms, que
+cortaria consoantes a meio) e `push` no ring se não for silêncio. Zero
+`postMessage`, zero alocação por quantum -- o único canal de setup é
+`processorOptions.sab` no construtor.
+
+### `live-session` liga e desliga o tap
+
+`ligarSessao` cria `desligarTap = ligarTap(stream, ring).catch(() => () =>
+{})` ao arrancar -- uma falha do tap (sem AudioWorklet/SAB, caso comum em
+jsdom/CI) nunca bloqueia a sessão, só desativa a tomada B. `encerrar()`
+resolve essa promise e chama o desligar antes de parar as faixas do
+`stream`.
+
+### Motor (`engine-for.ts` + `asr.worker.ts`)
+
+`engineFor(): TranscriptionEngine` escolhe o motor por
+`import.meta.env.VITE_FAKE_ASR` (precedente `router.tsx`,
+`VITE_ENABLE_E2E_TEST_ROUTES`): `'true'` devolve `fakeEngine()` local, sem
+Worker; qualquer outro valor devolve um proxy sobre um `Worker` dedicado
+(`new Worker(new URL('./asr.worker.ts', import.meta.url), { type: 'module'
+})`).
+
+`asr.worker.ts` hospeda hoje um `fakeEngine()` (troca por
+`nemotron-engine.ts` numa fatia futura, sem mudar o protocolo) e responde
+por `AsrRequest`/`AsrReply`:
+
+```ts
+type AsrRequest =
+  | { id: number; kind: 'warmup' }
+  | { id: number; kind: 'transcribe'; pcm: Float32Array }
+  | { id: number; kind: 'close' }
+type AsrReply =
+  | { id: number; ok: true; segments: TranscriptionSegment[] } // [] em warmup/close
+  | { id: number; ok: false; error: string }
+```
+
+O proxy em `engine-for.ts` mantém um `Map<id, {resolve, reject}>` de
+pendentes e roteia cada `AsrReply` pelo `id` -- necessário porque
+`warmup()`/`transcribe()` podem estar em voo ao mesmo tempo (`live-session`
+não aguarda o warmup). Dentro do Worker, uma fila serial
+(`fila = fila.then(...)`) garante que warmup/transcribe/close no engine
+nunca correm em paralelo -- uma sessão ONNX não é reentrante. `worker.onerror`
+rejeita todos os pendentes de uma vez.
+
+**Invariante do buffer reutilizado:** `pcm` viaja por structured clone,
+nunca por `transfer`. `runAsrLoop` reutiliza o mesmo `Float32Array` em
+todas as janelas (`packages/audio/src/asr-loop.ts`); transferi-lo o
+destacaria e a janela seguinte chegaria vazia ao motor. Uma cópia de
+~100KB por 1.6s de áudio não é o caminho quente -- o caminho quente é o
+ring, que nunca atravessa `postMessage`.
 
 ### Tabela evento-real → `SessaoEvento`
 
@@ -111,6 +183,15 @@ saturar, a tomada A continua a escrever em disco sem interrupção.
 - `SegmentStore` (tipo), `criarSegmentStore(): SegmentStore` --
   `subscribe`/`getSnapshot`/`acrescentar`, contrato `useSyncExternalStore`
   (`segment-store.ts`).
+- `ligarTap(stream, ring): Promise<() => void>` -- monta o `AudioWorklet` e
+  devolve o desligar; rejeita se o browser não suportar (`pcm-tap.ts`).
+  Classe `PcmTap` registada como `'pcm-tap'` (`pcm-tap.processor.ts`, audio
+  thread, sem export -- só efeito de `registerProcessor`).
+- `engineFor(): TranscriptionEngine` -- motor por
+  `VITE_FAKE_ASR` (`engine-for.ts`).
+- `AsrRequest`/`AsrReply` (tipos) -- protocolo do Worker
+  (`asr.worker.ts`, corre isolado, sem export de função: side effect de
+  `self.onmessage`).
 
 ## Decisões relevantes
 
@@ -127,3 +208,20 @@ os métodos que `chunk-store.ts` de facto usa (`getFileHandle`,
 com o que uma implementação alternativa de `write` (ex.: IndexedDB, fatia
 futura) poderia precisar, mesmo `opfsWriter` não o usando no nome do
 ficheiro.
+
+**`engineFor()` sem parâmetros**: o único chamador de produção é a UI, e os
+testes de `live-session` já injetam `engine` direto -- um `opts` hoje seria
+especulativo. Se um segundo chamador vier a precisar de escolher motor por
+outra via que não `VITE_FAKE_ASR`, é a hora de adicionar o parâmetro, não
+antes.
+
+**Default é sempre o Worker; `VITE_FAKE_ASR=true` é opt-in.** O Worker
+hospeda `fakeEngine` hoje, portanto os dois ramos dão o mesmo texto e só
+diferem em threading -- o caminho real já é o default, e quando
+`nemotron-engine.ts` entrar não há default para inverter.
+
+**`pcm-tap.processor.ts` sem exclusão de cobertura**: a classe só usa
+`options.processorOptions` e os globais `AudioWorkletProcessor`/
+`registerProcessor`; com `vi.stubGlobal` desses dois + `await import()`, o
+`process()` corre em jsdom como função pura sobre `Float32Array` -- não
+precisa de `AudioContext` nem de viver fora de `src/**`.

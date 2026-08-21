@@ -406,6 +406,38 @@ describe('ligarSessao — controller', () => {
   })
 })
 
+describe('ligarSessao — tomada B (tap)', () => {
+  it('liga o tap (constrói AudioContext@16k) ao arrancar a sessão', async () => {
+    const AudioContextFalso = vi.fn().mockImplementation(function AudioContextFalso() {
+      return {
+        audioWorklet: { addModule: vi.fn(() => new Promise(() => {})) }, // nunca resolve
+        resume: vi.fn(async () => {}),
+        close: vi.fn(async () => {}),
+        createMediaStreamSource: vi.fn(() => ({ connect: vi.fn(), disconnect: vi.fn() })),
+      }
+    })
+    vi.stubGlobal('AudioContext', AudioContextFalso)
+    const opcoes = await opcoesBase()
+
+    ligarSessao(opcoes)
+
+    expect(AudioContextFalso).toHaveBeenCalledWith({ sampleRate: 16000 })
+  })
+
+  it('ligarTap a rejeitar (sem AudioWorklet/SAB, caso jsdom) não impede encerrar() de resolver e enviar FILA_DRENADA', async () => {
+    const enviar = vi.fn()
+    const opcoes = await opcoesBase({ enviar })
+
+    // Sem stub de AudioContext: `ligarTap` rejeita porque jsdom não tem
+    // AudioContext — a invariante da tomada B é que isso nunca bloqueia
+    // encerrar() nem impede a tomada A de drenar.
+    const controller = ligarSessao(opcoes)
+    await expect(controller.encerrar()).resolves.toBeUndefined()
+
+    expect(enviar).toHaveBeenCalledWith({ type: 'FILA_DRENADA' })
+  })
+})
+
 describe('ligarSessao — asr-loop → segmentos', () => {
   it('onSegments do asr-loop chega à UI via segmentos.acrescentar (useSyncExternalStore)', async () => {
     const segmentos = criarSegmentStore()
