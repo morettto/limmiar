@@ -3,12 +3,14 @@
 ## Responsabilidade
 
 Núcleo puro e testável em Node do caminho de áudio: o buffer partilhado que
-liga produtor (AudioWorklet, fatia seguinte) a consumidor (worker de ASR,
-fatia seguinte), o gate de silêncio, o contrato de motor de transcrição, um
-duplo determinístico desse contrato para testes, o decode CTC greedy, e o
-loop que consome o buffer em janelas. Zero dependências de runtime, zero UI,
-zero ONNX real — só os seams puros. `AudioWorklet`, `Worker`, o motor ONNX
-real e OPFS entram em fatias seguintes de S05-02.
+liga produtor (AudioWorklet) a consumidor (worker de ASR), o gate de
+silêncio, o contrato de motor de transcrição, um duplo determinístico desse
+contrato para testes, o motor real sobre um reconhecedor streaming
+estrutural (`nemotron-engine.ts`), e o loop que consome o buffer em janelas.
+Zero dependências de runtime, zero UI, zero WASM/ONNX real — só os seams
+puros. O carregador do reconhecedor (`fetch` do `.wasm`/`.onnx`, `Module`
+Emscripten) é código de browser e vive em `apps/app`, fatia seguinte de
+S05-02.
 
 ## Fluxo — ring buffer (`ring-buffer.ts`)
 
@@ -66,12 +68,75 @@ segmento cobrindo o bloco inteiro, `text` derivado do comprimento), sem
 `Math.random` nem `Date.now` não injetado. `opts.transcribe` permite
 cenários de teste guionizados.
 
-## Fluxo — decode CTC (`ctc-decode.ts`)
+## Motor real (`nemotron-engine.ts`)
 
-`ctcGreedy(logits, vocabSize, vocab)` decodifica greedy: `logits` é um array
-plano `[tempo, vocabSize]` (uma linha de `vocabSize` scores por passo).
-Escolhe o argmax por passo, colapsa repetições consecutivas, e descarta o
-token de blank (índice `0` do vocabulário). Pura, sem estado.
+`nemotronEngine(recognizer: Promise<AsrRecognizer>): TranscriptionEngine`
+traduz um reconhecedor streaming (a API confirmada do `OnlineRecognizer` do
+sherpa-onnx, aqui como interfaces estruturais — `AsrRecognizer`, `AsrStream`,
+`AsrResult`) para o contrato `TranscriptionEngine`. Recebe a *promessa* do
+reconhecedor, não um reconhecedor pronto: o download do WASM + pesos arranca
+no boot do Worker, e `warmup()` é o ponto onde se espera por ele — a
+rejeição da promessa propaga-se pela rejeição de `warmup()`, que é o gancho
+que a máquina de sessão usa para `GPU_PERDIDA`.
+
+**Ciclo accept→decode→endpoint→reset.** `warmup()` cria um único
+`OnlineStream` (reutilizado em todas as janelas seguintes — o relógio de
+`start_time` do sherpa e o contexto do FastConformer são ambos relativos ao
+*stream*, não à janela) e aquece-o com 320ms de zeros. Cada `transcribe(pcm)`:
+1. `stream.acceptWaveform(16000, pcm)`
+2. `while (recognizer.isReady(stream)) recognizer.decode(stream)` — drena
+   todo o decode disponível para a janela
+3. `recognizer.isEndpoint(stream)` — `false` devolve `[]` sem ler nem
+   resetar; `true` lê o resultado, reseta o stream (mesmo com texto vazio —
+   o silêncio tem de fechar o segmento) e devolve o segmento
+
+**Semântica de segmento finalizado.** Só sai um segmento no `isEndpoint`;
+texto parcial a meio de frase nunca é devolvido — `SegmentStore` (fatia 3)
+é append-only, e devolver o parcial crescente a cada janela duplicaria
+"olá", "olá bom", "olá bom dia" como três segmentos. `startMs`/`endMs` somam
+`start_time` (início do segmento, absoluto no stream) com `timestamps[i]`
+(relativo ao segmento, zera em cada `reset`); sem `timestamps`, ambos caem
+no `start_time`. `// ponytail: só finalizados; parcial ao vivo exige
+SegmentStore.revisarUltimo — mudança de contrato, não deste ficheiro`.
+
+**`transcribe()` espera pela mesma promessa que `warmup()`, não por
+`rec`/`stream` soltos.** `live-session.ts` chama `engine.warmup().then(...)`
+sem `await` e arranca o loop que chama `transcribe()` logo a seguir — se
+`transcribe()` lesse duas variáveis de módulo populadas por `warmup()`,
+correria com `undefined` sempre que `warmup()` ainda não tivesse resolvido.
+Em vez disso, `warmup()` guarda uma única `readyPromise` (a `IIFE` que faz
+`createStream` → aquece → `reset`); `transcribe()` faz
+`const { rec, stream } = await readyPromise` — se `warmup()` já foi chamado
+mas ainda não resolveu, `transcribe()` espera pela mesma promessa em vez de
+ver `undefined`. Chamar `transcribe()` sem nunca ter chamado `warmup()` (fora
+do contrato, não deveria acontecer em produção) lança
+`Error('transcribe() chamado antes de warmup()')` em vez de um cast a mentir
+ao compilador.
+
+`close()` é idempotente e tolerante a `warmup()` que nunca correu, nunca
+resolveu, ou ainda está a resolver — se `readyPromise` existe, espera por ela
+(engolindo rejeição) antes de libertar `stream`/`recognizer`, e só liberta se
+o resultado existir.
+
+**O relógio do stream não é o relógio da sessão.** `start_time`/`timestamps`
+medem "áudio efetivamente alimentado" ao `acceptWaveform` — chunks
+descartados pelo gate de silêncio ou por overflow do ring nunca chegam cá,
+logo o tempo só coincide com o da sessão se nada tiver sido descartado.
+`// ponytail: relógio = áudio alimentado, não relógio de parede; a linha
+exata vem do passe canónico`. Não corrigido aqui de propósito — passar um
+`offsetMs` mudaria a assinatura de `TranscriptionEngine` para servir a
+tomada best-effort; a linha temporal autoritativa é a dos chunks do
+`MediaRecorder` em OPFS e do passe canónico (`packages/diarization`).
+
+**Limite conhecido de integração.** Os testes cobrem 100% do ciclo contra um
+duplo estrutural fiel à API do sherpa-onnx (lida no código-fonte oficial,
+não suposta), mas nenhum deles prova que o `.wasm` real se comporta como o
+duplo — não há teste de integração possível até existirem os dois artefactos
+externos: o export Python dos pesos NVIDIA e o build Emscripten do
+sherpa-onnx. A primeira prova real é manual, com microfone, na fatia
+seguinte (carregador em `apps/app`). Mesmo estado em que `nemotron-engine.ts`
+já correu de graça em Node: zero dependências novas (`package.json`
+inalterado), `environment: 'node'` no `vitest.config` do pacote.
 
 ## Fluxo — loop de ASR (`asr-loop.ts`)
 
@@ -120,7 +185,8 @@ isso é o adapter, não este loop), não desta fatia.
   `DEFAULT_SILENCE_RMS = 0.01` (`src/gate.ts`).
 - `TranscriptionEngine`, `TranscriptionSegment` (`src/transcription-engine.ts`).
 - `fakeEngine(opts?): TranscriptionEngine` (`src/fake-engine.ts`).
-- `ctcGreedy(logits, vocabSize, vocab): string` (`src/ctc-decode.ts`).
+- `nemotronEngine(recognizer: Promise<AsrRecognizer>): TranscriptionEngine`,
+  `AsrRecognizer`, `AsrStream`, `AsrResult` (`src/nemotron-engine.ts`).
 - `runAsrLoop(options): Promise<AsrLoopStats>`, `AsrLoopStats` (`src/asr-loop.ts`).
 - `src/index.ts` reexporta tudo o que é API pública dos ficheiros acima.
 

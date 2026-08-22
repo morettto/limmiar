@@ -16,7 +16,12 @@ export type { TranscriptionEngine, TranscriptionSegment } from './transcription-
 
 export { fakeEngine, type FakeEngineOptions } from './fake-engine.ts'
 
-export { ctcGreedy } from './ctc-decode.ts'
+export {
+  nemotronEngine,
+  type AsrRecognizer,
+  type AsrResult,
+  type AsrStream,
+} from './nemotron-engine.ts'
 
 export {
   runAsrLoop,
