@@ -9,7 +9,7 @@ vi.mock('@limmiar/audio', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@limmiar/audio')>()
   return {
     ...actual,
-    fakeEngine: () => ({
+    nemotronEngine: () => ({
       warmup: async () => warmupMock(),
       transcribe: async (pcm: Float32Array) => transcribeMock(pcm),
       close: async () => closeMock(),
@@ -17,10 +17,25 @@ vi.mock('@limmiar/audio', async (importOriginal) => {
   }
 })
 
+// `carregarReconhecedor` é substituído para não depender de glue/WASM real
+// (fatia 6); `capturado.importarGlue` guarda o `importarGlue` que
+// `asr.worker.ts` de facto constrói (`(url) => import(url)`), para provar
+// que essa linha de plataforma corre — ver o teste dedicado abaixo. `vi.mock`
+// é içado acima de qualquer `let`/`const` do módulo, daí `vi.hoisted`.
+const capturado = vi.hoisted(() => ({
+  importarGlue: undefined as ((url: string) => Promise<unknown>) | undefined,
+}))
+vi.mock('./nemotron-loader', () => ({
+  carregarReconhecedor: (importarGlue: (url: string) => Promise<unknown>) => {
+    capturado.importarGlue = importarGlue
+    return new Promise(() => {}) // nunca resolve: warmupMock/transcribeMock vêm do engine falso acima
+  },
+}))
+
 // `self.onmessage` corre como efeito de import em jsdom (`self` é `window`) —
 // precedente `patient-summary.worker.test.ts`. O engine é substituído acima
 // (`vi.mock`) para poder provar o ramo de rejeição sem depender do
-// comportamento fixo do `fakeEngine` real.
+// comportamento fixo do motor real.
 import './asr.worker'
 import type { AsrRequest } from './asr.worker'
 
@@ -92,5 +107,9 @@ describe('asr.worker', () => {
     await vi.waitFor(() =>
       expect(postMessage).toHaveBeenCalledWith({ id: 5, ok: false, error: 'boom' }),
     )
+  })
+
+  it('o `importarGlue` construído (`(url) => import(url)`) corre e rejeita para uma URL inexistente', async () => {
+    await expect(capturado.importarGlue?.('/nao-existe.mjs')).rejects.toBeTruthy()
   })
 })

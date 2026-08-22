@@ -16,3 +16,11 @@ bin/
 obj/
 TestResults/
 *.user
+
+# Artefacto de diff da cadeia de review (efémero, 1.3.0)
+.harness/diff/
+
+# Artefactos de ASR (glue WASM + .data com os pesos) usados só em dev local
+# por apps/app/src/session/nemotron-loader.ts; produção serve de object
+# store externo (VITE_ASR_MODEL_BASE_URL) -- ver S05-02 fatia 6.
+apps/app/public/models/

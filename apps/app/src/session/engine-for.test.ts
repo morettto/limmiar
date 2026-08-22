@@ -109,14 +109,17 @@ describe('engineFor', () => {
   })
 
   // Load-criterion test: roundtrip contra o Worker de verdade (@vitest/web-worker,
-  // já instalado — worker_threads por baixo), hospedando o `fakeEngine` real dentro
-  // de asr.worker.ts. Precedente: apps/app/src/patients/worker-client.test.ts.
-  it('roundtrip real: warmup → transcribe → close contra o fakeEngine dentro do Worker de verdade', async () => {
+  // já instalado — worker_threads por baixo), hospedando o motor real
+  // (`nemotronEngine` + `carregarReconhecedor`) dentro de asr.worker.ts.
+  // Sem `.wasm`/artefactos disponíveis em jsdom/Node, `import(/* @vite-ignore */ url)`
+  // de `sherpa-onnx-wasm-main-asr.mjs` rejeita — e é exatamente essa rejeição, ponta
+  // a ponta (carregador → fila do Worker → `AsrReply{ok:false}` → `postMessage` →
+  // proxy → `Error`), que prova o protocolo de erro da decisão 4/10 do desenho da
+  // fatia 6. Precedente: apps/app/src/patients/worker-client.test.ts.
+  it('roundtrip real: warmup contra o Worker de verdade rejeita — motor real não tem artefactos em teste', async () => {
     const engine = engineFor()
 
-    await expect(engine.warmup()).resolves.toBeUndefined()
-    const segments = await engine.transcribe(new Float32Array(8000)) // 500ms @16kHz
-    expect(segments).toEqual([{ startMs: 0, endMs: 500, text: '[fake:8000]' }])
+    await expect(engine.warmup()).rejects.toThrow(/falhou a carregar/)
     await expect(engine.close()).resolves.toBeUndefined()
   })
 })

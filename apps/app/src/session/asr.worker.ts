@@ -1,5 +1,7 @@
-import { fakeEngine } from '@limmiar/audio'
+import { nemotronEngine } from '@limmiar/audio'
 import type { TranscriptionSegment } from '@limmiar/audio'
+import { carregarReconhecedor } from './nemotron-loader'
+import type { GlueSherpa } from './nemotron-loader'
 
 export type AsrRequest =
   | { id: number; kind: 'warmup' }
@@ -10,9 +12,15 @@ export type AsrReply =
   | { id: number; ok: true; segments: TranscriptionSegment[] }
   | { id: number; ok: false; error: string }
 
-// Hoje o Worker hospeda `fakeEngine` (decisão 9 do desenho); quando
-// `nemotron-engine.ts` entrar, é esta linha que troca, não o protocolo.
-const engine = fakeEngine()
+// Motor real (fatia 6 do desenho): `nemotronEngine` recebe a *promessa* do
+// reconhecedor — o carregamento (glue + WASM + pesos) arranca já aqui, e
+// `warmup()` é o ponto onde se espera por ele. `carregarReconhecedor` recebe
+// `importarGlue` como seam de plataforma (decisão 6 do desenho da fatia 6):
+// `import()` de uma URL só conhecida em runtime não é intercetável por
+// `vi.mock`.
+const engine = nemotronEngine(
+  carregarReconhecedor((url) => import(/* @vite-ignore */ url) as Promise<GlueSherpa>),
+)
 
 // Fila serial (decisão 6 do desenho): uma sessão ONNX não é reentrante —
 // warmup/transcribe/close no engine nunca correm em paralelo, mesmo que
