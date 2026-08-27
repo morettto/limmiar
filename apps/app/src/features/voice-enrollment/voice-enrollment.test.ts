@@ -75,7 +75,10 @@ describe('cadastrarVoz', () => {
   // servidor": the serialized PUT body must be opaque base64, not the plaintext array.
   it('never sends the plaintext embedding array or its numeric values in the PUT body', async () => {
     const kek = await makeKek()
-    const embedding = [0.123456, -9.87654, 42.0]
+    // Every value must stringify with a '.', which base64's alphabet never produces:
+    // an integer like 42 would render as "42" and collide with the random ciphertext
+    // by chance in roughly 3% of runs.
+    const embedding = [0.123456, -9.87654, 42.5]
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }))
     vi.stubGlobal('fetch', fetchMock)
 

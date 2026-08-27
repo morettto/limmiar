@@ -67,7 +67,7 @@ msgstr "Database unavailable at the moment."
 msgid "Bem-vindo ao Limmiar"
 msgstr "Welcome to Limmiar"
 
-#: src/features/copilot-byok/CopilotKeySetup.tsx:52
+#: src/features/copilot-byok/CopilotKeySetup.tsx:57
 msgid "Cadastrar chave de API de IA"
 msgstr "Register AI API key"
 
@@ -80,11 +80,11 @@ msgstr "Invalid field: {field}."
 msgid "Carregando pacientes..."
 msgstr "Loading patients..."
 
-#: src/features/copilot-byok/CopilotKeySetup.tsx:76
+#: src/features/copilot-byok/CopilotKeySetup.tsx:81
 msgid "Chave de API"
 msgstr "API key"
 
-#: src/features/copilot-byok/CopilotKeySetup.tsx:28
+#: src/features/copilot-byok/CopilotKeySetup.tsx:30
 msgid "Chaveiro bloqueado. Desbloqueie para cadastrar sua chave de API."
 msgstr "Keychain locked. Unlock it to register your API key."
 
@@ -128,6 +128,10 @@ msgstr "How will you use Limmiar?"
 #: src/features/qr-scan/PairingScan.tsx:113
 msgid "Concluindo o pareamento..."
 msgstr "Completing pairing..."
+
+#: src/app/routing/router.tsx:31
+msgid "Configurar copiloto de IA"
+msgstr "Set up AI copilot"
 
 #: src/features/totp-enrollment/TotpSetup.tsx:125
 msgid "Configure a verificação em duas etapas"
@@ -251,7 +255,7 @@ msgstr "This record changed on another device. Reload and try again."
 msgid "Estes códigos não serão exibidos novamente. Guarde-os em um local seguro: eles são a única forma de recuperar o acesso à sua conta caso você perca o aplicativo autenticador."
 msgstr "These codes will not be shown again. Store them somewhere safe: they are the only way to recover access to your account if you lose your authenticator app."
 
-#: src/features/copilot-byok/CopilotKeySetup.tsx:61
+#: src/features/copilot-byok/CopilotKeySetup.tsx:66
 msgid "Fornecedor"
 msgstr "Provider"
 
@@ -292,7 +296,7 @@ msgstr "I've saved my phrase"
 msgid "agenda.slot_taken"
 msgstr "There is already a session at this time."
 
-#: src/features/copilot-byok/CopilotKeySetup.tsx:99
+#: src/features/copilot-byok/CopilotKeySetup.tsx:104
 msgid "Lembrar neste dispositivo"
 msgstr "Remember on this device"
 
@@ -339,7 +343,7 @@ msgstr "Could not decrypt the received key. Try pairing again."
 msgid "Não foi possível ler"
 msgstr "Could not read"
 
-#: src/features/copilot-byok/CopilotKeySetup.tsx:56
+#: src/features/copilot-byok/CopilotKeySetup.tsx:61
 msgid "Não foi possível salvar a chave. Tente novamente."
 msgstr "Could not save the key. Try again."
 
@@ -398,7 +402,8 @@ msgstr "Professional"
 msgid "patients.not_found"
 msgstr "Record not found."
 
-#: src/features/copilot-byok/CopilotKeySetup.tsx:111
+#: src/features/copilot-byok/CopilotKeySetup.tsx:33
+#: src/features/copilot-byok/CopilotKeySetup.tsx:116
 msgid "Pular"
 msgstr "Skip"
 
@@ -414,7 +419,7 @@ msgstr "Recover account access"
 msgid "Risco"
 msgstr "Risk"
 
-#: src/features/copilot-byok/CopilotKeySetup.tsx:108
+#: src/features/copilot-byok/CopilotKeySetup.tsx:113
 msgid "Salvar"
 msgstr "Save"
 

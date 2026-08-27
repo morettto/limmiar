@@ -22,11 +22,16 @@ export function CopilotKeySetup({ accountId, kek, providers = SUPPORTED_PROVIDER
   const [state, setState] = useState<Status>({ status: 'idle' })
 
   if (kek === null) {
+    // ponytail: the skip affordance is duplicated across both the locked and unlocked
+    // branches on purpose -- collapse it into a shared footer only if a third branch shows up.
     return (
       <div className="mx-auto max-w-sm p-4">
         <p role="status">
           <Trans>Chaveiro bloqueado. Desbloqueie para cadastrar sua chave de API.</Trans>
         </p>
+        <button type="button" onClick={onDone} className="mt-4 w-full rounded-md border border-neutral-300 px-4 py-2">
+          {t`Pular`}
+        </button>
       </div>
     )
   }

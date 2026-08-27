@@ -99,6 +99,16 @@ describe('CopilotKeySetup', () => {
     expect(screen.queryByRole('button', { name: 'Salvar' })).toBeNull()
   })
 
+  it('the locked state still offers "Pular", which calls onDone without ever calling saveApiKey', () => {
+    const onDone = vi.fn()
+    renderSetup({ kek: null, onDone })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Pular' }))
+
+    expect(onDone).toHaveBeenCalledTimes(1)
+    expect(saveApiKeyMock).not.toHaveBeenCalled()
+  })
+
   it('clicking "Pular" calls onDone without writing anything to localStorage', async () => {
     const kek = await makeKek()
     const onDone = vi.fn()

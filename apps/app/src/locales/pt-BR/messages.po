@@ -67,7 +67,7 @@ msgstr "Banco de dados indisponível no momento."
 msgid "Bem-vindo ao Limmiar"
 msgstr "Bem-vindo ao Limmiar"
 
-#: src/features/copilot-byok/CopilotKeySetup.tsx:52
+#: src/features/copilot-byok/CopilotKeySetup.tsx:57
 msgid "Cadastrar chave de API de IA"
 msgstr "Cadastrar chave de API de IA"
 
@@ -80,11 +80,11 @@ msgstr "Campo inválido: {field}."
 msgid "Carregando pacientes..."
 msgstr "Carregando pacientes..."
 
-#: src/features/copilot-byok/CopilotKeySetup.tsx:76
+#: src/features/copilot-byok/CopilotKeySetup.tsx:81
 msgid "Chave de API"
 msgstr "Chave de API"
 
-#: src/features/copilot-byok/CopilotKeySetup.tsx:28
+#: src/features/copilot-byok/CopilotKeySetup.tsx:30
 msgid "Chaveiro bloqueado. Desbloqueie para cadastrar sua chave de API."
 msgstr "Chaveiro bloqueado. Desbloqueie para cadastrar sua chave de API."
 
@@ -128,6 +128,10 @@ msgstr "Como você vai usar o Limmiar?"
 #: src/features/qr-scan/PairingScan.tsx:113
 msgid "Concluindo o pareamento..."
 msgstr "Concluindo o pareamento..."
+
+#: src/app/routing/router.tsx:31
+msgid "Configurar copiloto de IA"
+msgstr "Configurar copiloto de IA"
 
 #: src/features/totp-enrollment/TotpSetup.tsx:125
 msgid "Configure a verificação em duas etapas"
@@ -251,7 +255,7 @@ msgstr "Este prontuário mudou em outro dispositivo. Recarregue e tente de novo.
 msgid "Estes códigos não serão exibidos novamente. Guarde-os em um local seguro: eles são a única forma de recuperar o acesso à sua conta caso você perca o aplicativo autenticador."
 msgstr "Estes códigos não serão exibidos novamente. Guarde-os em um local seguro: eles são a única forma de recuperar o acesso à sua conta caso você perca o aplicativo autenticador."
 
-#: src/features/copilot-byok/CopilotKeySetup.tsx:61
+#: src/features/copilot-byok/CopilotKeySetup.tsx:66
 msgid "Fornecedor"
 msgstr "Fornecedor"
 
@@ -292,7 +296,7 @@ msgstr "Guardei minha frase"
 msgid "agenda.slot_taken"
 msgstr "Já existe uma sessão neste horário."
 
-#: src/features/copilot-byok/CopilotKeySetup.tsx:99
+#: src/features/copilot-byok/CopilotKeySetup.tsx:104
 msgid "Lembrar neste dispositivo"
 msgstr "Lembrar neste dispositivo"
 
@@ -339,7 +343,7 @@ msgstr "Não foi possível decifrar a chave recebida. Tente parear novamente."
 msgid "Não foi possível ler"
 msgstr "Não foi possível ler"
 
-#: src/features/copilot-byok/CopilotKeySetup.tsx:56
+#: src/features/copilot-byok/CopilotKeySetup.tsx:61
 msgid "Não foi possível salvar a chave. Tente novamente."
 msgstr "Não foi possível salvar a chave. Tente novamente."
 
@@ -398,7 +402,8 @@ msgstr "Profissional"
 msgid "patients.not_found"
 msgstr "Prontuário não encontrado."
 
-#: src/features/copilot-byok/CopilotKeySetup.tsx:111
+#: src/features/copilot-byok/CopilotKeySetup.tsx:33
+#: src/features/copilot-byok/CopilotKeySetup.tsx:116
 msgid "Pular"
 msgstr "Pular"
 
@@ -414,7 +419,7 @@ msgstr "Recuperar acesso à conta"
 msgid "Risco"
 msgstr "Risco"
 
-#: src/features/copilot-byok/CopilotKeySetup.tsx:108
+#: src/features/copilot-byok/CopilotKeySetup.tsx:113
 msgid "Salvar"
 msgstr "Salvar"
 

@@ -1,6 +1,8 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { RouterProvider } from '@tanstack/react-router'
+import { I18nProvider } from '@lingui/react'
+import { i18n, dynamicActivate } from '../../shared/i18n'
 import { encodeBase64 } from '../../shared/lib/base64'
 
 vi.mock('../../widgets/auth-screen/AuthScreen', () => ({ AuthScreen: vi.fn(() => <div data-testid="auth-screen" />) }))
@@ -18,6 +20,9 @@ vi.mock('../../features/device-pairing-primary/PairPrimaryDevice', () => ({
 }))
 vi.mock('../../features/device-pairing-new/PairNewDevice', () => ({
   PairNewDevice: vi.fn(() => <div data-testid="pair-new-device" />),
+}))
+vi.mock('../../features/copilot-byok/CopilotKeySetup', () => ({
+  CopilotKeySetup: vi.fn(() => <div data-testid="copilot-key-setup" />),
 }))
 
 // Route construction (createRoute/createRouter/routeTree, including the env-gated E2E
@@ -38,6 +43,12 @@ async function loadRouterAt(url: string, enableE2ERoutes = false) {
 }
 
 describe('router', () => {
+  beforeAll(async () => {
+    // indexRoute's <Link> label goes through @lingui/react/macro's <Trans>, which throws
+    // without an I18nProvider ancestor -- only the two tests that render "/" need it wrapped.
+    await dynamicActivate('pt-BR')
+  })
+
   afterEach(() => {
     cleanup()
     vi.clearAllMocks()
@@ -59,18 +70,57 @@ describe('router', () => {
   it('resolves the index route ("/") and renders the app shell', async () => {
     const router = await loadRouterAt('/')
 
-    render(<RouterProvider router={router} />)
+    render(
+      <I18nProvider i18n={i18n}>
+        <RouterProvider router={router} />
+      </I18nProvider>,
+    )
 
     const shell = await screen.findByText('Limmiar')
 
     expect(shell.id).toBe('app-shell')
-    expect(shell.textContent).toBe('Limmiar')
+    expect(shell.textContent).toContain('Limmiar')
 
     const matches = router.state.matches
     expect(matches).toHaveLength(2)
     expect(matches[0]?.routeId).toBe('__root__')
     expect(matches[1]?.routeId).toBe('/')
     expect(matches[1]?.fullPath).toBe('/')
+  })
+
+  it('resolves /settings/copilot with a locked keychain and an empty accountId, and its onDone navigates back to "/"', async () => {
+    const router = await loadRouterAt('/settings/copilot')
+
+    render(<RouterProvider router={router} />)
+    await screen.findByTestId('copilot-key-setup')
+
+    const { CopilotKeySetup } = await import('../../features/copilot-byok/CopilotKeySetup')
+    const props = vi.mocked(CopilotKeySetup).mock.calls[0]![0]
+    expect(props.accountId).toBe('')
+    expect(props.kek).toBeNull()
+
+    await act(async () => {
+      props.onDone()
+    })
+
+    expect(router.state.location.pathname).toBe('/')
+  })
+
+  it('the index route offers a link to /settings/copilot', async () => {
+    const router = await loadRouterAt('/')
+
+    render(
+      <I18nProvider i18n={i18n}>
+        <RouterProvider router={router} />
+      </I18nProvider>,
+    )
+    await screen.findByText('Limmiar')
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('link', { name: 'Configurar copiloto de IA' }))
+    })
+
+    expect(router.state.location.pathname).toBe('/settings/copilot')
   })
 
   it('resolves /auth/magic-link and passes baseUrl/token through to MagicLinkCallback', async () => {
