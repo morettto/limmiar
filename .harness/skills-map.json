@@ -1,0 +1,17 @@
+{
+  ".ts": "review-typescript-react",
+  ".tsx": "review-typescript-react",
+  ".js": "review-typescript-react",
+  ".jsx": "review-typescript-react",
+  ".mjs": "review-typescript-react",
+  ".cjs": "review-typescript-react",
+  ".css": "review-typescript-react",
+  ".html": "review-typescript-react",
+  ".cs": "review-dotnet-csharp",
+  ".csproj": "review-dotnet-csharp",
+  ".razor": "review-dotnet-csharp",
+  ".sql": "review-sql-data",
+  ".po": null,
+  ".sh": null,
+  ".ps1": null
+}
