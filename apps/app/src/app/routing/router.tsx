@@ -26,7 +26,7 @@ const indexRoute = createRoute({
   path: '/',
   component: () => (
     <div id="app-shell">
-      Limmiar{' '}
+      Limmiar
       <Link to="/settings/copilot">
         <Trans>Configurar copiloto de IA</Trans>
       </Link>
