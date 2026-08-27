@@ -2,6 +2,12 @@ import { assign, setup } from 'xstate'
 import { separarPorAncora } from './provenancia.ts'
 import type { CriarMaquinaRascunhoOpcoes, RascunhoContexto, RascunhoEvento } from './types.ts'
 
+// Relógio injetado pelo chamador (determinístico, testável); se omitido, cai
+// para o relógio real. Partilhado entre GERADO e AVISO_VENCIMENTO.
+function resolverAgora(agora?: string): string {
+  return agora ?? new Date().toISOString()
+}
+
 export function criarMaquinaRascunho(opcoes: CriarMaquinaRascunhoOpcoes) {
   return setup({
     types: {
@@ -31,7 +37,7 @@ export function criarMaquinaRascunho(opcoes: CriarMaquinaRascunhoOpcoes) {
               return {
                 afirmacoes: comAncora,
                 afirmacoesDescartadasSemAncora: descartadas,
-                criadaEm: event.agora ?? new Date().toISOString(),
+                criadaEm: resolverAgora(event.agora),
               }
             }),
           },
@@ -43,8 +49,13 @@ export function criarMaquinaRascunho(opcoes: CriarMaquinaRascunhoOpcoes) {
           DESCARTAR: 'descartado',
           AVISO_VENCIMENTO: {
             target: 'aVencer',
-            actions: assign({ avisoEmitidoEm: ({ event }) => event.agora ?? new Date().toISOString() }),
+            actions: assign({ avisoEmitidoEm: ({ event }) => resolverAgora(event.agora) }),
           },
+          // Rede de segurança: se o adapter falhar a janela de aviso (23-30
+          // dias) e disparar VENCEU direto a partir de `rascunho` sem passar
+          // por `aVencer`, o rascunho ainda assim é descartado aos 30 dias
+          // como a spec S07 promete — ver machine.test.ts.
+          VENCEU: 'descartado',
         },
       },
       aVencer: {

@@ -94,6 +94,15 @@ describe('criarMaquinaRascunho', () => {
     expect(actor.getSnapshot().status).toBe('done')
   })
 
+  it('caminho gerando → rascunho → descartado via VENCEU direto (rede de segurança, sem passar por aVencer)', () => {
+    const actor = createActor(criarMaquinaRascunho({ id: 'r1' })).start()
+    actor.send({ type: 'GERADO', afirmacoes: [ancorada('a')], agora: '2026-01-01T00:00:00.000Z' })
+    actor.send({ type: 'VENCEU' })
+
+    expect(actor.getSnapshot().matches('descartado')).toBe(true)
+    expect(actor.getSnapshot().status).toBe('done')
+  })
+
   it('caminho gerando → rascunho → aVencer → descartado via DESCARTAR', () => {
     const actor = createActor(criarMaquinaRascunho({ id: 'r1' })).start()
     actor.send({ type: 'GERADO', afirmacoes: [ancorada('a')], agora: '2026-01-01T00:00:00.000Z' })

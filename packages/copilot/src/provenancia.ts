@@ -4,7 +4,9 @@ const DIA_MS = 24 * 60 * 60 * 1000
 const JANELA_AVISO_MS = 23 * DIA_MS
 const PRAZO_DESCARTE_MS = 30 * DIA_MS
 
-export function separarPorAncora(afirmacoes: readonly Afirmacao[]): { comAncora: Afirmacao[]; descartadas: number } {
+export function separarPorAncora(
+  afirmacoes: readonly Afirmacao[],
+): { comAncora: readonly Afirmacao[]; descartadas: number } {
   const comAncora = afirmacoes.filter((afirmacao) => afirmacao.ancoras.length > 0)
   return { comAncora, descartadas: afirmacoes.length - comAncora.length }
 }
