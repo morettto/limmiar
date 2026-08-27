@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import { lingui, linguiTransformerBabelPreset } from '@lingui/vite-plugin'
 import babel from '@rolldown/plugin-babel'
 import tailwindcss from '@tailwindcss/vite'
+import { CONTENT_SECURITY_POLICY } from './src/features/copilot-byok/csp.ts'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -19,6 +20,7 @@ export default defineConfig({
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'credentialless',
       'X-Content-Type-Options': 'nosniff',
+      'Content-Security-Policy': CONTENT_SECURITY_POLICY,
     },
   },
   test: {

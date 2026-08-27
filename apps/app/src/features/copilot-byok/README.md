@@ -13,6 +13,7 @@ BYOK (bring your own key) para o copiloto de IA: o profissional cola a própria 
 5. `clearApiKey(accountId)` limpa a cópia em memória (se for da conta) e remove a entrada namespaced de `localStorage`. Não há nenhum fluxo de logout na app ainda que a chame -- fica para um ticket futuro de sessão/auth.
 6. `cors-probe.ts` (`probeProviderCors`) faz uma sondagem GET não autenticada para confirmar que o browser consegue mesmo chamar a API do provedor entre origens, antes do profissional confiar a própria chave ao fluxo -- nunca envia a chave, só a sonda.
 7. `provider-registry.ts` (`SUPPORTED_PROVIDERS`) é a lista fixa dos 3 provedores suportados no MVP -- array literal, sem registry/factory, porque não cresce em runtime.
+8. `csp.ts` (`CONTENT_SECURITY_POLICY`) deriva de `SUPPORTED_PROVIDERS` a diretiva `connect-src` da Content-Security-Policy do app (mais `object-src 'none'`), publicada em `apps/app/public/_headers` e espelhada em `preview.headers` de `vite.config.ts` (o que o job de DAST/ZAP varre). `csp.test.ts` é a rede de segurança: falha se `_headers` divergir do que `SUPPORTED_PROVIDERS` autoriza, para qualquer lado -- domínio a mais ou a menos.
 
 ## Pontos de entrada
 
@@ -20,6 +21,7 @@ BYOK (bring your own key) para o copiloto de IA: o profissional cola a própria 
 - `saveApiKey`, `loadApiKey`, `clearApiKey`, `COPILOT_KEY_STORAGE_KEY` (`key-store.ts`).
 - `copilotDekAad`, `copilotKeyAad` (`copilot-crypto.ts`) -- AAD versionado para o envelope da DEK e da chave, mesma disciplina de `patients/patient-crypto.ts`.
 - `probeProviderCors` (`cors-probe.ts`); `SUPPORTED_PROVIDERS`, tipo `AiProvider` (`provider-registry.ts`).
+- `CONTENT_SECURITY_POLICY` (`csp.ts`).
 
 ## Decisões relevantes
 
@@ -28,6 +30,10 @@ Persistência é opt-in (checkbox desmarcado por omissão), não opt-out -- a sp
 O storage de `localStorage` é namespaced por `accountId` desde a ronda 1 -- antes disso a chave global (`limmiar:copilot-key`, sem sufixo) fazia a chave de um segundo profissional no mesmo dispositivo sobrescrever silenciosamente a do primeiro.
 
 `e2e/copilot-byok.spec.ts` testa `SUPPORTED_PROVIDERS` contra as APIs reais dos 3 provedores (não fixture local) -- é o único teste do repo que depende de internet real; ver o comentário no topo do próprio spec para como diferenciar uma regressão nossa de uma API/rede fora do ar.
+
+A whitelist de `connect-src` na CSP (`csp.ts`) deriva de `SUPPORTED_PROVIDERS` em vez de ser escrita à mão em `_headers` e em `vite.config.ts` -- escrever a lista de domínios duas vezes em TypeScript é como a sincronia se perde silenciosamente quando um fornecedor é adicionado ou removido do registo; `csp.test.ts` ainda assim compara `_headers` contra o registo linha a linha, porque `_headers` é o artefacto que o browser de facto recebe (Cloudflare), não o TypeScript que o gerou. Ponto de calibração: `connect-src 'self'` só cobre a API .NET enquanto ela for servida na mesma origem deste app -- `shared/api/client.ts` recebe `baseUrl` por parâmetro e hoje nenhum ecrã o liga a um domínio externo, mas no dia em que o backend ganhar origem própria, essa origem tem de entrar em `csp.ts` ou o browser passa a bloquear as chamadas de API.
+
+O import de `provider-registry` em `csp.ts` mantém a extensão `.ts` explícita, ao contrário da convenção extensionless do resto do módulo -- `csp.ts` também entra no grafo de `tsconfig.node.json` (module `nodenext`) por ser importado de `vite.config.ts`, e sem a extensão `SUPPORTED_PROVIDERS` degrada para `any` nessa config, silenciosamente. Não "corrigir" esta extensão numa limpeza de estilo.
 
 Ronda 2 corrigiu dois bloqueantes que sobraram da ronda 1:
 - **Opt-out não apagava o já persistido**: tirar o `<input>` do `<form>` bastava para o botão "Salvar" não disparar submit nativo, mas nada limpava um envelope anterior se o profissional gravasse uma vez com "Lembrar" marcado e depois regravasse (mesma conta) com a caixa desmarcada. `saveApiKey` agora remove a entrada de `localStorage` da conta no ramo `!persist`.
