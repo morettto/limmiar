@@ -3,7 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Api.Accounts;
-using Api.Endpoints;
+using Api.Scheduling;
 using Api.Scheduling;
 using Api.Serialization;
 using Api.Tests.Infrastructure;
@@ -124,7 +124,7 @@ public sealed class SchedulingEndpointsTests : IAsyncLifetime
         var response = await client.PatchAsJsonAsync(
             $"/accounts/{accountId}/agenda/sessions/{sessionId}",
             new MoveSessionRequest(SomeStart.AddHours(1), 30),
-            ApiJsonSerializerContext.Default.MoveSessionRequest);
+            SchedulingJsonContext.Default.MoveSessionRequest);
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -180,7 +180,7 @@ public sealed class SchedulingEndpointsTests : IAsyncLifetime
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/agenda/sessions",
             new ScheduleSessionRequest(Guid.NewGuid(), SomeStart, 45),
-            ApiJsonSerializerContext.Default.ScheduleSessionRequest);
+            SchedulingJsonContext.Default.ScheduleSessionRequest);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
@@ -199,7 +199,7 @@ public sealed class SchedulingEndpointsTests : IAsyncLifetime
         var response = await clientB.PatchAsJsonAsync(
             $"/accounts/{accountIdB}/agenda/sessions/{sessionId}",
             new MoveSessionRequest(SomeStart.AddHours(1), 30),
-            ApiJsonSerializerContext.Default.MoveSessionRequest);
+            SchedulingJsonContext.Default.MoveSessionRequest);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -216,7 +216,7 @@ public sealed class SchedulingEndpointsTests : IAsyncLifetime
         var response = await client.PostAsJsonAsync(
             $"/accounts/{Guid.NewGuid()}/agenda/sessions",
             new ScheduleSessionRequest(Guid.NewGuid(), SomeStart, 50),
-            ApiJsonSerializerContext.Default.ScheduleSessionRequest);
+            SchedulingJsonContext.Default.ScheduleSessionRequest);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -234,7 +234,7 @@ public sealed class SchedulingEndpointsTests : IAsyncLifetime
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/agenda/sessions",
             new ScheduleSessionRequest(Guid.NewGuid(), SomeStart, 50),
-            ApiJsonSerializerContext.Default.ScheduleSessionRequest);
+            SchedulingJsonContext.Default.ScheduleSessionRequest);
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -253,7 +253,7 @@ public sealed class SchedulingEndpointsTests : IAsyncLifetime
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/agenda/sessions",
             new ScheduleSessionRequest(Guid.NewGuid(), SomeStart, 50),
-            ApiJsonSerializerContext.Default.ScheduleSessionRequest);
+            SchedulingJsonContext.Default.ScheduleSessionRequest);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -271,7 +271,7 @@ public sealed class SchedulingEndpointsTests : IAsyncLifetime
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/agenda/sessions",
             new ScheduleSessionRequest(Guid.NewGuid(), SomeStart, 0),
-            ApiJsonSerializerContext.Default.ScheduleSessionRequest);
+            SchedulingJsonContext.Default.ScheduleSessionRequest);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -290,7 +290,7 @@ public sealed class SchedulingEndpointsTests : IAsyncLifetime
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/agenda/sessions",
             new ScheduleSessionRequest(Guid.NewGuid(), SomeStart, 1441),
-            ApiJsonSerializerContext.Default.ScheduleSessionRequest);
+            SchedulingJsonContext.Default.ScheduleSessionRequest);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -310,7 +310,7 @@ public sealed class SchedulingEndpointsTests : IAsyncLifetime
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/agenda/sessions",
             new ScheduleSessionRequest(Guid.NewGuid(), SomeStart, 30),
-            ApiJsonSerializerContext.Default.ScheduleSessionRequest);
+            SchedulingJsonContext.Default.ScheduleSessionRequest);
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -329,10 +329,10 @@ public sealed class SchedulingEndpointsTests : IAsyncLifetime
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/agenda/sessions",
             new ScheduleSessionRequest(patientId, SomeStart, 50),
-            ApiJsonSerializerContext.Default.ScheduleSessionRequest);
+            SchedulingJsonContext.Default.ScheduleSessionRequest);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        var created = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.ScheduledSessionResponse);
+        var created = await response.Content.ReadFromJsonAsync(SchedulingJsonContext.Default.ScheduledSessionResponse);
         Assert.NotNull(created);
         Assert.Equal(patientId, created!.PatientId);
         Assert.Equal(SomeStart, created.StartsAt);
@@ -352,10 +352,10 @@ public sealed class SchedulingEndpointsTests : IAsyncLifetime
         var response = await client.PatchAsJsonAsync(
             $"/accounts/{accountId}/agenda/sessions/{sessionId}",
             new MoveSessionRequest(newStart, 30),
-            ApiJsonSerializerContext.Default.MoveSessionRequest);
+            SchedulingJsonContext.Default.MoveSessionRequest);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var moved = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.ScheduledSessionResponse);
+        var moved = await response.Content.ReadFromJsonAsync(SchedulingJsonContext.Default.ScheduledSessionResponse);
         Assert.NotNull(moved);
         Assert.Equal(newStart, moved!.StartsAt);
         Assert.Equal(30, moved.DurationMinutes);
@@ -370,7 +370,7 @@ public sealed class SchedulingEndpointsTests : IAsyncLifetime
         var response = await client.PatchAsJsonAsync(
             $"/accounts/{Guid.NewGuid()}/agenda/sessions/{Guid.NewGuid()}",
             new MoveSessionRequest(SomeStart, 50),
-            ApiJsonSerializerContext.Default.MoveSessionRequest);
+            SchedulingJsonContext.Default.MoveSessionRequest);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -388,7 +388,7 @@ public sealed class SchedulingEndpointsTests : IAsyncLifetime
         var response = await client.PatchAsJsonAsync(
             $"/accounts/{accountId}/agenda/sessions/{Guid.NewGuid()}",
             new MoveSessionRequest(SomeStart, 50),
-            ApiJsonSerializerContext.Default.MoveSessionRequest);
+            SchedulingJsonContext.Default.MoveSessionRequest);
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -407,7 +407,7 @@ public sealed class SchedulingEndpointsTests : IAsyncLifetime
         var response = await client.PatchAsJsonAsync(
             $"/accounts/{accountId}/agenda/sessions/{Guid.NewGuid()}",
             new MoveSessionRequest(SomeStart, 50),
-            ApiJsonSerializerContext.Default.MoveSessionRequest);
+            SchedulingJsonContext.Default.MoveSessionRequest);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -426,7 +426,7 @@ public sealed class SchedulingEndpointsTests : IAsyncLifetime
         var response = await client.PatchAsJsonAsync(
             $"/accounts/{accountId}/agenda/sessions/{sessionId}",
             new MoveSessionRequest(SomeStart.AddHours(1), 0),
-            ApiJsonSerializerContext.Default.MoveSessionRequest);
+            SchedulingJsonContext.Default.MoveSessionRequest);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -447,7 +447,7 @@ public sealed class SchedulingEndpointsTests : IAsyncLifetime
         var response = await client.PatchAsJsonAsync(
             $"/accounts/{accountId}/agenda/sessions/{sessionId}",
             new MoveSessionRequest(SomeStart.AddHours(1), 30),
-            ApiJsonSerializerContext.Default.MoveSessionRequest);
+            SchedulingJsonContext.Default.MoveSessionRequest);
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -468,7 +468,7 @@ public sealed class SchedulingEndpointsTests : IAsyncLifetime
         var response = await client.PatchAsJsonAsync(
             $"/accounts/{accountId}/agenda/sessions/{movableSessionId}",
             new MoveSessionRequest(takenSlot, 30),
-            ApiJsonSerializerContext.Default.MoveSessionRequest);
+            SchedulingJsonContext.Default.MoveSessionRequest);
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -583,8 +583,8 @@ public sealed class SchedulingEndpointsTests : IAsyncLifetime
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/agenda/sessions",
             new ScheduleSessionRequest(Guid.NewGuid(), startsAt, durationMinutes),
-            ApiJsonSerializerContext.Default.ScheduleSessionRequest);
-        var created = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.ScheduledSessionResponse);
+            SchedulingJsonContext.Default.ScheduleSessionRequest);
+        var created = await response.Content.ReadFromJsonAsync(SchedulingJsonContext.Default.ScheduledSessionResponse);
         return created!.SessionId;
     }
 
@@ -614,7 +614,7 @@ public sealed class SchedulingEndpointsTests : IAsyncLifetime
         await client.PostAsJsonAsync(
             $"/accounts/{accountId}/professional-verification",
             new SubmitProfessionalCredentialRequest(ProfessionalCredentialType.Crp, "06/123456", "SP", null),
-            ApiJsonSerializerContext.Default.SubmitProfessionalCredentialRequest);
+            AccountsJsonContext.Default.SubmitProfessionalCredentialRequest);
 
         return accountId;
     }
@@ -624,20 +624,20 @@ public sealed class SchedulingEndpointsTests : IAsyncLifetime
         var registerResponse = await client.PostAsJsonAsync(
             "/auth/register",
             new RegisterRequest(email, SomeVerifier, AccountRole.Professional),
-            ApiJsonSerializerContext.Default.RegisterRequest);
-        var registered = await registerResponse.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.RegisterResponse);
+            AccountsJsonContext.Default.RegisterRequest);
+        var registered = await registerResponse.Content.ReadFromJsonAsync(AccountsJsonContext.Default.RegisterResponse);
         var accountId = registered!.Id;
         var ticket = registered.TwoFactorTicket!;
 
         await client.PostAsJsonAsync(
             $"/accounts/{accountId}/totp",
             new BeginTotpEnrollmentRequest(ticket),
-            ApiJsonSerializerContext.Default.BeginTotpEnrollmentRequest);
+            AccountsJsonContext.Default.BeginTotpEnrollmentRequest);
         var confirmResponse = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/totp/confirm",
             new ConfirmTotpEnrollmentRequest(ticket, ValidStubCode),
-            ApiJsonSerializerContext.Default.ConfirmTotpEnrollmentRequest);
-        var confirmed = await confirmResponse.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.ConfirmTotpEnrollmentResponse);
+            AccountsJsonContext.Default.ConfirmTotpEnrollmentRequest);
+        var confirmed = await confirmResponse.Content.ReadFromJsonAsync(AccountsJsonContext.Default.ConfirmTotpEnrollmentResponse);
 
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", confirmed!.AccessToken);
         return accountId;
@@ -645,7 +645,7 @@ public sealed class SchedulingEndpointsTests : IAsyncLifetime
 
     private static byte[] CreateVerifier(byte fill)
     {
-        var verifier = new byte[AccountService.PasswordVerifierLength];
+        var verifier = new byte[AccountVerifierLengths.PasswordVerifierLength];
         Array.Fill(verifier, fill);
         return verifier;
     }

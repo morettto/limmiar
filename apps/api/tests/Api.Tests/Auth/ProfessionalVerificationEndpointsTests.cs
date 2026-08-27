@@ -3,7 +3,6 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Api.Accounts;
-using Api.Endpoints;
 using Api.Serialization;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -30,10 +29,10 @@ public sealed class ProfessionalVerificationEndpointsTests
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/professional-verification",
             new SubmitProfessionalCredentialRequest(ProfessionalCredentialType.Crp, "06/123456", "SP", null),
-            ApiJsonSerializerContext.Default.SubmitProfessionalCredentialRequest);
+            AccountsJsonContext.Default.SubmitProfessionalCredentialRequest);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.SubmitProfessionalCredentialResponse);
+        var body = await response.Content.ReadFromJsonAsync(AccountsJsonContext.Default.SubmitProfessionalCredentialResponse);
         Assert.NotNull(body);
         Assert.Equal(AccountVerificationStatus.Active, body!.Status);
         Assert.Null(body.RejectionReason);
@@ -49,10 +48,10 @@ public sealed class ProfessionalVerificationEndpointsTests
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/professional-verification",
             new SubmitProfessionalCredentialRequest(ProfessionalCredentialType.Crm, "123456-SP", "SP", null),
-            ApiJsonSerializerContext.Default.SubmitProfessionalCredentialRequest);
+            AccountsJsonContext.Default.SubmitProfessionalCredentialRequest);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.SubmitProfessionalCredentialResponse);
+        var body = await response.Content.ReadFromJsonAsync(AccountsJsonContext.Default.SubmitProfessionalCredentialResponse);
         Assert.NotNull(body);
         Assert.Equal(AccountVerificationStatus.Rejected, body!.Status);
         Assert.Equal("Número não encontrado.", body.RejectionReason);
@@ -68,13 +67,13 @@ public sealed class ProfessionalVerificationEndpointsTests
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/professional-verification",
             new SubmitProfessionalCredentialRequest(ProfessionalCredentialType.Document, null, null, "doc-ref-1"),
-            ApiJsonSerializerContext.Default.SubmitProfessionalCredentialRequest);
+            AccountsJsonContext.Default.SubmitProfessionalCredentialRequest);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.SubmitProfessionalCredentialResponse);
+        var body = await response.Content.ReadFromJsonAsync(AccountsJsonContext.Default.SubmitProfessionalCredentialResponse);
         Assert.NotNull(body);
         Assert.Equal(AccountVerificationStatus.InReview, body!.Status);
-        Assert.Equal(AccountService.DocumentReviewSlaBusinessDays, body.DocumentReviewSlaBusinessDays);
+        Assert.Equal(SubmitProfessionalCredentialHandler.DocumentReviewSlaBusinessDays, body.DocumentReviewSlaBusinessDays);
     }
 
     [Fact]
@@ -87,7 +86,7 @@ public sealed class ProfessionalVerificationEndpointsTests
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/professional-verification",
             new SubmitProfessionalCredentialRequest(ProfessionalCredentialType.Crp, null, "SP", null),
-            ApiJsonSerializerContext.Default.SubmitProfessionalCredentialRequest);
+            AccountsJsonContext.Default.SubmitProfessionalCredentialRequest);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -106,7 +105,7 @@ public sealed class ProfessionalVerificationEndpointsTests
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/professional-verification",
             new SubmitProfessionalCredentialRequest(ProfessionalCredentialType.Crp, "06/123456", null, null),
-            ApiJsonSerializerContext.Default.SubmitProfessionalCredentialRequest);
+            AccountsJsonContext.Default.SubmitProfessionalCredentialRequest);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -124,7 +123,7 @@ public sealed class ProfessionalVerificationEndpointsTests
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/professional-verification",
             new SubmitProfessionalCredentialRequest(ProfessionalCredentialType.Document, null, null, null),
-            ApiJsonSerializerContext.Default.SubmitProfessionalCredentialRequest);
+            AccountsJsonContext.Default.SubmitProfessionalCredentialRequest);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -142,7 +141,7 @@ public sealed class ProfessionalVerificationEndpointsTests
         var response = await client.PostAsJsonAsync(
             $"/accounts/{Guid.NewGuid()}/professional-verification/decision",
             new ProfessionalVerificationDecisionRequest(Approved: true, RejectionReason: null),
-            ApiJsonSerializerContext.Default.ProfessionalVerificationDecisionRequest);
+            AccountsJsonContext.Default.ProfessionalVerificationDecisionRequest);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -162,7 +161,7 @@ public sealed class ProfessionalVerificationEndpointsTests
         var response = await client.PostAsJsonAsync(
             $"/accounts/{unknownAccountId}/professional-verification",
             new SubmitProfessionalCredentialRequest(ProfessionalCredentialType.Crp, "06/123456", "SP", null),
-            ApiJsonSerializerContext.Default.SubmitProfessionalCredentialRequest);
+            AccountsJsonContext.Default.SubmitProfessionalCredentialRequest);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -179,15 +178,15 @@ public sealed class ProfessionalVerificationEndpointsTests
         var registerResponse = await client.PostAsJsonAsync(
             "/auth/register",
             new RegisterRequest("patient-submits@example.com", SomeVerifier, AccountRole.Patient),
-            ApiJsonSerializerContext.Default.RegisterRequest);
-        var registered = await registerResponse.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.RegisterResponse);
+            AccountsJsonContext.Default.RegisterRequest);
+        var registered = await registerResponse.Content.ReadFromJsonAsync(AccountsJsonContext.Default.RegisterResponse);
         // A Patient's TwoFactorRequirement is always NotApplicable (ADR-S02-03), so register already returned a real session.
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", registered!.AccessToken);
 
         var response = await client.PostAsJsonAsync(
             $"/accounts/{registered.Id}/professional-verification",
             new SubmitProfessionalCredentialRequest(ProfessionalCredentialType.Crp, "06/123456", "SP", null),
-            ApiJsonSerializerContext.Default.SubmitProfessionalCredentialRequest);
+            AccountsJsonContext.Default.SubmitProfessionalCredentialRequest);
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -207,7 +206,7 @@ public sealed class ProfessionalVerificationEndpointsTests
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/professional-verification",
             new SubmitProfessionalCredentialRequest(ProfessionalCredentialType.Crp, "06/123456", "SP", null),
-            ApiJsonSerializerContext.Default.SubmitProfessionalCredentialRequest);
+            AccountsJsonContext.Default.SubmitProfessionalCredentialRequest);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -228,7 +227,7 @@ public sealed class ProfessionalVerificationEndpointsTests
         var response = await client.PostAsJsonAsync(
             $"/accounts/{victimAccountId}/professional-verification",
             new SubmitProfessionalCredentialRequest(ProfessionalCredentialType.Document, null, null, "forged-doc-ref"),
-            ApiJsonSerializerContext.Default.SubmitProfessionalCredentialRequest);
+            AccountsJsonContext.Default.SubmitProfessionalCredentialRequest);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -248,7 +247,7 @@ public sealed class ProfessionalVerificationEndpointsTests
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/professional-verification",
             new SubmitProfessionalCredentialRequest(ProfessionalCredentialType.Crp, "06/123456", "SP", null),
-            ApiJsonSerializerContext.Default.SubmitProfessionalCredentialRequest);
+            AccountsJsonContext.Default.SubmitProfessionalCredentialRequest);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -265,12 +264,12 @@ public sealed class ProfessionalVerificationEndpointsTests
         await client.PostAsJsonAsync(
             $"/accounts/{accountId}/professional-verification",
             new SubmitProfessionalCredentialRequest(ProfessionalCredentialType.Crp, "06/123456", "SP", null),
-            ApiJsonSerializerContext.Default.SubmitProfessionalCredentialRequest);
+            AccountsJsonContext.Default.SubmitProfessionalCredentialRequest);
 
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/professional-verification",
             new SubmitProfessionalCredentialRequest(ProfessionalCredentialType.Crp, "06/123456", "SP", null),
-            ApiJsonSerializerContext.Default.SubmitProfessionalCredentialRequest);
+            AccountsJsonContext.Default.SubmitProfessionalCredentialRequest);
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -287,7 +286,7 @@ public sealed class ProfessionalVerificationEndpointsTests
         await client.PostAsJsonAsync(
             $"/accounts/{accountId}/professional-verification",
             new SubmitProfessionalCredentialRequest(ProfessionalCredentialType.Document, null, null, "doc-ref-2"),
-            ApiJsonSerializerContext.Default.SubmitProfessionalCredentialRequest);
+            AccountsJsonContext.Default.SubmitProfessionalCredentialRequest);
 
         AddStaffApiKey(client);
         var response = await client.GetAsync("/accounts/professional-verification/queue");
@@ -308,16 +307,16 @@ public sealed class ProfessionalVerificationEndpointsTests
         await client.PostAsJsonAsync(
             $"/accounts/{accountId}/professional-verification",
             new SubmitProfessionalCredentialRequest(ProfessionalCredentialType.Document, null, null, "doc-ref-3"),
-            ApiJsonSerializerContext.Default.SubmitProfessionalCredentialRequest);
+            AccountsJsonContext.Default.SubmitProfessionalCredentialRequest);
 
         AddStaffApiKey(client);
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/professional-verification/decision",
             new ProfessionalVerificationDecisionRequest(Approved: true, RejectionReason: null),
-            ApiJsonSerializerContext.Default.ProfessionalVerificationDecisionRequest);
+            AccountsJsonContext.Default.ProfessionalVerificationDecisionRequest);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.ProfessionalVerificationDecisionResponse);
+        var body = await response.Content.ReadFromJsonAsync(AccountsJsonContext.Default.ProfessionalVerificationDecisionResponse);
         Assert.NotNull(body);
         Assert.Equal(AccountVerificationStatus.Active, body!.Status);
     }
@@ -331,13 +330,13 @@ public sealed class ProfessionalVerificationEndpointsTests
         await client.PostAsJsonAsync(
             $"/accounts/{accountId}/professional-verification",
             new SubmitProfessionalCredentialRequest(ProfessionalCredentialType.Document, null, null, "doc-ref-4"),
-            ApiJsonSerializerContext.Default.SubmitProfessionalCredentialRequest);
+            AccountsJsonContext.Default.SubmitProfessionalCredentialRequest);
 
         AddStaffApiKey(client);
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/professional-verification/decision",
             new ProfessionalVerificationDecisionRequest(Approved: false, RejectionReason: null),
-            ApiJsonSerializerContext.Default.ProfessionalVerificationDecisionRequest);
+            AccountsJsonContext.Default.ProfessionalVerificationDecisionRequest);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -356,7 +355,7 @@ public sealed class ProfessionalVerificationEndpointsTests
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/professional-verification/decision",
             new ProfessionalVerificationDecisionRequest(Approved: true, RejectionReason: null),
-            ApiJsonSerializerContext.Default.ProfessionalVerificationDecisionRequest);
+            AccountsJsonContext.Default.ProfessionalVerificationDecisionRequest);
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -374,12 +373,12 @@ public sealed class ProfessionalVerificationEndpointsTests
         await client.PostAsJsonAsync(
             $"/accounts/{accountId}/professional-verification",
             new SubmitProfessionalCredentialRequest(ProfessionalCredentialType.Document, null, null, "doc-ref-self-approve"),
-            ApiJsonSerializerContext.Default.SubmitProfessionalCredentialRequest);
+            AccountsJsonContext.Default.SubmitProfessionalCredentialRequest);
 
         var withoutHeaderResponse = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/professional-verification/decision",
             new ProfessionalVerificationDecisionRequest(Approved: true, RejectionReason: null),
-            ApiJsonSerializerContext.Default.ProfessionalVerificationDecisionRequest);
+            AccountsJsonContext.Default.ProfessionalVerificationDecisionRequest);
 
         Assert.Equal(HttpStatusCode.Unauthorized, withoutHeaderResponse.StatusCode);
         var withoutHeaderBody = await withoutHeaderResponse.Content.ReadAsStringAsync();
@@ -390,7 +389,7 @@ public sealed class ProfessionalVerificationEndpointsTests
         var wrongKeyResponse = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/professional-verification/decision",
             new ProfessionalVerificationDecisionRequest(Approved: true, RejectionReason: null),
-            ApiJsonSerializerContext.Default.ProfessionalVerificationDecisionRequest);
+            AccountsJsonContext.Default.ProfessionalVerificationDecisionRequest);
 
         Assert.Equal(HttpStatusCode.Unauthorized, wrongKeyResponse.StatusCode);
         var wrongKeyBody = await wrongKeyResponse.Content.ReadAsStringAsync();
@@ -426,20 +425,20 @@ public sealed class ProfessionalVerificationEndpointsTests
         var registerResponse = await client.PostAsJsonAsync(
             "/auth/register",
             new RegisterRequest(email, SomeVerifier, AccountRole.Professional),
-            ApiJsonSerializerContext.Default.RegisterRequest);
-        var registered = await registerResponse.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.RegisterResponse);
+            AccountsJsonContext.Default.RegisterRequest);
+        var registered = await registerResponse.Content.ReadFromJsonAsync(AccountsJsonContext.Default.RegisterResponse);
         var accountId = registered!.Id;
         var ticket = registered.TwoFactorTicket!;
 
         await client.PostAsJsonAsync(
             $"/accounts/{accountId}/totp",
             new BeginTotpEnrollmentRequest(ticket),
-            ApiJsonSerializerContext.Default.BeginTotpEnrollmentRequest);
+            AccountsJsonContext.Default.BeginTotpEnrollmentRequest);
         var confirmResponse = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/totp/confirm",
             new ConfirmTotpEnrollmentRequest(ticket, ValidStubCode),
-            ApiJsonSerializerContext.Default.ConfirmTotpEnrollmentRequest);
-        var confirmed = await confirmResponse.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.ConfirmTotpEnrollmentResponse);
+            AccountsJsonContext.Default.ConfirmTotpEnrollmentRequest);
+        var confirmed = await confirmResponse.Content.ReadFromJsonAsync(AccountsJsonContext.Default.ConfirmTotpEnrollmentResponse);
 
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", confirmed!.AccessToken);
         return accountId;
@@ -511,7 +510,7 @@ public sealed class ProfessionalVerificationEndpointsTests
 
     private static byte[] CreateVerifier(byte fill)
     {
-        var verifier = new byte[AccountService.PasswordVerifierLength];
+        var verifier = new byte[AccountVerifierLengths.PasswordVerifierLength];
         Array.Fill(verifier, fill);
         return verifier;
     }

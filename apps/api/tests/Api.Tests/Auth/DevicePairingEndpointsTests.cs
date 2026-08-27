@@ -3,7 +3,6 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Api.Accounts;
-using Api.Endpoints;
 using Api.Serialization;
 using Api.Tests.Accounts;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -97,7 +96,7 @@ public sealed class DevicePairingEndpointsTests
         var response = await PostCreateAsync(client, accountId);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.CreatePairingSessionResponse);
+        var body = await response.Content.ReadFromJsonAsync(AccountsJsonContext.Default.CreatePairingSessionResponse);
         Assert.NotNull(body);
         Assert.False(string.IsNullOrWhiteSpace(body!.SessionId));
         Assert.True(body.ExpiresAt > before);
@@ -129,7 +128,7 @@ public sealed class DevicePairingEndpointsTests
         var response = await PostClaimAsync(client, sessionId);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.ClaimPairingSessionResponse);
+        var body = await response.Content.ReadFromJsonAsync(AccountsJsonContext.Default.ClaimPairingSessionResponse);
         Assert.NotNull(body);
         Assert.Equal(PrimaryPublicKey, body!.PrimaryPublicKey);
     }
@@ -161,7 +160,7 @@ public sealed class DevicePairingEndpointsTests
         var response = await GetClaimStatusAsync(client, accountId, sessionId);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.PairingClaimStatusResponse);
+        var body = await response.Content.ReadFromJsonAsync(AccountsJsonContext.Default.PairingClaimStatusResponse);
         Assert.NotNull(body);
         Assert.False(body!.Claimed);
         Assert.Null(body.NewDevicePublicKey);
@@ -179,7 +178,7 @@ public sealed class DevicePairingEndpointsTests
         var response = await GetClaimStatusAsync(client, accountId, sessionId);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.PairingClaimStatusResponse);
+        var body = await response.Content.ReadFromJsonAsync(AccountsJsonContext.Default.PairingClaimStatusResponse);
         Assert.NotNull(body);
         Assert.True(body!.Claimed);
         Assert.Equal(NewDevicePublicKey, body.NewDevicePublicKey);
@@ -324,7 +323,7 @@ public sealed class DevicePairingEndpointsTests
         var response = await GetPayloadAsync(client, sessionId);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.PairingSessionPayloadResponse);
+        var body = await response.Content.ReadFromJsonAsync(AccountsJsonContext.Default.PairingSessionPayloadResponse);
         Assert.NotNull(body);
         Assert.Equal(EncryptedKek, body!.EncryptedKek);
     }
@@ -394,16 +393,16 @@ public sealed class DevicePairingEndpointsTests
         var sessionId = await CreateSessionForAsync(primary, accountId);
 
         var pendingStatus = await GetClaimStatusAsync(primary, accountId, sessionId);
-        var pending = await pendingStatus.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.PairingClaimStatusResponse);
+        var pending = await pendingStatus.Content.ReadFromJsonAsync(AccountsJsonContext.Default.PairingClaimStatusResponse);
         Assert.False(pending!.Claimed);
 
         var claimResponse = await PostClaimAsync(newDevice, sessionId);
         Assert.Equal(HttpStatusCode.OK, claimResponse.StatusCode);
-        var claimed = await claimResponse.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.ClaimPairingSessionResponse);
+        var claimed = await claimResponse.Content.ReadFromJsonAsync(AccountsJsonContext.Default.ClaimPairingSessionResponse);
         Assert.Equal(PrimaryPublicKey, claimed!.PrimaryPublicKey);
 
         var claimedStatus = await GetClaimStatusAsync(primary, accountId, sessionId);
-        var observed = await claimedStatus.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.PairingClaimStatusResponse);
+        var observed = await claimedStatus.Content.ReadFromJsonAsync(AccountsJsonContext.Default.PairingClaimStatusResponse);
         Assert.True(observed!.Claimed);
         Assert.Equal(NewDevicePublicKey, observed.NewDevicePublicKey);
 
@@ -412,7 +411,7 @@ public sealed class DevicePairingEndpointsTests
 
         var fetchResponse = await GetPayloadAsync(newDevice, sessionId);
         Assert.Equal(HttpStatusCode.OK, fetchResponse.StatusCode);
-        var fetched = await fetchResponse.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.PairingSessionPayloadResponse);
+        var fetched = await fetchResponse.Content.ReadFromJsonAsync(AccountsJsonContext.Default.PairingSessionPayloadResponse);
         Assert.Equal(EncryptedKek, fetched!.EncryptedKek);
     }
 
@@ -429,7 +428,7 @@ public sealed class DevicePairingEndpointsTests
         var response = await PostCreateAsync(client, accountId);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.CreatePairingSessionResponse);
+        var body = await response.Content.ReadFromJsonAsync(AccountsJsonContext.Default.CreatePairingSessionResponse);
         Assert.NotNull(body);
         Assert.True(body!.ExpiresAt <= before + TimeSpan.FromSeconds(30) + TimeSpan.FromSeconds(5));
     }
@@ -441,7 +440,7 @@ public sealed class DevicePairingEndpointsTests
         client.PostAsJsonAsync(
             $"/accounts/{accountId}/devices/pairing-sessions/{sessionId}/payload",
             new SubmitPairingPayloadRequest(EncryptedKek),
-            ApiJsonSerializerContext.Default.SubmitPairingPayloadRequest);
+            AccountsJsonContext.Default.SubmitPairingPayloadRequest);
 
     private static Task<HttpResponseMessage> GetClaimStatusAsync(HttpClient client, Guid accountId, string sessionId) =>
         client.GetAsync($"/accounts/{accountId}/devices/pairing-sessions/{sessionId}/claim-status");
@@ -450,7 +449,7 @@ public sealed class DevicePairingEndpointsTests
         client.PostAsJsonAsync(
             $"/devices/pairing-sessions/{sessionId}/claim",
             new ClaimPairingSessionRequest(NewDevicePublicKey),
-            ApiJsonSerializerContext.Default.ClaimPairingSessionRequest);
+            AccountsJsonContext.Default.ClaimPairingSessionRequest);
 
     /// <summary>Registers a fresh account and opens a pairing session, returning the session id the primary device would encode into its QR code; leaves client authenticated as that account.</summary>
     private static async Task<string> CreateSessionAsync(HttpClient client, string email)
@@ -463,7 +462,7 @@ public sealed class DevicePairingEndpointsTests
     private static async Task<string> CreateSessionForAsync(HttpClient client, Guid accountId)
     {
         var response = await PostCreateAsync(client, accountId);
-        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.CreatePairingSessionResponse);
+        var body = await response.Content.ReadFromJsonAsync(AccountsJsonContext.Default.CreatePairingSessionResponse);
         return body!.SessionId;
     }
 
@@ -471,7 +470,7 @@ public sealed class DevicePairingEndpointsTests
         client.PostAsJsonAsync(
             $"/accounts/{accountId}/devices/pairing-sessions",
             new CreatePairingSessionRequest(PrimaryPublicKey),
-            ApiJsonSerializerContext.Default.CreatePairingSessionRequest);
+            AccountsJsonContext.Default.CreatePairingSessionRequest);
 
     /// <summary>Registers a Patient account (2FA NotApplicable per ADR-S02-03, so registration yields a real access token with no TOTP flow) and leaves client carrying it as the default Bearer header.</summary>
     private static async Task<(Guid AccountId, string AccessToken)> RegisterAsync(HttpClient client, string email)
@@ -479,8 +478,8 @@ public sealed class DevicePairingEndpointsTests
         var response = await client.PostAsJsonAsync(
             "/auth/register",
             new RegisterRequest(email, SomeVerifier, AccountRole.Patient),
-            ApiJsonSerializerContext.Default.RegisterRequest);
-        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.RegisterResponse);
+            AccountsJsonContext.Default.RegisterRequest);
+        var body = await response.Content.ReadFromJsonAsync(AccountsJsonContext.Default.RegisterResponse);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", body!.AccessToken);
         return (body.Id, body.AccessToken!);
     }
@@ -506,7 +505,7 @@ public sealed class DevicePairingEndpointsTests
 
     private static byte[] CreateVerifier(byte fill)
     {
-        var verifier = new byte[AccountService.PasswordVerifierLength];
+        var verifier = new byte[AccountVerifierLengths.PasswordVerifierLength];
         Array.Fill(verifier, fill);
         return verifier;
     }

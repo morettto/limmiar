@@ -10,9 +10,9 @@ public sealed class AccountServiceTests
     public async Task RegisterAsync_WithNewEmail_CreatesAccountWithRequestedRoleAndVerifier()
     {
         var store = new FakeAccountStore();
-        var service = new AccountService(store, new StubPasswordVerifierComparer(alwaysMatches: false), new StubGoogleIdentityProvider());
+        var handler = new RegisterHandler(store, new TwoFactorTicketIssuer(), new SessionTokenIssuer());
 
-        var result = await service.RegisterAsync("new@example.com", SomeVerifier, AccountRole.Professional, CancellationToken.None);
+        var result = await handler.Handle(new RegisterCommand("new@example.com", SomeVerifier, AccountRole.Professional), CancellationToken.None);
 
         Assert.True(result.Succeeded);
         Assert.NotNull(result.Account);
@@ -27,9 +27,9 @@ public sealed class AccountServiceTests
     {
         var existingAccount = new Account(Guid.NewGuid(), "taken@example.com", AccountRole.Patient, CreateVerifier(0x02), null);
         var store = new FakeAccountStore(existingAccount);
-        var service = new AccountService(store, new StubPasswordVerifierComparer(alwaysMatches: false), new StubGoogleIdentityProvider());
+        var handler = new RegisterHandler(store, new TwoFactorTicketIssuer(), new SessionTokenIssuer());
 
-        var result = await service.RegisterAsync("taken@example.com", SomeVerifier, AccountRole.Professional, CancellationToken.None);
+        var result = await handler.Handle(new RegisterCommand("taken@example.com", SomeVerifier, AccountRole.Professional), CancellationToken.None);
 
         Assert.False(result.Succeeded);
         Assert.Equal(AccountRegistrationFailureReason.EmailAlreadyRegistered, result.FailureReason);
@@ -44,9 +44,9 @@ public sealed class AccountServiceTests
     {
         var existingAccount = new Account(Guid.NewGuid(), "known@example.com", AccountRole.Patient, SomeVerifier, null);
         var store = new FakeAccountStore(existingAccount);
-        var service = new AccountService(store, new StubPasswordVerifierComparer(alwaysMatches: true), new StubGoogleIdentityProvider());
+        var handler = new LoginHandler(store, new StubPasswordVerifierComparer(alwaysMatches: true), new TwoFactorTicketIssuer(), new SessionTokenIssuer());
 
-        var result = await service.LoginAsync("known@example.com", SomeVerifier, CancellationToken.None);
+        var result = await handler.Handle(new LoginCommand("known@example.com", SomeVerifier), CancellationToken.None);
 
         Assert.True(result.Succeeded);
         Assert.Same(existingAccount, result.Account);
@@ -57,9 +57,9 @@ public sealed class AccountServiceTests
     {
         var existingAccount = new Account(Guid.NewGuid(), "known@example.com", AccountRole.Patient, SomeVerifier, null);
         var store = new FakeAccountStore(existingAccount);
-        var service = new AccountService(store, new StubPasswordVerifierComparer(alwaysMatches: false), new StubGoogleIdentityProvider());
+        var handler = new LoginHandler(store, new StubPasswordVerifierComparer(alwaysMatches: false), new TwoFactorTicketIssuer(), new SessionTokenIssuer());
 
-        var result = await service.LoginAsync("known@example.com", CreateVerifier(0xFF), CancellationToken.None);
+        var result = await handler.Handle(new LoginCommand("known@example.com", CreateVerifier(0xFF)), CancellationToken.None);
 
         Assert.False(result.Succeeded);
         Assert.Equal(AccountLoginFailureReason.InvalidCredentials, result.FailureReason);
@@ -70,9 +70,9 @@ public sealed class AccountServiceTests
     public async Task LoginAsync_WithUnknownEmail_ReturnsSameFailureAsWrongVerifier()
     {
         var store = new FakeAccountStore();
-        var service = new AccountService(store, new StubPasswordVerifierComparer(alwaysMatches: false), new StubGoogleIdentityProvider());
+        var handler = new LoginHandler(store, new StubPasswordVerifierComparer(alwaysMatches: false), new TwoFactorTicketIssuer(), new SessionTokenIssuer());
 
-        var result = await service.LoginAsync("ghost@example.com", SomeVerifier, CancellationToken.None);
+        var result = await handler.Handle(new LoginCommand("ghost@example.com", SomeVerifier), CancellationToken.None);
 
         Assert.False(result.Succeeded);
         Assert.Equal(AccountLoginFailureReason.InvalidCredentials, result.FailureReason);
@@ -86,12 +86,12 @@ public sealed class AccountServiceTests
     {
         var store = new FakeAccountStore();
         var comparer = new RecordingPasswordVerifierComparer(result: false);
-        var service = new AccountService(store, comparer, new StubGoogleIdentityProvider());
+        var handler = new LoginHandler(store, comparer, new TwoFactorTicketIssuer(), new SessionTokenIssuer());
 
-        await service.LoginAsync("ghost@example.com", SomeVerifier, CancellationToken.None);
+        await handler.Handle(new LoginCommand("ghost@example.com", SomeVerifier), CancellationToken.None);
 
         Assert.Equal(1, comparer.CallCount);
-        Assert.Equal(AccountService.PasswordVerifierLength, comparer.LastStoredLength);
+        Assert.Equal(AccountVerifierLengths.PasswordVerifierLength, comparer.LastStoredLength);
     }
 
     [Fact]
@@ -100,12 +100,12 @@ public sealed class AccountServiceTests
         var existingAccount = new Account(Guid.NewGuid(), "known@example.com", AccountRole.Patient, SomeVerifier, null);
         var store = new FakeAccountStore(existingAccount);
         var comparer = new RecordingPasswordVerifierComparer(result: false);
-        var service = new AccountService(store, comparer, new StubGoogleIdentityProvider());
+        var handler = new LoginHandler(store, comparer, new TwoFactorTicketIssuer(), new SessionTokenIssuer());
 
-        await service.LoginAsync("known@example.com", CreateVerifier(0xFF), CancellationToken.None);
+        await handler.Handle(new LoginCommand("known@example.com", CreateVerifier(0xFF)), CancellationToken.None);
 
         Assert.Equal(1, comparer.CallCount);
-        Assert.Equal(AccountService.PasswordVerifierLength, comparer.LastStoredLength);
+        Assert.Equal(AccountVerifierLengths.PasswordVerifierLength, comparer.LastStoredLength);
     }
 
     [Fact]
@@ -114,14 +114,14 @@ public sealed class AccountServiceTests
         var googleOnlyAccount = new Account(Guid.NewGuid(), "google-only@example.com", AccountRole.Patient, PasswordVerifier: null, "google-subject-1");
         var store = new FakeAccountStore(googleOnlyAccount);
         var comparer = new RecordingPasswordVerifierComparer(result: false);
-        var service = new AccountService(store, comparer, new StubGoogleIdentityProvider());
+        var handler = new LoginHandler(store, comparer, new TwoFactorTicketIssuer(), new SessionTokenIssuer());
 
-        var result = await service.LoginAsync("google-only@example.com", SomeVerifier, CancellationToken.None);
+        var result = await handler.Handle(new LoginCommand("google-only@example.com", SomeVerifier), CancellationToken.None);
 
         Assert.False(result.Succeeded);
         Assert.Equal(AccountLoginFailureReason.InvalidCredentials, result.FailureReason);
         Assert.Equal(1, comparer.CallCount);
-        Assert.Equal(AccountService.PasswordVerifierLength, comparer.LastStoredLength);
+        Assert.Equal(AccountVerifierLengths.PasswordVerifierLength, comparer.LastStoredLength);
     }
 
     // Regression: an all-zero submitted verifier used to match the all-zero DummyVerifier
@@ -132,10 +132,10 @@ public sealed class AccountServiceTests
     {
         var googleOnlyAccount = new Account(Guid.NewGuid(), "google-only@example.com", AccountRole.Professional, PasswordVerifier: null, "google-subject-1");
         var store = new FakeAccountStore(googleOnlyAccount);
-        var service = new AccountService(store, new ConstantTimePasswordVerifierComparer(), new StubGoogleIdentityProvider());
-        var allZeroVerifier = new byte[AccountService.PasswordVerifierLength];
+        var handler = new LoginHandler(store, new ConstantTimePasswordVerifierComparer(), new TwoFactorTicketIssuer(), new SessionTokenIssuer());
+        var allZeroVerifier = new byte[AccountVerifierLengths.PasswordVerifierLength];
 
-        var result = await service.LoginAsync("google-only@example.com", allZeroVerifier, CancellationToken.None);
+        var result = await handler.Handle(new LoginCommand("google-only@example.com", allZeroVerifier), CancellationToken.None);
 
         Assert.False(result.Succeeded);
         Assert.Equal(AccountLoginFailureReason.InvalidCredentials, result.FailureReason);
@@ -147,9 +147,9 @@ public sealed class AccountServiceTests
     {
         var store = new FakeAccountStore();
         var identity = new GoogleIdentity("new-via-google@example.com", "google-subject-1");
-        var service = new AccountService(store, new StubPasswordVerifierComparer(alwaysMatches: false), new StubGoogleIdentityProvider(identity));
+        var handler = new ContinueWithGoogleHandler(new StubGoogleIdentityProvider(identity), store, new TwoFactorTicketIssuer(), new SessionTokenIssuer());
 
-        var result = await service.GoogleAuthAsync("valid-id-token", AccountRole.Professional, CancellationToken.None);
+        var result = await handler.Handle(new ContinueWithGoogleCommand("valid-id-token", AccountRole.Professional), CancellationToken.None);
 
         Assert.True(result.Succeeded);
         Assert.True(result.IsNewAccount);
@@ -165,9 +165,9 @@ public sealed class AccountServiceTests
         var existingAccount = new Account(Guid.NewGuid(), "already-here@example.com", AccountRole.Professional, SomeVerifier, null);
         var store = new FakeAccountStore(existingAccount);
         var identity = new GoogleIdentity("already-here@example.com", "google-subject-2");
-        var service = new AccountService(store, new StubPasswordVerifierComparer(alwaysMatches: false), new StubGoogleIdentityProvider(identity));
+        var handler = new ContinueWithGoogleHandler(new StubGoogleIdentityProvider(identity), store, new TwoFactorTicketIssuer(), new SessionTokenIssuer());
 
-        var result = await service.GoogleAuthAsync("valid-id-token", AccountRole.Patient, CancellationToken.None);
+        var result = await handler.Handle(new ContinueWithGoogleCommand("valid-id-token", AccountRole.Patient), CancellationToken.None);
 
         Assert.True(result.Succeeded);
         Assert.False(result.IsNewAccount);
@@ -179,9 +179,9 @@ public sealed class AccountServiceTests
     public async Task GoogleAuthAsync_WithInvalidGoogleToken_ReturnsFailure()
     {
         var store = new FakeAccountStore();
-        var service = new AccountService(store, new StubPasswordVerifierComparer(alwaysMatches: false), new StubGoogleIdentityProvider(identity: null));
+        var handler = new ContinueWithGoogleHandler(new StubGoogleIdentityProvider(identity: null), store, new TwoFactorTicketIssuer(), new SessionTokenIssuer());
 
-        var result = await service.GoogleAuthAsync("bad-id-token", AccountRole.Patient, CancellationToken.None);
+        var result = await handler.Handle(new ContinueWithGoogleCommand("bad-id-token", AccountRole.Patient), CancellationToken.None);
 
         Assert.False(result.Succeeded);
         Assert.Equal(AccountGoogleAuthFailureReason.InvalidGoogleToken, result.FailureReason);
@@ -190,7 +190,7 @@ public sealed class AccountServiceTests
 
     private static byte[] CreateVerifier(byte fill)
     {
-        var verifier = new byte[AccountService.PasswordVerifierLength];
+        var verifier = new byte[AccountVerifierLengths.PasswordVerifierLength];
         Array.Fill(verifier, fill);
         return verifier;
     }

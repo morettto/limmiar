@@ -10,9 +10,9 @@ public sealed class AccountServiceRecoveryTests
     public async Task RecoverAccessAsync_WithUnknownEmail_ReturnsInvalidRecoveryPhrase()
     {
         var store = new FakeAccountStore();
-        var service = CreateService(store, new StubPasswordVerifierComparer(alwaysMatches: false));
+        var handler = CreateRecoverAccessHandler(store, new StubPasswordVerifierComparer(alwaysMatches: false));
 
-        var result = await service.RecoverAccessAsync("ghost@example.com", SomeVerifier, CancellationToken.None);
+        var result = await handler.Handle(new RecoverAccessCommand("ghost@example.com", SomeVerifier), CancellationToken.None);
 
         Assert.False(result.Succeeded);
         Assert.Equal(AccountRecoveryFailureReason.InvalidRecoveryPhrase, result.FailureReason);
@@ -24,9 +24,9 @@ public sealed class AccountServiceRecoveryTests
     {
         var account = new Account(Guid.NewGuid(), "no-recovery@example.com", AccountRole.Professional, SomeVerifier, null);
         var store = new FakeAccountStore(account);
-        var service = CreateService(store, new StubPasswordVerifierComparer(alwaysMatches: true));
+        var handler = CreateRecoverAccessHandler(store, new StubPasswordVerifierComparer(alwaysMatches: true));
 
-        var result = await service.RecoverAccessAsync("no-recovery@example.com", SomeVerifier, CancellationToken.None);
+        var result = await handler.Handle(new RecoverAccessCommand("no-recovery@example.com", SomeVerifier), CancellationToken.None);
 
         Assert.False(result.Succeeded);
         Assert.Equal(AccountRecoveryFailureReason.InvalidRecoveryPhrase, result.FailureReason);
@@ -39,9 +39,9 @@ public sealed class AccountServiceRecoveryTests
             Guid.NewGuid(), "known@example.com", AccountRole.Professional, SomeVerifier, null,
             RecoveryVerifier: CreateVerifier(0x02));
         var store = new FakeAccountStore(account);
-        var service = CreateService(store, new StubPasswordVerifierComparer(alwaysMatches: false));
+        var handler = CreateRecoverAccessHandler(store, new StubPasswordVerifierComparer(alwaysMatches: false));
 
-        var result = await service.RecoverAccessAsync("known@example.com", CreateVerifier(0xFF), CancellationToken.None);
+        var result = await handler.Handle(new RecoverAccessCommand("known@example.com", CreateVerifier(0xFF)), CancellationToken.None);
 
         Assert.False(result.Succeeded);
         Assert.Equal(AccountRecoveryFailureReason.InvalidRecoveryPhrase, result.FailureReason);
@@ -52,12 +52,12 @@ public sealed class AccountServiceRecoveryTests
     {
         var store = new FakeAccountStore();
         var comparer = new RecordingPasswordVerifierComparer(result: false);
-        var service = CreateService(store, comparer);
+        var handler = CreateRecoverAccessHandler(store, comparer);
 
-        await service.RecoverAccessAsync("ghost@example.com", SomeVerifier, CancellationToken.None);
+        await handler.Handle(new RecoverAccessCommand("ghost@example.com", SomeVerifier), CancellationToken.None);
 
         Assert.Equal(1, comparer.CallCount);
-        Assert.Equal(AccountService.PasswordVerifierLength, comparer.LastStoredLength);
+        Assert.Equal(AccountVerifierLengths.PasswordVerifierLength, comparer.LastStoredLength);
     }
 
     [Fact]
@@ -67,9 +67,9 @@ public sealed class AccountServiceRecoveryTests
             Guid.NewGuid(), "patient@example.com", AccountRole.Patient, SomeVerifier, null,
             RecoveryVerifier: CreateVerifier(0x02));
         var store = new FakeAccountStore(account);
-        var service = CreateService(store, new StubPasswordVerifierComparer(alwaysMatches: true));
+        var handler = CreateRecoverAccessHandler(store, new StubPasswordVerifierComparer(alwaysMatches: true));
 
-        var result = await service.RecoverAccessAsync("patient@example.com", CreateVerifier(0x02), CancellationToken.None);
+        var result = await handler.Handle(new RecoverAccessCommand("patient@example.com", CreateVerifier(0x02)), CancellationToken.None);
 
         Assert.True(result.Succeeded);
         Assert.Same(account, result.Account);
@@ -84,9 +84,9 @@ public sealed class AccountServiceRecoveryTests
             Guid.NewGuid(), "pro@example.com", AccountRole.Professional, SomeVerifier, null,
             RecoveryVerifier: CreateVerifier(0x02));
         var store = new FakeAccountStore(account);
-        var service = CreateService(store, new StubPasswordVerifierComparer(alwaysMatches: true));
+        var handler = CreateRecoverAccessHandler(store, new StubPasswordVerifierComparer(alwaysMatches: true));
 
-        var result = await service.RecoverAccessAsync("pro@example.com", CreateVerifier(0x02), CancellationToken.None);
+        var result = await handler.Handle(new RecoverAccessCommand("pro@example.com", CreateVerifier(0x02)), CancellationToken.None);
 
         Assert.True(result.Succeeded);
         Assert.Equal(TwoFactorRequirement.SetupRequired, result.TwoFactorRequirement);
@@ -98,9 +98,9 @@ public sealed class AccountServiceRecoveryTests
     public async Task RegisterRecoveryVerifierAsync_WithUnknownAccountId_ReturnsAccountNotFound()
     {
         var store = new FakeAccountStore();
-        var service = CreateService(store, new StubPasswordVerifierComparer(alwaysMatches: false));
+        var handler = new RegisterRecoveryVerifierHandler(store);
 
-        var result = await service.RegisterRecoveryVerifierAsync(Guid.NewGuid(), SomeVerifier, CancellationToken.None);
+        var result = await handler.Handle(new RegisterRecoveryVerifierCommand(Guid.NewGuid(), SomeVerifier), CancellationToken.None);
 
         Assert.False(result.Succeeded);
         Assert.Equal(RegisterRecoveryVerifierFailureReason.AccountNotFound, result.FailureReason);
@@ -111,9 +111,9 @@ public sealed class AccountServiceRecoveryTests
     {
         var account = new Account(Guid.NewGuid(), "patient@example.com", AccountRole.Patient, SomeVerifier, null);
         var store = new FakeAccountStore(account);
-        var service = CreateService(store, new StubPasswordVerifierComparer(alwaysMatches: false));
+        var handler = new RegisterRecoveryVerifierHandler(store);
 
-        var result = await service.RegisterRecoveryVerifierAsync(account.Id, SomeVerifier, CancellationToken.None);
+        var result = await handler.Handle(new RegisterRecoveryVerifierCommand(account.Id, SomeVerifier), CancellationToken.None);
 
         Assert.False(result.Succeeded);
         Assert.Equal(RegisterRecoveryVerifierFailureReason.NotAProfessionalAccount, result.FailureReason);
@@ -124,9 +124,9 @@ public sealed class AccountServiceRecoveryTests
     {
         var account = new Account(Guid.NewGuid(), "pro@example.com", AccountRole.Professional, SomeVerifier, null);
         var store = new FakeAccountStore(account);
-        var service = CreateService(store, new StubPasswordVerifierComparer(alwaysMatches: false));
+        var handler = new RegisterRecoveryVerifierHandler(store);
 
-        var result = await service.RegisterRecoveryVerifierAsync(account.Id, SomeVerifier, CancellationToken.None);
+        var result = await handler.Handle(new RegisterRecoveryVerifierCommand(account.Id, SomeVerifier), CancellationToken.None);
 
         Assert.True(result.Succeeded);
         Assert.Equal(SomeVerifier, result.Account!.RecoveryVerifier);
@@ -140,23 +140,23 @@ public sealed class AccountServiceRecoveryTests
     {
         var account = new Account(Guid.NewGuid(), "pro@example.com", AccountRole.Professional, SomeVerifier, null);
         var store = new FakeAccountStore(account);
-        var service = CreateService(store, new StubPasswordVerifierComparer(alwaysMatches: false));
+        var handler = new RegisterRecoveryVerifierHandler(store);
         var firstVerifier = CreateVerifier(0x02);
         var secondVerifier = CreateVerifier(0x03);
 
-        await service.RegisterRecoveryVerifierAsync(account.Id, firstVerifier, CancellationToken.None);
-        var result = await service.RegisterRecoveryVerifierAsync(account.Id, secondVerifier, CancellationToken.None);
+        await handler.Handle(new RegisterRecoveryVerifierCommand(account.Id, firstVerifier), CancellationToken.None);
+        var result = await handler.Handle(new RegisterRecoveryVerifierCommand(account.Id, secondVerifier), CancellationToken.None);
 
         Assert.True(result.Succeeded);
         Assert.Equal(secondVerifier, result.Account!.RecoveryVerifier);
     }
 
-    private static AccountService CreateService(FakeAccountStore store, IPasswordVerifierComparer comparer) =>
-        new(store, comparer, new StubGoogleIdentityProvider());
+    private static RecoverAccessHandler CreateRecoverAccessHandler(FakeAccountStore store, IPasswordVerifierComparer comparer) =>
+        new(store, comparer, new TwoFactorTicketIssuer(), new SessionTokenIssuer());
 
     private static byte[] CreateVerifier(byte fill)
     {
-        var verifier = new byte[AccountService.PasswordVerifierLength];
+        var verifier = new byte[AccountVerifierLengths.PasswordVerifierLength];
         Array.Fill(verifier, fill);
         return verifier;
     }
@@ -223,11 +223,5 @@ public sealed class AccountServiceRecoveryTests
             LastStoredLength = stored.Length;
             return _result;
         }
-    }
-
-    private sealed class StubGoogleIdentityProvider : IGoogleIdentityProvider
-    {
-        public Task<GoogleIdentity?> VerifyIdTokenAsync(string idToken, CancellationToken cancellationToken) =>
-            Task.FromResult<GoogleIdentity?>(null);
     }
 }

@@ -3,7 +3,6 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Api.Accounts;
-using Api.Endpoints;
 using Api.Serialization;
 using Api.Tests.Accounts;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -25,11 +24,11 @@ public sealed class AuthEndpointsTests
         var response = await client.PostAsJsonAsync(
             "/auth/register",
             new RegisterRequest("new@example.com", SomeVerifier, AccountRole.Professional),
-            ApiJsonSerializerContext.Default.RegisterRequest);
+            AccountsJsonContext.Default.RegisterRequest);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.RegisterResponse);
+        var body = await response.Content.ReadFromJsonAsync(AccountsJsonContext.Default.RegisterResponse);
         Assert.NotNull(body);
         Assert.Equal("new@example.com", body!.Email);
         Assert.Equal(AccountRole.Professional, body.Role);
@@ -43,9 +42,9 @@ public sealed class AuthEndpointsTests
         using var client = factory.CreateClient();
 
         var request = new RegisterRequest("taken@example.com", SomeVerifier, AccountRole.Patient);
-        await client.PostAsJsonAsync("/auth/register", request, ApiJsonSerializerContext.Default.RegisterRequest);
+        await client.PostAsJsonAsync("/auth/register", request, AccountsJsonContext.Default.RegisterRequest);
 
-        var response = await client.PostAsJsonAsync("/auth/register", request, ApiJsonSerializerContext.Default.RegisterRequest);
+        var response = await client.PostAsJsonAsync("/auth/register", request, AccountsJsonContext.Default.RegisterRequest);
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
@@ -65,7 +64,7 @@ public sealed class AuthEndpointsTests
         var response = await client.PostAsJsonAsync(
             "/auth/register",
             new RegisterRequest("", SomeVerifier, AccountRole.Patient),
-            ApiJsonSerializerContext.Default.RegisterRequest);
+            AccountsJsonContext.Default.RegisterRequest);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
@@ -85,7 +84,7 @@ public sealed class AuthEndpointsTests
         var response = await client.PostAsJsonAsync(
             "/auth/register",
             new RegisterRequest("someone@example.com", new byte[] { 1, 2, 3 }, AccountRole.Patient),
-            ApiJsonSerializerContext.Default.RegisterRequest);
+            AccountsJsonContext.Default.RegisterRequest);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
@@ -104,15 +103,15 @@ public sealed class AuthEndpointsTests
         await client.PostAsJsonAsync(
             "/auth/register",
             new RegisterRequest("login-ok@example.com", SomeVerifier, AccountRole.Professional),
-            ApiJsonSerializerContext.Default.RegisterRequest);
+            AccountsJsonContext.Default.RegisterRequest);
 
         var response = await client.PostAsJsonAsync(
             "/auth/login",
             new LoginRequest("login-ok@example.com", SomeVerifier),
-            ApiJsonSerializerContext.Default.LoginRequest);
+            AccountsJsonContext.Default.LoginRequest);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.LoginResponse);
+        var body = await response.Content.ReadFromJsonAsync(AccountsJsonContext.Default.LoginResponse);
         Assert.NotNull(body);
         Assert.Equal("login-ok@example.com", body!.Email);
         Assert.Equal(AccountRole.Professional, body.Role);
@@ -128,17 +127,17 @@ public sealed class AuthEndpointsTests
         await client.PostAsJsonAsync(
             "/auth/register",
             new RegisterRequest("registered@example.com", SomeVerifier, AccountRole.Patient),
-            ApiJsonSerializerContext.Default.RegisterRequest);
+            AccountsJsonContext.Default.RegisterRequest);
 
         var wrongPasswordResponse = await client.PostAsJsonAsync(
             "/auth/login",
             new LoginRequest("registered@example.com", CreateVerifier(0xFF)),
-            ApiJsonSerializerContext.Default.LoginRequest);
+            AccountsJsonContext.Default.LoginRequest);
 
         var unknownEmailResponse = await client.PostAsJsonAsync(
             "/auth/login",
             new LoginRequest("nobody-registered@example.com", SomeVerifier),
-            ApiJsonSerializerContext.Default.LoginRequest);
+            AccountsJsonContext.Default.LoginRequest);
 
         Assert.Equal(HttpStatusCode.Unauthorized, wrongPasswordResponse.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, unknownEmailResponse.StatusCode);
@@ -161,14 +160,14 @@ public sealed class AuthEndpointsTests
         await client.PostAsJsonAsync(
             "/auth/register",
             new RegisterRequest("login-patient-tokens@example.com", SomeVerifier, AccountRole.Patient),
-            ApiJsonSerializerContext.Default.RegisterRequest);
+            AccountsJsonContext.Default.RegisterRequest);
 
         var response = await client.PostAsJsonAsync(
             "/auth/login",
             new LoginRequest("login-patient-tokens@example.com", SomeVerifier),
-            ApiJsonSerializerContext.Default.LoginRequest);
+            AccountsJsonContext.Default.LoginRequest);
 
-        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.LoginResponse);
+        var body = await response.Content.ReadFromJsonAsync(AccountsJsonContext.Default.LoginResponse);
         Assert.NotNull(body);
         Assert.NotNull(body!.AccessToken);
         Assert.NotNull(body.RefreshToken);
@@ -184,7 +183,7 @@ public sealed class AuthEndpointsTests
         var response = await client.PostAsJsonAsync(
             "/auth/login",
             new LoginRequest("", SomeVerifier),
-            ApiJsonSerializerContext.Default.LoginRequest);
+            AccountsJsonContext.Default.LoginRequest);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
@@ -226,10 +225,10 @@ public sealed class AuthEndpointsTests
         var response = await client.PostAsJsonAsync(
             "/auth/google",
             new GoogleAuthRequest("new-google-token", AccountRole.Professional),
-            ApiJsonSerializerContext.Default.GoogleAuthRequest);
+            AccountsJsonContext.Default.GoogleAuthRequest);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.GoogleAuthResponse);
+        var body = await response.Content.ReadFromJsonAsync(AccountsJsonContext.Default.GoogleAuthResponse);
         Assert.NotNull(body);
         Assert.Equal("new-via-google@example.com", body!.Email);
         Assert.Equal(AccountRole.Professional, body.Role);
@@ -247,15 +246,15 @@ public sealed class AuthEndpointsTests
         await client.PostAsJsonAsync(
             "/auth/register",
             new RegisterRequest("already-here@example.com", SomeVerifier, AccountRole.Professional),
-            ApiJsonSerializerContext.Default.RegisterRequest);
+            AccountsJsonContext.Default.RegisterRequest);
 
         var response = await client.PostAsJsonAsync(
             "/auth/google",
             new GoogleAuthRequest("existing-google-token", AccountRole.Patient),
-            ApiJsonSerializerContext.Default.GoogleAuthRequest);
+            AccountsJsonContext.Default.GoogleAuthRequest);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.GoogleAuthResponse);
+        var body = await response.Content.ReadFromJsonAsync(AccountsJsonContext.Default.GoogleAuthResponse);
         Assert.NotNull(body);
         Assert.Equal(AccountRole.Professional, body!.Role);
         Assert.False(body.IsNewAccount);
@@ -272,9 +271,9 @@ public sealed class AuthEndpointsTests
         var response = await client.PostAsJsonAsync(
             "/auth/google",
             new GoogleAuthRequest("new-patient-google-token", AccountRole.Patient),
-            ApiJsonSerializerContext.Default.GoogleAuthRequest);
+            AccountsJsonContext.Default.GoogleAuthRequest);
 
-        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.GoogleAuthResponse);
+        var body = await response.Content.ReadFromJsonAsync(AccountsJsonContext.Default.GoogleAuthResponse);
         Assert.NotNull(body);
         Assert.NotNull(body!.AccessToken);
         Assert.NotNull(body.RefreshToken);
@@ -290,7 +289,7 @@ public sealed class AuthEndpointsTests
         var response = await client.PostAsJsonAsync(
             "/auth/google",
             new GoogleAuthRequest("unrecognized-token", AccountRole.Patient),
-            ApiJsonSerializerContext.Default.GoogleAuthRequest);
+            AccountsJsonContext.Default.GoogleAuthRequest);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
@@ -309,7 +308,7 @@ public sealed class AuthEndpointsTests
         var response = await client.PostAsJsonAsync(
             "/auth/google",
             new GoogleAuthRequest("", AccountRole.Patient),
-            ApiJsonSerializerContext.Default.GoogleAuthRequest);
+            AccountsJsonContext.Default.GoogleAuthRequest);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
@@ -328,9 +327,9 @@ public sealed class AuthEndpointsTests
         var response = await client.PostAsJsonAsync(
             "/auth/register",
             new RegisterRequest("patient-tokens@example.com", SomeVerifier, AccountRole.Patient),
-            ApiJsonSerializerContext.Default.RegisterRequest);
+            AccountsJsonContext.Default.RegisterRequest);
 
-        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.RegisterResponse);
+        var body = await response.Content.ReadFromJsonAsync(AccountsJsonContext.Default.RegisterResponse);
         Assert.NotNull(body!.AccessToken);
         Assert.NotNull(body.RefreshToken);
     }
@@ -345,9 +344,9 @@ public sealed class AuthEndpointsTests
         var response = await client.PostAsJsonAsync(
             "/auth/register",
             new RegisterRequest("pro-no-tokens@example.com", SomeVerifier, AccountRole.Professional),
-            ApiJsonSerializerContext.Default.RegisterRequest);
+            AccountsJsonContext.Default.RegisterRequest);
 
-        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.RegisterResponse);
+        var body = await response.Content.ReadFromJsonAsync(AccountsJsonContext.Default.RegisterResponse);
         Assert.Null(body!.AccessToken);
         Assert.Null(body.RefreshToken);
     }
@@ -361,16 +360,16 @@ public sealed class AuthEndpointsTests
         var registerResponse = await client.PostAsJsonAsync(
             "/auth/register",
             new RegisterRequest("refresh-ok@example.com", SomeVerifier, AccountRole.Patient),
-            ApiJsonSerializerContext.Default.RegisterRequest);
-        var issued = await registerResponse.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.RegisterResponse);
+            AccountsJsonContext.Default.RegisterRequest);
+        var issued = await registerResponse.Content.ReadFromJsonAsync(AccountsJsonContext.Default.RegisterResponse);
 
         var response = await client.PostAsJsonAsync(
             "/auth/refresh",
             new RefreshTokenRequest(issued!.RefreshToken!),
-            ApiJsonSerializerContext.Default.RefreshTokenRequest);
+            AccountsJsonContext.Default.RefreshTokenRequest);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.RefreshTokenResponse);
+        var body = await response.Content.ReadFromJsonAsync(AccountsJsonContext.Default.RefreshTokenResponse);
         Assert.NotNull(body);
         Assert.NotEqual(issued.RefreshToken, body!.RefreshToken);
         Assert.NotEqual(issued.AccessToken, body.AccessToken);
@@ -386,13 +385,13 @@ public sealed class AuthEndpointsTests
         var registerResponse = await client.PostAsJsonAsync(
             "/auth/register",
             new RegisterRequest("refresh-reuse@example.com", SomeVerifier, AccountRole.Patient),
-            ApiJsonSerializerContext.Default.RegisterRequest);
-        var issued = await registerResponse.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.RegisterResponse);
+            AccountsJsonContext.Default.RegisterRequest);
+        var issued = await registerResponse.Content.ReadFromJsonAsync(AccountsJsonContext.Default.RegisterResponse);
         await client.PostAsJsonAsync(
-            "/auth/refresh", new RefreshTokenRequest(issued!.RefreshToken!), ApiJsonSerializerContext.Default.RefreshTokenRequest);
+            "/auth/refresh", new RefreshTokenRequest(issued!.RefreshToken!), AccountsJsonContext.Default.RefreshTokenRequest);
 
         var response = await client.PostAsJsonAsync(
-            "/auth/refresh", new RefreshTokenRequest(issued.RefreshToken!), ApiJsonSerializerContext.Default.RefreshTokenRequest);
+            "/auth/refresh", new RefreshTokenRequest(issued.RefreshToken!), AccountsJsonContext.Default.RefreshTokenRequest);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -410,15 +409,15 @@ public sealed class AuthEndpointsTests
         var registerResponse = await client.PostAsJsonAsync(
             "/auth/register",
             new RegisterRequest("refresh-compare@example.com", SomeVerifier, AccountRole.Patient),
-            ApiJsonSerializerContext.Default.RegisterRequest);
-        var issued = await registerResponse.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.RegisterResponse);
+            AccountsJsonContext.Default.RegisterRequest);
+        var issued = await registerResponse.Content.ReadFromJsonAsync(AccountsJsonContext.Default.RegisterResponse);
         await client.PostAsJsonAsync(
-            "/auth/refresh", new RefreshTokenRequest(issued!.RefreshToken!), ApiJsonSerializerContext.Default.RefreshTokenRequest);
+            "/auth/refresh", new RefreshTokenRequest(issued!.RefreshToken!), AccountsJsonContext.Default.RefreshTokenRequest);
         var reusedResponse = await client.PostAsJsonAsync(
-            "/auth/refresh", new RefreshTokenRequest(issued.RefreshToken!), ApiJsonSerializerContext.Default.RefreshTokenRequest);
+            "/auth/refresh", new RefreshTokenRequest(issued.RefreshToken!), AccountsJsonContext.Default.RefreshTokenRequest);
 
         var unknownResponse = await client.PostAsJsonAsync(
-            "/auth/refresh", new RefreshTokenRequest("never-issued-token"), ApiJsonSerializerContext.Default.RefreshTokenRequest);
+            "/auth/refresh", new RefreshTokenRequest("never-issued-token"), AccountsJsonContext.Default.RefreshTokenRequest);
 
         Assert.Equal(reusedResponse.StatusCode, unknownResponse.StatusCode);
         Assert.Equal(await reusedResponse.Content.ReadAsStringAsync(), await unknownResponse.Content.ReadAsStringAsync());
@@ -431,7 +430,7 @@ public sealed class AuthEndpointsTests
         using var client = factory.CreateClient();
 
         var response = await client.PostAsJsonAsync(
-            "/auth/refresh", new RefreshTokenRequest(""), ApiJsonSerializerContext.Default.RefreshTokenRequest);
+            "/auth/refresh", new RefreshTokenRequest(""), AccountsJsonContext.Default.RefreshTokenRequest);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -454,7 +453,7 @@ public sealed class AuthEndpointsTests
         var response = await client.PostAsJsonAsync(
             "/auth/magic-link/request",
             new MagicLinkRequestRequest("someone@example.com"),
-            ApiJsonSerializerContext.Default.MagicLinkRequestRequest);
+            AccountsJsonContext.Default.MagicLinkRequestRequest);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
@@ -468,7 +467,7 @@ public sealed class AuthEndpointsTests
         var response = await client.PostAsJsonAsync(
             "/auth/magic-link/request",
             new MagicLinkRequestRequest("real-sender@example.com"),
-            ApiJsonSerializerContext.Default.MagicLinkRequestRequest);
+            AccountsJsonContext.Default.MagicLinkRequestRequest);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -485,7 +484,7 @@ public sealed class AuthEndpointsTests
         var response = await client.PostAsJsonAsync(
             "/auth/magic-link/request",
             new MagicLinkRequestRequest(""),
-            ApiJsonSerializerContext.Default.MagicLinkRequestRequest);
+            AccountsJsonContext.Default.MagicLinkRequestRequest);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -506,7 +505,7 @@ public sealed class AuthEndpointsTests
         var response = await client.PostAsJsonAsync(
             "/auth/magic-link/request",
             new MagicLinkRequestRequest("override@example.com"),
-            ApiJsonSerializerContext.Default.MagicLinkRequestRequest);
+            AccountsJsonContext.Default.MagicLinkRequestRequest);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
@@ -520,7 +519,7 @@ public sealed class AuthEndpointsTests
         var response = await client.PostAsJsonAsync(
             "/auth/magic-link/verify",
             new VerifyMagicLinkRequest("never-issued"),
-            ApiJsonSerializerContext.Default.VerifyMagicLinkRequest);
+            AccountsJsonContext.Default.VerifyMagicLinkRequest);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -537,7 +536,7 @@ public sealed class AuthEndpointsTests
         var response = await client.PostAsJsonAsync(
             "/auth/magic-link/verify",
             new VerifyMagicLinkRequest(""),
-            ApiJsonSerializerContext.Default.VerifyMagicLinkRequest);
+            AccountsJsonContext.Default.VerifyMagicLinkRequest);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -556,7 +555,7 @@ public sealed class AuthEndpointsTests
             "/auth/magic-link/webauthn/complete",
             new CompleteMagicLinkWebAuthnRequest(
                 "never-issued", Convert.ToBase64String([1]), Convert.ToBase64String([2]), Convert.ToBase64String([3]), null, null),
-            ApiJsonSerializerContext.Default.CompleteMagicLinkWebAuthnRequest);
+            AccountsJsonContext.Default.CompleteMagicLinkWebAuthnRequest);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -574,7 +573,7 @@ public sealed class AuthEndpointsTests
             "/auth/magic-link/webauthn/complete",
             new CompleteMagicLinkWebAuthnRequest(
                 "some-ticket", "not-base64!!", Convert.ToBase64String([1]), null, null, null),
-            ApiJsonSerializerContext.Default.CompleteMagicLinkWebAuthnRequest);
+            AccountsJsonContext.Default.CompleteMagicLinkWebAuthnRequest);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -593,7 +592,7 @@ public sealed class AuthEndpointsTests
         var response = await client.PostAsJsonAsync(
             "/auth/magic-link/webauthn/complete",
             new CompleteMagicLinkWebAuthnRequest("some-ticket", "", Convert.ToBase64String([1]), null, null, null),
-            ApiJsonSerializerContext.Default.CompleteMagicLinkWebAuthnRequest);
+            AccountsJsonContext.Default.CompleteMagicLinkWebAuthnRequest);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -611,7 +610,7 @@ public sealed class AuthEndpointsTests
         var response = await client.PostAsJsonAsync(
             "/auth/magic-link/webauthn/complete",
             new CompleteMagicLinkWebAuthnRequest("", Convert.ToBase64String([1]), Convert.ToBase64String([2]), null, null, null),
-            ApiJsonSerializerContext.Default.CompleteMagicLinkWebAuthnRequest);
+            AccountsJsonContext.Default.CompleteMagicLinkWebAuthnRequest);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -630,7 +629,7 @@ public sealed class AuthEndpointsTests
             "/auth/magic-link/webauthn/complete",
             new CompleteMagicLinkWebAuthnRequest(
                 "some-ticket", Convert.ToBase64String([1]), "not-base64!!", null, null, null),
-            ApiJsonSerializerContext.Default.CompleteMagicLinkWebAuthnRequest);
+            AccountsJsonContext.Default.CompleteMagicLinkWebAuthnRequest);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -649,7 +648,7 @@ public sealed class AuthEndpointsTests
             "/auth/magic-link/webauthn/complete",
             new CompleteMagicLinkWebAuthnRequest(
                 "some-ticket", Convert.ToBase64String([1]), Convert.ToBase64String([2]), "not-base64!!", null, null),
-            ApiJsonSerializerContext.Default.CompleteMagicLinkWebAuthnRequest);
+            AccountsJsonContext.Default.CompleteMagicLinkWebAuthnRequest);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -668,7 +667,7 @@ public sealed class AuthEndpointsTests
             "/auth/magic-link/webauthn/complete",
             new CompleteMagicLinkWebAuthnRequest(
                 "some-ticket", Convert.ToBase64String([1]), Convert.ToBase64String([2]), null, "not-base64!!", null),
-            ApiJsonSerializerContext.Default.CompleteMagicLinkWebAuthnRequest);
+            AccountsJsonContext.Default.CompleteMagicLinkWebAuthnRequest);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -687,7 +686,7 @@ public sealed class AuthEndpointsTests
             "/auth/magic-link/webauthn/complete",
             new CompleteMagicLinkWebAuthnRequest(
                 "some-ticket", Convert.ToBase64String([1]), Convert.ToBase64String([2]), null, null, "not-base64!!"),
-            ApiJsonSerializerContext.Default.CompleteMagicLinkWebAuthnRequest);
+            AccountsJsonContext.Default.CompleteMagicLinkWebAuthnRequest);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -705,13 +704,13 @@ public sealed class AuthEndpointsTests
         const string email = "e2e-register@example.com";
 
         await client.PostAsJsonAsync(
-            "/auth/magic-link/request", new MagicLinkRequestRequest(email), ApiJsonSerializerContext.Default.MagicLinkRequestRequest);
+            "/auth/magic-link/request", new MagicLinkRequestRequest(email), AccountsJsonContext.Default.MagicLinkRequestRequest);
         var token = sender.LastTokenSentTo(email)!;
 
         var verifyResponse = await client.PostAsJsonAsync(
-            "/auth/magic-link/verify", new VerifyMagicLinkRequest(token), ApiJsonSerializerContext.Default.VerifyMagicLinkRequest);
+            "/auth/magic-link/verify", new VerifyMagicLinkRequest(token), AccountsJsonContext.Default.VerifyMagicLinkRequest);
         Assert.Equal(HttpStatusCode.OK, verifyResponse.StatusCode);
-        var verifyBody = await verifyResponse.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.VerifyMagicLinkResponse);
+        var verifyBody = await verifyResponse.Content.ReadFromJsonAsync(AccountsJsonContext.Default.VerifyMagicLinkResponse);
         Assert.NotNull(verifyBody);
         Assert.Equal(MagicLinkCeremonyType.Register, verifyBody!.CeremonyType);
         Assert.Equal(WebAuthnRelyingPartyId, verifyBody.RelyingPartyId);
@@ -732,10 +731,10 @@ public sealed class AuthEndpointsTests
                 Convert.ToBase64String(attestationObject),
                 null,
                 null),
-            ApiJsonSerializerContext.Default.CompleteMagicLinkWebAuthnRequest);
+            AccountsJsonContext.Default.CompleteMagicLinkWebAuthnRequest);
 
         Assert.Equal(HttpStatusCode.OK, completeResponse.StatusCode);
-        var completeBody = await completeResponse.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.CompleteMagicLinkWebAuthnResponse);
+        var completeBody = await completeResponse.Content.ReadFromJsonAsync(AccountsJsonContext.Default.CompleteMagicLinkWebAuthnResponse);
         Assert.NotNull(completeBody);
         Assert.Equal(email, completeBody!.Email);
         Assert.Equal(AccountRole.Patient, completeBody.Role);
@@ -755,11 +754,11 @@ public sealed class AuthEndpointsTests
         await CompleteRegistrationCeremonyOverHttp(client, sender, email, authenticator);
 
         await client.PostAsJsonAsync(
-            "/auth/magic-link/request", new MagicLinkRequestRequest(email), ApiJsonSerializerContext.Default.MagicLinkRequestRequest);
+            "/auth/magic-link/request", new MagicLinkRequestRequest(email), AccountsJsonContext.Default.MagicLinkRequestRequest);
         var assertToken = sender.LastTokenSentTo(email)!;
         var verifyResponse = await client.PostAsJsonAsync(
-            "/auth/magic-link/verify", new VerifyMagicLinkRequest(assertToken), ApiJsonSerializerContext.Default.VerifyMagicLinkRequest);
-        var verifyBody = await verifyResponse.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.VerifyMagicLinkResponse);
+            "/auth/magic-link/verify", new VerifyMagicLinkRequest(assertToken), AccountsJsonContext.Default.VerifyMagicLinkRequest);
+        var verifyBody = await verifyResponse.Content.ReadFromJsonAsync(AccountsJsonContext.Default.VerifyMagicLinkResponse);
         Assert.Equal(MagicLinkCeremonyType.Assert, verifyBody!.CeremonyType);
         Assert.Equal(Convert.ToBase64String(authenticator.CredentialId), verifyBody.CredentialId);
 
@@ -777,10 +776,10 @@ public sealed class AuthEndpointsTests
                 null,
                 Convert.ToBase64String(authenticatorData),
                 Convert.ToBase64String(signature)),
-            ApiJsonSerializerContext.Default.CompleteMagicLinkWebAuthnRequest);
+            AccountsJsonContext.Default.CompleteMagicLinkWebAuthnRequest);
 
         Assert.Equal(HttpStatusCode.OK, completeResponse.StatusCode);
-        var completeBody = await completeResponse.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.CompleteMagicLinkWebAuthnResponse);
+        var completeBody = await completeResponse.Content.ReadFromJsonAsync(AccountsJsonContext.Default.CompleteMagicLinkWebAuthnResponse);
         Assert.NotNull(completeBody);
         Assert.Equal(email, completeBody!.Email);
         Assert.NotEmpty(completeBody.AccessToken);
@@ -799,11 +798,11 @@ public sealed class AuthEndpointsTests
         await CompleteRegistrationCeremonyOverHttp(client, sender, email, authenticator);
 
         await client.PostAsJsonAsync(
-            "/auth/magic-link/request", new MagicLinkRequestRequest(email), ApiJsonSerializerContext.Default.MagicLinkRequestRequest);
+            "/auth/magic-link/request", new MagicLinkRequestRequest(email), AccountsJsonContext.Default.MagicLinkRequestRequest);
         var assertToken = sender.LastTokenSentTo(email)!;
         var verifyResponse = await client.PostAsJsonAsync(
-            "/auth/magic-link/verify", new VerifyMagicLinkRequest(assertToken), ApiJsonSerializerContext.Default.VerifyMagicLinkRequest);
-        var verifyBody = await verifyResponse.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.VerifyMagicLinkResponse);
+            "/auth/magic-link/verify", new VerifyMagicLinkRequest(assertToken), AccountsJsonContext.Default.VerifyMagicLinkRequest);
+        var verifyBody = await verifyResponse.Content.ReadFromJsonAsync(AccountsJsonContext.Default.VerifyMagicLinkResponse);
 
         var challenge = Base64Url.EncodeToString(Convert.FromBase64String(verifyBody!.Challenge));
         var clientDataJson = SoftwareAuthenticator.ClientDataJson("webauthn.get", challenge, WebAuthnOrigin);
@@ -820,7 +819,7 @@ public sealed class AuthEndpointsTests
                 null,
                 Convert.ToBase64String(authenticatorData),
                 Convert.ToBase64String(signature)),
-            ApiJsonSerializerContext.Default.CompleteMagicLinkWebAuthnRequest);
+            AccountsJsonContext.Default.CompleteMagicLinkWebAuthnRequest);
 
         Assert.Equal(HttpStatusCode.Unauthorized, completeResponse.StatusCode);
         var body = await completeResponse.Content.ReadAsStringAsync();
@@ -832,11 +831,11 @@ public sealed class AuthEndpointsTests
         HttpClient client, CapturingMagicLinkEmailSender sender, string email, SoftwareAuthenticator authenticator)
     {
         await client.PostAsJsonAsync(
-            "/auth/magic-link/request", new MagicLinkRequestRequest(email), ApiJsonSerializerContext.Default.MagicLinkRequestRequest);
+            "/auth/magic-link/request", new MagicLinkRequestRequest(email), AccountsJsonContext.Default.MagicLinkRequestRequest);
         var token = sender.LastTokenSentTo(email)!;
         var verifyResponse = await client.PostAsJsonAsync(
-            "/auth/magic-link/verify", new VerifyMagicLinkRequest(token), ApiJsonSerializerContext.Default.VerifyMagicLinkRequest);
-        var verifyBody = await verifyResponse.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.VerifyMagicLinkResponse);
+            "/auth/magic-link/verify", new VerifyMagicLinkRequest(token), AccountsJsonContext.Default.VerifyMagicLinkRequest);
+        var verifyBody = await verifyResponse.Content.ReadFromJsonAsync(AccountsJsonContext.Default.VerifyMagicLinkResponse);
 
         var challenge = Base64Url.EncodeToString(Convert.FromBase64String(verifyBody!.Challenge));
         var clientDataJson = SoftwareAuthenticator.ClientDataJson("webauthn.create", challenge, WebAuthnOrigin);
@@ -851,7 +850,7 @@ public sealed class AuthEndpointsTests
                 Convert.ToBase64String(attestationObject),
                 null,
                 null),
-            ApiJsonSerializerContext.Default.CompleteMagicLinkWebAuthnRequest);
+            AccountsJsonContext.Default.CompleteMagicLinkWebAuthnRequest);
         Assert.Equal(HttpStatusCode.OK, completeResponse.StatusCode);
     }
 
@@ -897,19 +896,19 @@ public sealed class AuthEndpointsTests
         const string email = "debug-endpoint@example.com";
 
         var requestResponse = await client.PostAsJsonAsync(
-            "/auth/magic-link/request", new MagicLinkRequestRequest(email), ApiJsonSerializerContext.Default.MagicLinkRequestRequest);
+            "/auth/magic-link/request", new MagicLinkRequestRequest(email), AccountsJsonContext.Default.MagicLinkRequestRequest);
         Assert.Equal(HttpStatusCode.OK, requestResponse.StatusCode);
 
         var debugResponse = await client.GetAsync($"/auth/magic-link/_debug-last?email={Uri.EscapeDataString(email)}");
         Assert.Equal(HttpStatusCode.OK, debugResponse.StatusCode);
 
-        var debugBody = await debugResponse.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.MagicLinkDebugLastResponse);
+        var debugBody = await debugResponse.Content.ReadFromJsonAsync(AccountsJsonContext.Default.MagicLinkDebugLastResponse);
         Assert.NotNull(debugBody);
         Assert.False(string.IsNullOrWhiteSpace(debugBody!.Token));
 
         // Not just "looks like a token" -- the exact token a real /auth/magic-link/verify call accepts.
         var verifyResponse = await client.PostAsJsonAsync(
-            "/auth/magic-link/verify", new VerifyMagicLinkRequest(debugBody.Token), ApiJsonSerializerContext.Default.VerifyMagicLinkRequest);
+            "/auth/magic-link/verify", new VerifyMagicLinkRequest(debugBody.Token), AccountsJsonContext.Default.VerifyMagicLinkRequest);
         Assert.Equal(HttpStatusCode.OK, verifyResponse.StatusCode);
     }
 
@@ -960,7 +959,7 @@ public sealed class AuthEndpointsTests
 
     private static byte[] CreateVerifier(byte fill)
     {
-        var verifier = new byte[AccountService.PasswordVerifierLength];
+        var verifier = new byte[AccountVerifierLengths.PasswordVerifierLength];
         Array.Fill(verifier, fill);
         return verifier;
     }

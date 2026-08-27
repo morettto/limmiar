@@ -14,331 +14,456 @@ msgstr ""
 "Plural-Forms: \n"
 
 #. js-lingui-explicit-id
-#: src/errors/problem-messages.ts:50
+#: src/shared/api/problem-messages.ts:153
+msgid "agenda.recording_active"
+msgstr "A sessão está gravando e não pode ser alterada agora."
+
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:54
 msgid "auth.totp_not_enabled"
 msgstr "A verificação em duas etapas ainda não foi ativada para esta conta."
 
 #. js-lingui-explicit-id
-#: src/errors/problem-messages.ts:36
+#: src/shared/api/problem-messages.ts:40
 msgid "auth.totp_already_enabled"
 msgstr "A verificação em duas etapas já está ativada para esta conta."
 
-#: src/auth/RecoveryScreen.tsx:104
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:92
+msgid "staff.unauthorized"
+msgstr "Acesso não autorizado."
+
+#: src/features/recovery/RecoveryScreen.tsx:102
 msgid "Acesso recuperado com sucesso."
 msgstr "Acesso recuperado com sucesso."
 
-#: src/auth/AuthScreen.tsx:181
+#: src/widgets/auth-screen/AuthScreen.tsx:183
 msgid "Acompanhe suas consultas e informações de saúde com segurança."
 msgstr "Acompanhe suas consultas e informações de saúde com segurança."
 
-#: src/auth/TotpSetup.tsx:128
+#: src/features/totp-enrollment/TotpSetup.tsx:128
 msgid "Adicione esta conta no seu aplicativo autenticador, usando as informações abaixo."
 msgstr "Adicione esta conta no seu aplicativo autenticador, usando as informações abaixo."
 
-#: src/devices/PairNewDevice.tsx:90
+#: src/features/device-pairing-new/PairNewDevice.tsx:90
 msgid "Aguardando o outro dispositivo enviar a chave..."
 msgstr "Aguardando o outro dispositivo enviar a chave..."
 
-#: src/devices/PairingScan.tsx:122
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:115
+msgid "auth.device_pairing_payload_not_ready"
+msgstr "Aguarde o outro dispositivo ler o código antes de liberar o acesso."
+
+#: src/features/qr-scan/PairingScan.tsx:115
 msgid "Aponte a câmera para o código QR exibido no outro dispositivo."
 msgstr "Aponte a câmera para o código QR exibido no outro dispositivo."
 
 #. js-lingui-explicit-id
-#: src/errors/problem-messages.ts:10
+#: src/shared/api/problem-messages.ts:14
 msgid "health.database_unreachable"
 msgstr "Banco de dados indisponível no momento."
 
-#: src/App.tsx:16
+#: src/App.tsx:10
 msgid "Bem-vindo ao Limmiar"
 msgstr "Bem-vindo ao Limmiar"
 
-#: src/copilot/CopilotKeySetup.tsx:52
+#: src/features/copilot-byok/CopilotKeySetup.tsx:52
 msgid "Cadastrar chave de API de IA"
 msgstr "Cadastrar chave de API de IA"
 
 #. js-lingui-explicit-id
-#: src/errors/problem-messages.ts:32
+#: src/shared/api/problem-messages.ts:36
 msgid "validation.invalid_field"
 msgstr "Campo inválido: {field}."
 
-#: src/copilot/CopilotKeySetup.tsx:76
+#: src/widgets/patient-wallet/PatientWallet.tsx:95
+msgid "Carregando pacientes..."
+msgstr "Carregando pacientes..."
+
+#: src/features/copilot-byok/CopilotKeySetup.tsx:76
 msgid "Chave de API"
 msgstr "Chave de API"
 
-#: src/copilot/CopilotKeySetup.tsx:28
+#: src/features/copilot-byok/CopilotKeySetup.tsx:28
 msgid "Chaveiro bloqueado. Desbloqueie para cadastrar sua chave de API."
 msgstr "Chaveiro bloqueado. Desbloqueie para cadastrar sua chave de API."
 
-#: src/auth/TotpSetup.tsx:158
+#: src/widgets/patient-wallet/PatientWallet.tsx:85
+msgid "Chaveiro bloqueado. Desbloqueie para ver a carteira de pacientes."
+msgstr "Chaveiro bloqueado. Desbloqueie para ver a carteira de pacientes."
+
+#: src/features/totp-enrollment/TotpSetup.tsx:158
 msgid "Código de 6 dígitos do aplicativo autenticador"
 msgstr "Código de 6 dígitos do aplicativo autenticador"
 
-#: src/auth/TotpChallenge.tsx:53
+#: src/features/totp-challenge/TotpChallenge.tsx:53
 msgid "Código de verificação"
 msgstr "Código de verificação"
 
 #. js-lingui-explicit-id
-#: src/errors/problem-messages.ts:46
+#: src/shared/api/problem-messages.ts:50
 msgid "auth.totp_invalid_code"
 msgstr "Código inválido. Verifique o app autenticador ou use um código de backup."
 
-#: src/auth/TotpChallenge.tsx:60
+#: src/features/totp-challenge/TotpChallenge.tsx:60
 msgid "Código ou código de backup"
 msgstr "Código ou código de backup"
 
-#: src/devices/PairingScan.tsx:70
+#: src/features/qr-scan/PairingScan.tsx:63
 msgid "Código QR inválido. Tente escanear novamente."
 msgstr "Código QR inválido. Tente escanear novamente."
 
-#: src/devices/PairingQr.tsx:155
+#: src/features/device-pairing-primary/PairingQr.tsx:156
 msgid "Código QR para parear novo dispositivo"
 msgstr "Código QR para parear novo dispositivo"
 
-#: src/auth/TotpSetup.tsx:132
+#: src/features/totp-enrollment/TotpSetup.tsx:132
 msgid "Código secreto"
 msgstr "Código secreto"
 
-#: src/auth/AuthScreen.tsx:153
+#: src/widgets/auth-screen/AuthScreen.tsx:155
 msgid "Como você vai usar o Limmiar?"
 msgstr "Como você vai usar o Limmiar?"
 
-#: src/devices/PairingScan.tsx:120
+#: src/features/qr-scan/PairingScan.tsx:113
 msgid "Concluindo o pareamento..."
 msgstr "Concluindo o pareamento..."
 
-#: src/auth/TotpSetup.tsx:125
+#: src/features/totp-enrollment/TotpSetup.tsx:125
 msgid "Configure a verificação em duas etapas"
 msgstr "Configure a verificação em duas etapas"
 
-#: src/auth/MagicLinkCallback.tsx:155
+#: src/features/magic-link-auth/MagicLinkCallback.tsx:155
 msgid "Confirmando seu acesso..."
 msgstr "Confirmando seu acesso..."
 
-#: src/auth/TotpSetup.tsx:178
+#: src/features/totp-enrollment/TotpSetup.tsx:178
 msgid "Confirmar"
 msgstr "Confirmar"
 
-#: src/auth/AuthScreen.tsx:146
+#: src/widgets/auth-screen/AuthScreen.tsx:148
 msgid "Conta criada. Você está cadastrado como paciente."
 msgstr "Conta criada. Você está cadastrado como paciente."
 
-#: src/auth/AuthScreen.tsx:144
+#: src/widgets/auth-screen/AuthScreen.tsx:146
 msgid "Conta criada. Você está cadastrado como profissional."
 msgstr "Conta criada. Você está cadastrado como profissional."
 
-#: src/auth/AuthScreen.tsx:233
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:72
+msgid "auth.account_not_found"
+msgstr "Conta não encontrada."
+
+#: src/widgets/auth-screen/AuthScreen.tsx:235
 msgid "Continuar com o Google"
 msgstr "Continuar com o Google"
 
-#: src/auth/AuthScreen.tsx:225
+#: src/widgets/auth-screen/AuthScreen.tsx:227
 msgid "Criar conta"
 msgstr "Criar conta"
 
-#: src/auth/TotpChallenge.tsx:47
+#: src/features/totp-challenge/TotpChallenge.tsx:47
 msgid "Digite o código de 6 dígitos do seu aplicativo autenticador ou um dos seus códigos de backup."
 msgstr "Digite o código de 6 dígitos do seu aplicativo autenticador ou um dos seus códigos de backup."
 
-#: src/auth/RecoveryScreen.tsx:118
+#: src/features/recovery/RecoveryScreen.tsx:116
 msgid "Digite seu e-mail e sua frase de recuperação para recuperar o acesso à sua conta."
 msgstr "Digite seu e-mail e sua frase de recuperação para recuperar o acesso à sua conta."
 
-#: src/devices/PairingQr.tsx:139
-#: src/devices/PairingScan.tsx:110
-#: src/devices/PairNewDevice.tsx:100
-#: src/devices/PairPrimaryDevice.tsx:76
+#: src/features/device-pairing-new/PairNewDevice.tsx:100
+#: src/features/device-pairing-primary/PairingQr.tsx:140
+#: src/features/device-pairing-primary/PairPrimaryDevice.tsx:76
+#: src/features/qr-scan/PairingScan.tsx:103
 msgid "Dispositivo pareado com sucesso."
 msgstr "Dispositivo pareado com sucesso."
 
-#: src/auth/AuthScreen.tsx:189
-#: src/auth/RecoveryScreen.tsx:124
+#: src/features/recovery/RecoveryScreen.tsx:122
+#: src/widgets/auth-screen/AuthScreen.tsx:191
 msgid "E-mail"
 msgstr "E-mail"
 
 #. js-lingui-explicit-id
-#: src/errors/problem-messages.ts:64
+#: src/shared/api/problem-messages.ts:68
 msgid "auth.invalid_recovery_phrase"
 msgstr "E-mail ou frase de recuperação inválidos."
 
 #. js-lingui-explicit-id
-#: src/errors/problem-messages.ts:24
+#: src/shared/api/problem-messages.ts:28
 msgid "auth.invalid_credentials"
 msgstr "E-mail ou senha inválidos."
 
-#: src/devices/PairPrimaryDevice.tsx:66
+#: src/features/device-pairing-primary/PairPrimaryDevice.tsx:66
 msgid "Enviando a chave para o novo dispositivo..."
 msgstr "Enviando a chave para o novo dispositivo..."
 
-#: src/auth/AuthScreen.tsx:225
+#: src/widgets/auth-screen/AuthScreen.tsx:227
 msgid "Enviar link mágico"
 msgstr "Enviar link mágico"
 
-#: src/devices/PairingQr.tsx:151
+#: src/features/device-pairing-primary/PairingQr.tsx:152
 msgid "Escaneie este código QR com o dispositivo que você quer parear."
 msgstr "Escaneie este código QR com o dispositivo que você quer parear."
 
-#: src/auth/RecoveryPhraseSetup.tsx:85
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:76
+msgid "auth.not_a_professional_account"
+msgstr "Esta ação está disponível apenas para contas de profissional."
+
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:84
+msgid "auth.not_in_review"
+msgstr "Esta conta não está aguardando análise."
+
+#: src/features/recovery/RecoveryPhraseSetup.tsx:83
 msgid "Esta frase não será exibida novamente. Guarde-a em um local seguro: ela é a única forma de recuperar o acesso à sua conta caso você perca todos os seus dispositivos."
 msgstr "Esta frase não será exibida novamente. Guarde-a em um local seguro: ela é a única forma de recuperar o acesso à sua conta caso você perca todos os seus dispositivos."
 
-#: src/devices/PairingQr.tsx:129
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:149
+msgid "agenda.session_cancelled"
+msgstr "Esta sessão foi cancelada."
+
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:109
+msgid "auth.device_pairing_session_not_found"
+msgstr "Este código de pareamento não é mais válido. Gere um novo."
+
+#: src/features/device-pairing-primary/PairingQr.tsx:130
 msgid "Este código expirou. Volte para gerar um novo."
 msgstr "Este código expirou. Volte para gerar um novo."
 
 #. js-lingui-explicit-id
-#: src/errors/problem-messages.ts:18
+#: src/shared/api/problem-messages.ts:22
 msgid "auth.email_already_registered"
 msgstr "Este e-mail já está cadastrado."
 
 #. js-lingui-explicit-id
-#: src/errors/problem-messages.ts:54
+#: src/shared/api/problem-messages.ts:58
 msgid "auth.magic_link_invalid"
 msgstr "Este link de acesso não é mais válido. Solicite um novo."
 
-#: src/auth/TotpSetup.tsx:101
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:133
+msgid "patients.entry_sequence_conflict"
+msgstr "Este prontuário mudou em outro dispositivo. Recarregue e tente de novo."
+
+#: src/features/totp-enrollment/TotpSetup.tsx:101
 msgid "Estes códigos não serão exibidos novamente. Guarde-os em um local seguro: eles são a única forma de recuperar o acesso à sua conta caso você perca o aplicativo autenticador."
 msgstr "Estes códigos não serão exibidos novamente. Guarde-os em um local seguro: eles são a única forma de recuperar o acesso à sua conta caso você perca o aplicativo autenticador."
 
-#: src/copilot/CopilotKeySetup.tsx:61
+#: src/features/copilot-byok/CopilotKeySetup.tsx:61
 msgid "Fornecedor"
 msgstr "Fornecedor"
 
-#: src/auth/RecoveryScreen.tsx:136
+#: src/features/recovery/RecoveryScreen.tsx:134
 msgid "Frase de recuperação"
 msgstr "Frase de recuperação"
 
-#: src/auth/RecoveryScreen.tsx:60
+#: src/features/recovery/RecoveryScreen.tsx:58
 msgid "Frase de recuperação inválida. Verifique se você digitou todas as palavras corretamente."
 msgstr "Frase de recuperação inválida. Verifique se você digitou todas as palavras corretamente."
 
-#: src/auth/RecoveryPhraseSetup.tsx:61
+#: src/features/recovery/RecoveryPhraseSetup.tsx:59
 msgid "Gerando sua frase de recuperação..."
 msgstr "Gerando sua frase de recuperação..."
 
-#: src/auth/AuthScreen.tsx:179
+#: src/widgets/auth-screen/AuthScreen.tsx:181
 msgid "Gerencie pacientes, prontuários e agenda em um só lugar."
 msgstr "Gerencie pacientes, prontuários e agenda em um só lugar."
 
-#: src/auth/TotpSetup.tsx:98
+#: src/features/totp-enrollment/TotpSetup.tsx:98
 msgid "Guarde seus códigos de backup"
 msgstr "Guarde seus códigos de backup"
 
-#: src/auth/RecoveryPhraseSetup.tsx:82
+#: src/features/recovery/RecoveryPhraseSetup.tsx:80
 msgid "Guarde sua frase de recuperação"
 msgstr "Guarde sua frase de recuperação"
 
-#: src/auth/TotpSetup.tsx:114
+#: src/features/totp-enrollment/TotpSetup.tsx:114
 msgid "Guardei meus códigos"
 msgstr "Guardei meus códigos"
 
-#: src/auth/RecoveryPhraseSetup.tsx:99
+#: src/features/recovery/RecoveryPhraseSetup.tsx:97
 msgid "Guardei minha frase"
 msgstr "Guardei minha frase"
 
-#: src/copilot/CopilotKeySetup.tsx:93
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:141
+msgid "agenda.slot_taken"
+msgstr "Já existe uma sessão neste horário."
+
+#: src/features/copilot-byok/CopilotKeySetup.tsx:99
 msgid "Lembrar neste dispositivo"
 msgstr "Lembrar neste dispositivo"
 
-#: src/auth/TotpSetup.tsx:144
+#: src/features/totp-enrollment/TotpSetup.tsx:144
 msgid "Link de provisionamento"
 msgstr "Link de provisionamento"
 
-#: src/auth/MagicLinkCallback.tsx:146
+#: src/features/magic-link-auth/MagicLinkCallback.tsx:146
 msgid "Login realizado com sucesso."
 msgstr "Login realizado com sucesso."
 
-#: src/devices/PairingScan.tsx:60
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:80
+msgid "auth.invalid_verification_state"
+msgstr "Não é possível enviar a comprovação com a conta no estado atual."
+
+#: src/features/qr-scan/PairingScan.tsx:53
 msgid "Não foi possível acessar a câmera para escanear o código."
 msgstr "Não foi possível acessar a câmera para escanear o código."
 
-#: src/devices/PairPrimaryDevice.tsx:57
+#: src/widgets/patient-wallet/PatientWallet.tsx:68
+msgid "Não foi possível carregar a carteira de pacientes. Tente novamente."
+msgstr "Não foi possível carregar a carteira de pacientes. Tente novamente."
+
+#: src/features/device-pairing-primary/PairPrimaryDevice.tsx:57
 msgid "Não foi possível concluir o pareamento com segurança. Tente novamente."
 msgstr "Não foi possível concluir o pareamento com segurança. Tente novamente."
 
 #. js-lingui-explicit-id
-#: src/errors/problem-messages.ts:58
+#: src/shared/api/problem-messages.ts:62
 msgid "auth.webauthn_ceremony_failed"
 msgstr "Não foi possível confirmar sua identidade neste dispositivo. Tente novamente."
 
 #. js-lingui-explicit-id
-#: src/errors/problem-messages.ts:28
+#: src/shared/api/problem-messages.ts:32
 msgid "auth.google_token_invalid"
 msgstr "Não foi possível continuar com o Google. Tente novamente."
 
-#: src/devices/PairNewDevice.tsx:57
+#: src/features/device-pairing-new/PairNewDevice.tsx:57
 msgid "Não foi possível decifrar a chave recebida. Tente parear novamente."
 msgstr "Não foi possível decifrar a chave recebida. Tente parear novamente."
 
-#: src/copilot/CopilotKeySetup.tsx:56
+#: src/widgets/patient-wallet/PatientWallet.tsx:113
+msgid "Não foi possível ler"
+msgstr "Não foi possível ler"
+
+#: src/features/copilot-byok/CopilotKeySetup.tsx:56
 msgid "Não foi possível salvar a chave. Tente novamente."
 msgstr "Não foi possível salvar a chave. Tente novamente."
 
 #. js-lingui-explicit-id
-#: src/errors/problem-messages.ts:40
+#: src/shared/api/problem-messages.ts:44
 msgid "auth.totp_not_pending"
 msgstr "Não há uma configuração de verificação em duas etapas pendente para esta conta."
 
 #. js-lingui-explicit-id
-#: src/errors/problem-messages.ts:14
+#: src/shared/api/problem-messages.ts:157
+msgid "voice.enrollment_not_found"
+msgstr "Nenhum cadastro de voz encontrado para esta conta."
+
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:121
+msgid "auth.device_pairing_payload_not_delivered"
+msgstr "O dispositivo principal ainda não liberou o acesso. Aguarde."
+
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:18
 msgid "unexpected_error"
 msgstr "Ocorreu um erro inesperado no servidor."
 
 #. js-lingui-explicit-id
-#: src/errors/problem-messages.ts:72
+#: src/shared/api/problem-messages.ts:165
 msgid "errors.generic"
 msgstr "Ocorreu um erro inesperado. Tente novamente."
 
-#: src/auth/AuthScreen.tsx:174
+#: src/widgets/auth-screen/AuthScreen.tsx:176
+#: src/widgets/patient-wallet/PatientWallet.tsx:120
 msgid "Paciente"
 msgstr "Paciente"
 
-#: src/devices/PairingQr.tsx:148
+#: src/widgets/patient-wallet/PatientWallet.tsx:118
+msgid "Pacientes"
+msgstr "Pacientes"
+
+#: src/features/device-pairing-primary/PairingQr.tsx:149
 msgid "Parear novo dispositivo"
 msgstr "Parear novo dispositivo"
 
-#: src/auth/TotpSetup.tsx:78
+#: src/features/totp-enrollment/TotpSetup.tsx:78
 msgid "Preparando a verificação em duas etapas..."
 msgstr "Preparando a verificação em duas etapas..."
 
-#: src/devices/PairingQr.tsx:109
+#: src/features/device-pairing-primary/PairingQr.tsx:110
 msgid "Preparando o código para parear o novo dispositivo..."
 msgstr "Preparando o código para parear o novo dispositivo..."
 
-#: src/auth/AuthScreen.tsx:164
+#: src/widgets/auth-screen/AuthScreen.tsx:166
 msgid "Profissional"
 msgstr "Profissional"
 
-#: src/copilot/CopilotKeySetup.tsx:105
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:125
+msgid "patients.not_found"
+msgstr "Prontuário não encontrado."
+
+#: src/features/copilot-byok/CopilotKeySetup.tsx:111
 msgid "Pular"
 msgstr "Pular"
 
-#: src/auth/RecoveryScreen.tsx:156
+#: src/features/recovery/RecoveryScreen.tsx:154
 msgid "Recuperar acesso"
 msgstr "Recuperar acesso"
 
-#: src/auth/RecoveryScreen.tsx:115
+#: src/features/recovery/RecoveryScreen.tsx:113
 msgid "Recuperar acesso à conta"
 msgstr "Recuperar acesso à conta"
 
-#: src/copilot/CopilotKeySetup.tsx:102
+#: src/widgets/patient-wallet/PatientWallet.tsx:121
+msgid "Risco"
+msgstr "Risco"
+
+#: src/features/copilot-byok/CopilotKeySetup.tsx:108
 msgid "Salvar"
 msgstr "Salvar"
 
-#: src/auth/AuthScreen.tsx:202
+#: src/widgets/auth-screen/AuthScreen.tsx:204
 msgid "Senha"
 msgstr "Senha"
 
-#: src/auth/AuthScreen.tsx:155
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:145
+msgid "agenda.session_not_found"
+msgstr "Sessão não encontrada."
+
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:137
+msgid "agenda.not_authorized_to_schedule"
+msgstr "Sua conta ainda não pode agendar sessões."
+
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:129
+msgid "patients.not_authorized_to_create_records"
+msgstr "Sua conta ainda não pode criar prontuários."
+
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:98
+msgid "auth.refresh_token_invalid"
+msgstr "Sua sessão expirou. Entre novamente."
+
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:102
+msgid "auth.access_token_invalid"
+msgstr "Sua sessão expirou. Entre novamente."
+
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:88
+msgid "auth.totp_ticket_invalid"
+msgstr "Sua verificação em duas etapas expirou. Entre novamente."
+
+#: src/widgets/auth-screen/AuthScreen.tsx:157
 msgid "Tipo de conta"
 msgstr "Tipo de conta"
 
-#: src/auth/TotpChallenge.tsx:44
+#: src/features/totp-challenge/TotpChallenge.tsx:44
 msgid "Verificação em duas etapas"
 msgstr "Verificação em duas etapas"
 
-#: src/auth/TotpChallenge.tsx:76
+#: src/features/totp-challenge/TotpChallenge.tsx:76
 msgid "Verificar"
 msgstr "Verificar"
 
-#: src/auth/AuthScreen.tsx:131
+#: src/widgets/auth-screen/AuthScreen.tsx:133
 msgid "Verifique seu e-mail para continuar. Enviamos um link de acesso, se este e-mail existir."
 msgstr "Verifique seu e-mail para continuar. Enviamos um link de acesso, se este e-mail existir."

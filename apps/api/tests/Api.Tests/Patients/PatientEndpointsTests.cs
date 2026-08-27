@@ -5,7 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Api.Accounts;
-using Api.Endpoints;
+using Api.Patients;
 using Api.Patients;
 using Api.Serialization;
 using Api.Tests.Infrastructure;
@@ -77,7 +77,7 @@ public sealed class PatientEndpointsTests : IAsyncLifetime
         var createResponse = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/patients",
             new CreatePatientRequest(patientId, wrappedDek, ciphertext),
-            ApiJsonSerializerContext.Default.CreatePatientRequest);
+            PatientsJsonContext.Default.CreatePatientRequest);
 
         Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
         var createBody = await createResponse.Content.ReadAsStringAsync();
@@ -88,7 +88,7 @@ public sealed class PatientEndpointsTests : IAsyncLifetime
         var getBody = await getResponse.Content.ReadAsStringAsync();
         Assert.DoesNotContain(PlaintextMarker, getBody);
 
-        var record = await getResponse.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.PatientRecordResponse);
+        var record = await getResponse.Content.ReadFromJsonAsync(PatientsJsonContext.Default.PatientRecordResponse);
         Assert.NotNull(record);
         Assert.Equal(patientId, record!.PatientId);
         Assert.Equal(wrappedDek, record.WrappedDek);
@@ -115,20 +115,20 @@ public sealed class PatientEndpointsTests : IAsyncLifetime
         await client.PostAsJsonAsync(
             $"/accounts/{accountId}/patients",
             new CreatePatientRequest(patientId, SomeSealedBlob(0x01), SomeSealedBlob(0xAA)),
-            ApiJsonSerializerContext.Default.CreatePatientRequest);
+            PatientsJsonContext.Default.CreatePatientRequest);
 
         var entryCiphertext = Encoding.UTF8.GetBytes(PlaintextMarker + "-entry");
         var appendResponse = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/patients/{patientId}/entries",
             new AppendPatientEntryRequest(2, entryCiphertext),
-            ApiJsonSerializerContext.Default.AppendPatientEntryRequest);
+            PatientsJsonContext.Default.AppendPatientEntryRequest);
 
         Assert.Equal(HttpStatusCode.Created, appendResponse.StatusCode);
         var appendBody = await appendResponse.Content.ReadAsStringAsync();
         Assert.DoesNotContain(PlaintextMarker, appendBody);
 
         var getResponse = await client.GetAsync($"/accounts/{accountId}/patients/{patientId}");
-        var record = await getResponse.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.PatientRecordResponse);
+        var record = await getResponse.Content.ReadFromJsonAsync(PatientsJsonContext.Default.PatientRecordResponse);
         Assert.NotNull(record);
         Assert.Equal(2, record!.Entries.Count);
         Assert.Equal(entryCiphertext, record.Entries[1].Ciphertext);
@@ -144,7 +144,7 @@ public sealed class PatientEndpointsTests : IAsyncLifetime
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/patients/{Guid.NewGuid()}/entries",
             new AppendPatientEntryRequest(2, SomeSealedBlob(0xAA)),
-            ApiJsonSerializerContext.Default.AppendPatientEntryRequest);
+            PatientsJsonContext.Default.AppendPatientEntryRequest);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -159,9 +159,9 @@ public sealed class PatientEndpointsTests : IAsyncLifetime
         using var client = factory.CreateClient();
         var accountId = await RegisterActiveProfessionalAsync(client, "patient-conflict@example.com");
         var request = new CreatePatientRequest(Guid.NewGuid(), SomeSealedBlob(0x01), SomeSealedBlob(0xAA));
-        await client.PostAsJsonAsync($"/accounts/{accountId}/patients", request, ApiJsonSerializerContext.Default.CreatePatientRequest);
+        await client.PostAsJsonAsync($"/accounts/{accountId}/patients", request, PatientsJsonContext.Default.CreatePatientRequest);
 
-        var response = await client.PostAsJsonAsync($"/accounts/{accountId}/patients", request, ApiJsonSerializerContext.Default.CreatePatientRequest);
+        var response = await client.PostAsJsonAsync($"/accounts/{accountId}/patients", request, PatientsJsonContext.Default.CreatePatientRequest);
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -179,17 +179,17 @@ public sealed class PatientEndpointsTests : IAsyncLifetime
         await client.PostAsJsonAsync(
             $"/accounts/{accountId}/patients",
             new CreatePatientRequest(patientId, SomeSealedBlob(0x01), SomeSealedBlob(0xAA)),
-            ApiJsonSerializerContext.Default.CreatePatientRequest);
+            PatientsJsonContext.Default.CreatePatientRequest);
         var entryRequest = new AppendPatientEntryRequest(2, SomeSealedBlob(0xBB));
         await client.PostAsJsonAsync(
             $"/accounts/{accountId}/patients/{patientId}/entries",
             entryRequest,
-            ApiJsonSerializerContext.Default.AppendPatientEntryRequest);
+            PatientsJsonContext.Default.AppendPatientEntryRequest);
 
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/patients/{patientId}/entries",
             entryRequest,
-            ApiJsonSerializerContext.Default.AppendPatientEntryRequest);
+            PatientsJsonContext.Default.AppendPatientEntryRequest);
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -206,7 +206,7 @@ public sealed class PatientEndpointsTests : IAsyncLifetime
         var response = await client.PostAsJsonAsync(
             $"/accounts/{Guid.NewGuid()}/patients",
             new CreatePatientRequest(Guid.NewGuid(), SomeSealedBlob(0x01), SomeSealedBlob(0xAA)),
-            ApiJsonSerializerContext.Default.CreatePatientRequest);
+            PatientsJsonContext.Default.CreatePatientRequest);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -223,7 +223,7 @@ public sealed class PatientEndpointsTests : IAsyncLifetime
         var response = await client.PostAsJsonAsync(
             $"/accounts/{Guid.NewGuid()}/patients/{Guid.NewGuid()}/entries",
             new AppendPatientEntryRequest(2, SomeSealedBlob(0xAA)),
-            ApiJsonSerializerContext.Default.AppendPatientEntryRequest);
+            PatientsJsonContext.Default.AppendPatientEntryRequest);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -281,7 +281,7 @@ public sealed class PatientEndpointsTests : IAsyncLifetime
         var response = await client.GetAsync($"/accounts/{accountId}/patients");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.ListPatientsResponse);
+        var body = await response.Content.ReadFromJsonAsync(PatientsJsonContext.Default.ListPatientsResponse);
         Assert.NotNull(body);
         Assert.Empty(body!.Patients);
     }
@@ -299,22 +299,22 @@ public sealed class PatientEndpointsTests : IAsyncLifetime
         await client.PostAsJsonAsync(
             $"/accounts/{accountId}/patients",
             new CreatePatientRequest(patientWithAppend, SomeSealedBlob(0x02), creationCiphertext),
-            ApiJsonSerializerContext.Default.CreatePatientRequest);
+            PatientsJsonContext.Default.CreatePatientRequest);
         await client.PostAsJsonAsync(
             $"/accounts/{accountId}/patients/{patientWithAppend}/entries",
             new AppendPatientEntryRequest(2, SomeSealedBlob(0x03)),
-            ApiJsonSerializerContext.Default.AppendPatientEntryRequest);
+            PatientsJsonContext.Default.AppendPatientEntryRequest);
 
         var patientWithoutAppend = Guid.NewGuid();
         await client.PostAsJsonAsync(
             $"/accounts/{accountId}/patients",
             new CreatePatientRequest(patientWithoutAppend, SomeSealedBlob(0x04), SomeSealedBlob(0x05)),
-            ApiJsonSerializerContext.Default.CreatePatientRequest);
+            PatientsJsonContext.Default.CreatePatientRequest);
 
         var response = await client.GetAsync($"/accounts/{accountId}/patients");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.ListPatientsResponse);
+        var body = await response.Content.ReadFromJsonAsync(PatientsJsonContext.Default.ListPatientsResponse);
         Assert.NotNull(body);
         Assert.Equal(2, body!.Patients.Count);
         var summary = Assert.Single(body.Patients, p => p.PatientId == patientWithAppend);
@@ -332,7 +332,7 @@ public sealed class PatientEndpointsTests : IAsyncLifetime
         var response = await client.PostAsJsonAsync(
             $"/accounts/{Guid.NewGuid()}/patients",
             new CreatePatientRequest(Guid.NewGuid(), SomeSealedBlob(0x01), SomeSealedBlob(0xAA)),
-            ApiJsonSerializerContext.Default.CreatePatientRequest);
+            PatientsJsonContext.Default.CreatePatientRequest);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -357,7 +357,7 @@ public sealed class PatientEndpointsTests : IAsyncLifetime
         var response = await client.PostAsJsonAsync(
             $"/accounts/{otherAccountId}/patients",
             new CreatePatientRequest(Guid.NewGuid(), SomeSealedBlob(0x01), SomeSealedBlob(0xAA)),
-            ApiJsonSerializerContext.Default.CreatePatientRequest);
+            PatientsJsonContext.Default.CreatePatientRequest);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -376,7 +376,7 @@ public sealed class PatientEndpointsTests : IAsyncLifetime
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/patients",
             new CreatePatientRequest(Guid.NewGuid(), SomeSealedBlob(0x01), SomeSealedBlob(0xAA)),
-            ApiJsonSerializerContext.Default.CreatePatientRequest);
+            PatientsJsonContext.Default.CreatePatientRequest);
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -396,7 +396,7 @@ public sealed class PatientEndpointsTests : IAsyncLifetime
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/patients",
             new CreatePatientRequest(Guid.NewGuid(), SomeSealedBlob(0x01), SomeSealedBlob(0xAA)),
-            ApiJsonSerializerContext.Default.CreatePatientRequest);
+            PatientsJsonContext.Default.CreatePatientRequest);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -430,7 +430,7 @@ public sealed class PatientEndpointsTests : IAsyncLifetime
         await clientA.PostAsJsonAsync(
             $"/accounts/{accountIdA}/patients",
             new CreatePatientRequest(patientId, SomeSealedBlob(0x01), SomeSealedBlob(0xAA)),
-            ApiJsonSerializerContext.Default.CreatePatientRequest);
+            PatientsJsonContext.Default.CreatePatientRequest);
 
         using var clientB = factory.CreateClient();
         var accountIdB = await RegisterActiveProfessionalAsync(clientB, "patient-cross-tenant-b@example.com");
@@ -454,12 +454,12 @@ public sealed class PatientEndpointsTests : IAsyncLifetime
         await client.PostAsJsonAsync(
             $"/accounts/{accountId}/patients",
             new CreatePatientRequest(patientId, SomeSealedBlob(0x01), SomeSealedBlob(0xAA)),
-            ApiJsonSerializerContext.Default.CreatePatientRequest);
+            PatientsJsonContext.Default.CreatePatientRequest);
 
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/patients/{patientId}/entries",
             new AppendPatientEntryRequest(5, SomeSealedBlob(0xAA)),
-            ApiJsonSerializerContext.Default.AppendPatientEntryRequest);
+            PatientsJsonContext.Default.AppendPatientEntryRequest);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -479,12 +479,12 @@ public sealed class PatientEndpointsTests : IAsyncLifetime
         await client.PostAsJsonAsync(
             $"/accounts/{accountId}/patients",
             new CreatePatientRequest(patientId, SomeSealedBlob(0x01), SomeSealedBlob(0xAA)),
-            ApiJsonSerializerContext.Default.CreatePatientRequest);
+            PatientsJsonContext.Default.CreatePatientRequest);
 
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/patients/{patientId}/entries",
             new AppendPatientEntryRequest(1, SomeSealedBlob(0xAA)),
-            ApiJsonSerializerContext.Default.AppendPatientEntryRequest);
+            PatientsJsonContext.Default.AppendPatientEntryRequest);
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -514,7 +514,7 @@ public sealed class PatientEndpointsTests : IAsyncLifetime
         await client.PostAsJsonAsync(
             $"/accounts/{accountId}/patients",
             new CreatePatientRequest(patientId, SomeSealedBlob(0x01), SomeSealedBlob(0xAA)),
-            ApiJsonSerializerContext.Default.CreatePatientRequest);
+            PatientsJsonContext.Default.CreatePatientRequest);
 
         var patientService = factory.Services.GetRequiredService<PatientService>();
 
@@ -551,7 +551,7 @@ public sealed class PatientEndpointsTests : IAsyncLifetime
         await activeClient.PostAsJsonAsync(
             $"/accounts/{activeAccountId}/patients",
             new CreatePatientRequest(patientId, SomeSealedBlob(0x01), SomeSealedBlob(0xAA)),
-            ApiJsonSerializerContext.Default.CreatePatientRequest);
+            PatientsJsonContext.Default.CreatePatientRequest);
 
         // A second, unverified account appending to the FIRST account's patient would already
         // be blocked by RLS/ownership (PatientNotFound), which would mask the authorization
@@ -563,7 +563,7 @@ public sealed class PatientEndpointsTests : IAsyncLifetime
         var response = await unverifiedClient.PostAsJsonAsync(
             $"/accounts/{unverifiedAccountId}/patients/{patientId}/entries",
             new AppendPatientEntryRequest(2, SomeSealedBlob(0xAA)),
-            ApiJsonSerializerContext.Default.AppendPatientEntryRequest);
+            PatientsJsonContext.Default.AppendPatientEntryRequest);
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -583,7 +583,7 @@ public sealed class PatientEndpointsTests : IAsyncLifetime
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/patients/{Guid.NewGuid()}/entries",
             new AppendPatientEntryRequest(2, SomeSealedBlob(0xAA)),
-            ApiJsonSerializerContext.Default.AppendPatientEntryRequest);
+            PatientsJsonContext.Default.AppendPatientEntryRequest);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -602,7 +602,7 @@ public sealed class PatientEndpointsTests : IAsyncLifetime
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/patients",
             new CreatePatientRequest(Guid.NewGuid(), SomeSealedBlob(0x01), [0xAA]),
-            ApiJsonSerializerContext.Default.CreatePatientRequest);
+            PatientsJsonContext.Default.CreatePatientRequest);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -622,7 +622,7 @@ public sealed class PatientEndpointsTests : IAsyncLifetime
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/patients",
             new CreatePatientRequest(Guid.NewGuid(), [0x01], SomeSealedBlob(0xAA)),
-            ApiJsonSerializerContext.Default.CreatePatientRequest);
+            PatientsJsonContext.Default.CreatePatientRequest);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -642,12 +642,12 @@ public sealed class PatientEndpointsTests : IAsyncLifetime
         await client.PostAsJsonAsync(
             $"/accounts/{accountId}/patients",
             new CreatePatientRequest(patientId, SomeSealedBlob(0x01), SomeSealedBlob(0xAA)),
-            ApiJsonSerializerContext.Default.CreatePatientRequest);
+            PatientsJsonContext.Default.CreatePatientRequest);
 
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/patients/{patientId}/entries",
             new AppendPatientEntryRequest(2, [0xAA]),
-            ApiJsonSerializerContext.Default.AppendPatientEntryRequest);
+            PatientsJsonContext.Default.AppendPatientEntryRequest);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -673,7 +673,7 @@ public sealed class PatientEndpointsTests : IAsyncLifetime
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/patients",
             new CreatePatientRequest(Guid.NewGuid(), null!, SomeSealedBlob(0xAA)),
-            ApiJsonSerializerContext.Default.CreatePatientRequest);
+            PatientsJsonContext.Default.CreatePatientRequest);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -690,7 +690,7 @@ public sealed class PatientEndpointsTests : IAsyncLifetime
         await client.PostAsJsonAsync(
             $"/accounts/{accountId}/professional-verification",
             new SubmitProfessionalCredentialRequest(ProfessionalCredentialType.Crp, "06/123456", "SP", null),
-            ApiJsonSerializerContext.Default.SubmitProfessionalCredentialRequest);
+            AccountsJsonContext.Default.SubmitProfessionalCredentialRequest);
 
         return accountId;
     }
@@ -700,20 +700,20 @@ public sealed class PatientEndpointsTests : IAsyncLifetime
         var registerResponse = await client.PostAsJsonAsync(
             "/auth/register",
             new RegisterRequest(email, SomeVerifier, AccountRole.Professional),
-            ApiJsonSerializerContext.Default.RegisterRequest);
-        var registered = await registerResponse.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.RegisterResponse);
+            AccountsJsonContext.Default.RegisterRequest);
+        var registered = await registerResponse.Content.ReadFromJsonAsync(AccountsJsonContext.Default.RegisterResponse);
         var accountId = registered!.Id;
         var ticket = registered.TwoFactorTicket!;
 
         await client.PostAsJsonAsync(
             $"/accounts/{accountId}/totp",
             new BeginTotpEnrollmentRequest(ticket),
-            ApiJsonSerializerContext.Default.BeginTotpEnrollmentRequest);
+            AccountsJsonContext.Default.BeginTotpEnrollmentRequest);
         var confirmResponse = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/totp/confirm",
             new ConfirmTotpEnrollmentRequest(ticket, ValidStubCode),
-            ApiJsonSerializerContext.Default.ConfirmTotpEnrollmentRequest);
-        var confirmed = await confirmResponse.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.ConfirmTotpEnrollmentResponse);
+            AccountsJsonContext.Default.ConfirmTotpEnrollmentRequest);
+        var confirmed = await confirmResponse.Content.ReadFromJsonAsync(AccountsJsonContext.Default.ConfirmTotpEnrollmentResponse);
 
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", confirmed!.AccessToken);
         return accountId;
@@ -721,7 +721,7 @@ public sealed class PatientEndpointsTests : IAsyncLifetime
 
     private static byte[] CreateVerifier(byte fill)
     {
-        var verifier = new byte[AccountService.PasswordVerifierLength];
+        var verifier = new byte[AccountVerifierLengths.PasswordVerifierLength];
         Array.Fill(verifier, fill);
         return verifier;
     }

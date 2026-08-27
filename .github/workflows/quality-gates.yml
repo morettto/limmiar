@@ -143,6 +143,47 @@ jobs:
 
       - name: Dependency rules (copilot)
         run: pnpm --filter copilot lint:arch
+      - name: Dependency rules (app — Feature-Sliced Design layering)
+        run: pnpm --filter app lint:arch
+
+  # The .NET side owns the problem `code` strings; apps/app used to re-type them by
+  # hand into errors/problem-messages.ts, and drifted to 13 of 24 — every
+  # device-pairing failure rendered the generic message. src/errors/problem-codes.ts
+  # is generated from apps/api/src/Api/**/*ProblemCodes.cs and keys the registry, so
+  # a missing entry is a tsc error; this job is the other half, catching a code added
+  # to the API whose generated file was never regenerated and committed. Same
+  # regenerate-then-git-status-check shape as i18n-extract-check below and
+  # pact-consumer further down, for the same reason: the generator has no --check flag.
+  problem-codes-check:
+    name: "Contract: problem codes (API → app drift detection)"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate problem codes from the API
+        run: pnpm --filter app generate:problem-codes
+
+      - name: Fail if the generated file changed (API code with no committed regeneration)
+        run: |
+          if [ -n "$(git status --porcelain -- apps/app/src/errors/problem-codes.ts)" ]; then
+            echo "::error::apps/app/src/errors/problem-codes.ts is stale — a problem code changed in apps/api. Run 'pnpm --filter app generate:problem-codes' locally, answer any new code in errors/problem-messages.ts, run 'pnpm --filter app check:i18n-extract', translate, and commit."
+            git diff -- apps/app/src/errors/problem-codes.ts
+            exit 1
+          fi
 
   # S00.5-03 gate 1: custom ESLint config enforcing i18n-safe source — no
   # hardcoded JSX text outside a translation macro

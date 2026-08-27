@@ -3,7 +3,6 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Api.Accounts;
-using Api.Endpoints;
 using Api.Serialization;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -34,13 +33,13 @@ public sealed class VoiceEnrollmentEndpointsTests
         var response = await client.PutAsJsonAsync(
             $"/accounts/{accountId}/voice-enrollment",
             new VoiceEnrollmentRequest(wrappedDek, sealedEmbedding),
-            ApiJsonSerializerContext.Default.VoiceEnrollmentRequest);
+            AccountsJsonContext.Default.VoiceEnrollmentRequest);
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
 
         var getResponse = await client.GetAsync($"/accounts/{accountId}/voice-enrollment");
         Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
-        var body = await getResponse.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.VoiceEnrollmentResponse);
+        var body = await getResponse.Content.ReadFromJsonAsync(AccountsJsonContext.Default.VoiceEnrollmentResponse);
         Assert.NotNull(body);
         Assert.Equal(wrappedDek, body!.WrappedDek);
         Assert.Equal(sealedEmbedding, body.SealedEmbedding);
@@ -56,7 +55,7 @@ public sealed class VoiceEnrollmentEndpointsTests
         var response = await client.PutAsJsonAsync(
             $"/accounts/{accountId}/voice-enrollment",
             new VoiceEnrollmentRequest([0xAA], SomeSealedBlob(0x02)),
-            ApiJsonSerializerContext.Default.VoiceEnrollmentRequest);
+            AccountsJsonContext.Default.VoiceEnrollmentRequest);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -76,7 +75,7 @@ public sealed class VoiceEnrollmentEndpointsTests
         var response = await client.PutAsJsonAsync(
             $"/accounts/{accountId}/voice-enrollment",
             new VoiceEnrollmentRequest(SomeSealedBlob(0x01), [0xAA]),
-            ApiJsonSerializerContext.Default.VoiceEnrollmentRequest);
+            AccountsJsonContext.Default.VoiceEnrollmentRequest);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -99,7 +98,7 @@ public sealed class VoiceEnrollmentEndpointsTests
         var response = await client.PutAsJsonAsync(
             $"/accounts/{otherAccountId}/voice-enrollment",
             new VoiceEnrollmentRequest(SomeSealedBlob(0x01), SomeSealedBlob(0x02)),
-            ApiJsonSerializerContext.Default.VoiceEnrollmentRequest);
+            AccountsJsonContext.Default.VoiceEnrollmentRequest);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -116,7 +115,7 @@ public sealed class VoiceEnrollmentEndpointsTests
         var response = await client.PutAsJsonAsync(
             $"/accounts/{Guid.NewGuid()}/voice-enrollment",
             new VoiceEnrollmentRequest(SomeSealedBlob(0x01), SomeSealedBlob(0x02)),
-            ApiJsonSerializerContext.Default.VoiceEnrollmentRequest);
+            AccountsJsonContext.Default.VoiceEnrollmentRequest);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -159,7 +158,7 @@ public sealed class VoiceEnrollmentEndpointsTests
         await client.PutAsJsonAsync(
             $"/accounts/{accountId}/voice-enrollment",
             new VoiceEnrollmentRequest(SomeSealedBlob(0x01), SomeSealedBlob(0x02)),
-            ApiJsonSerializerContext.Default.VoiceEnrollmentRequest);
+            AccountsJsonContext.Default.VoiceEnrollmentRequest);
 
         var deleteResponse = await client.DeleteAsync($"/accounts/{accountId}/voice-enrollment");
         Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
@@ -205,18 +204,18 @@ public sealed class VoiceEnrollmentEndpointsTests
         await client.PutAsJsonAsync(
             $"/accounts/{accountId}/voice-enrollment",
             new VoiceEnrollmentRequest(SomeSealedBlob(0x01), SomeSealedBlob(0x02)),
-            ApiJsonSerializerContext.Default.VoiceEnrollmentRequest);
+            AccountsJsonContext.Default.VoiceEnrollmentRequest);
 
         var secondWrappedDek = SomeSealedBlob(0x03);
         var secondSealedEmbedding = SomeSealedBlob(0x04);
         var response = await client.PutAsJsonAsync(
             $"/accounts/{accountId}/voice-enrollment",
             new VoiceEnrollmentRequest(secondWrappedDek, secondSealedEmbedding),
-            ApiJsonSerializerContext.Default.VoiceEnrollmentRequest);
+            AccountsJsonContext.Default.VoiceEnrollmentRequest);
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
         var getResponse = await client.GetAsync($"/accounts/{accountId}/voice-enrollment");
-        var body = await getResponse.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.VoiceEnrollmentResponse);
+        var body = await getResponse.Content.ReadFromJsonAsync(AccountsJsonContext.Default.VoiceEnrollmentResponse);
         Assert.NotNull(body);
         Assert.Equal(secondWrappedDek, body!.WrappedDek);
         Assert.Equal(secondSealedEmbedding, body.SealedEmbedding);
@@ -234,7 +233,7 @@ public sealed class VoiceEnrollmentEndpointsTests
         var response = await client.PutAsJsonAsync(
             $"/accounts/{accountId}/voice-enrollment",
             new VoiceEnrollmentRequest(SomeSealedBlob(0x01), SomeSealedBlob(0x02)),
-            ApiJsonSerializerContext.Default.VoiceEnrollmentRequest);
+            AccountsJsonContext.Default.VoiceEnrollmentRequest);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
@@ -282,20 +281,20 @@ public sealed class VoiceEnrollmentEndpointsTests
         var registerResponse = await client.PostAsJsonAsync(
             "/auth/register",
             new RegisterRequest(email, SomeVerifier, AccountRole.Professional),
-            ApiJsonSerializerContext.Default.RegisterRequest);
-        var registered = await registerResponse.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.RegisterResponse);
+            AccountsJsonContext.Default.RegisterRequest);
+        var registered = await registerResponse.Content.ReadFromJsonAsync(AccountsJsonContext.Default.RegisterResponse);
         var accountId = registered!.Id;
         var ticket = registered.TwoFactorTicket!;
 
         await client.PostAsJsonAsync(
             $"/accounts/{accountId}/totp",
             new BeginTotpEnrollmentRequest(ticket),
-            ApiJsonSerializerContext.Default.BeginTotpEnrollmentRequest);
+            AccountsJsonContext.Default.BeginTotpEnrollmentRequest);
         var confirmResponse = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/totp/confirm",
             new ConfirmTotpEnrollmentRequest(ticket, ValidStubCode),
-            ApiJsonSerializerContext.Default.ConfirmTotpEnrollmentRequest);
-        var confirmed = await confirmResponse.Content.ReadFromJsonAsync(ApiJsonSerializerContext.Default.ConfirmTotpEnrollmentResponse);
+            AccountsJsonContext.Default.ConfirmTotpEnrollmentRequest);
+        var confirmed = await confirmResponse.Content.ReadFromJsonAsync(AccountsJsonContext.Default.ConfirmTotpEnrollmentResponse);
 
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", confirmed!.AccessToken);
         return accountId;
@@ -303,7 +302,7 @@ public sealed class VoiceEnrollmentEndpointsTests
 
     private static byte[] CreateVerifier(byte fill)
     {
-        var verifier = new byte[AccountService.PasswordVerifierLength];
+        var verifier = new byte[AccountVerifierLengths.PasswordVerifierLength];
         Array.Fill(verifier, fill);
         return verifier;
     }
