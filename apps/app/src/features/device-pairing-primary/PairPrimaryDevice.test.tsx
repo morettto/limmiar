@@ -27,6 +27,20 @@ const SESSION_ID = 'session-primary-flow'
 const BASE_URL = 'http://api.test'
 const KEK = new Uint8Array(32).fill(0x42)
 
+// QRCode finishes through zlib, whose callbacks land on the libuv thread pool -- fake timers
+// cannot schedule those, so a fixed number of ticks is a race that loses under CI load (it
+// already flaked on main, run 32451615191). Tick until the awaited state is really on screen.
+async function flushUntil(ready: () => boolean, maxTicks = 500) {
+  for (let tick = 0; tick < maxTicks; tick++) {
+    if (ready()) {
+      return
+    }
+    await vi.advanceTimersByTimeAsync(0)
+  }
+
+  throw new Error(`flushUntil: still false after ${maxTicks} ticks`)
+}
+
 describe('PairPrimaryDevice', () => {
   beforeAll(async () => {
     await dynamicActivate('pt-BR')
@@ -78,18 +92,13 @@ describe('PairPrimaryDevice', () => {
 
     expect(screen.getByRole('status').textContent).toBe('Preparando o código para parear o novo dispositivo...')
 
-    // Flush the QR-mount effect (createPairingSession -> toDataURL), same technique as
-    // PairingQr.test.tsx -- QRCode's Node renderer schedules via setImmediate, which fake
-    // timers intercept, so a single microtask flush isn't enough.
-    for (let i = 0; i < 50; i++) {
-      await vi.advanceTimersByTimeAsync(0)
-    }
+    // Wait for the QR to mount (createPairingSession -> toDataURL) instead of guessing ticks.
+    await flushUntil(() => screen.queryByRole('img') !== null)
 
-    // Trigger the claim-status poll that discovers the (fake) claim.
+    // Trigger the claim-status poll that discovers the (fake) claim, then let the
+    // getKekForTransfer -> encrypt -> submitPairingPayload chain settle.
     await vi.advanceTimersByTimeAsync(1000)
-    for (let i = 0; i < 50; i++) {
-      await vi.advanceTimersByTimeAsync(0)
-    }
+    await flushUntil(() => screen.queryByRole('status')?.textContent === 'Dispositivo pareado com sucesso.')
 
     // waitFor's own retry loop uses a real setTimeout, which never fires under fake timers
     // -- the microtask-flush loop above already drains the getKekForTransfer -> encrypt ->
@@ -139,13 +148,13 @@ describe('PairPrimaryDevice', () => {
       </I18nProvider>,
     )
 
-    for (let i = 0; i < 50; i++) {
-      await vi.advanceTimersByTimeAsync(0)
-    }
+    // Wait for the QR to mount (createPairingSession -> toDataURL) instead of guessing ticks.
+    await flushUntil(() => screen.queryByRole('img') !== null)
+
+    // Trigger the claim-status poll that discovers the (fake) claim, then let the
+    // getKekForTransfer -> encrypt -> submitPairingPayload chain settle.
     await vi.advanceTimersByTimeAsync(1000)
-    for (let i = 0; i < 50; i++) {
-      await vi.advanceTimersByTimeAsync(0)
-    }
+    await flushUntil(() => screen.queryByRole('status')?.textContent === 'Enviando a chave para o novo dispositivo...')
 
     expect(screen.getByRole('status').textContent).toBe('Enviando a chave para o novo dispositivo...')
     expect(submitPairingPayloadMock).not.toHaveBeenCalled()
@@ -184,13 +193,13 @@ describe('PairPrimaryDevice', () => {
       </I18nProvider>,
     )
 
-    for (let i = 0; i < 50; i++) {
-      await vi.advanceTimersByTimeAsync(0)
-    }
+    // Wait for the QR to mount (createPairingSession -> toDataURL) instead of guessing ticks.
+    await flushUntil(() => screen.queryByRole('img') !== null)
+
+    // Trigger the claim-status poll that discovers the (fake) claim, then let the
+    // getKekForTransfer -> encrypt -> submitPairingPayload chain settle.
     await vi.advanceTimersByTimeAsync(1000)
-    for (let i = 0; i < 50; i++) {
-      await vi.advanceTimersByTimeAsync(0)
-    }
+    await flushUntil(() => screen.queryByRole('alert') !== null)
 
     expect(screen.getByRole('alert')).toBeTruthy()
     expect(onDelivered).not.toHaveBeenCalled()
@@ -222,13 +231,13 @@ describe('PairPrimaryDevice', () => {
       </I18nProvider>,
     )
 
-    for (let i = 0; i < 50; i++) {
-      await vi.advanceTimersByTimeAsync(0)
-    }
+    // Wait for the QR to mount (createPairingSession -> toDataURL) instead of guessing ticks.
+    await flushUntil(() => screen.queryByRole('img') !== null)
+
+    // Trigger the claim-status poll that discovers the (fake) claim, then let the
+    // getKekForTransfer -> encrypt -> submitPairingPayload chain settle.
     await vi.advanceTimersByTimeAsync(1000)
-    for (let i = 0; i < 50; i++) {
-      await vi.advanceTimersByTimeAsync(0)
-    }
+    await flushUntil(() => screen.queryByRole('alert') !== null)
 
     expect(screen.getByRole('alert').textContent).toBe(
       'Não foi possível concluir o pareamento com segurança. Tente novamente.',
@@ -263,13 +272,13 @@ describe('PairPrimaryDevice', () => {
       </I18nProvider>,
     )
 
-    for (let i = 0; i < 50; i++) {
-      await vi.advanceTimersByTimeAsync(0)
-    }
+    // Wait for the QR to mount (createPairingSession -> toDataURL) instead of guessing ticks.
+    await flushUntil(() => screen.queryByRole('img') !== null)
+
+    // Trigger the claim-status poll that discovers the (fake) claim, then let the
+    // getKekForTransfer -> encrypt -> submitPairingPayload chain settle.
     await vi.advanceTimersByTimeAsync(1000)
-    for (let i = 0; i < 50; i++) {
-      await vi.advanceTimersByTimeAsync(0)
-    }
+    await flushUntil(() => screen.queryByRole('status')?.textContent === 'Dispositivo pareado com sucesso.')
 
     expect(screen.getByRole('status').textContent).toBe('Dispositivo pareado com sucesso.')
   })
