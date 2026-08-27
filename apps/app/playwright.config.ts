@@ -27,7 +27,11 @@ export default defineConfig({
       // points this wrangler dev at the isolated directory instead, so dist/ is never written
       // by this variant at all -- confirmed `wrangler dev --assets <dir>` overrides
       // wrangler.jsonc's configured directory (wrangler 4.118.0).
-      command: 'pnpm run build:e2e && pnpm exec wrangler dev --port 8787 --local-protocol http --assets dist-e2e',
+      // allow-api-origin.mjs: build:e2e copia public/_headers para dist-e2e/ e o wrangler dev
+      // serve essa CSP, cujo `connect-src 'self'` não cobre a API .NET desta suite -- ela corre
+      // noutra porta, logo noutra origem (ver o comentário do próprio ficheiro). O passo corre
+      // entre o build e o wrangler, e só altera o artefacto de teste.
+      command: `pnpm run build:e2e && node e2e/fixtures/allow-api-origin.mjs ${API_BASE_URL} && pnpm exec wrangler dev --port 8787 --local-protocol http --assets dist-e2e`,
       url: 'http://127.0.0.1:8787',
       reuseExistingServer: false,
       timeout: 30_000,
