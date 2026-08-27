@@ -46,6 +46,15 @@ describe('AdaptiveTable', () => {
     expect(screen.getByRole('list').children).toHaveLength(2)
   })
 
+  it('table mode: each <tr> carries the pointer-coarse:h-11 class (44px touch target, AC "AdaptiveTable verde ... alvo 44px em pointer:coarse")', () => {
+    mockedUseBreakpoint.mockReturnValue('xl')
+    render(<AdaptiveTable columns={COLUMNS} rows={ROWS} />)
+
+    for (const row of screen.getAllByRole('row').slice(1)) {
+      expect(row.className).toContain('pointer-coarse:h-11')
+    }
+  })
+
   it('table mode: one <th> per column, in order, and cells aligned to their column', () => {
     mockedUseBreakpoint.mockReturnValue('xl')
     render(<AdaptiveTable columns={COLUMNS} rows={ROWS} />)

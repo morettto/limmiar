@@ -17,6 +17,7 @@ public static class AccountsComposition
         services.AddCredentials();
         services.AddDevicePairing(configuration);
         services.AddProfessionalVerification(configuration);
+        services.AddVoiceEnrollment();
 
         services.ConfigureHttpJsonOptions(options =>
         {
@@ -32,5 +33,6 @@ public static class AccountsComposition
         app.MapDevicePairing();
         app.MapProfessionalVerification();
         app.MapRecovery();
+        app.MapVoiceEnrollment();
     }
 }

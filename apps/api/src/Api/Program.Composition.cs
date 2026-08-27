@@ -2,6 +2,8 @@ using Api.Accounts;
 using Api.Data;
 using Api.Health;
 using Api.ExceptionHandling;
+using Api.Patients;
+using Api.Scheduling;
 using Api.Serialization;
 using Mediator;
 using Microsoft.AspNetCore.Cors.Infrastructure;
@@ -43,6 +45,9 @@ public partial class Program
 
         builder.Services.AddAccounts(builder.Configuration);
 
+        builder.Services.AddPatients();
+        builder.Services.AddScheduling();
+
         var app = builder.Build();
 
         if (app.Environment.IsDevelopment())
@@ -56,6 +61,8 @@ public partial class Program
 
         app.MapHealthEndpoints();
         app.MapAccounts();
+        app.MapPatients();
+        app.MapScheduling();
 
         return app;
     }

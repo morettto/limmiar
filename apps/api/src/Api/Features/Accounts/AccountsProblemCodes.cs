@@ -48,4 +48,6 @@ public static class AccountsProblemCodes
     public const string AuthWebAuthnCeremonyFailed = "auth.webauthn_ceremony_failed";
 
     public const string AuthInvalidRecoveryPhrase = "auth.invalid_recovery_phrase";
+
+    public const string VoiceEnrollmentNotFound = "voice.enrollment_not_found";
 }

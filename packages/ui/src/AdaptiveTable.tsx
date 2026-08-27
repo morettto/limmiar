@@ -47,7 +47,7 @@ export function AdaptiveTable({ columns, rows, caption }: AdaptiveTableProps) {
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.key} className="border-b border-neutral-200">
+            <tr key={row.key} className="border-b border-neutral-200 pointer-coarse:h-11">
               {row.cells.map((cell, index) => (
                 <td key={columns[index].key} className="p-2">
                   {cell}

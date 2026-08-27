@@ -122,6 +122,42 @@ const knownProblemMessages: Record<ProblemCode, MessageDescriptor> = {
     id: 'auth.device_pairing_payload_not_delivered',
     message: 'O dispositivo principal ainda não liberou o acesso. Aguarde.',
   }),
+  'patients.not_found': msg({
+    id: 'patients.not_found',
+    message: 'Prontuário não encontrado.',
+  }),
+  'patients.not_authorized_to_create_records': msg({
+    id: 'patients.not_authorized_to_create_records',
+    message: 'Sua conta ainda não pode criar prontuários.',
+  }),
+  'patients.entry_sequence_conflict': msg({
+    id: 'patients.entry_sequence_conflict',
+    message: 'Este prontuário mudou em outro dispositivo. Recarregue e tente de novo.',
+  }),
+  'agenda.not_authorized_to_schedule': msg({
+    id: 'agenda.not_authorized_to_schedule',
+    message: 'Sua conta ainda não pode agendar sessões.',
+  }),
+  'agenda.slot_taken': msg({
+    id: 'agenda.slot_taken',
+    message: 'Já existe uma sessão neste horário.',
+  }),
+  'agenda.session_not_found': msg({
+    id: 'agenda.session_not_found',
+    message: 'Sessão não encontrada.',
+  }),
+  'agenda.session_cancelled': msg({
+    id: 'agenda.session_cancelled',
+    message: 'Esta sessão foi cancelada.',
+  }),
+  'agenda.recording_active': msg({
+    id: 'agenda.recording_active',
+    message: 'A sessão está gravando e não pode ser alterada agora.',
+  }),
+  'voice.enrollment_not_found': msg({
+    id: 'voice.enrollment_not_found',
+    message: 'Nenhum cadastro de voz encontrado para esta conta.',
+  }),
 }
 
 // Fallback for a backend `code` not in the registry above. The raw code string must

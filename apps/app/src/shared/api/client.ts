@@ -16,7 +16,7 @@ async function readProblem(response: Response): Promise<ProblemResult> {
 // parse at all -- differs per endpoint.
 export async function request(
   baseUrl: string,
-  method: 'GET' | 'POST',
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE',
   path: string,
   body?: unknown,
   accessToken?: string,
@@ -30,7 +30,7 @@ export async function request(
 
 async function sendRequest(
   baseUrl: string,
-  method: 'GET' | 'POST',
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE',
   path: string,
   body?: unknown,
   accessToken?: string,
@@ -42,11 +42,15 @@ async function sendRequest(
     return fetch(`${baseUrl}${path}`, { headers: { Authorization: `Bearer ${accessToken}` } })
   }
 
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  const headers: Record<string, string> = {}
   if (accessToken !== undefined) {
     headers.Authorization = `Bearer ${accessToken}`
   }
-  return fetch(`${baseUrl}${path}`, { method: 'POST', headers, body: JSON.stringify(body) })
+  if (method === 'DELETE') {
+    return fetch(`${baseUrl}${path}`, { method, headers })
+  }
+  headers['Content-Type'] = 'application/json'
+  return fetch(`${baseUrl}${path}`, { method, headers, body: JSON.stringify(body) })
 }
 
 export async function getHealthDb(baseUrl: string): Promise<HealthDbResult> {

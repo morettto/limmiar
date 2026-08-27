@@ -1,0 +1,35 @@
+{
+  "name": "@limmiar/agenda",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "oxlint",
+    "lint:arch": "depcruise src --config .dependency-cruiser.cjs",
+    "test:unit": "vitest run --coverage",
+    "test:unit:watch": "vitest",
+    "test:mutation": "stryker run",
+    "test:mutation:incremental": "stryker run --incremental"
+  },
+  "dependencies": {
+    "@date-fns/tz": "^1.5.0",
+    "date-fns": "^4.1.0",
+    "rrule": "^2.8.1"
+  },
+  "devDependencies": {
+    "@stryker-mutator/core": "9.6.1",
+    "@stryker-mutator/vitest-runner": "9.6.1",
+    "@types/node": "^24.13.3",
+    "@vitest/coverage-istanbul": "4.1.10",
+    "dependency-cruiser": "^18.1.0",
+    "fast-check": "^4.9.0",
+    "oxlint": "^1.76.0",
+    "typescript": "~6.0.3",
+    "vitest": "4.1.10"
+  }
+}

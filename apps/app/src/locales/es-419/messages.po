@@ -14,6 +14,11 @@ msgstr ""
 "Plural-Forms: \n"
 
 #. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:153
+msgid "agenda.recording_active"
+msgstr "La sesión está grabando y no se puede modificar ahora."
+
+#. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:54
 msgid "auth.totp_not_enabled"
 msgstr "La verificación en dos pasos aún no ha sido activada para esta cuenta."
@@ -62,10 +67,30 @@ msgstr "Base de datos no disponible en este momento."
 msgid "Bem-vindo ao Limmiar"
 msgstr "Bienvenido a Limmiar"
 
+#: src/features/copilot-byok/CopilotKeySetup.tsx:52
+msgid "Cadastrar chave de API de IA"
+msgstr "Registrar clave de API de IA"
+
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:36
 msgid "validation.invalid_field"
 msgstr "Campo inválido: {field}."
+
+#: src/widgets/patient-wallet/PatientWallet.tsx:95
+msgid "Carregando pacientes..."
+msgstr "Cargando pacientes..."
+
+#: src/features/copilot-byok/CopilotKeySetup.tsx:76
+msgid "Chave de API"
+msgstr "Clave de API"
+
+#: src/features/copilot-byok/CopilotKeySetup.tsx:28
+msgid "Chaveiro bloqueado. Desbloqueie para cadastrar sua chave de API."
+msgstr "Llavero bloqueado. Desbloquéalo para registrar tu clave de API."
+
+#: src/widgets/patient-wallet/PatientWallet.tsx:85
+msgid "Chaveiro bloqueado. Desbloqueie para ver a carteira de pacientes."
+msgstr "Llavero bloqueado. Desbloquéalo para ver la cartera de pacientes."
 
 #: src/features/totp-enrollment/TotpSetup.tsx:158
 msgid "Código de 6 dígitos do aplicativo autenticador"
@@ -194,6 +219,11 @@ msgid "Esta frase não será exibida novamente. Guarde-a em um local seguro: ela
 msgstr "Esta frase no se mostrará de nuevo. Guárdala en un lugar seguro: es la única forma de recuperar el acceso a tu cuenta si pierdes todos tus dispositivos."
 
 #. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:149
+msgid "agenda.session_cancelled"
+msgstr "Esta sesión fue cancelada."
+
+#. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:109
 msgid "auth.device_pairing_session_not_found"
 msgstr "Este código de vinculación ya no es válido. Genera uno nuevo."
@@ -212,9 +242,18 @@ msgstr "Este correo electrónico ya está registrado."
 msgid "auth.magic_link_invalid"
 msgstr "Este enlace de acceso ya no es válido. Solicita uno nuevo."
 
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:133
+msgid "patients.entry_sequence_conflict"
+msgstr "Este expediente cambió en otro dispositivo. Recarga e intenta de nuevo."
+
 #: src/features/totp-enrollment/TotpSetup.tsx:101
 msgid "Estes códigos não serão exibidos novamente. Guarde-os em um local seguro: eles são a única forma de recuperar o acesso à sua conta caso você perca o aplicativo autenticador."
 msgstr "Estos códigos no se mostrarán de nuevo. Guárdalos en un lugar seguro: son la única forma de recuperar el acceso a tu cuenta si pierdes tu app autenticadora."
+
+#: src/features/copilot-byok/CopilotKeySetup.tsx:61
+msgid "Fornecedor"
+msgstr "Proveedor"
 
 #: src/features/recovery/RecoveryScreen.tsx:134
 msgid "Frase de recuperação"
@@ -248,6 +287,15 @@ msgstr "Guardé mis códigos"
 msgid "Guardei minha frase"
 msgstr "Guardé mi frase"
 
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:141
+msgid "agenda.slot_taken"
+msgstr "Ya existe una sesión en este horario."
+
+#: src/features/copilot-byok/CopilotKeySetup.tsx:99
+msgid "Lembrar neste dispositivo"
+msgstr "Recordar en este dispositivo"
+
 #: src/features/totp-enrollment/TotpSetup.tsx:144
 msgid "Link de provisionamento"
 msgstr "Enlace de aprovisionamiento"
@@ -264,6 +312,10 @@ msgstr "No se puede enviar la acreditación con la cuenta en su estado actual."
 #: src/features/qr-scan/PairingScan.tsx:53
 msgid "Não foi possível acessar a câmera para escanear o código."
 msgstr "No se pudo acceder a la cámara para escanear el código."
+
+#: src/widgets/patient-wallet/PatientWallet.tsx:68
+msgid "Não foi possível carregar a carteira de pacientes. Tente novamente."
+msgstr "No se pudo cargar la cartera de pacientes. Intenta de nuevo."
 
 #: src/features/device-pairing-primary/PairPrimaryDevice.tsx:57
 msgid "Não foi possível concluir o pareamento com segurança. Tente novamente."
@@ -283,10 +335,23 @@ msgstr "No se pudo continuar con Google. Inténtalo de nuevo."
 msgid "Não foi possível decifrar a chave recebida. Tente parear novamente."
 msgstr "No se pudo descifrar la clave recibida. Intenta vincular de nuevo."
 
+#: src/widgets/patient-wallet/PatientWallet.tsx:113
+msgid "Não foi possível ler"
+msgstr "No se pudo leer"
+
+#: src/features/copilot-byok/CopilotKeySetup.tsx:56
+msgid "Não foi possível salvar a chave. Tente novamente."
+msgstr "No se pudo guardar la clave. Intenta de nuevo."
+
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:44
 msgid "auth.totp_not_pending"
 msgstr "No hay una configuración de verificación en dos pasos pendiente para esta cuenta."
+
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:157
+msgid "voice.enrollment_not_found"
+msgstr "No se encontró registro de voz para esta cuenta."
 
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:121
@@ -299,13 +364,18 @@ msgid "unexpected_error"
 msgstr "Ocurrió un error inesperado en el servidor."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:129
+#: src/shared/api/problem-messages.ts:165
 msgid "errors.generic"
 msgstr "Ocurrió un error inesperado. Inténtalo de nuevo."
 
 #: src/widgets/auth-screen/AuthScreen.tsx:176
+#: src/widgets/patient-wallet/PatientWallet.tsx:120
 msgid "Paciente"
 msgstr "Paciente"
+
+#: src/widgets/patient-wallet/PatientWallet.tsx:118
+msgid "Pacientes"
+msgstr "Pacientes"
 
 #: src/features/device-pairing-primary/PairingQr.tsx:149
 msgid "Parear novo dispositivo"
@@ -323,6 +393,15 @@ msgstr "Preparando el código para vincular el nuevo dispositivo..."
 msgid "Profissional"
 msgstr "Profesional"
 
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:125
+msgid "patients.not_found"
+msgstr "Expediente no encontrado."
+
+#: src/features/copilot-byok/CopilotKeySetup.tsx:111
+msgid "Pular"
+msgstr "Omitir"
+
 #: src/features/recovery/RecoveryScreen.tsx:154
 msgid "Recuperar acesso"
 msgstr "Recuperar acceso"
@@ -331,9 +410,32 @@ msgstr "Recuperar acceso"
 msgid "Recuperar acesso à conta"
 msgstr "Recuperar acceso a la cuenta"
 
+#: src/widgets/patient-wallet/PatientWallet.tsx:121
+msgid "Risco"
+msgstr "Riesgo"
+
+#: src/features/copilot-byok/CopilotKeySetup.tsx:108
+msgid "Salvar"
+msgstr "Guardar"
+
 #: src/widgets/auth-screen/AuthScreen.tsx:204
 msgid "Senha"
 msgstr "Contraseña"
+
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:145
+msgid "agenda.session_not_found"
+msgstr "Sesión no encontrada."
+
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:137
+msgid "agenda.not_authorized_to_schedule"
+msgstr "Tu cuenta todavía no puede agendar sesiones."
+
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:129
+msgid "patients.not_authorized_to_create_records"
+msgstr "Tu cuenta todavía no puede crear expedientes."
 
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:98

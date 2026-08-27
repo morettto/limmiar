@@ -39,6 +39,8 @@ namespace Api.Accounts;
 [JsonSerializable(typeof(RecoverAccessResponse))]
 [JsonSerializable(typeof(RegisterRecoveryVerifierRequest))]
 [JsonSerializable(typeof(RegisterRecoveryVerifierResponse))]
+[JsonSerializable(typeof(VoiceEnrollmentRequest))]
+[JsonSerializable(typeof(VoiceEnrollmentResponse))]
 public partial class AccountsJsonContext : JsonSerializerContext
 {
 }

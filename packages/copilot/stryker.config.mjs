@@ -1,0 +1,23 @@
+// @ts-check
+/** @type {import('@stryker-mutator/api/core').PartialStrykerOptions} */
+export default {
+  packageManager: 'pnpm',
+  testRunner: 'vitest',
+  // pnpm's non-flat node_modules means Stryker's automatic plugin resolution
+  // (globbing "@stryker-mutator/*" in node_modules) can miss the runner;
+  // list it explicitly so it's always found regardless of hoisting.
+  plugins: ['@stryker-mutator/vitest-runner'],
+  mutate: ['src/**/*.ts', '!src/index.ts', '!src/**/*.test.ts'],
+  coverageAnalysis: 'perTest',
+  reporters: ['html', 'clear-text', 'progress'],
+  thresholds: {
+    high: 100,
+    low: 95,
+    break: 95,
+  },
+  // `incremental` is controlled per-invocation via the CLI flag
+  // (`test:mutation` runs a full pass, `test:mutation:incremental` passes
+  // `--incremental`) rather than forced on here, so the two npm scripts stay
+  // meaningfully different.
+  incrementalFile: '.stryker-tmp/incremental.json',
+}
