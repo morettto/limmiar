@@ -143,6 +143,33 @@ describe('saveApiKey / loadApiKey', () => {
   })
 })
 
+describe('empty accountId', () => {
+  // storageKeyFor('') collapses to a single global slot (`${COPILOT_KEY_STORAGE_KEY}:`) shared by
+  // every caller that forgets to pass a real accountId -- the AAD would also stop distinguishing
+  // accounts. All three entry points funnel through the same namespacing, so all three reject it.
+  afterEach(() => {
+    localStorage.clear()
+  })
+
+  it('saveApiKey rejects an empty accountId before touching memory or storage', async () => {
+    const kek = await makeKek()
+
+    await expect(saveApiKey(kek, '', 'openai', FAKE_API_KEY, true)).rejects.toThrow(/accountId/)
+
+    expect(window.localStorage.length).toBe(0)
+  })
+
+  it('loadApiKey rejects an empty accountId', async () => {
+    const kek = await makeKek()
+
+    await expect(loadApiKey(kek, '')).rejects.toThrow(/accountId/)
+  })
+
+  it('clearApiKey rejects an empty accountId', () => {
+    expect(() => clearApiKey('')).toThrow(/accountId/)
+  })
+})
+
 describe('clearApiKey', () => {
   afterEach(() => {
     localStorage.clear()

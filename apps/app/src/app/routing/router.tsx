@@ -1,10 +1,12 @@
-import { createRootRoute, createRoute, createRouter } from '@tanstack/react-router'
+import { createRootRoute, createRoute, createRouter, Link } from '@tanstack/react-router'
+import { Trans } from '@lingui/react/macro'
 import { AuthPage } from '../../pages/auth/AuthPage'
 import { MagicLinkCallbackPage } from '../../pages/magic-link-callback/MagicLinkCallbackPage'
 import { RecoveryPage } from '../../pages/recovery/RecoveryPage'
 import { RecoveryPhraseSetupPage } from '../../pages/recovery/RecoveryPhraseSetupPage'
 import { PairPrimaryPage } from '../../pages/device-pairing/PairPrimaryPage'
 import { PairNewPage } from '../../pages/device-pairing/PairNewPage'
+import { CopilotKeyPage } from '../../pages/settings/CopilotKeyPage'
 
 function readSearchString(search: Record<string, unknown>, key: string): string {
   const value = search[key]
@@ -17,10 +19,19 @@ function readSearchString(search: Record<string, unknown>, key: string): string 
 // be equivalent, not a behavior change, so it is left implicit.
 const rootRoute = createRootRoute()
 
+// ponytail: this <div id="app-shell"> is a navigation stub, not a real landing page --
+// replace it together with the real landing page, not as a standalone cleanup.
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
-  component: () => <div id="app-shell">Limmiar</div>,
+  component: () => (
+    <div id="app-shell">
+      Limmiar
+      <Link to="/settings/copilot">
+        <Trans>Configurar copiloto de IA</Trans>
+      </Link>
+    </div>
+  ),
 })
 
 interface MagicLinkCallbackSearch {
@@ -186,18 +197,26 @@ function PairNewRouteComponent() {
 // exercises a real `vite build` (not `vite dev`) to match production bundling as closely as
 // possible -- so this is a dedicated build-time flag the E2E's build command sets
 // (VITE_ENABLE_E2E_TEST_ROUTES=true) and no other build (including local `vite dev`) does.
+
+const copilotSettingsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/settings/copilot',
+  component: CopilotKeyPage,
+})
+
 const routeTree =
   import.meta.env.VITE_ENABLE_E2E_TEST_ROUTES === 'true'
     ? rootRoute.addChildren([
         indexRoute,
         magicLinkCallbackRoute,
+        copilotSettingsRoute,
         authScreenE2ERoute,
         pairPrimaryRoute,
         pairNewRoute,
         recoveryScreenE2ERoute,
         recoveryPhraseSetupE2ERoute,
       ])
-    : rootRoute.addChildren([indexRoute, magicLinkCallbackRoute])
+    : rootRoute.addChildren([indexRoute, magicLinkCallbackRoute, copilotSettingsRoute])
 
 export const router = createRouter({ routeTree })
 

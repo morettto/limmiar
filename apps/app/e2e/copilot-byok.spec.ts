@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
-import { SUPPORTED_PROVIDERS } from '../src/copilot/provider-registry'
-import { probeProviderCors } from '../src/copilot/cors-probe'
-import type { AiProvider } from '../src/copilot/provider-registry'
+import { SUPPORTED_PROVIDERS } from '../src/features/copilot-byok/provider-registry'
+import { probeProviderCors } from '../src/features/copilot-byok/cors-probe'
+import type { AiProvider } from '../src/features/copilot-byok/provider-registry'
 
 // S07-01: unlike every other spec in this file/directory, this one depends on REAL internet
 // access to three third-party APIs (OpenAI, Anthropic, Gemini) -- there is no local fixture

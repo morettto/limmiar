@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { LOCALE_STORAGE_KEY } from '../src/locale/local-storage-locale-store'
+import { LOCALE_STORAGE_KEY } from '../src/shared/i18n/locale/local-storage-locale-store'
 
 declare global {
   interface Window {

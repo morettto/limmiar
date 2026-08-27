@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:e2e": "tsc -b && vite build --outDir dist-e2e",
     "lint": "oxlint",
     "lint:i18n": "eslint src",
     "lint:arch": "depcruise src --config .dependency-cruiser.cjs",

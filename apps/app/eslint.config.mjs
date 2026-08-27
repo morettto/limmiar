@@ -51,7 +51,12 @@ export default tseslint.config(
           // "Limmiar" is the product name — identical in all 4 locales, so
           // wrapping it in a translation macro everywhere it appears would
           // be extraction noise with zero translation payoff.
-          ignore: ['^Limmiar$'],
+          // A bare URL path (TanStack Router's <Link to="/settings/copilot">) is
+          // routing config, not copy: no locale renders a slash-path with no spaces
+          // and no capitals as visible text. Matched by VALUE rather than added to
+          // ignoreNames, because ignoreNames matches the attribute name alone and
+          // would exempt every future JSX attribute called `to`, copy included.
+          ignore: ['^Limmiar$', '^/[a-z0-9/-]*$'],
           ignoreNames: [
             { regex: { pattern: 'className', flags: 'i' } },
             'id',

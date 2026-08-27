@@ -2,3 +2,4 @@
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Embedder-Policy: credentialless
   X-Content-Type-Options: nosniff
+  Content-Security-Policy: connect-src 'self' https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com; object-src 'none'; form-action 'self'; base-uri 'self'; frame-ancestors 'none'

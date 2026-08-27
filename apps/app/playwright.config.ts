@@ -18,7 +18,20 @@ export default defineConfig({
       // VITE_ENABLE_E2E_TEST_ROUTES: router.tsx gates the /devices/pair-primary and
       // /devices/pair-new test-only routes behind this flag so they never ship in a real
       // production build -- see that file's own doc comment. Only this E2E build sets it.
-      command: 'pnpm run build && pnpm exec wrangler dev --port 8787 --local-protocol http',
+      //
+      // This build writes to dist-e2e/, not dist/ -- wrangler.jsonc's `assets.directory` is
+      // ./dist, the exact path `wrangler deploy` publishes (deploy.yml). Routes gated by this
+      // flag accept a raw accessToken/KEK in the query string; if this build ever landed in
+      // dist/, deploy.yml running its own build afterwards would (today) overwrite it before
+      // publish, but that's an ordering accident, not a guarantee. `--assets dist-e2e` below
+      // points this wrangler dev at the isolated directory instead, so dist/ is never written
+      // by this variant at all -- confirmed `wrangler dev --assets <dir>` overrides
+      // wrangler.jsonc's configured directory (wrangler 4.118.0).
+      // allow-api-origin.mjs: build:e2e copia public/_headers para dist-e2e/ e o wrangler dev
+      // serve essa CSP, cujo `connect-src 'self'` não cobre a API .NET desta suite -- ela corre
+      // noutra porta, logo noutra origem (ver o comentário do próprio ficheiro). O passo corre
+      // entre o build e o wrangler, e só altera o artefacto de teste.
+      command: `pnpm run build:e2e && node e2e/fixtures/allow-api-origin.mjs ${API_BASE_URL} && pnpm exec wrangler dev --port 8787 --local-protocol http --assets dist-e2e`,
       url: 'http://127.0.0.1:8787',
       reuseExistingServer: false,
       timeout: 30_000,
