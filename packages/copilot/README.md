@@ -23,8 +23,7 @@ Entidade de rascunho gerado por copiloto de IA (spec S07, BYOK) e a camada de pr
 
 - `criarMaquinaRascunho(opcoes: CriarMaquinaRascunhoOpcoes)` — factory da máquina.
 - `separarPorAncora`, `deveAvisarVencimento`, `deveDescartarPorVencimento` — funções puras de `src/provenancia.ts`.
-- Tipos: `RascunhoContexto`, `RascunhoEvento`, `Afirmacao`, `Ancora`, `CriarMaquinaRascunhoOpcoes`, `NotificadorVencimentoRascunho` (`src/types.ts`, zero import de `xstate` — regra aplicada por `pnpm lint:arch`).
-- `NotificadorVencimentoRascunho.avisar(rascunhoId: string)` — porta de notificação de vencimento. A assinatura só aceita o id do rascunho, nunca texto ou afirmações: impossível, por construção do tipo, vazar dado clínico por esta porta.
+- Tipos: `RascunhoContexto`, `RascunhoEvento`, `Afirmacao`, `Ancora`, `CriarMaquinaRascunhoOpcoes` (`src/types.ts`, zero import de `xstate` — regra aplicada por `pnpm lint:arch`).
 
 ## Decisões recentes relevantes
 
@@ -33,5 +32,5 @@ O prazo de 30 dias e a janela de aviso de 7 dias (23→30) são constantes fixas
 ## Fora de âmbito
 
 - Chamada real a um LLM para gerar o rascunho — fica para ticket futuro da spec S07.
-- Envio real da notificação de vencimento — a porta `NotificadorVencimentoRascunho` está definida aqui; a implementação (browser `Notification`, e-mail, painel) é trabalho de adapter fora deste package.
+- Envio real da notificação de vencimento (browser `Notification`, e-mail, painel) — nenhuma porta para isto está definida neste package; a interface especulativa `NotificadorVencimentoRascunho` que existia aqui foi removida (S07-04 follow-up B2) por não ter nenhum adapter em todo o monorepo. Se/quando um adapter real precisar dela, a interface volta a nascer nesse ticket, moldada pelo consumidor real.
 - Persistência do rascunho (disco/servidor) — fora de âmbito; ver S07-01 para o padrão de envelope já usado no resto do BYOK.

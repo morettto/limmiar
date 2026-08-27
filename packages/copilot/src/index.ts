@@ -4,7 +4,6 @@ export type {
   Afirmacao,
   Ancora,
   CriarMaquinaRascunhoOpcoes,
-  NotificadorVencimentoRascunho,
   RascunhoContexto,
   RascunhoEvento,
 } from './types.ts'

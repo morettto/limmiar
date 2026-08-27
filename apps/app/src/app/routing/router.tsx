@@ -1,4 +1,4 @@
-import { createRootRoute, createRoute, createRouter, Link, useNavigate } from '@tanstack/react-router'
+import { createRootRoute, createRoute, createRouter, Link } from '@tanstack/react-router'
 import { Trans } from '@lingui/react/macro'
 import { AuthPage } from '../../pages/auth/AuthPage'
 import { MagicLinkCallbackPage } from '../../pages/magic-link-callback/MagicLinkCallbackPage'
@@ -198,19 +198,10 @@ function PairNewRouteComponent() {
 // possible -- so this is a dedicated build-time flag the E2E's build command sets
 // (VITE_ENABLE_E2E_TEST_ROUTES=true) and no other build (including local `vite dev`) does.
 
-// ponytail: `kek` is pinned to `null` and `accountId` to '' because no KeychainProvider is
-// mounted anywhere in the app yet. Whoever opens this route today sees the locked screen with
-// "Pular", and that's the correct behavior, not a bug. Whoever wires up the keychain connects
-// both here, in this same diff -- the empty accountId is only harmless while kek stays null.
-function CopilotSettingsRouteComponent() {
-  const navigate = useNavigate()
-  return <CopilotKeyPage accountId="" kek={null} onDone={() => navigate({ to: '/' })} />
-}
-
 const copilotSettingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/settings/copilot',
-  component: CopilotSettingsRouteComponent,
+  component: CopilotKeyPage,
 })
 
 const routeTree =

@@ -17,6 +17,16 @@ interface StoredCopilotKey {
  */
 let inMemoryKey: { accountId: string; providerId: string; apiKey: string } | null = null
 
+// Shared entry guard: every one of saveApiKey/loadApiKey/clearApiKey namespaces its storage slot
+// (and, for save/load, its AAD) by accountId. An empty accountId collapses that namespacing to a
+// single slot shared by whoever else also forgot to pass one -- reject it once, here, at the top
+// of each public function, instead of trusting every call site to have checked already.
+function assertAccountId(accountId: string): void {
+  if (accountId === '') {
+    throw new Error('key-store: accountId must not be empty')
+  }
+}
+
 function storageKeyFor(accountId: string): string {
   return `${COPILOT_KEY_STORAGE_KEY}:${accountId}`
 }
@@ -36,6 +46,7 @@ export async function saveApiKey(
   apiKey: string,
   persist: boolean,
 ): Promise<void> {
+  assertAccountId(accountId)
   inMemoryKey = { accountId, providerId, apiKey }
 
   if (!persist) {
@@ -62,6 +73,7 @@ export async function loadApiKey(
   kek: CryptoKey,
   accountId: string,
 ): Promise<{ providerId: string; apiKey: string } | null> {
+  assertAccountId(accountId)
   if (inMemoryKey !== null && inMemoryKey.accountId === accountId) {
     return { providerId: inMemoryKey.providerId, apiKey: inMemoryKey.apiKey }
   }
@@ -84,6 +96,7 @@ export async function loadApiKey(
 }
 
 export function clearApiKey(accountId: string): void {
+  assertAccountId(accountId)
   if (inMemoryKey !== null && inMemoryKey.accountId === accountId) {
     inMemoryKey = null
   }

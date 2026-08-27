@@ -26,10 +26,3 @@ export type RascunhoEvento =
 export interface CriarMaquinaRascunhoOpcoes {
   id: string
 }
-
-// Porta de notificação — implementação fica para adapter fora deste package
-// (candidato: S07-04 ou ticket dedicado). A assinatura não aceita texto nem
-// afirmações: impossível, por construção do tipo, enviar dado clínico aqui.
-export interface NotificadorVencimentoRascunho {
-  avisar(rascunhoId: string): void | Promise<void>
-}

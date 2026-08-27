@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 import { lingui, linguiTransformerBabelPreset } from '@lingui/vite-plugin'
 import babel from '@rolldown/plugin-babel'
 import tailwindcss from '@tailwindcss/vite'
-import { CONTENT_SECURITY_POLICY } from './src/features/copilot-byok/csp.ts'
+import { SECURITY_HEADERS } from './security-headers.ts'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -16,12 +16,7 @@ export default defineConfig({
   // preview` — used by the DAST (ZAP) CI job — reflects actual production
   // header posture instead of scanning a preview server with none of it.
   preview: {
-    headers: {
-      'Cross-Origin-Opener-Policy': 'same-origin',
-      'Cross-Origin-Embedder-Policy': 'credentialless',
-      'X-Content-Type-Options': 'nosniff',
-      'Content-Security-Policy': CONTENT_SECURITY_POLICY,
-    },
+    headers: { ...SECURITY_HEADERS },
   },
   test: {
     environment: 'jsdom',
@@ -32,7 +27,10 @@ export default defineConfig({
     // *.test.tsx (Vitest) and *.spec.tsx (Playwright CT) files -- before
     // this, Vitest's default include also matched *.spec.tsx and would try
     // (and fail) to run AuthScreen.spec.tsx's Playwright `test()` calls.
-    include: ['src/**/*.test.{ts,tsx}'],
+    // security-headers.test.ts lives beside security-headers.ts at the app root (build layer,
+    // not a feature slice under src/) -- included explicitly since the src/** glob below doesn't
+    // reach it.
+    include: ['src/**/*.test.{ts,tsx}', '*.test.{ts,tsx}'],
     // Pact consumer tests spin up a real mock-server process and hit a live
     // .po-derived catalog through the whole client -> translateProblemCode
     // pipeline — they're contract tests, not unit tests, and must stay out
@@ -50,7 +48,9 @@ export default defineConfig({
       // Discover every source file (not just ones a test happens to import),
       // so a new file added without a test fails the gate instead of being
       // silently absent from the report.
-      include: ['src/**/*.{ts,tsx}'],
+      // security-headers.ts is build layer (root, not src/) but still real logic (CSP directive
+      // derivation) -- gated at 100% like everything else, so it's listed explicitly here.
+      include: ['src/**/*.{ts,tsx}', 'security-headers.ts'],
       // main.tsx is the app's bootstrap/entry point (createRoot + render);
       // it has no branching logic of its own to assert on, so it's excluded
       // by the conventional "don't test the entry point" rule, not to dodge
