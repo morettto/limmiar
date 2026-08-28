@@ -81,7 +81,12 @@ servidor é a fatia 4. Sem áudio, sem edição de nota: isso é `features/nota-
 
 ## Fora de âmbito (fatias seguintes da spec S08)
 
-- Buscar `itens` de um backend real (fatia 4) -- hoje é sempre injetado pelo chamador
-  (`pages/notas/NotaPage.tsx` monta com uma única nota em memória nesta fatia).
-- Assinatura de facto (fatia 4): este módulo só sabe navegar/selecionar; assinar é
-  `EditorSoap`/`FilaEEditor` chamando `aoAssinar`, que hoje é um stub em memória.
+- Buscar `itens` de um backend real (fila com múltiplas notas/pacientes) -- continua fora
+  de âmbito; `pages/notas/NotaPage.tsx` continua a montar com uma única nota fixa em
+  memória (ver o seu README). Isto é distinto de assinar de facto (linha abaixo), que já
+  está feito.
+- Assinatura de facto (fatia 5, feita): este módulo continua a só saber navegar/selecionar
+  -- assinar é `EditorSoap`/`FilaEEditor` chamando `aoAssinar`, hoje implementado a sério
+  em `pages/notas/NotaPage.tsx` (grava no prontuário, assina, marca só o item da nota
+  assinada). `ESTADO_PENDENTE`/`ESTADO_ASSINADA` continuam a única coisa que este módulo
+  sabe sobre esse resultado -- em qual aba um item aparece.

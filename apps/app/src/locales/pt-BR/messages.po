@@ -230,6 +230,10 @@ msgstr "Esta conta não está aguardando análise."
 msgid "Esta frase não será exibida novamente. Guarde-a em um local seguro: ela é a única forma de recuperar o acesso à sua conta caso você perca todos os seus dispositivos."
 msgstr "Esta frase não será exibida novamente. Guarde-a em um local seguro: ela é a única forma de recuperar o acesso à sua conta caso você perca todos os seus dispositivos."
 
+#: src/pages/notas/NotaPage.tsx:112
+msgid "Esta nota já tinha sido assinada. As alterações feitas depois não estão cobertas por essa assinatura."
+msgstr "Esta nota já tinha sido assinada. As alterações feitas depois não estão cobertas por essa assinatura."
+
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:149
 msgid "agenda.session_cancelled"
@@ -266,6 +270,10 @@ msgstr "Este prontuário mudou em outro dispositivo. Recarregue e tente de novo.
 #: src/features/totp-enrollment/TotpSetup.tsx:101
 msgid "Estes códigos não serão exibidos novamente. Guarde-os em um local seguro: eles são a única forma de recuperar o acesso à sua conta caso você perca o aplicativo autenticador."
 msgstr "Estes códigos não serão exibidos novamente. Guarde-os em um local seguro: eles são a única forma de recuperar o acesso à sua conta caso você perca o aplicativo autenticador."
+
+#: src/pages/notas/NotaPage.tsx:117
+msgid "Falha ao assinar a nota. Tente novamente."
+msgstr "Falha ao assinar a nota. Tente novamente."
 
 #: src/features/nota-fila/FilaAssinatura.tsx:100
 #: src/widgets/soap-editor/FilaEEditor.tsx:32
@@ -377,6 +385,10 @@ msgstr "Nenhum cadastro de voz encontrado para esta conta."
 #: src/features/nota-fila/FilaAssinatura.tsx:108
 msgid "Nenhuma nota nesta aba."
 msgstr "Nenhuma nota nesta aba."
+
+#: src/pages/notas/NotaPage.tsx:105
+msgid "Nota assinada em {dataAssinatura}."
+msgstr "Nota assinada em {dataAssinatura}."
 
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:121

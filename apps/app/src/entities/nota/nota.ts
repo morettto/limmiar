@@ -52,6 +52,20 @@ export function editarFrase(nota: Nota, fraseId: string, texto: string): Nota {
   return { ...nota, revisao: nota.revisao + 1, frases }
 }
 
+// Forma comum a `textoCanonico` (abaixo) e `notaParaEntrada` (nota-crypto.ts): secção,
+// texto e âncoras de cada frase, sem id da frase. Extraído porque os dois serializadores
+// copiavam este map byte a byte -- um campo novo em `FraseNota` atualizado só num dos dois
+// divergiria em silêncio, sem teste a apanhar. Cada chamador continua a decidir sozinho o
+// que envolve isto (revisao/noteId/tipo): a saída dos dois não pode mudar um único byte,
+// assinaturas já produzidas dependem disso.
+export function serializarFrases(frases: readonly FraseNota[]): { secao: SecaoSoap; texto: string; ancoras: { inicioMs: number; fimMs: number }[] }[] {
+  return frases.map((frase) => ({
+    secao: frase.secao,
+    texto: frase.texto,
+    ancoras: frase.ancoras.map((ancora) => ({ inicioMs: ancora.inicioMs, fimMs: ancora.fimMs })),
+  }))
+}
+
 // Cobre secção, texto e âncoras de cada frase, e revisão — exatamente o que a assinatura
 // (fatia 4) tem de atestar. id da frase, id/patientId da nota ficam de fora de propósito:
 // não fazem parte da superfície combinada aqui. JSON.stringify de um objeto literal com
@@ -60,11 +74,7 @@ export function editarFrase(nota: Nota, fraseId: string, texto: string): Nota {
 export function textoCanonico(nota: Nota): string {
   return JSON.stringify({
     revisao: nota.revisao,
-    frases: nota.frases.map((frase) => ({
-      secao: frase.secao,
-      texto: frase.texto,
-      ancoras: frase.ancoras.map((ancora) => ({ inicioMs: ancora.inicioMs, fimMs: ancora.fimMs })),
-    })),
+    frases: serializarFrases(nota.frases),
   })
 }
 

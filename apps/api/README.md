@@ -41,6 +41,13 @@ tentar arrancar o container, não passam silenciosamente. Os testes puramente un
   `duration_minutes` ficam em claro no servidor -- ver
   `docs/adr/ADR-S04-02-horario-em-claro-servidor-zero-knowledge.md` e o README do módulo
   (`src/Api/Scheduling/README.md`).
+- `src/Api/Features/Notes` -- assinatura de nota: uma trava por `(tenant_id, note_id)`
+  (`note_signatures`, migração `0005_create_note_signatures.sql`), imposta pela própria chave
+  primária, RLS por tenant via a mesma `OpenTenantScopedTransactionAsync`. Como Scheduling,
+  abre uma exceção pontual ao zero-knowledge: o servidor vê a existência da nota, a revisão
+  assinada, e o instante da assinatura -- ver
+  `docs/adr/ADR-S08-01-assinatura-visivel-ao-servidor.md` e o README do módulo
+  (`src/Api/Features/Notes/README.md`). O blob de assinatura em si continua opaco.
 - `src/Api/Endpoints` -- Minimal API, um ficheiro por área (`AuthEndpoints`,
   `DevicePairingEndpoints`, `PatientEndpoints`, `ProfessionalVerificationEndpoints`,
   `RecoveryEndpoints`, `SchedulingEndpoints`, `TwoFactorEndpoints`, `VoiceEnrollmentEndpoints`).

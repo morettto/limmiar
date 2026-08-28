@@ -21,8 +21,8 @@ uma da outra.
    `setSelecionadoId`.
 4. Se `notaSelecionada` existir, renderiza `EditorSoap` com ela; senão, mostra
    `role="status"` ("Selecione uma nota na fila.") -- acontece hoje quando `itens` está
-   vazio, e vai continuar a acontecer quando a fila real (fatia 4) chegar vazia por
-   qualquer motivo.
+   vazio, e vai continuar a acontecer quando a fila real (buscada de um backend, ainda por
+   construir) chegar vazia por qualquer motivo.
 5. `onChangeNota`/`aoTocar`/`aoAssinar` são repassados direto ao `EditorSoap` -- este
    widget não intercepta nem transforma nenhum deles; só decide *qual* nota chega até lá.
 
@@ -32,10 +32,9 @@ uma da outra.
   `onChangeNota`, `aoTocar`, `aoAssinar`.
 - Consumido por `pages/notas/NotaPage.tsx` (rota `/notas`, ver
   `app/routing/router.tsx`) -- ponto de entrada de produto para este widget, fora dele
-  (camada `pages`/`app`). `NotaPage` não tem README próprio: é fina de mais (monta uma
-  nota fixa em memória e liga os três callbacks a estado local -- ver o comentário no topo
-  do próprio ficheiro), mesmo padrão de `pages/settings/CopilotKeyPage.tsx`, que também não
-  tem um.
+  (camada `pages`/`app`). `NotaPage` ganhou README próprio na fatia 5 (`pages/notas/README.md`):
+  deixou de ser fina de mais assim que `aoAssinar` passou a gravar no prontuário e assinar
+  de facto, em vez de só mexer em estado local.
 
 ## Decisões desta fatia
 
@@ -49,10 +48,10 @@ uma da outra.
 
 ## Fora de âmbito (fatias seguintes da spec S08)
 
-- `notas`/`itens` reais vindos de um backend (fatia 4) -- hoje são sempre injetados pelo
-  chamador. `pages/notas/NotaPage.tsx` monta com uma única nota fixa em memória só para a
-  rota `/notas` existir de facto (não um componente construído e nunca ligado). O mesmo
-  `NotaPage` já liga `aoTocar` ao reprodutor real de `features/nota-audio` (fatia 3) --
-  falta só a fonte do áudio (`dir`/`dek`/`sessionId` reais), que é fatia 4.
-- Assinatura de facto (`aoAssinar`, fatia 4) -- ver os READMEs de `features/nota-editor`
-  e `features/nota-fila`.
+- `notas`/`itens` reais vindos de um backend (fila com múltiplas notas/pacientes) --
+  continuam sempre injetados pelo chamador. `pages/notas/NotaPage.tsx` continua a montar
+  com uma única nota fixa em memória só para a rota `/notas` existir de facto (não um
+  componente construído e nunca ligado) -- ver o README desse módulo para o que já é real
+  (assinatura) e o que continua fixture (a própria fila/nota, a sessão/Keychain).
+- Fonte real do áudio (`dir`/`dek`/`sessionId` vindos de um backend) -- `aoTocar` já liga
+  ao reprodutor real (fatia 3), só falta a origem do áudio.

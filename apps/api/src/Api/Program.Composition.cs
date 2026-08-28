@@ -2,6 +2,7 @@ using Api.Accounts;
 using Api.Data;
 using Api.Health;
 using Api.ExceptionHandling;
+using Api.Notes;
 using Api.Patients;
 using Api.Scheduling;
 using Api.Serialization;
@@ -47,6 +48,7 @@ public partial class Program
 
         builder.Services.AddPatients();
         builder.Services.AddScheduling();
+        builder.Services.AddNotes();
 
         var app = builder.Build();
 
@@ -63,6 +65,7 @@ public partial class Program
         app.MapAccounts();
         app.MapPatients();
         app.MapScheduling();
+        app.MapNotes();
 
         return app;
     }

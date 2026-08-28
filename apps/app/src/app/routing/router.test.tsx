@@ -129,7 +129,11 @@ describe('router', () => {
   it('resolves /notas and mounts FilaEEditor with a single in-memory nota fixture (pendente, S/O/A/P)', async () => {
     const router = await loadRouterAt('/notas')
 
-    render(<RouterProvider router={router} />)
+    render(
+      <I18nProvider i18n={i18n}>
+        <RouterProvider router={router} />
+      </I18nProvider>,
+    )
     await screen.findByTestId('fila-e-editor')
 
     const { FilaEEditor } = await import('../../widgets/soap-editor/FilaEEditor')
@@ -144,7 +148,11 @@ describe('router', () => {
   it('/notas: aoTocar toca a âncora no reprodutor real (fatia 3)', async () => {
     const play = vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(() => Promise.resolve())
     const router = await loadRouterAt('/notas')
-    render(<RouterProvider router={router} />)
+    render(
+      <I18nProvider i18n={i18n}>
+        <RouterProvider router={router} />
+      </I18nProvider>,
+    )
     await screen.findByTestId('fila-e-editor')
 
     const { FilaEEditor } = await import('../../widgets/soap-editor/FilaEEditor')
@@ -158,7 +166,11 @@ describe('router', () => {
 
   it('/notas: onChangeNota atualiza a nota em memória, refletida na renderização seguinte', async () => {
     const router = await loadRouterAt('/notas')
-    render(<RouterProvider router={router} />)
+    render(
+      <I18nProvider i18n={i18n}>
+        <RouterProvider router={router} />
+      </I18nProvider>,
+    )
     await screen.findByTestId('fila-e-editor')
 
     const { FilaEEditor } = await import('../../widgets/soap-editor/FilaEEditor')
@@ -174,9 +186,19 @@ describe('router', () => {
     expect(propsDepois.notas[notaId]).toEqual(notaEditada)
   })
 
-  it('/notas: aoAssinar marca a nota (única, em memória) como assinada na fila', async () => {
+  // NotaPage ainda não tem sessão/keychain real montada nesta rota (ver o comentário
+  // ponytail: no topo de NotaPage.tsx) -- aoAssinar tenta mesmo assim a cadeia real
+  // (openRecord/appendPatientEntry/assinarNota), que aqui falha (kek/credenciais fixture),
+  // caindo no mesmo caminho de falha de rede que um apagão de rede genuíno cairia: o item
+  // fica pendente e um role=alert é anunciado. O caminho de sucesso (fatia 5) é coberto por
+  // NotaPage.test.tsx com os módulos de crypto/api duplados.
+  it('/notas: aoAssinar sem sessão real cai no caminho de falha de rede -- item continua pendente', async () => {
     const router = await loadRouterAt('/notas')
-    render(<RouterProvider router={router} />)
+    render(
+      <I18nProvider i18n={i18n}>
+        <RouterProvider router={router} />
+      </I18nProvider>,
+    )
     await screen.findByTestId('fila-e-editor')
 
     const { FilaEEditor } = await import('../../widgets/soap-editor/FilaEEditor')
@@ -184,11 +206,12 @@ describe('router', () => {
     const notaId = props.itens[0]!.id
 
     await act(async () => {
-      props.aoAssinar(props.notas[notaId]!)
+      await (props.aoAssinar(props.notas[notaId]!) as unknown as Promise<void>)
     })
 
     const propsDepois = vi.mocked(FilaEEditor).mock.calls.at(-1)![0]
-    expect(propsDepois.itens[0]!.estado).toBe('assinada')
+    expect(propsDepois.itens[0]!.estado).toBe('pendente')
+    expect(screen.getByRole('alert')).toBeTruthy()
   })
 
   it('resolves /auth/magic-link and passes baseUrl/token through to MagicLinkCallback', async () => {

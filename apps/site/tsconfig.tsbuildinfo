@@ -1,0 +1,1 @@
+{"root":["./astro.config.mjs","./playwright.config.ts","./vitest.config.ts","./coverage/block-navigation.js","./coverage/prettify.js","./coverage/sorter.js","./e2e/i18n-routing.spec.ts","./src/lib/content.test.ts","./src/lib/content.ts","./src/lib/hreflang.test.ts","./src/lib/hreflang.ts"],"version":"6.0.3"}

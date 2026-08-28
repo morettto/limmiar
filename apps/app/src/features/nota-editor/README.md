@@ -70,7 +70,10 @@ pelo chamador -- hoje `pages/notas/NotaPage.tsx`).
 
 ## Fora de âmbito (fatias seguintes da spec S08)
 
-- Assinatura de facto, persistência da nota editada -- fatia 4. `onChange`/`aoAssinar`
-  hoje só devolvem a nota ao chamador; nada é gravado em disco/servidor a partir daqui.
+- Assinatura de facto, persistência da nota editada -- fatia 5 (feita). `onChange`/
+  `aoAssinar` continuam a só devolver/repassar a nota; quem grava no prontuário e assina de
+  facto é o chamador (`pages/notas/NotaPage.tsx`, ver o seu README) -- este módulo continua
+  sem saber de rede, crypto ou persistência, só de que `aoAssinar(nota)` é a nota como está
+  no momento do atalho.
 - Carregar o áudio real de uma sessão (`dir`/`dek`/`sessionId` vindos de um backend) --
-  fatia 4, ver README de `features/nota-audio`.
+  continua fora de âmbito, ver README de `features/nota-audio`.
