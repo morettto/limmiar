@@ -62,9 +62,12 @@ elemento `<audio>` e decide quando chamar `tocar`/`parar` é o chamador
   operação (listar o que está num diretório OPFS), só o chamador difere (recuperação de
   sessão órfã vs. leitura de sessão para tocar).
 - **Sem mock de OPFS de repositório para reusar** (mesma decisão de `chunk-store.test.ts`):
-  o mock (`FakeDirectoryHandle`/`FakeFileHandle`/`FakeFile`) fica local a
+  o mock (`FakeDirectoryHandle`/`FakeFileHandle`) começou local a
   `reprodutor.test.ts`, só com os métodos que `abrirSessaoComoBlob` de facto usa
-  (`getFileHandle` → `getFile` → `arrayBuffer`, `keys`).
+  (`getFileHandle` → `getFile` → `arrayBuffer`, `keys`). Desde S08-02 vive em
+  `apps/app/src/test-support/fake-opfs.ts`, partilhado com `chunk-store.test.ts` (que só
+  escreve) e `indice-store.test.ts` de `features/nota-biblioteca` (que lê e escreve) --
+  terceira duplicação do mesmo duplo, extraído em vez de copiado outra vez.
 
 ## Fora de âmbito (fatias seguintes da spec S08)
 

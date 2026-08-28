@@ -267,9 +267,15 @@ vive.
 **Sem mock de OPFS de repositório para reusar**: grepado
 `FileSystemDirectoryHandle`/`createWritable`/`getDirectory` em todo o repo
 antes de escrever um -- nenhum precedente. O mock (`FakeDirectoryHandle`/
-`FakeFileHandle`/`FakeWritable`) fica local a `chunk-store.test.ts`, só com
+`FakeFileHandle`/`FakeWritable`) começou local a `chunk-store.test.ts`, só com
 os métodos que `chunk-store.ts` de facto usa (`getFileHandle`,
-`createWritable`, `write`, `close`, `keys`), sem lib nova.
+`createWritable`, `write`, `close`, `keys`), sem lib nova. Desde S08-02
+(terceira duplicação -- `reprodutor.test.ts` já tinha duplicado uma vez, e
+`indice-store.test.ts` de `features/nota-biblioteca` precisava dos dois
+lados, leitura e escrita) vive em `apps/app/src/test-support/fake-opfs.ts`;
+`chunk-store.test.ts` importa de lá em vez de o redeclarar. `handle.bytes`
+só fica visível depois de `close()` -- espelha a API real e substitui o
+antigo campo `writable.closed`.
 
 **Nome de ficheiro é só o `seq`, sem `sessionId`**: o diretório passado a
 `opfsWriter` já é escopado a uma sessão (quem chama decide o diretório);
