@@ -81,20 +81,56 @@ public sealed class AuditChainTests
         Assert.Equal(AuditBreakKind.BrokenLink, result.BreakKind);
     }
 
-    /// <summary>AuditAnchor has no producer yet (CaptureAnchorAsync is fatia 7's scope) -- this
-    /// only proves the record shape the ticket's signature block fixes, so AuditChain.Verify
-    /// compiles against a real type today instead of a placeholder.</summary>
+    /// <summary>Fatia 7, critério 3: the chain is internally coherent -- every hash recomputes,
+    /// every link points where it should -- and the only thing that gives the rewrite away is
+    /// the anchor captured beforehand: the entry at AnchoredSequence no longer carries the hash
+    /// the witness recorded.</summary>
     [Fact]
-    public void AuditAnchor_ExposesTheFourAnchorFields()
+    public void Verify_WhenTheAnchoredEntryNoLongerCarriesTheAnchoredHash_ReportsAnchorMismatch()
     {
-        var hash = AuditChain.GenesisHash.ToArray();
+        var entries = BuildIntactChain(3);
+        var anchors = new[] { new AuditAnchor(TenantId, 3, Enumerable.Repeat((byte)0xCD, 32).ToArray(), RecordedAt) };
 
-        var anchor = new AuditAnchor(TenantId, 7, hash, RecordedAt);
+        var result = AuditChain.Verify(entries, anchors);
 
-        Assert.Equal(TenantId, anchor.TenantId);
-        Assert.Equal(7, anchor.AnchoredSequence);
-        Assert.Same(hash, anchor.AnchoredHash);
-        Assert.Equal(RecordedAt, anchor.AnchoredAt);
+        Assert.False(result.Intact);
+        Assert.Equal(3, result.FirstBrokenSequence);
+        Assert.Equal(AuditBreakKind.AnchorMismatch, result.BreakKind);
+    }
+
+    /// <summary>Truncation is a rewrite too: dropping every entry after the anchor leaves a
+    /// chain that walks intact from genesis, so the anchor pointing at a sequence that no
+    /// longer exists is the only remaining evidence. A missing entry cannot carry the
+    /// anchored hash, so it is the same break as a rewritten one.</summary>
+    [Fact]
+    public void Verify_WhenTheAnchoredEntryIsMissingFromTheChain_ReportsAnchorMismatch()
+    {
+        var entries = BuildIntactChain(3);
+        var anchors = new[] { new AuditAnchor(TenantId, 3, entries[2].EntryHash, RecordedAt) };
+        entries.RemoveAt(2);
+
+        var result = AuditChain.Verify(entries, anchors);
+
+        Assert.False(result.Intact);
+        Assert.Equal(3, result.FirstBrokenSequence);
+        Assert.Equal(AuditBreakKind.AnchorMismatch, result.BreakKind);
+    }
+
+    /// <summary>Detection order, locked: a break inside the chain wins over a violated anchor.
+    /// The anchor is the net for a rewrite that leaves no internal break at all, so reporting
+    /// it ahead of a stale hash would point at the anchored sequence instead of at the entry
+    /// that is actually wrong (criterion 1's "a partir daí").</summary>
+    [Fact]
+    public void Verify_WhenBothAnEntryAndItsAnchorAreViolated_ReportsTheChainBreakNotTheAnchor()
+    {
+        var entries = BuildIntactChain(3);
+        var anchors = new[] { new AuditAnchor(TenantId, 3, Enumerable.Repeat((byte)0xCD, 32).ToArray(), RecordedAt) };
+        entries[1] = entries[1] with { Action = AuditAction.SignOut };
+
+        var result = AuditChain.Verify(entries, anchors);
+
+        Assert.Equal(2, result.FirstBrokenSequence);
+        Assert.Equal(AuditBreakKind.HashMismatch, result.BreakKind);
     }
 
     private static List<AuditEntry> BuildIntactChain(int count)

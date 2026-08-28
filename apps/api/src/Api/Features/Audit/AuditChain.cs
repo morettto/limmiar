@@ -53,9 +53,11 @@ public static class AuditChain
     /// worth reporting separately.
     /// </summary>
     /// <remarks>
-    /// <paramref name="anchors"/> is accepted now to match the ticket's fixed signature but not
-    /// yet consulted -- <see cref="AuditBreakKind.AnchorMismatch"/> is wired in by fatia 7
-    /// (out of this session's scope), which owns the concurrency/anchor slices of S10-01.
+    /// The chain walk runs first and wins: an anchor only has something to say about a chain
+    /// that is already internally coherent. A rewrite that recomputes every hash passes the
+    /// walk and is caught solely by <paramref name="anchors"/> (acceptance criterion 3); a
+    /// clumsier tamper is already a broken link or a stale hash, and reporting the anchor for
+    /// it would point at the wrong sequence.
     /// </remarks>
     public static AuditVerification Verify(IReadOnlyList<AuditEntry> chain, IReadOnlyList<AuditAnchor> anchors)
     {
@@ -75,6 +77,20 @@ public static class AuditChain
             }
 
             expectedPreviousHash = entry.EntryHash;
+        }
+
+        // ponytail: linear scan of the chain per anchor. Anchors are captured one per
+        // CaptureAnchorAsync call and read back for a single tenant, so this is a handful of
+        // passes over a list already held in memory. Ceiling: if a tenant ever carries enough
+        // anchors for O(anchors x chain) to show up, index the chain by Sequence into a
+        // Dictionary once before the loop.
+        foreach (var anchor in anchors)
+        {
+            var anchored = chain.FirstOrDefault(entry => entry.Sequence == anchor.AnchoredSequence);
+            if (anchored is null || !CryptographicOperations.FixedTimeEquals(anchored.EntryHash, anchor.AnchoredHash))
+            {
+                return AuditVerification.Broken(anchor.AnchoredSequence, AuditBreakKind.AnchorMismatch);
+            }
         }
 
         return AuditVerification.Ok();

@@ -50,4 +50,21 @@ public sealed class AuditEntriesRlsTests : IAsyncLifetime
         var ex = await Assert.ThrowsAsync<PostgresException>(() => command.ExecuteNonQueryAsync());
         Assert.Equal(PostgresErrorCodes.InsufficientPrivilege, ex.SqlState);
     }
+
+    /// <summary>
+    /// audit_anchors is criterion 3's witness -- if its REVOKE were missing or pointed at the
+    /// wrong table/role, a rewriter could erase the very anchor meant to catch a full-chain
+    /// rewrite, and nothing else in this suite would notice.
+    /// </summary>
+    [Fact]
+    public async Task AsAppRole_DirectUpdate_OnAuditAnchors_FailsWithPermissionDenied()
+    {
+        await using var connection = new NpgsqlConnection(_fixture.AppRoleConnectionString);
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = "UPDATE audit_anchors SET anchored_sequence = 0 WHERE true";
+
+        var ex = await Assert.ThrowsAsync<PostgresException>(() => command.ExecuteNonQueryAsync());
+        Assert.Equal(PostgresErrorCodes.InsufficientPrivilege, ex.SqlState);
+    }
 }

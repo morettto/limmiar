@@ -1,8 +1,9 @@
 namespace Api.Audit;
 
 /// <summary>The way a chain can stop being intact -- which check inside <see cref="AuditChain.Verify"/>
-/// first failed. <see cref="AnchorMismatch"/> is produced only once fatia 7 wires anchor
-/// checking into <see cref="AuditChain.Verify"/>; this session (fatias 1-4) never returns it.</summary>
+/// first failed. <see cref="HashMismatch"/> and <see cref="BrokenLink"/> come from the chain
+/// walk itself; <see cref="AnchorMismatch"/> comes from an anchor contradicting a chain that
+/// walked intact, which is the only evidence a fully recomputed rewrite leaves behind.</summary>
 public enum AuditBreakKind
 {
     HashMismatch,

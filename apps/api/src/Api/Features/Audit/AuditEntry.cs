@@ -34,9 +34,10 @@ public sealed record AuditEntry(
     byte[] EntryHash);
 
 /// <summary>
-/// A periodic witness of the chain's head, captured into <c>audit_anchors</c> (fatia 7,
-/// not this session's scope) -- proves criterion 3 (full-chain rewrite detection) against
-/// an attacker who rewrites <c>audit_entries</c> but not the separate anchors table.
+/// A witness of the chain's head, captured into <c>audit_anchors</c> by
+/// <see cref="AuditEntryStore.CaptureAnchorAsync"/> -- proves criterion 3 (full-chain rewrite
+/// detection) against an attacker who rewrites <c>audit_entries</c> but not the separate
+/// anchors table. Ceiling and upgrade path: see the ponytail comment in migration 0006.
 /// </summary>
 public sealed record AuditAnchor(
     Guid TenantId,

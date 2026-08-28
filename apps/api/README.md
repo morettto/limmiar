@@ -65,11 +65,15 @@ tentar arrancar o container, não passam silenciosamente. Os testes puramente un
   `AccountAuthorizationGuard.CanCreatePatientRecords` -- cadastro de voz é a própria conta do
   profissional, não um registo de paciente, então a única guarda é
   `IsAuthorizedForAccount` (o token pertence a esta conta).
-- `src/Api/Features/Audit` -- trilha de auditoria encadeada por hash (`audit_entries`,
-  migração `0006_create_audit_trail.sql`): `AuditChain.ComputeHash`/`Verify` são puros (zero
-  I/O, zero DI); a imposição de não-fork da cadeia é `UNIQUE (tenant_id, previous_hash)` no
-  Postgres, não uma trava de aplicação. Ainda sem `AuditEntryStore` nem produtor real de evento
-  -- ver `docs/adr/ADR-S10-01-campos-do-hash-da-trilha.md` e o README do módulo
+- `src/Api/Features/Audit` -- trilha de auditoria encadeada por hash (`audit_entries` e
+  `audit_anchors`, migração `0006_create_audit_trail.sql`): `AuditChain.ComputeHash`/`Verify`
+  são puros (zero I/O, zero DI); a imposição de não-fork da cadeia é
+  `UNIQUE (tenant_id, previous_hash)` no Postgres, não uma trava de aplicação. `AuditEntryStore`
+  está completo (`AppendAsync` com retry, `ListAsync`, `CaptureAnchorAsync`, `ListAnchorsAsync`)
+  e a âncora deteta a reescrita completa e recomputada da cadeia -- com o teto de viver na mesma
+  base que as entradas. Ainda sem produtor real de evento, sem endpoint e sem registo em DI: os
+  testes constroem o store diretamente. Ver
+  `docs/adr/ADR-S10-01-campos-do-hash-da-trilha.md` e o README do módulo
   (`src/Api/Features/Audit/README.md`).
 - `src/Api/Problems` -- `LimmiarProblemDetails` (RFC 7807 + `code` + `params` estruturado,
   nunca a mensagem de exceção crua) e o catálogo central `ProblemCodes` (ex.:
