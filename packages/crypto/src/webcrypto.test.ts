@@ -10,6 +10,7 @@ import {
   generateWrappedDek,
   importKek,
   rewrapDek,
+  sha256,
   unwrapDek,
   type WebCryptoKey as CryptoKey,
 } from './webcrypto'
@@ -294,6 +295,20 @@ describe('rewrapDek', () => {
     expect(decrypted).toEqual(plaintext)
 
     await expect(unwrapDek(await importKek(new Uint8Array(32).fill(0x01)), rewrapped, aad)).rejects.toThrow()
+  })
+})
+
+describe('sha256 — NIST FIPS 180-4 known-answer test', () => {
+  it('hashes the empty message to the well-known constant', async () => {
+    const result = await sha256(new Uint8Array())
+
+    expect(bytesToHex(result)).toBe('e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855')
+  })
+
+  it('hashes "abc" to the well-known FIPS 180-4 vector', async () => {
+    const result = await sha256(new TextEncoder().encode('abc'))
+
+    expect(bytesToHex(result)).toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad')
   })
 })
 

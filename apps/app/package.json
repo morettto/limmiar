@@ -26,6 +26,7 @@
   },
   "dependencies": {
     "@limmiar/audio": "workspace:*",
+    "@limmiar/copilot": "workspace:*",
     "@limmiar/crypto": "workspace:*",
     "@limmiar/i18n": "workspace:*",
     "@limmiar/session": "workspace:*",

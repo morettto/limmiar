@@ -1,6 +1,6 @@
 import { webcrypto as limmiarWebcrypto } from '@limmiar/crypto'
 import { describe, expect, it } from 'vitest'
-import { audioChunkAad, sealChunk } from './audio-crypto'
+import { abrirChunk, audioChunkAad, sealChunk } from './audio-crypto'
 
 const SESSION_ID = '11111111-1111-1111-1111-111111111111'
 
@@ -52,5 +52,41 @@ describe('sealChunk', () => {
     const sealed = await sealChunk(dek, SESSION_ID, 5, chunk)
 
     await expect(limmiarWebcrypto.decrypt(dek, sealed, audioChunkAad(SESSION_ID, 6))).rejects.toThrow()
+  })
+})
+
+describe('abrirChunk', () => {
+  const OUTRA_SESSION_ID = '22222222-2222-2222-2222-222222222222'
+
+  it('round-trips with sealChunk under the matching sessionId/seq', async () => {
+    const dek = await makeDek()
+    const chunk = crypto.getRandomValues(new Uint8Array(64))
+
+    const sealed = await sealChunk(dek, SESSION_ID, 5, chunk)
+    const aberto = await abrirChunk(dek, SESSION_ID, 5, sealed)
+
+    expect(toHex(aberto)).toBe(toHex(chunk))
+  })
+
+  // Prova que a AAD liga o chunk à sessão certa: um chunk de outra sessão (ou
+  // encaminhado por engano para o dir errado) tem de rejeitar, não abrir por bom.
+  it('rejects when the sessionId does not match the one used to seal', async () => {
+    const dek = await makeDek()
+    const chunk = crypto.getRandomValues(new Uint8Array(64))
+
+    const sealed = await sealChunk(dek, SESSION_ID, 5, chunk)
+
+    await expect(abrirChunk(dek, OUTRA_SESSION_ID, 5, sealed)).rejects.toThrow()
+  })
+
+  // Prova que a AAD liga o chunk à posição certa: um chunk fora de ordem (seq trocado)
+  // tem de rejeitar, não abrir por bom -- é o que impede reordenar/duplicar em silêncio.
+  it('rejects when the seq does not match the one used to seal', async () => {
+    const dek = await makeDek()
+    const chunk = crypto.getRandomValues(new Uint8Array(64))
+
+    const sealed = await sealChunk(dek, SESSION_ID, 5, chunk)
+
+    await expect(abrirChunk(dek, SESSION_ID, 6, sealed)).rejects.toThrow()
   })
 })

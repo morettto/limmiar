@@ -58,6 +58,14 @@ msgstr "Espera a que el otro dispositivo lea el código antes de liberar el acce
 msgid "Aponte a câmera para o código QR exibido no outro dispositivo."
 msgstr "Apunta la cámara al código QR que se muestra en el otro dispositivo."
 
+#: src/features/nota-fila/FilaAssinatura.tsx:56
+msgid "Assinadas"
+msgstr "Firmadas"
+
+#: src/features/nota-editor/EditorSoap.tsx:29
+msgid "Avaliação"
+msgstr "Evaluación"
+
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:14
 msgid "health.database_unreachable"
@@ -129,7 +137,7 @@ msgstr "¿Cómo vas a usar Limmiar?"
 msgid "Concluindo o pareamento..."
 msgstr "Completando la vinculación..."
 
-#: src/app/routing/router.tsx:31
+#: src/app/routing/router.tsx:32
 msgid "Configurar copiloto de IA"
 msgstr "Configurar copiloto de IA"
 
@@ -227,6 +235,10 @@ msgstr "Esta frase no se mostrará de nuevo. Guárdala en un lugar seguro: es la
 msgid "agenda.session_cancelled"
 msgstr "Esta sesión fue cancelada."
 
+#: src/features/nota-fila/FilaAssinatura.tsx:84
+msgid "Estado da nota"
+msgstr "Estado de la nota"
+
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:109
 msgid "auth.device_pairing_session_not_found"
@@ -254,6 +266,11 @@ msgstr "Este expediente cambió en otro dispositivo. Recarga e intenta de nuevo.
 #: src/features/totp-enrollment/TotpSetup.tsx:101
 msgid "Estes códigos não serão exibidos novamente. Guarde-os em um local seguro: eles são a única forma de recuperar o acesso à sua conta caso você perca o aplicativo autenticador."
 msgstr "Estos códigos no se mostrarán de nuevo. Guárdalos en un lugar seguro: son la única forma de recuperar el acceso a tu cuenta si pierdes tu app autenticadora."
+
+#: src/features/nota-fila/FilaAssinatura.tsx:100
+#: src/widgets/soap-editor/FilaEEditor.tsx:32
+msgid "Fila de assinatura"
+msgstr "Cola de firma"
 
 #: src/features/copilot-byok/CopilotKeySetup.tsx:66
 msgid "Fornecedor"
@@ -357,10 +374,18 @@ msgstr "No hay una configuración de verificación en dos pasos pendiente para e
 msgid "voice.enrollment_not_found"
 msgstr "No se encontró registro de voz para esta cuenta."
 
+#: src/features/nota-fila/FilaAssinatura.tsx:108
+msgid "Nenhuma nota nesta aba."
+msgstr "Ninguna nota en esta pestaña."
+
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:121
 msgid "auth.device_pairing_payload_not_delivered"
 msgstr "El dispositivo principal aún no ha liberado el acceso. Espera."
+
+#: src/features/nota-editor/EditorSoap.tsx:28
+msgid "Objetivo"
+msgstr "Objetivo"
 
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:18
@@ -384,6 +409,14 @@ msgstr "Pacientes"
 #: src/features/device-pairing-primary/PairingQr.tsx:149
 msgid "Parear novo dispositivo"
 msgstr "Vincular nuevo dispositivo"
+
+#: src/features/nota-fila/FilaAssinatura.tsx:55
+msgid "Pendentes"
+msgstr "Pendientes"
+
+#: src/features/nota-editor/EditorSoap.tsx:30
+msgid "Plano"
+msgstr "Plan"
 
 #: src/features/totp-enrollment/TotpSetup.tsx:78
 msgid "Preparando a verificação em duas etapas..."
@@ -423,6 +456,10 @@ msgstr "Riesgo"
 msgid "Salvar"
 msgstr "Guardar"
 
+#: src/widgets/soap-editor/FilaEEditor.tsx:40
+msgid "Selecione uma nota na fila."
+msgstr "Seleccione una nota en la cola."
+
 #: src/widgets/auth-screen/AuthScreen.tsx:204
 msgid "Senha"
 msgstr "Contraseña"
@@ -457,9 +494,17 @@ msgstr "Tu sesión expiró. Inicia sesión de nuevo."
 msgid "auth.totp_ticket_invalid"
 msgstr "Tu verificación en dos pasos expiró. Inicia sesión de nuevo."
 
+#: src/features/nota-editor/EditorSoap.tsx:27
+msgid "Subjetivo"
+msgstr "Subjetivo"
+
 #: src/widgets/auth-screen/AuthScreen.tsx:157
 msgid "Tipo de conta"
 msgstr "Tipo de cuenta"
+
+#: src/features/nota-editor/Citacao.tsx:32
+msgid "Tocar áudio de {inicio} a {fim}"
+msgstr "Reproducir audio de {inicio} a {fim}"
 
 #: src/features/totp-challenge/TotpChallenge.tsx:44
 msgid "Verificação em duas etapas"

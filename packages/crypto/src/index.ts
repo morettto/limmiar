@@ -13,6 +13,7 @@ export const webcrypto = {
   rewrapDek: webcryptoInternal.rewrapDek,
   encrypt: webcryptoInternal.encrypt,
   decrypt: webcryptoInternal.decrypt,
+  sha256: webcryptoInternal.sha256,
 }
 export { generateKeyPair, getPublicKey, getSharedSecret } from './x25519'
 export { deriveChannelKey } from './device-pairing-channel'

@@ -7,6 +7,7 @@ import { RecoveryPhraseSetupPage } from '../../pages/recovery/RecoveryPhraseSetu
 import { PairPrimaryPage } from '../../pages/device-pairing/PairPrimaryPage'
 import { PairNewPage } from '../../pages/device-pairing/PairNewPage'
 import { CopilotKeyPage } from '../../pages/settings/CopilotKeyPage'
+import { NotaPage } from '../../pages/notas/NotaPage'
 
 function readSearchString(search: Record<string, unknown>, key: string): string {
   const value = search[key]
@@ -204,19 +205,28 @@ const copilotSettingsRoute = createRoute({
   component: CopilotKeyPage,
 })
 
+// Ticket S08-01, fatia 2/5: Tela P4.1 (fila de assinatura + editor SOAP). Monta com uma
+// nota em memória -- ver o comentário no topo de pages/notas/NotaPage.tsx.
+const notaRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/notas',
+  component: NotaPage,
+})
+
 const routeTree =
   import.meta.env.VITE_ENABLE_E2E_TEST_ROUTES === 'true'
     ? rootRoute.addChildren([
         indexRoute,
         magicLinkCallbackRoute,
         copilotSettingsRoute,
+        notaRoute,
         authScreenE2ERoute,
         pairPrimaryRoute,
         pairNewRoute,
         recoveryScreenE2ERoute,
         recoveryPhraseSetupE2ERoute,
       ])
-    : rootRoute.addChildren([indexRoute, magicLinkCallbackRoute, copilotSettingsRoute])
+    : rootRoute.addChildren([indexRoute, magicLinkCallbackRoute, copilotSettingsRoute, notaRoute])
 
 export const router = createRouter({ routeTree })
 

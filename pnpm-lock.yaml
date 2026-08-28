@@ -23,6 +23,9 @@ importers:
       '@limmiar/audio':
         specifier: workspace:*
         version: link:../../packages/audio
+      '@limmiar/copilot':
+        specifier: workspace:*
+        version: link:../../packages/copilot
       '@limmiar/crypto':
         specifier: workspace:*
         version: link:../../packages/crypto

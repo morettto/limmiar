@@ -24,6 +24,9 @@ vi.mock('../../features/device-pairing-new/PairNewDevice', () => ({
 vi.mock('../../features/copilot-byok/CopilotKeySetup', () => ({
   CopilotKeySetup: vi.fn(() => <div data-testid="copilot-key-setup" />),
 }))
+vi.mock('../../widgets/soap-editor/FilaEEditor', () => ({
+  FilaEEditor: vi.fn(() => <div data-testid="fila-e-editor" />),
+}))
 
 // Route construction (createRoute/createRouter/routeTree, including the env-gated E2E
 // branch) runs once at module top level. Each test needs its own fresh evaluation of that
@@ -121,6 +124,71 @@ describe('router', () => {
     })
 
     expect(router.state.location.pathname).toBe('/settings/copilot')
+  })
+
+  it('resolves /notas and mounts FilaEEditor with a single in-memory nota fixture (pendente, S/O/A/P)', async () => {
+    const router = await loadRouterAt('/notas')
+
+    render(<RouterProvider router={router} />)
+    await screen.findByTestId('fila-e-editor')
+
+    const { FilaEEditor } = await import('../../widgets/soap-editor/FilaEEditor')
+    const props = vi.mocked(FilaEEditor).mock.calls[0]![0]
+    expect(props.itens).toHaveLength(1)
+    expect(props.itens[0]!.estado).toBe('pendente')
+    const notaId = props.itens[0]!.id
+    expect(props.notas[notaId]).toBeDefined()
+    expect(props.notas[notaId]!.frases.map((frase) => frase.secao)).toEqual(['S', 'O', 'A', 'P'])
+  })
+
+  it('/notas: aoTocar toca a âncora no reprodutor real (fatia 3)', async () => {
+    const play = vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(() => Promise.resolve())
+    const router = await loadRouterAt('/notas')
+    render(<RouterProvider router={router} />)
+    await screen.findByTestId('fila-e-editor')
+
+    const { FilaEEditor } = await import('../../widgets/soap-editor/FilaEEditor')
+    const props = vi.mocked(FilaEEditor).mock.calls[0]![0]
+
+    expect(props.aoTocar({ inicioMs: 2500, fimMs: 3000 })).toBeUndefined()
+    expect(play).toHaveBeenCalledTimes(1)
+
+    play.mockRestore()
+  })
+
+  it('/notas: onChangeNota atualiza a nota em memória, refletida na renderização seguinte', async () => {
+    const router = await loadRouterAt('/notas')
+    render(<RouterProvider router={router} />)
+    await screen.findByTestId('fila-e-editor')
+
+    const { FilaEEditor } = await import('../../widgets/soap-editor/FilaEEditor')
+    const props = vi.mocked(FilaEEditor).mock.calls[0]![0]
+    const notaId = props.itens[0]!.id
+    const notaEditada = { ...props.notas[notaId]!, revisao: 1 }
+
+    await act(async () => {
+      props.onChangeNota(notaEditada)
+    })
+
+    const propsDepois = vi.mocked(FilaEEditor).mock.calls.at(-1)![0]
+    expect(propsDepois.notas[notaId]).toEqual(notaEditada)
+  })
+
+  it('/notas: aoAssinar marca a nota (única, em memória) como assinada na fila', async () => {
+    const router = await loadRouterAt('/notas')
+    render(<RouterProvider router={router} />)
+    await screen.findByTestId('fila-e-editor')
+
+    const { FilaEEditor } = await import('../../widgets/soap-editor/FilaEEditor')
+    const props = vi.mocked(FilaEEditor).mock.calls[0]![0]
+    const notaId = props.itens[0]!.id
+
+    await act(async () => {
+      props.aoAssinar(props.notas[notaId]!)
+    })
+
+    const propsDepois = vi.mocked(FilaEEditor).mock.calls.at(-1)![0]
+    expect(propsDepois.itens[0]!.estado).toBe('assinada')
   })
 
   it('resolves /auth/magic-link and passes baseUrl/token through to MagicLinkCallback', async () => {

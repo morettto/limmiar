@@ -27,6 +27,13 @@ sob essa AAD via `webcrypto.encrypt` de `@limmiar/crypto` -- wire format
 `iv(12) || ciphertext || tag(16)`, mesma primitiva usada em todo o resto do
 app, não reimplementada.
 
+`abrirChunk(dek, sessionId, seq, selado)` é o inverso exato (fatia 3, S08-01)
+-- `webcrypto.decrypt` sob a mesma AAD. Rejeita se `sessionId`/`seq` não
+forem os mesmos usados para selar: é a AAD, não uma checagem extra, que
+impede um chunk de outra sessão ou fora de ordem de abrir por bom. Consumido
+por `features/nota-audio/reprodutor.ts` (`abrirSessaoComoBlob`), que também
+reusa `listarOrfaos` (abaixo) para listar os chunks de uma sessão por `seq`.
+
 ## Fluxo -- escrita OPFS (`chunk-store.ts`)
 
 1. `opfsWriter(dir: FileSystemDirectoryHandle): WriteSealed` devolve uma
@@ -230,7 +237,8 @@ vive.
 ## Pontos de entrada
 
 - `audioChunkAad(sessionId, seq): Uint8Array<ArrayBuffer>`,
-  `sealChunk(dek, sessionId, seq, chunk): Promise<Uint8Array<ArrayBuffer>>`
+  `sealChunk(dek, sessionId, seq, chunk): Promise<Uint8Array<ArrayBuffer>>`,
+  `abrirChunk(dek, sessionId, seq, selado): Promise<Uint8Array<ArrayBuffer>>`
   (`audio-crypto.ts`).
 - `WriteSealed` (tipo), `opfsWriter(dir): WriteSealed`,
   `persistChunk(write, dek, sessionId, seq, blob): Promise<void>`,
