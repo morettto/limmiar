@@ -3,11 +3,13 @@
 ## Responsabilidade
 
 Biblioteca de notas assinadas/pendentes da spec S08 (ticket S08-02). Três partes puras,
-sem UI e sem router (fatias 1-3 de 5): agrupar a fila de assinatura por paciente
-(`biblioteca.ts`), o índice de busca full-text sobre o texto das notas (`indice.ts`, via
-`minisearch`) e a persistência desse índice cifrado em OPFS (`indice-crypto.ts` +
-`indice-store.ts`). Mesma disciplina do resto do monorepo: entra e sai por
-parâmetro/retorno, zero estado global, zero primitiva de cifra própria.
+sem UI e sem router: agrupar a fila de assinatura por paciente (`biblioteca.ts`), o índice
+de busca full-text sobre o texto das notas (`indice.ts`, via `minisearch`) e a persistência
+desse índice cifrado em OPFS (`indice-crypto.ts` + `indice-store.ts`). Mesma disciplina do
+resto do monorepo: entra e sai por parâmetro/retorno, zero estado global, zero primitiva de
+cifra própria. Desde a fatia 5, tem chamador real: `pages/biblioteca/BibliotecaPage.tsx` é
+o único lugar que compõe as três partes com UI (`widgets/biblioteca/BibliotecaNotas.tsx`) --
+ver os READMEs dos dois para o fluxo de composição.
 
 ## Fluxo principal
 
@@ -56,8 +58,10 @@ parâmetro/retorno, zero estado global, zero primitiva de cifra própria.
   `persistirIndice(gravar, dek, accountId, indice): Promise<void>`,
   `restaurarIndice(ler, dek, accountId): Promise<MiniSearch<DocNota> | null>`
   (`indice-store.ts`).
-- Ainda sem chamador nesta fatia -- ligar à UI (widget/página que renderiza a biblioteca e o
-  campo de busca) é trabalho das fatias 4-5 desta spec, fora deste diff.
+- Chamador (fatias 4-5): `widgets/biblioteca/BibliotecaNotas.tsx` renderiza `GrupoPaciente[]`
+  e `ResultadoBusca`; `pages/biblioteca/BibliotecaPage.tsx` é quem chama
+  `agruparPorPaciente`/`buscar`/`persistirIndice`/`restaurarIndice` de facto, na rota
+  `/biblioteca`.
 
 ## Decisões desta fatia
 
@@ -106,12 +110,12 @@ parâmetro/retorno, zero estado global, zero primitiva de cifra própria.
   comportamento -- os dois continuam verdes). Ver os READMEs de `features/live-session` e
   `features/nota-audio` para o antes/depois.
 
-## Fora de âmbito (fatias seguintes da spec S08/ticket S08-02)
+## Fora de âmbito
 
-- UI da biblioteca e do campo de busca (widget/página que chama `agruparPorPaciente`/
-  `buscar`, mostra estados de carregamento/vazio) -- fatias 4-5.
-- Manter o índice atualizado quando uma nota é assinada/editada (reindexar, persistir de
-  novo) -- também fatias seguintes; este módulo só sabe construir/(re)carregar/persistir um
-  índice já montado, não decide quando isso deve acontecer.
-- Qualquer mudança em `entities/nota`, `nota-fila` ou no router -- fora deste diff por
-  instrução explícita do ticket.
+- Manter o índice atualizado quando uma nota é assinada/editada fora do ciclo de vida de
+  `BibliotecaPage` (reindexar, persistir de novo a partir de outra tela, ex.:
+  `pages/notas/NotaPage.tsx`) -- este módulo só sabe construir/(re)carregar/persistir um
+  índice já montado, não decide quando isso deve acontecer; ver `pages/biblioteca/README.md`,
+  "Fora de âmbito".
+- Qualquer mudança em `entities/nota`, `nota-fila` -- fora deste diff por instrução
+  explícita do ticket.

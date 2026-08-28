@@ -75,6 +75,10 @@ msgstr "Database unavailable at the moment."
 msgid "Bem-vindo ao Limmiar"
 msgstr "Welcome to Limmiar"
 
+#: src/widgets/biblioteca/BibliotecaNotas.tsx:37
+msgid "Buscar notas"
+msgstr "Search notes"
+
 #: src/features/copilot-byok/CopilotKeySetup.tsx:57
 msgid "Cadastrar chave de API de IA"
 msgstr "Register AI API key"
@@ -137,7 +141,7 @@ msgstr "How will you use Limmiar?"
 msgid "Concluindo o pareamento..."
 msgstr "Completing pairing..."
 
-#: src/app/routing/router.tsx:32
+#: src/app/routing/router.tsx:33
 msgid "Configurar copiloto de IA"
 msgstr "Set up AI copilot"
 
@@ -368,6 +372,10 @@ msgstr "Could not decrypt the received key. Try pairing again."
 msgid "Não foi possível ler"
 msgstr "Could not read"
 
+#: src/pages/biblioteca/BibliotecaPage.tsx:66
+msgid "Não foi possível preparar a busca. Tente novamente."
+msgstr "Could not prepare the search. Try again."
+
 #: src/features/copilot-byok/CopilotKeySetup.tsx:61
 msgid "Não foi possível salvar a chave. Tente novamente."
 msgstr "Could not save the key. Try again."
@@ -381,6 +389,10 @@ msgstr "There is no pending two-factor verification setup for this account."
 #: src/shared/api/problem-messages.ts:157
 msgid "voice.enrollment_not_found"
 msgstr "No voice enrollment found for this account."
+
+#: src/widgets/biblioteca/BibliotecaNotas.tsx:53
+msgid "Nenhuma nota encontrada."
+msgstr "No notes found."
 
 #: src/features/nota-fila/FilaAssinatura.tsx:108
 msgid "Nenhuma nota nesta aba."
@@ -429,6 +441,10 @@ msgstr "Pending"
 #: src/features/nota-editor/EditorSoap.tsx:30
 msgid "Plano"
 msgstr "Plan"
+
+#: src/widgets/biblioteca/BibliotecaNotas.tsx:48
+msgid "Preparando a busca..."
+msgstr "Preparing search..."
 
 #: src/features/totp-enrollment/TotpSetup.tsx:78
 msgid "Preparando a verificação em duas etapas..."

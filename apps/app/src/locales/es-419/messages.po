@@ -75,6 +75,10 @@ msgstr "Base de datos no disponible en este momento."
 msgid "Bem-vindo ao Limmiar"
 msgstr "Bienvenido a Limmiar"
 
+#: src/widgets/biblioteca/BibliotecaNotas.tsx:37
+msgid "Buscar notas"
+msgstr "Buscar notas"
+
 #: src/features/copilot-byok/CopilotKeySetup.tsx:57
 msgid "Cadastrar chave de API de IA"
 msgstr "Registrar clave de API de IA"
@@ -137,7 +141,7 @@ msgstr "¿Cómo vas a usar Limmiar?"
 msgid "Concluindo o pareamento..."
 msgstr "Completando la vinculación..."
 
-#: src/app/routing/router.tsx:32
+#: src/app/routing/router.tsx:33
 msgid "Configurar copiloto de IA"
 msgstr "Configurar copiloto de IA"
 
@@ -368,6 +372,10 @@ msgstr "No se pudo descifrar la clave recibida. Intenta vincular de nuevo."
 msgid "Não foi possível ler"
 msgstr "No se pudo leer"
 
+#: src/pages/biblioteca/BibliotecaPage.tsx:66
+msgid "Não foi possível preparar a busca. Tente novamente."
+msgstr "No se pudo preparar la búsqueda. Intenta de nuevo."
+
 #: src/features/copilot-byok/CopilotKeySetup.tsx:61
 msgid "Não foi possível salvar a chave. Tente novamente."
 msgstr "No se pudo guardar la clave. Intenta de nuevo."
@@ -381,6 +389,10 @@ msgstr "No hay una configuración de verificación en dos pasos pendiente para e
 #: src/shared/api/problem-messages.ts:157
 msgid "voice.enrollment_not_found"
 msgstr "No se encontró registro de voz para esta cuenta."
+
+#: src/widgets/biblioteca/BibliotecaNotas.tsx:53
+msgid "Nenhuma nota encontrada."
+msgstr "No se encontraron notas."
 
 #: src/features/nota-fila/FilaAssinatura.tsx:108
 msgid "Nenhuma nota nesta aba."
@@ -429,6 +441,10 @@ msgstr "Pendientes"
 #: src/features/nota-editor/EditorSoap.tsx:30
 msgid "Plano"
 msgstr "Plan"
+
+#: src/widgets/biblioteca/BibliotecaNotas.tsx:48
+msgid "Preparando a busca..."
+msgstr "Preparando la búsqueda..."
 
 #: src/features/totp-enrollment/TotpSetup.tsx:78
 msgid "Preparando a verificação em duas etapas..."

@@ -8,6 +8,7 @@ import { PairPrimaryPage } from '../../pages/device-pairing/PairPrimaryPage'
 import { PairNewPage } from '../../pages/device-pairing/PairNewPage'
 import { CopilotKeyPage } from '../../pages/settings/CopilotKeyPage'
 import { NotaPage } from '../../pages/notas/NotaPage'
+import { BibliotecaPage } from '../../pages/biblioteca/BibliotecaPage'
 
 function readSearchString(search: Record<string, unknown>, key: string): string {
   const value = search[key]
@@ -213,6 +214,27 @@ const notaRoute = createRoute({
   component: NotaPage,
 })
 
+// ponytail: mesma situação, mesmo motivo do `kek={null}, accountId=""` de CopilotKeyPage/
+// NotaPage -- sem KeychainProvider/sessão real montada ainda. `dek={null}` faz
+// BibliotecaPage ficar em `a-preparar` sem tentar abrir OPFS nenhuma; `itens`/`notas`
+// vazios e `store` que nunca acha nada persistido são o equivalente, para esta rota, do
+// prontuário fixture de NotaPage. Quem ligar Keychain/sessão substitui os cinco valores por
+// props reais -- a lógica de BibliotecaPage não muda.
+const BIBLIOTECA_STORE_FIXTURE = { ler: async () => null, gravar: async () => {} }
+
+function BibliotecaRouteComponent() {
+  return <BibliotecaPage itens={[]} notas={[]} accountId="" dek={null} store={BIBLIOTECA_STORE_FIXTURE} />
+}
+
+// Ticket S08-02, fatias 4-5: biblioteca de notas com busca cifrada no cliente. Rota normal
+// de produto (não vai atrás do gate VITE_ENABLE_E2E_TEST_ROUTES) -- ao contrário dos blocos
+// acima, esta não é scaffolding só para o E2E alcançar a tela.
+const bibliotecaRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/biblioteca',
+  component: BibliotecaRouteComponent,
+})
+
 const routeTree =
   import.meta.env.VITE_ENABLE_E2E_TEST_ROUTES === 'true'
     ? rootRoute.addChildren([
@@ -220,13 +242,14 @@ const routeTree =
         magicLinkCallbackRoute,
         copilotSettingsRoute,
         notaRoute,
+        bibliotecaRoute,
         authScreenE2ERoute,
         pairPrimaryRoute,
         pairNewRoute,
         recoveryScreenE2ERoute,
         recoveryPhraseSetupE2ERoute,
       ])
-    : rootRoute.addChildren([indexRoute, magicLinkCallbackRoute, copilotSettingsRoute, notaRoute])
+    : rootRoute.addChildren([indexRoute, magicLinkCallbackRoute, copilotSettingsRoute, notaRoute, bibliotecaRoute])
 
 export const router = createRouter({ routeTree })
 

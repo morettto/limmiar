@@ -31,8 +31,8 @@ e `apps/app/src/entities/patient` (`nota-crypto.ts` é, aliás, o molde literal 
    resultante (`iv(12) || ct(32) || tag(16)`) é o que `assinarNota` envia ao backend.
 6. `notaParaEntrada(nota)` (fatia 5) — serializa a nota inteira (não só o digest) para
    virar o `plaintext` de uma entrada de prontuário (`sealEntry`, `entities/patient`).
-7. `assinarNota`/`obterAssinatura` (fatia 5, `api.ts`) — cliente HTTP de
-   `POST`/`GET /accounts/{accountId}/notes/{noteId}/signature`.
+7. `assinarNota` (fatia 5, `api.ts`) — cliente HTTP de
+   `POST /accounts/{accountId}/notes/{noteId}/signature`.
 
 ## Pontos de entrada
 
@@ -64,11 +64,6 @@ e `apps/app/src/entities/patient` (`nota-crypto.ts` é, aliás, o molde literal 
 - `notaParaEntrada(nota: Nota): Uint8Array<ArrayBuffer>` (`nota-crypto.ts`, fatia 5).
 - `assinarNota(baseUrl, accountId, accessToken, noteId, { revisao, signature }): Promise<AssinarNotaResult>`
   (`api.ts`, fatia 5) -- `POST /accounts/{accountId}/notes/{noteId}/signature`, 201.
-- `obterAssinatura(baseUrl, accountId, accessToken, noteId): Promise<ObterAssinaturaResult>`
-  (`api.ts`, fatia 5) -- `GET /accounts/{accountId}/notes/{noteId}/signature`, 200 ou 404
-  `notes.signature_not_found`. Ainda sem chamador (fica pronto para a fatia que precisar de
-  reabrir uma nota já assinada e mostrar quando foi assinada sem depender só do estado
-  local de `NotaPage`).
 
 ## Decisões desta fatia
 
@@ -134,3 +129,12 @@ e `apps/app/src/entities/patient` (`nota-crypto.ts` é, aliás, o molde literal 
 - Ligar `selarAssinatura`/`assinarNota` ao ecrã (gravar no prontuário antes de assinar,
   reagir a 409/falha de rede, marcar a nota como assinada na fila) -- isso é
   `pages/notas/NotaPage.tsx` (fatia 5), ver o README desse módulo.
+
+## Removido (S08-02)
+
+- **`obterAssinatura`/`ObterAssinaturaResult`** (`api.ts`) foram apagados: nasceram na
+  fatia 5 do S08-01 sem chamador ("fica pronto para..."), e continuaram sem nenhum até o
+  ticket S08-02 -- reabrir uma nota já assinada é fluxo que ainda não existe em lado
+  nenhum da app. Veredicto herdado do S08-01 (já registado nesse README antes da remoção),
+  não reaberto aqui. `assinarNota` continua -- é o único lado do endpoint com chamador
+  real (`pages/notas/NotaPage.tsx`).

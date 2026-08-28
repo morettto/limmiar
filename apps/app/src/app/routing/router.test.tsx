@@ -27,6 +27,9 @@ vi.mock('../../features/copilot-byok/CopilotKeySetup', () => ({
 vi.mock('../../widgets/soap-editor/FilaEEditor', () => ({
   FilaEEditor: vi.fn(() => <div data-testid="fila-e-editor" />),
 }))
+vi.mock('../../pages/biblioteca/BibliotecaPage', () => ({
+  BibliotecaPage: vi.fn(() => <div data-testid="biblioteca-page" />),
+}))
 
 // Route construction (createRoute/createRouter/routeTree, including the env-gated E2E
 // branch) runs once at module top level. Each test needs its own fresh evaluation of that
@@ -212,6 +215,27 @@ describe('router', () => {
     const propsDepois = vi.mocked(FilaEEditor).mock.calls.at(-1)![0]
     expect(propsDepois.itens[0]!.estado).toBe('pendente')
     expect(screen.getByRole('alert')).toBeTruthy()
+  })
+
+  // BibliotecaPage é mockado aqui (não BibliotecaNotas): a fixture desta rota é o próprio
+  // `store` passado a BibliotecaPage (dek=null, sem KeychainProvider ainda -- mesmo motivo
+  // do kek={null} de /settings/copilot), então o teste chama `ler`/`gravar` diretamente para
+  // provar o comportamento deles, em vez de depender de BibliotecaPage os invocar (o que só
+  // aconteceria com um dek real -- fora desta fatia).
+  it('resolves /biblioteca com fixtures vazias e dek=null; o store fixture nunca acha nada persistido', async () => {
+    const router = await loadRouterAt('/biblioteca')
+
+    render(<RouterProvider router={router} />)
+    await screen.findByTestId('biblioteca-page')
+
+    const { BibliotecaPage } = await import('../../pages/biblioteca/BibliotecaPage')
+    const props = vi.mocked(BibliotecaPage).mock.calls[0]![0]
+    expect(props.itens).toEqual([])
+    expect(props.notas).toEqual([])
+    expect(props.accountId).toBe('')
+    expect(props.dek).toBeNull()
+    await expect(props.store.ler()).resolves.toBeNull()
+    await expect(props.store.gravar(new Uint8Array())).resolves.toBeUndefined()
   })
 
   it('resolves /auth/magic-link and passes baseUrl/token through to MagicLinkCallback', async () => {

@@ -84,5 +84,7 @@ sério -- ver o README de `widgets/soap-editor` para o histórico dessa decisão
   `widgets/soap-editor/README.md`.
 - Sessão/Keychain real (substituir os quatro valores fixture por props reais) -- ver a
   decisão acima.
-- `obterAssinatura` (`entities/nota/api.ts`) não tem chamador aqui ainda -- reabrir uma
-  nota já assinada e mostrar quando foi assinada é fluxo futuro, não desta fatia.
+- Reabrir uma nota já assinada e mostrar quando foi assinada é fluxo futuro, ainda sem
+  nenhuma tela. `obterAssinatura` (`entities/nota/api.ts`) que serviria esse fluxo foi
+  apagado no S08-02 por nunca ter tido chamador -- ver `entities/nota/README.md`,
+  "Removido".
