@@ -158,6 +158,22 @@ const knownProblemMessages: Record<ProblemCode, MessageDescriptor> = {
     id: 'voice.enrollment_not_found',
     message: 'Nenhum cadastro de voz encontrado para esta conta.',
   }),
+  'notes.already_signed': msg({
+    id: 'notes.already_signed',
+    message: 'Esta nota já foi assinada.',
+  }),
+  'notes.signature_not_found': msg({
+    id: 'notes.signature_not_found',
+    message: 'Esta nota ainda não foi assinada.',
+  }),
+  'notes.not_authorized_to_sign': msg({
+    id: 'notes.not_authorized_to_sign',
+    message: 'Sua conta ainda não pode assinar notas.',
+  }),
+  'consent.not_authorized_to_record': msg({
+    id: 'consent.not_authorized_to_record',
+    message: 'Sua conta ainda não pode registrar consentimento.',
+  }),
 }
 
 // Fallback for a backend `code` not in the registry above. The raw code string must

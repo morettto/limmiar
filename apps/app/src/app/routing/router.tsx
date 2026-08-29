@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { createRootRoute, createRoute, createRouter, Link } from '@tanstack/react-router'
 import { Trans } from '@lingui/react/macro'
 import { AuthPage } from '../../pages/auth/AuthPage'
@@ -8,10 +9,22 @@ import { PairPrimaryPage } from '../../pages/device-pairing/PairPrimaryPage'
 import { PairNewPage } from '../../pages/device-pairing/PairNewPage'
 import { CopilotKeyPage } from '../../pages/settings/CopilotKeyPage'
 import { NotaPage } from '../../pages/notas/NotaPage'
+import { abrirMicrofone, type AbrirMicrofoneResult } from '../../features/live-session/microfone'
+import type { EstadoConsentimento } from '../../entities/consentimento/api'
 
 function readSearchString(search: Record<string, unknown>, key: string): string {
   const value = search[key]
   return typeof value === 'string' ? value : ''
+}
+
+const ESTADOS_CONSENTIMENTO: ReadonlySet<string> = new Set(['pendente', 'concedido', 'revogado'])
+
+// Fronteira de confiança: a query string é entrada não confiável (S10-02 fatia 6, andaime
+// e2e). Qualquer valor fora do enum -- incluindo ausente -- cai no estado mais restritivo
+// ('pendente'), o mesmo default que o servidor usa sem eventos (Api.Consent.ConsentState.Fold).
+function readEstadoConsentimento(search: Record<string, unknown>, key: string): EstadoConsentimento {
+  const value = search[key]
+  return typeof value === 'string' && ESTADOS_CONSENTIMENTO.has(value) ? (value as EstadoConsentimento) : 'pendente'
 }
 
 // The root route's own component is deliberately left unset: TanStack Router's default
@@ -186,13 +199,55 @@ function PairNewRouteComponent() {
   return <PairNewPage baseUrl={baseUrl} />
 }
 
+// S10-02 fatia 6 (decisão 6 do desenho -- zero UI de produção): a única exceção é este
+// andaime mínimo de E2E, no mesmo precedente de /devices/pair-primary acima -- consentimento
+// chega por query string, não há navegação real até este ecrã porque não existe nenhum ecrã
+// de produção para uma finalidade de consentimento revogar/conceder (decisão 6: "nenhuma rota
+// de produção"). Ao contrário de pair-primary (que reusa um componente de produção,
+// PairPrimaryDevice, montado por uma página real), este componente não tem equivalente de
+// produção nenhum -- existe só para consentimento-microfone.spec.ts clicar "Gravar" com um
+// consentimento conhecido e ler no DOM o que `abrirMicrofone` devolveu, sem inventar UI real.
+interface E2eMicrofoneSearch {
+  consentimento: EstadoConsentimento
+}
+
+const e2eMicrofoneRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/e2e/microfone',
+  validateSearch: (search: Record<string, unknown>): E2eMicrofoneSearch => ({
+    consentimento: readEstadoConsentimento(search, 'consentimento'),
+  }),
+  component: E2eMicrofoneRouteComponent,
+})
+
+function E2eMicrofoneRouteComponent() {
+  const { consentimento } = e2eMicrofoneRoute.useSearch()
+  const [resultado, setResultado] = useState<AbrirMicrofoneResult | null>(null)
+
+  async function abrir() {
+    setResultado(await abrirMicrofone(consentimento))
+  }
+
+  return (
+    <div>
+      <button type="button" onClick={() => void abrir()}>
+        Gravar
+      </button>
+      {resultado !== null && resultado.ok && <p role="status">microfone aberto</p>}
+      {resultado !== null && !resultado.ok && <p role="alert">{resultado.motivo}</p>}
+    </div>
+  )
+}
+
 // All of these routes are E2E-only scaffolding (see the file-level doc comment above) and
 // must not ship in the real production bundle: auth/screen mounts AuthScreen with no
 // login-flow guard in front of it, pair-primary takes an accessToken + raw KEK straight off
 // the query string, pair-new is unusable without a window hook the E2E installs, auth/recover
-// mounts RecoveryScreen the same bare way auth/screen mounts AuthScreen, and
+// mounts RecoveryScreen the same bare way auth/screen mounts AuthScreen,
 // auth/recovery-phrase-setup takes an accessToken straight off the query string the same way
-// pair-primary does -- but "unusable in practice" isn't the same as "absent from the bundle",
+// pair-primary does, and e2e/microfone (S10-02 fatia 6, above) mounts a bare "Gravar" button
+// wired straight to `abrirMicrofone` with the consentimento state read off the query string --
+// but "unusable in practice" isn't the same as "absent from the bundle",
 // a route registered in the real tree is still shipped, crawlable, and linkable. Gating on
 // `import.meta.env.DEV` would also exclude them from THIS E2E, since playwright.config.ts
 // exercises a real `vite build` (not `vite dev`) to match production bundling as closely as
@@ -225,6 +280,7 @@ const routeTree =
         pairNewRoute,
         recoveryScreenE2ERoute,
         recoveryPhraseSetupE2ERoute,
+        e2eMicrofoneRoute,
       ])
     : rootRoute.addChildren([indexRoute, magicLinkCallbackRoute, copilotSettingsRoute, notaRoute])
 

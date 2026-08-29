@@ -230,6 +230,16 @@ msgstr "Esta cuenta no está esperando revisión."
 msgid "Esta frase não será exibida novamente. Guarde-a em um local seguro: ela é a única forma de recuperar o acesso à sua conta caso você perca todos os seus dispositivos."
 msgstr "Esta frase no se mostrará de nuevo. Guárdala en un lugar seguro: es la única forma de recuperar el acceso a tu cuenta si pierdes todos tus dispositivos."
 
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:165
+msgid "notes.signature_not_found"
+msgstr "Esta nota aún no ha sido firmada."
+
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:161
+msgid "notes.already_signed"
+msgstr "Esta nota ya fue firmada."
+
 #: src/pages/notas/NotaPage.tsx:112
 msgid "Esta nota já tinha sido assinada. As alterações feitas depois não estão cobertas por essa assinatura."
 msgstr "Esta nota ya había sido firmada. Los cambios realizados después no están cubiertos por esa firma."
@@ -405,7 +415,7 @@ msgid "unexpected_error"
 msgstr "Ocurrió un error inesperado en el servidor."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:165
+#: src/shared/api/problem-messages.ts:181
 msgid "errors.generic"
 msgstr "Ocurrió un error inesperado. Inténtalo de nuevo."
 
@@ -487,9 +497,19 @@ msgid "agenda.not_authorized_to_schedule"
 msgstr "Tu cuenta todavía no puede agendar sesiones."
 
 #. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:169
+msgid "notes.not_authorized_to_sign"
+msgstr "Su cuenta todavía no puede firmar notas."
+
+#. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:129
 msgid "patients.not_authorized_to_create_records"
 msgstr "Tu cuenta todavía no puede crear expedientes."
+
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:173
+msgid "consent.not_authorized_to_record"
+msgstr "Su cuenta todavía no puede registrar consentimiento."
 
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:98

@@ -4,6 +4,7 @@ import type { CryptoKey } from '@limmiar/crypto'
 import type { SessaoEvento } from '@limmiar/session'
 import { persistChunk } from './chunk-store'
 import type { WriteSealed } from './chunk-store'
+import type { MicrofoneAutorizado } from './microfone'
 import { ligarTap } from './pcm-tap'
 import type { SegmentStore } from './segment-store'
 
@@ -14,7 +15,7 @@ export interface DispositivoGpu {
 }
 
 export interface LigarSessaoOpcoes {
-  stream: MediaStream
+  microfone: MicrofoneAutorizado
   dek: CryptoKey
   sessionId: string
   gpu?: DispositivoGpu
@@ -43,7 +44,7 @@ const RING_CAPACITY_FRAMES = 65536
 /** Único adapter mundo-real→`SessaoEvento` da captura ao vivo. */
 export function ligarSessao(opcoes: LigarSessaoOpcoes): SessaoAoVivo {
   const {
-    stream,
+    microfone,
     dek,
     sessionId,
     gpu,
@@ -55,6 +56,7 @@ export function ligarSessao(opcoes: LigarSessaoOpcoes): SessaoAoVivo {
     timesliceMs = DEFAULT_TIMESLICE_MS,
   } = opcoes
 
+  const { stream } = microfone
   const tracks = stream.getTracks()
   const abort = new AbortController()
   const ring = attachRing(createRingSab(RING_CAPACITY_FRAMES))
