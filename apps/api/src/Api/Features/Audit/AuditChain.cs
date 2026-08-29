@@ -63,9 +63,16 @@ public static class AuditChain
     {
         var expectedPreviousHash = GenesisHash.ToArray();
 
+        // All three hash comparisons below use CryptographicOperations.FixedTimeEquals. Not for
+        // secrecy: entry_hash and anchored_hash are unkeyed SHA-256 over columns any reader can
+        // recompute, so there is no secret whose compare time could leak and constant time buys
+        // nothing here. It is uniform because one idiom for one operation is one fewer thing to
+        // explain -- three 32-byte hash compares, all false on a length mismatch -- instead of
+        // leaving the next reviewer to work out whether a SequenceEqual here and a FixedTimeEquals
+        // there was meant to signal something. It was not.
         foreach (var entry in chain)
         {
-            if (!entry.PreviousHash.AsSpan().SequenceEqual(expectedPreviousHash))
+            if (!CryptographicOperations.FixedTimeEquals(entry.PreviousHash, expectedPreviousHash))
             {
                 return AuditVerification.Broken(entry.Sequence, AuditBreakKind.BrokenLink);
             }

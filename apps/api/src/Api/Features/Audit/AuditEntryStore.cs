@@ -12,14 +12,18 @@ namespace Api.Audit;
 /// <param name="maxAttempts">How many times <see cref="AppendAsync"/> re-reads the chain head
 /// and retries before giving up. Not speculative config: the 100%-branch-coverage gate needs
 /// the "ran out of attempts" path to be reachable, and the honest way there is a test that
-/// builds the store with <c>maxAttempts: 1</c>. Default 4 is a real ceiling of the retry
-/// design, not an arbitrary number: each retry round has exactly one winner, so N genuinely
-/// concurrent writers to the same tenant need up to N attempts in the worst case (one
-/// straggler losing every earlier round). Four covers up to four-way contention; the
-/// eight-way concurrency test builds the store with <c>maxAttempts: 8</c> instead of the
-/// default for exactly this reason. Production default stays 4 -- raise it only with evidence
-/// that a tenant's real write concurrency regularly exceeds that.</param>
-public sealed class AuditEntryStore(NpgsqlDataSource dataSource, int maxAttempts = 4)
+/// builds the store with <c>maxAttempts: 1</c>. Default 8 comes from a measurement, not an
+/// estimate: each retry round has exactly one winner, so N genuinely concurrent writers to the
+/// same tenant need up to N attempts in the worst case (one straggler losing every earlier
+/// round), and
+/// <c>AppendAsync_WithEightConcurrentCalls_PersistsEightEntriesAndVerifyStaysIntact</c> drives
+/// that worst case with eight writers against a real Postgres. The default is set to what that
+/// test measured instead of sitting below it: under the observed worst case, real contention
+/// makes <see cref="AppendAsync"/> return <c>null</c> and an audit entry vanishes without a
+/// sound, and a lost audit entry is data loss. That test now builds the store with no explicit
+/// maxAttempts, so the number under contention is the shipped one -- lower this and the proof
+/// stops covering the concurrency it claims to cover.</param>
+public sealed class AuditEntryStore(NpgsqlDataSource dataSource, int maxAttempts = 8)
 {
     /// <summary>
     /// Reads the chain head, computes this entry's hash, and inserts it inside a

@@ -99,14 +99,10 @@ public sealed class AuditEntryStoreTests : IAsyncLifetime
     /// loser re-reads and retries, and every one of the eight eventually persists (unlike the
     /// slot-conflict molde in SchedulingEndpointsTests, nobody here is expected to lose
     /// outright). The chain that results must still verify intact end to end.</summary>
-    /// <remarks>
-    /// Why maxAttempts: 8, not the default 4: see the <c>maxAttempts</c> parameter docstring
-    /// on <see cref="AuditEntryStore"/>'s constructor.
-    /// </remarks>
     [Fact]
     public async Task AppendAsync_WithEightConcurrentCalls_PersistsEightEntriesAndVerifyStaysIntact()
     {
-        var store = CreateStore(maxAttempts: 8);
+        var store = CreateStore();
         var tenantId = Guid.NewGuid();
         var deviceId = Guid.NewGuid();
 
@@ -133,8 +129,7 @@ public sealed class AuditEntryStoreTests : IAsyncLifetime
     {
         var tenantId = Guid.NewGuid();
         var deviceId = Guid.NewGuid();
-        var blockerDataSource = NpgsqlDataSourceFactory.Create(_fixture.AppRoleConnectionString);
-        _createdDataSources.Add(blockerDataSource);
+        var blockerDataSource = CreateDataSource();
 
         await using var blockerScope = await blockerDataSource.OpenTenantScopedTransactionAsync(tenantId, CancellationToken.None);
         await using (var insertCommand = blockerScope.Connection.CreateCommand())
@@ -152,7 +147,7 @@ public sealed class AuditEntryStoreTests : IAsyncLifetime
             await insertCommand.ExecuteNonQueryAsync();
         }
 
-        var store = CreateStore(maxAttempts: 1);
+        var store = new AuditEntryStore(CreateDataSource(), maxAttempts: 1);
         var appendTask = Task.Run(() => store.AppendAsync(tenantId, AuditAction.SignIn, deviceId, CancellationToken.None));
 
         await WaitUntilBlockedOnAuditEntriesInsertAsync();
@@ -278,10 +273,12 @@ public sealed class AuditEntryStoreTests : IAsyncLifetime
         throw new TimeoutException("Timed out waiting for the maxAttempts:1 insert to block on the held row.");
     }
 
-    private AuditEntryStore CreateStore(int maxAttempts = 4)
+    private AuditEntryStore CreateStore() => new(CreateDataSource());
+
+    private NpgsqlDataSource CreateDataSource()
     {
         var dataSource = NpgsqlDataSourceFactory.Create(_fixture.AppRoleConnectionString);
         _createdDataSources.Add(dataSource);
-        return new AuditEntryStore(dataSource, maxAttempts);
+        return dataSource;
     }
 }

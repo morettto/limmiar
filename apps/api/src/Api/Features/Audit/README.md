@@ -59,7 +59,7 @@ critério 4) que o desenho já fechou.
     `WHERE tenant_id` em lugar nenhum, a policy RLS é quem isola. Se o `INSERT` colidir contra
     `UNIQUE (tenant_id, previous_hash)` (`PostgresException` com `SqlState` de
     `UniqueViolation`), relê a cabeça (agora avançada) e retenta, até `maxAttempts`
-    (parâmetro do construtor, default 4) -- só depois devolve `null`, nunca lança. `action`,
+    (parâmetro do construtor, default 8) -- só depois devolve `null`, nunca lança. `action`,
     `deviceId` e o único `recordedAt` capturado antes do laço nunca mudam entre tentativas;
     só `sequence` e `previousHash` mudam, porque são os únicos campos que uma escrita
     concorrente pode invalidar. `recorded_at` é fornecido pela aplicação, não pela migração
@@ -87,9 +87,11 @@ critério 4) que o desenho já fechou.
   tem dois sucessores": a cadeia nunca vira árvore, nem por bug futuro. `AppendAsync` é quem lê
   a cabeça, tenta o insert, e retenta em caso de perda -- nunca devolve a entrada perdida em
   silêncio, porque perder uma linha de auditoria é perda de dados.
-- **`AppendAsync` retenta até `maxAttempts`, nunca lança na perda de corrida.** O porquê do
-  default 4 (e do teste de concorrência construir o store com `maxAttempts: 8` em vez do
-  default) está no docstring do parâmetro `maxAttempts` no construtor de `AuditEntryStore`.
+- **`AppendAsync` retenta até `maxAttempts`, nunca lança na perda de corrida.** O default 8 é o
+  pior caso medido pelo teste de concorrência de oito escritores
+  (`AppendAsync_WithEightConcurrentCalls_PersistsEightEntriesAndVerifyStaysIntact`), que corre
+  com o default em vez de o contornar -- o argumento completo está no docstring do parâmetro
+  `maxAttempts` no construtor de `AuditEntryStore`.
 - **Sem trigger de imutabilidade.** O par `GRANT SELECT, INSERT` / `REVOKE UPDATE, DELETE`
   fecha todos os caminhos de escrita que `app_role` tem, e `app_role` é o único papel com que a
   API liga -- mesmo raciocínio de `note_signatures` (0005) e `patient_record_entries` (0002).
@@ -105,12 +107,17 @@ critério 4) que o desenho já fechou.
   para a sequência ancorada em vez da entrada que está de facto errada (o "a partir daí" do
   critério 1). Travado por
   `AuditChainTests.Verify_WhenBothAnEntryAndItsAnchorAreViolated_ReportsTheChainBreakNotTheAnchor`.
+- **Uma política de comparação de hash em `AuditChain`.** As três comparações de hash de
+  `Verify` (elo, `entry_hash` e `AnchorMismatch`) usam todas
+  `CryptographicOperations.FixedTimeEquals` -- o argumento completo está no comentário
+  imediatamente acima do `foreach` em `AuditChain.cs`.
 - **Critério de aceite 4 provado contra a base, não por regex na migração.**
-  `AuditEntries_HasExactlyTheSevenMetadataColumns` compara o conjunto exato de
-  `(column_name, data_type)` em `information_schema.columns`; `AuditActionRangeMatchesEnum`
-  insere todos os `Enum.GetValues<AuditAction>()` com sucesso e o valor seguinte com
-  `CheckViolation` -- mantém o `CHECK` da migração e o enum em sincronia por construção, não
-  por disciplina.
+  `AuditTrailSchemaTests.AuditEntries_HasExactlyTheSevenMetadataColumns` e
+  `AuditAnchors_HasExactlyTheFourColumns` comparam o conjunto exato de
+  `(column_name, data_type)` em `information_schema.columns` para cada tabela;
+  `AuditActionRangeMatchesEnum` insere todos os `Enum.GetValues<AuditAction>()` com sucesso e o
+  valor seguinte com `CheckViolation` -- mantém o `CHECK` da migração e o enum em sincronia por
+  construção, não por disciplina.
 
 ## Fora de âmbito do ticket S10-01 (as sete fatias fecharam)
 
