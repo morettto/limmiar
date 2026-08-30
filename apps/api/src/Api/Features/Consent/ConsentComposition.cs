@@ -6,20 +6,6 @@ namespace Api.Consent;
 
 public static class ConsentComposition
 {
-    // ConsentStatus (ConsentSnapshot's two fields, GET response only) wires as
-    // "pendente"/"concedido"/"revogado" (the design signature's literal comment). The
-    // closed-generic JsonStringEnumConverter<T> is the AOT-safe overload already used on
-    // AccountRole/AccountVerificationStatus/etc. in this repository, unlike the
-    // reflection-based non-generic converter the design rejects -- registered at the
-    // JsonSerializerOptions level (not a [JsonConverter] attribute on the enum itself, in
-    // ConsentEvent.cs, fatia 1, not touched by this fatia) so it stays entirely inside
-    // fatia 3's own files. ConsentEndpointsTests duplicates this one-line construction for
-    // its own response-reading options rather than this becoming internal/public just for
-    // test reuse -- same duplication call already made for CreateFactory() across this
-    // test suite.
-    private static readonly JsonConverter ConsentStatusStringConverter =
-        new JsonStringEnumConverter<ConsentStatus>(JsonNamingPolicy.CamelCase);
-
     public static void AddConsent(this IServiceCollection services)
     {
         services.AddSingleton<ConsentEventStore>();
@@ -30,7 +16,10 @@ public static class ConsentComposition
         services.ConfigureHttpJsonOptions(options =>
         {
             options.SerializerOptions.TypeInfoResolverChain.Insert(0, ConsentJsonContext.Default);
-            options.SerializerOptions.Converters.Add(ConsentStatusStringConverter);
+            // ConsentStatus só sai na resposta do GET. O overload genérico fechado é o AOT-safe,
+            // e registá-lo aqui (não por atributo em ConsentEvent.cs) mantém a decisão neste
+            // ficheiro; o pedido continua a parsear à mão, ver TryParseDefinedEnum.
+            options.SerializerOptions.Converters.Add(new JsonStringEnumConverter<ConsentStatus>(JsonNamingPolicy.CamelCase));
         });
     }
 

@@ -1,9 +1,19 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { abrirMicrofone } from './microfone'
+import { abrirMicrofone, type MicrofoneAutorizado } from './microfone'
 
 function midiaFalsa(getUserMedia: (constraints: MediaStreamConstraints) => Promise<MediaStream>): MediaDevices {
   return { getUserMedia } as unknown as MediaDevices
 }
+
+describe('MicrofoneAutorizado', () => {
+  it('não se forja: montar o objeto à mão não compila, só `abrirMicrofone` o constrói', () => {
+    // @ts-expect-error -- literal sem a marca não é `MicrofoneAutorizado`. A invariante da porta
+    // única é imposta pelo compilador, não por convenção escrita no README.
+    const forjado: MicrofoneAutorizado = { stream: {} as MediaStream }
+
+    expect(forjado.stream).toBeDefined()
+  })
+})
 
 describe('abrirMicrofone', () => {
   afterEach(() => {

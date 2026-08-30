@@ -5,7 +5,7 @@ import type { SessaoEvento } from '@limmiar/session'
 import { criarSegmentStore } from './segment-store'
 import { ligarSessao, type DispositivoGpu, type LigarSessaoOpcoes } from './live-session'
 import type { WriteSealed } from './chunk-store'
-import type { MicrofoneAutorizado } from './microfone'
+import { abrirMicrofone, type MicrofoneAutorizado } from './microfone'
 
 const runAsrLoopMock = vi.fn<(opts: RunAsrLoopOptions) => Promise<AsrLoopStats>>()
 
@@ -75,13 +75,21 @@ async function realDek(): Promise<CryptoKey> {
   return crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt'])
 }
 
-function microfoneFalso(tracks?: (MediaStreamTrack & EventTarget)[]): MicrofoneAutorizado {
-  return { stream: criarStreamFalso(tracks) }
+// Passa pela porta real em vez de montar o objeto à mão: `MicrofoneAutorizado` tem marca
+// nominal e é `abrirMicrofone` quem a põe.
+async function microfoneFalso(tracks?: (MediaStreamTrack & EventTarget)[]): Promise<MicrofoneAutorizado> {
+  const midia = { getUserMedia: async () => criarStreamFalso(tracks) } as unknown as MediaDevices
+  const resultado = await abrirMicrofone('concedido', midia)
+  if (!resultado.ok) {
+    throw new Error(`microfoneFalso: abrirMicrofone recusou (${resultado.motivo})`)
+  }
+  return resultado.microfone
 }
 
-function opcoesBase(overrides: Partial<LigarSessaoOpcoes> = {}): Promise<LigarSessaoOpcoes> {
-  return realDek().then((dek) => ({
-    microfone: microfoneFalso(),
+async function opcoesBase(overrides: Partial<LigarSessaoOpcoes> = {}): Promise<LigarSessaoOpcoes> {
+  const dek = await realDek()
+  return {
+    microfone: await microfoneFalso(),
     dek,
     sessionId: SESSION_ID,
     storage: storageFalso(1000, 0),
@@ -90,7 +98,7 @@ function opcoesBase(overrides: Partial<LigarSessaoOpcoes> = {}): Promise<LigarSe
     segmentos: criarSegmentStore(),
     enviar: vi.fn(),
     ...overrides,
-  }))
+  }
 }
 
 beforeEach(() => {
@@ -208,7 +216,7 @@ describe('ligarSessao — sentinelas', () => {
   it('track "ended" → MICROFONE_REVOGADO', async () => {
     const faixa = criarFaixa()
     const enviar = vi.fn()
-    const opcoes = await opcoesBase({ microfone: microfoneFalso([faixa]), enviar })
+    const opcoes = await opcoesBase({ microfone: await microfoneFalso([faixa]), enviar })
 
     ligarSessao(opcoes)
     faixa.dispatchEvent(new Event('ended'))
@@ -331,7 +339,7 @@ describe('ligarSessao — controller', () => {
     const enviar = vi.fn<(evento: SessaoEvento) => void>()
     const engine: TranscriptionEngine = { warmup: async () => {}, transcribe: async () => [], close: vi.fn(async () => {}) }
     const faixa = criarFaixa()
-    const opcoes = await opcoesBase({ microfone: microfoneFalso([faixa]), engine, enviar })
+    const opcoes = await opcoesBase({ microfone: await microfoneFalso([faixa]), engine, enviar })
 
     const controller = ligarSessao(opcoes)
     await controller.encerrar()
@@ -360,7 +368,7 @@ describe('ligarSessao — controller', () => {
   it('encerrar() remove o listener de "ended" antes de parar as faixas — sem MICROFONE_REVOGADO espúrio', async () => {
     const enviar = vi.fn()
     const faixa = criarFaixa()
-    const opcoes = await opcoesBase({ microfone: microfoneFalso([faixa]), enviar })
+    const opcoes = await opcoesBase({ microfone: await microfoneFalso([faixa]), enviar })
 
     const controller = ligarSessao(opcoes)
     await controller.encerrar()
@@ -380,7 +388,7 @@ describe('ligarSessao — controller', () => {
           signal.addEventListener('abort', () => reject(new Error('motor caiu')), { once: true })
         }),
     )
-    const opcoes = await opcoesBase({ microfone: microfoneFalso([faixa]), engine, enviar })
+    const opcoes = await opcoesBase({ microfone: await microfoneFalso([faixa]), engine, enviar })
 
     const controller = ligarSessao(opcoes)
     await expect(controller.encerrar()).resolves.toBeUndefined()

@@ -85,8 +85,11 @@ public static class ConsentEndpoints
 
     /// <summary>
     /// Purposes and decisions travel on the wire as strings ("gravacao"/"analiseIa",
-    /// "concedido"/"revogado"), not <c>JsonStringEnumConverter</c> -- the design rejects that
-    /// converter to avoid risking Directory.Build.props's WarningsAsErrors under AOT trimming.
+    /// "concedido"/"revogado"), not <c>JsonStringEnumConverter</c> -- not for AOT reasons (the
+    /// closed-generic overload is AOT-safe, and ConsentStatus uses it on the response), but to
+    /// keep control of the error shape: a converter turns an unknown string into a generic
+    /// <c>JsonException</c>, losing the <c>400 validation.invalid_field</c> with the exact
+    /// <c>params.field</c> this endpoint is specified to return.
     /// <see cref="Enum.TryParse{TEnum}(string?, bool, out TEnum)"/> alone is not enough: it also
     /// accepts an arbitrary in-range numeric string (e.g. "1") even when the caller only ever
     /// meant to send a name, so <see cref="Enum.IsDefined{TEnum}(TEnum)"/> is required on top to

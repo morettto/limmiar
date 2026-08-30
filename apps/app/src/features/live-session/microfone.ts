@@ -1,9 +1,15 @@
 import type { EstadoConsentimento } from '../../entities/consentimento/api'
 
-/** Construtor único: `abrirMicrofone`. Nenhum outro código deve montar este
- *  objeto diretamente (ver invariante em README.md). */
+// Marca nominal. `declare const` de um `unique symbol` não exportado: não existe em runtime
+// e nenhum outro módulo lhe consegue nomear a chave, portanto a tipagem estrutural do
+// TypeScript deixa de aceitar um `{ stream }` montado à mão como `MicrofoneAutorizado`.
+declare const marcaMicrofoneAutorizado: unique symbol
+
+/** Construtor único: `abrirMicrofone`. Montar este objeto fora daqui não compila -- a
+ *  invariante da porta única é do compilador, não da convenção (ver README.md). */
 export interface MicrofoneAutorizado {
   readonly stream: MediaStream
+  readonly [marcaMicrofoneAutorizado]: true
 }
 
 export type AbrirMicrofoneResult =
@@ -29,7 +35,7 @@ export async function abrirMicrofone(
 
   try {
     const stream = await midia.getUserMedia({ audio: true })
-    return { ok: true, microfone: { stream } }
+    return { ok: true, microfone: { stream } as MicrofoneAutorizado }
   } catch {
     return { ok: false, motivo: 'permissao-negada' }
   }

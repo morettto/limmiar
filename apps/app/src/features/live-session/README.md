@@ -73,9 +73,9 @@ concedido, chama `midia.getUserMedia({ audio: true })`; qualquer rejeição
 porque `AbrirMicrofoneResult` só tem esses dois motivos e nenhum critério de
 aceite pede um terceiro; se a UI precisar de os distinguir, é a hora de
 acrescentar o motivo e ramificar por `erro.name`. Em sucesso devolve `{ ok:
-true, microfone }`, onde `MicrofoneAutorizado` é um tipo cujo único
-construtor é esta função -- `LigarSessaoOpcoes.microfone` (abaixo) só aceita
-o que `abrirMicrofone` devolveu.
+true, microfone }`, onde `MicrofoneAutorizado` é um tipo com marca nominal
+cujo único construtor é esta função -- `LigarSessaoOpcoes.microfone` (abaixo)
+só aceita o que `abrirMicrofone` devolveu, e montar o objeto à mão não compila.
 
 ### Prova em browser real (S10-02 fatia 6)
 
@@ -300,6 +300,9 @@ vive.
   MicrofoneAutorizado` (S10-02 fatia 4, substitui o antigo `stream:
   MediaStream`) -- só `abrirMicrofone` o constrói, o que transforma "quem
   liga a sessão tem de se lembrar do consentimento" em erro de compilação.
+  O que torna isto verdade e não convenção é a marca nominal (um `unique
+  symbol` não exportado no campo da interface): sem ela, a tipagem estrutural
+  do TypeScript aceitaria qualquer `{ stream }` montado à mão.
 - `SegmentStore` (tipo), `criarSegmentStore(): SegmentStore` --
   `subscribe`/`getSnapshot`/`acrescentar`, contrato `useSyncExternalStore`
   (`segment-store.ts`).

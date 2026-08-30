@@ -4,6 +4,7 @@ import { RouterProvider } from '@tanstack/react-router'
 import { I18nProvider } from '@lingui/react'
 import { i18n, dynamicActivate } from '../../shared/i18n'
 import { encodeBase64 } from '../../shared/lib/base64'
+import type { MicrofoneAutorizado } from '../../features/live-session/microfone'
 
 vi.mock('../../widgets/auth-screen/AuthScreen', () => ({ AuthScreen: vi.fn(() => <div data-testid="auth-screen" />) }))
 vi.mock('../../features/magic-link-auth/MagicLinkCallback', () => ({
@@ -399,7 +400,12 @@ describe('router', () => {
 
   it('/e2e/microfone shows a status when abrirMicrofone succeeds', async () => {
     const { abrirMicrofone } = await import('../../features/live-session/microfone')
-    vi.mocked(abrirMicrofone).mockResolvedValue({ ok: true, microfone: { stream: {} as MediaStream } })
+    vi.mocked(abrirMicrofone).mockResolvedValue({
+      ok: true,
+      // A porta está mockada aqui, logo ninguém a atravessa para receber a marca nominal:
+      // o cast é do duplo, não de código de produção.
+      microfone: { stream: {} as MediaStream } as MicrofoneAutorizado,
+    })
 
     const router = await loadRouterAt('/e2e/microfone?consentimento=concedido', true)
     render(<RouterProvider router={router} />)

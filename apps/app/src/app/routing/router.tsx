@@ -17,7 +17,11 @@ function readSearchString(search: Record<string, unknown>, key: string): string 
   return typeof value === 'string' ? value : ''
 }
 
-const ESTADOS_CONSENTIMENTO: ReadonlySet<string> = new Set(['pendente', 'concedido', 'revogado'])
+// `satisfies Record<EstadoConsentimento, 0>`: acrescentar uma variante ao union sem a listar aqui
+// deixa de compilar, em vez de a fazer cair em silêncio no default 'pendente'.
+const ESTADOS_CONSENTIMENTO: ReadonlySet<string> = new Set(
+  Object.keys({ pendente: 0, concedido: 0, revogado: 0 } satisfies Record<EstadoConsentimento, 0>),
+)
 
 // Fronteira de confiança: a query string é entrada não confiável (S10-02 fatia 6, andaime
 // e2e). Qualquer valor fora do enum -- incluindo ausente -- cai no estado mais restritivo
