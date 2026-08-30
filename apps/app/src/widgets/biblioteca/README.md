@@ -20,9 +20,10 @@ igual em espírito a `widgets/soap-editor/FilaEEditor.tsx` (compõe, não decide
 3. `ocioso` -- mesma coisa (grupos inteiros, sem filtro), mas sem o status de preparação:
    é a biblioteca inteira, termo vazio.
 4. `pronto` -- filtra os itens de cada grupo por `resultado.ids` (`gruposFiltrados`, um
-   `Set` para lookup). Só quando `ids` vier vazio (`[]`) é que aparece "Nenhuma nota
-   encontrada" -- não quando o filtro apenas não bate com nenhum item de um grupo
-   específico (esse grupo só renderiza vazio).
+   `Set` para lookup) e descarta os grupos que ficaram sem itens depois do filtro. Só
+   quando `ids` vier vazio (`[]`) é que aparece "Nenhuma nota encontrada" -- não quando o
+   filtro apenas não bate com nenhum item de um grupo específico (esse grupo não
+   renderiza, sem alarme).
 5. A ordem dos itens dentro de cada grupo (rascunhos antes de assinadas) já vem pronta de
    `agruparPorPaciente` -- este widget nunca reordena, só filtra/renderiza na ordem
    recebida.
@@ -45,7 +46,8 @@ igual em espírito a `widgets/soap-editor/FilaEEditor.tsx` (compõe, não decide
   vazios".** São coisas diferentes: `ids: []` é o índice a dizer "não achei nada" (o caso
   que a UI deve anunciar); `ids` não-vazio que por acaso não bate com nenhum item de
   `grupos` (ex.: uma nota apagada da fila depois de indexada) é um estado de dados
-  divergentes, não "sem resultados" -- esse grupo só renderiza sem itens, sem alarme.
+  divergentes, não "sem resultados" -- `gruposFiltrados` descarta esse grupo (sem itens,
+  sem cabeçalho vazio), sem alarme.
 - **Sem `.spec.tsx` com `toHaveScreenshot`.** O critério de aceite deste ticket é "axe
   limpo" (`BibliotecaNotas.spec.tsx`, `componentAxeBuilder`), não regressão visual --
   diferente de `AuthScreen.spec.tsx`/`TotpSetup.spec.tsx`, cuja AC explícita inclui

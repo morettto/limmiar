@@ -109,6 +109,23 @@ describe('BibliotecaNotas', () => {
     expect(within(secaoPaciente1).getAllByRole('listitem').map((el) => el.textContent)).toEqual(['nota-1', 'nota-2'])
   })
 
+  it('pronto com ids que só batem no primeiro grupo: o grupo vazio não é renderizado', () => {
+    const grupos: readonly GrupoPaciente[] = [
+      {
+        patientId: 'paciente-1',
+        itens: [{ id: 'nota-1', patientId: 'paciente-1', estado: 'pendente' }],
+      },
+      {
+        patientId: 'paciente-2',
+        itens: [{ id: 'nota-3', patientId: 'paciente-2', estado: 'pendente' }],
+      },
+    ]
+    renderWidget({ grupos, resultado: { estado: 'pronto', ids: ['nota-1'] } })
+
+    expect(screen.getByRole('region', { name: 'paciente-1' })).toBeTruthy()
+    expect(screen.queryByRole('region', { name: 'paciente-2' })).toBeNull()
+  })
+
   it('propaga a digitação no campo de busca via onTermoChange', () => {
     const onTermoChange = vi.fn()
     renderWidget({ onTermoChange })

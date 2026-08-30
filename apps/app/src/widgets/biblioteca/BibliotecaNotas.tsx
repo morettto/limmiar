@@ -17,7 +17,9 @@ function gruposFiltrados(grupos: readonly GrupoPaciente[], resultado: ResultadoB
     return grupos
   }
   const ids = new Set(resultado.ids)
-  return grupos.map((grupo) => ({ ...grupo, itens: grupo.itens.filter((item) => ids.has(item.id)) }))
+  return grupos
+    .map((grupo) => ({ ...grupo, itens: grupo.itens.filter((item) => ids.has(item.id)) }))
+    .filter((grupo) => grupo.itens.length > 0)
 }
 
 /**
