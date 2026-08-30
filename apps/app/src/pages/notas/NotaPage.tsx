@@ -99,18 +99,20 @@ export function NotaPage() {
         signature,
       })
 
-      marcarAssinada(nota.id)
       if (resultado.ok) {
+        marcarAssinada(nota.id)
         const dataAssinatura = new Date(resultado.signedAt).toLocaleString(i18n.locale)
         setMensagem({ status: 'sucesso', texto: t`Nota assinada em ${dataAssinatura}.` })
-      } else {
-        // O único desfecho não-ok coberto por esta fatia é 409 notes.already_signed: o
-        // servidor é a verdade (a nota já estava assinada), então marca assinada também --
+      } else if (resultado.code === 'notes.already_signed') {
+        // O servidor é a verdade (a nota já estava assinada), então marca assinada também --
         // mas as alterações feitas depois dessa assinatura não estão cobertas por ela.
+        marcarAssinada(nota.id)
         setMensagem({
           status: 'erro',
           texto: t`Esta nota já tinha sido assinada. As alterações feitas depois não estão cobertas por essa assinatura.`,
         })
+      } else {
+        setMensagem({ status: 'erro', texto: translateProblemCode(resultado.code, resultado.params, i18n) })
       }
       focarListbox()
     } catch {

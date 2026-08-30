@@ -151,6 +151,19 @@ describe('NotaPage', () => {
       expect(screen.getByRole('alert')).toBeTruthy()
     })
 
+    it('401 auth.access_token_invalid não marca assinada, item continua pendente, e mostra role=alert com a mensagem traduzida', async () => {
+      const { assinarNota } = await import('../../entities/nota/api')
+      vi.mocked(assinarNota).mockResolvedValue({ ok: false, code: 'auth.access_token_invalid', params: {} })
+
+      const { props, notaId } = await renderEObterProps()
+      await assinar(props, notaId)
+
+      const propsDepois = props()
+      expect(propsDepois.itens.find((item) => item.id === notaId)?.estado).toBe('pendente')
+      const alert = screen.getByRole('alert')
+      expect(alert.textContent).toBe('Sua sessão expirou. Entre novamente.')
+    })
+
     it('falha de rede mostra role=alert e o item continua pendente', async () => {
       const { assinarNota } = await import('../../entities/nota/api')
       vi.mocked(assinarNota).mockRejectedValue(new Error('network down'))
