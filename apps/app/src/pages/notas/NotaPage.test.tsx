@@ -23,16 +23,16 @@ const CIPHERTEXT = new Uint8Array([1, 2, 3])
 const SIGNATURE = new Uint8Array([4, 5, 6])
 const SIGNED_AT = '2026-08-27T10:05:00Z'
 
-function renderNotaPage() {
+function renderNotaPage(kek: CryptoKey | null = null) {
   return render(
     <I18nProvider i18n={i18n}>
-      <NotaPage />
+      <NotaPage kek={kek} />
     </I18nProvider>,
   )
 }
 
-async function renderEObterProps() {
-  renderNotaPage()
+async function renderEObterProps(kek?: CryptoKey | null) {
+  renderNotaPage(kek)
   const { FilaEEditor } = await import('../../widgets/soap-editor/FilaEEditor')
   const props = () => vi.mocked(FilaEEditor).mock.calls.at(-1)![0]
   const notaId = props().notas[0]!.id
@@ -88,6 +88,19 @@ describe('NotaPage', () => {
     play.mockRestore()
   })
 
+  describe('aoAssinar sem sessão (kek === null)', () => {
+    it('mostra mensagem explícita de sessão ausente e nunca chama openRecord', async () => {
+      const { openRecord } = await import('../../entities/patient/patient-crypto')
+      const { props, notaId } = await renderEObterProps()
+
+      await assinar(props, notaId)
+
+      expect(vi.mocked(openRecord)).not.toHaveBeenCalled()
+      expect(screen.getByRole('alert').textContent).toBe('Sem sessão ativa. Não é possível assinar.')
+      expect(props().notas.find((nota) => nota.id === notaId)?.estado).toBe('pendente')
+    })
+  })
+
   describe('aoAssinar (fatia 5 -- ligação real ao prontuário e à assinatura)', () => {
     beforeEach(async () => {
       const { openRecord, sealEntry } = await import('../../entities/patient/patient-crypto')
@@ -107,7 +120,7 @@ describe('NotaPage', () => {
     })
 
     it('chama appendPatientEntry antes de assinarNota, com sequence = entries.length + 1', async () => {
-      const { props, notaId } = await renderEObterProps()
+      const { props, notaId } = await renderEObterProps(DEK)
       const { appendPatientEntry } = await import('../../entities/patient/api')
       const { assinarNota } = await import('../../entities/nota/api')
 
@@ -123,7 +136,7 @@ describe('NotaPage', () => {
     })
 
     it('sucesso marca só o item com nota.id como assinada e anuncia a data em role=status', async () => {
-      const { props, notaId } = await renderEObterProps()
+      const { props, notaId } = await renderEObterProps(DEK)
 
       await assinar(props, notaId)
 
@@ -134,7 +147,7 @@ describe('NotaPage', () => {
     })
 
     it('não marca o item de uma nota diferente -- prova que o filtro é por nota.id, não "todos os itens" (dívida da fatia 3)', async () => {
-      const { props, notaId } = await renderEObterProps()
+      const { props, notaId } = await renderEObterProps(DEK)
       const notaDeOutraId = { ...notaPorId(props, notaId), id: 'outra-nota-id' }
 
       await act(async () => {
@@ -153,7 +166,7 @@ describe('NotaPage', () => {
       const { assinarNota } = await import('../../entities/nota/api')
       vi.mocked(assinarNota).mockResolvedValue({ ok: false, code: 'notes.already_signed', params: {} })
 
-      const { props, notaId } = await renderEObterProps()
+      const { props, notaId } = await renderEObterProps(DEK)
       await assinar(props, notaId)
 
       const propsDepois = props()
@@ -165,7 +178,7 @@ describe('NotaPage', () => {
       const { assinarNota } = await import('../../entities/nota/api')
       vi.mocked(assinarNota).mockRejectedValue(new Error('network down'))
 
-      const { props, notaId } = await renderEObterProps()
+      const { props, notaId } = await renderEObterProps(DEK)
       await assinar(props, notaId)
 
       const propsDepois = props()
@@ -182,7 +195,7 @@ describe('NotaPage', () => {
         params: {},
       })
 
-      const { props, notaId } = await renderEObterProps()
+      const { props, notaId } = await renderEObterProps(DEK)
       await assinar(props, notaId)
 
       expect(vi.mocked(assinarNota)).not.toHaveBeenCalled()
@@ -196,7 +209,7 @@ describe('NotaPage', () => {
       const { appendPatientEntry } = await import('../../entities/patient/api')
       vi.mocked(assinarNota).mockRejectedValueOnce(new Error('network down'))
 
-      const { props, notaId } = await renderEObterProps()
+      const { props, notaId } = await renderEObterProps(DEK)
 
       await assinar(props, notaId)
       expect(vi.mocked(appendPatientEntry)).toHaveBeenCalledTimes(1)

@@ -19,12 +19,13 @@ const PATIENT_FIXTURE_ID = 'paciente-fixture-1'
 // `assinarNota` abaixo com estes valores falham contra um backend real (o mesmo caminho
 // de "falha de rede" que um apagão de rede genuíno cairia -- sem perda de dados, sem
 // estado inconsistente, só um fluxo que não completa até a sessão real existir). Quem
-// ligar Keychain/sessão substitui estes quatro valores por props; a lógica de aoAssinar
-// abaixo não muda.
+// ligar Keychain/sessão substitui estes três valores por props (o quarto, `kek`, já é
+// prop obrigatória desde a ronda 1 de correção do S08-07 -- `router.tsx` monta
+// `NotaRouteComponent` com `kek={null}`, mesmo padrão de `BibliotecaRouteComponent`/
+// `dek={null}`); a lógica de aoAssinar abaixo não muda.
 const BASE_URL_FIXTURE = ''
 const ACCOUNT_ID_FIXTURE = ''
 const ACCESS_TOKEN_FIXTURE = ''
-const KEK_FIXTURE = {} as CryptoKey
 const RECORD_FIXTURE = { wrappedDek: new Uint8Array(0), entries: [] as { sequence: number; ciphertext: Uint8Array<ArrayBuffer> }[] }
 
 function notaFixture(): Nota {
@@ -39,11 +40,19 @@ function notaFixture(): Nota {
 
 type Mensagem = { status: 'sucesso' | 'erro'; texto: string }
 
+export interface NotaPageProps {
+  // Obrigatória desde a ronda 1 de correção do S08-07 -- mesmo padrão de `BibliotecaPage`'s
+  // `dek: CryptoKey | null`. `router.tsx` monta via `NotaRouteComponent` com `kek={null}`
+  // enquanto não há KeychainProvider real; testes injetam uma chave real para exercitar o
+  // caminho pós-guarda.
+  kek: CryptoKey | null
+}
+
 // ponytail: fila com um único item fixo -- a fila real (fetch ao backend, múltiplas
 // notas/pacientes) continua fora desta fatia. `aoAssinar` agora grava no prontuário e
 // assina de facto (fatia 5), e marca só o item de `nota.id` -- a dívida da fatia 3 (que
 // marcava todos os itens, e só funcionava por a fixture ter um único item) está paga.
-export function NotaPage() {
+export function NotaPage({ kek }: NotaPageProps) {
   const { t, i18n } = useLingui()
   const [notas, setNotas] = useState<Record<string, Nota>>(() => ({ [NOTA_FIXTURE_ID]: notaFixture() }))
   const [mensagem, setMensagem] = useState<Mensagem | null>(null)
@@ -74,8 +83,12 @@ export function NotaPage() {
   // assinatura a apontar para uma revisão que não existe em lado nenhum do prontuário --
   // essa linha não se pode apagar depois.
   async function aoAssinar(nota: Nota) {
+    if (kek === null) {
+      setMensagem({ status: 'erro', texto: t`Sem sessão ativa. Não é possível assinar.` })
+      return
+    }
     try {
-      const { dek } = await openRecord(KEK_FIXTURE, RECORD_FIXTURE, nota.patientId)
+      const { dek } = await openRecord(kek, RECORD_FIXTURE, nota.patientId)
 
       if (ultimaRevisaoGravadaRef.current[nota.id] !== nota.revisao) {
         const sequence = proximaSequenciaRef.current

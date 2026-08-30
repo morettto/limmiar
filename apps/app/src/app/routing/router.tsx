@@ -206,12 +206,19 @@ const copilotSettingsRoute = createRoute({
   component: CopilotKeyPage,
 })
 
+// ponytail: mesma situação, mesmo motivo do `dek={null}` de BibliotecaRouteComponent --
+// sem KeychainProvider/sessão real montada ainda. Quem ligar Keychain/sessão substitui
+// `kek={null}` por uma `CryptoKey` real -- a lógica de NotaPage não muda.
+function NotaRouteComponent() {
+  return <NotaPage kek={null} />
+}
+
 // Ticket S08-01, fatia 2/5: Tela P4.1 (fila de assinatura + editor SOAP). Monta com uma
 // nota em memória -- ver o comentário no topo de pages/notas/NotaPage.tsx.
 const notaRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/notas',
-  component: NotaPage,
+  component: NotaRouteComponent,
 })
 
 // ponytail: mesma situação, mesmo motivo do `kek={null}, accountId=""` de CopilotKeyPage/

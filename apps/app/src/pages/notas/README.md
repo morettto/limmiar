@@ -2,12 +2,13 @@
 
 ## Responsabilidade
 
-Monta a Tela P4.1 (spec S08-01) na rota `/notas` (`app/routing/router.tsx`): compõe
-`widgets/soap-editor/FilaEEditor` com uma fila e uma nota em memória, e é o único lugar
-que sabe ligar `aoAssinar` à gravação real no prontuário e à assinatura de facto
-(`entities/nota`, `entities/patient`). Deixou de ser "fina de mais para ter README" na
-fatia 5, quando `aoAssinar` passou de mexer só em estado local para gravar/assinar a
-sério -- ver o README de `widgets/soap-editor` para o histórico dessa decisão.
+Monta a Tela P4.1 (spec S08-01) na rota `/notas` (`app/routing/router.tsx`, via
+`NotaRouteComponent`): compõe `widgets/soap-editor/FilaEEditor` com uma fila e uma nota
+em memória, e é o único lugar que sabe ligar `aoAssinar` à gravação real no prontuário e
+à assinatura de facto (`entities/nota`, `entities/patient`). Deixou de ser "fina de mais
+para ter README" na fatia 5, quando `aoAssinar` passou de mexer só em estado local para
+gravar/assinar a sério -- ver o README de `widgets/soap-editor` para o histórico dessa
+decisão.
 
 ## Fluxo principal
 
@@ -16,22 +17,35 @@ sério -- ver o README de `widgets/soap-editor` para o histórico dessa decisão
    um backend (fica fora de âmbito, ver `widgets/soap-editor/README.md`).
 2. `⌘↵`/`Ctrl+↵` no editor (via `EditorSoap`/`FilaEEditor`, ver `ehAtalhoAssinar`) chama
    `aoAssinar(nota)`, que segue uma ordem fixa e não inversível:
-   a. `openRecord(kek, record, nota.patientId)` -- desembrulha a DEK do prontuário.
-   b. Se a revisão desta nota ainda não foi gravada (`ultimaRevisaoGravadaRef`), sela
+   a. Guarda cedo: se `kek === null` (o que `NotaRouteComponent` sempre passa hoje, ver
+      "Pontos de entrada"), mostra `role="alert"` com uma mensagem de estado permanente
+      ("Sem sessão ativa. Não é possível assinar.") e retorna **sem** chamar `openRecord`
+      nem nenhuma outra função de cripto/rede -- mesmo padrão estrutural do `dek === null`
+      em `pages/biblioteca/BibliotecaPage.tsx`.
+   b. `openRecord(kek, record, nota.patientId)` -- desembrulha a DEK do prontuário.
+   c. Se a revisão desta nota ainda não foi gravada (`ultimaRevisaoGravadaRef`), sela
       (`sealEntry`) e grava (`appendPatientEntry`) uma entrada de prontuário com
       `notaParaEntrada(nota)`, **antes** de assinar.
-   c. Sela a assinatura (`selarAssinatura`) e chama `assinarNota`.
-   d. Marca **só o item com `nota.id`** (não a fila inteira) como assinado, e anuncia o
+   d. Sela a assinatura (`selarAssinatura`) e chama `assinarNota`.
+   e. Marca **só o item com `nota.id`** (não a fila inteira) como assinado, e anuncia o
       desfecho: sucesso (`role="status"`, data da assinatura), 409 `notes.already_signed`
       (`role="alert"`, mas marca assinada também -- o servidor é a verdade), ou falha de
       rede (`role="alert"`, item continua pendente).
-   e. Foca de volta a listbox da fila, para o `j`/`k` seguinte continuar dali.
+   f. Foca de volta a listbox da fila, para o `j`/`k` seguinte continuar dali.
 3. `onChangeNota`/`aoTocar` continuam simples repasses para estado local / o reprodutor
    real (`features/nota-audio`, fatia 3) -- nenhuma mudança nesta fatia.
 
 ## Pontos de entrada
 
-- `NotaPage()` -- componente React sem props, montado em `/notas`.
+- `NotaPage({ kek }: NotaPageProps)` -- componente React puro. `kek: CryptoKey | null` é
+  prop **obrigatória** (sem default) desde a ronda 1 de correção do S08-07 -- mesmo
+  contrato de `pages/biblioteca/BibliotecaPage`'s `dek: CryptoKey | null`. Testes injetam
+  uma `CryptoKey` real para exercitar o caminho pós-guarda.
+- `NotaRouteComponent()` (`app/routing/router.tsx`) -- monta `<NotaPage kek={null} />` na
+  rota `/notas`; é quem hoje decide o valor de `kek`, enquanto não existir
+  `KeychainProvider`/sessão real (mesmo padrão de `BibliotecaRouteComponent`/`dek={null}`
+  em `pages/biblioteca/README.md`). Ver "Decisões desta fatia (S08-07)" e "ronda 1 de
+  correção" abaixo.
 
 ## Decisões desta fatia (atualizado no ticket S08-06)
 
@@ -49,20 +63,41 @@ sério -- ver o README de `widgets/soap-editor` para o histórico dessa decisão
   `marcarAssinada` por dentro mudou (map sobre array → update de chave num `Record`); os
   três ramos de desfecho (sucesso, 409, falha de rede) continuam exatamente como estavam.
 
-## Decisões desta fatia (S08-01, fatia 5 de 5)
+## Decisões desta fatia (S08-07)
 
-- **`kek`/`record`/`baseUrl`/`accountId`/`accessToken` são fixtures locais, não props.**
+- **O fixture do `kek` deixou de ser `{} as CryptoKey` (um cast que fazia um objeto vazio
+  passar por chave) e passou a `null` honesto, tipado `CryptoKey | null`.** O defeito:
+  `openRecord({} as CryptoKey, ...)` lançava `TypeError` contra um `openRecord` real, e o
+  `catch` genérico mostrava "Falha ao assinar a nota. Tente novamente." -- uma mentira,
+  porque não é falha transitória, é ausência de sessão, permanente até existir
+  `KeychainProvider`. Agora `aoAssinar` guarda cedo sobre `kek === null` e mostra
+  "Sem sessão ativa. Não é possível assinar." em `role="alert"`, **antes** de qualquer
+  chamada a `openRecord`/`sealAssinatura` -- mesma forma estrutural do `dek === null` em
+  `pages/biblioteca/BibliotecaPage.tsx`.
+- **`kek` virou prop de `NotaPage` (na altura, opcional com default `= null`), não ficou
+  só o valor do fixture trocado por dentro.** O ticket S08-07 pedia a solução mais estreita
+  (só o tipo/valor do fixture + a guarda, sem prop) -- mas um `const` de módulo fixo em
+  `null`, sem seam nenhum para o substituir, faz a guarda interceptar **toda** chamada a
+  `aoAssinar`, incluindo dentro dos testes (`vi.mock` dos módulos de cripto/api não alcança
+  um `const` interno do próprio ficheiro sob teste). Isso tornava o resto de `aoAssinar`
+  (`openRecord` → `sealEntry` → `appendPatientEntry` → `assinarNota`, os três desfechos)
+  permanentemente morto e sem cobertura -- quebrando 5 dos 7 testes da fatia 5 e violando o
+  piso de 100% de branch do portão de cobertura. Essa necessidade técnica (seam de teste
+  inexistente + piso de cobertura) justificou a prop opcional na altura -- não foi uma
+  cláusula do ticket a autorizá-la, o ticket só descrevia a solução preferida, mais
+  estreita. A ronda 1 de correção abaixo tornou `kek` **obrigatória**, alinhando com o
+  critério de aceite 2 do ticket.
+- **`record`/`baseUrl`/`accountId`/`accessToken` continuam fixtures locais, não props.**
   Não existe ainda nenhum `KeychainProvider`/sessão real montada em lado nenhum da app
   (mesma situação, mesmo motivo, do `kek={null}, accountId=""` de
   `pages/settings/CopilotKeyPage.tsx`) -- inventar aqui uma forma de os receber via
   query string alargaria esta fatia para construir a wiring de sessão que nenhuma outra
-  página tem, e que a spec S08-01 não pediu. `ponytail:` o comentário no topo de
+  página tem, e que nenhuma spec pediu ainda. `ponytail:` o comentário no topo de
   `NotaPage.tsx` nomeia o teto (as chamadas de rede reais falham com estas credenciais) e
   o caminho de upgrade (substituir os quatro valores quando existir Keychain/sessão --
   a lógica de `aoAssinar` não muda). Consequência prática: contra o `wrangler dev` que o
-  e2e sobe, `aoAssinar` cai sempre no caminho de falha de rede -- `e2e/assinar-nota.spec.ts`
-  prova o percurso de teclado até aí (o mesmo desfecho de rede que
-  `NotaPage.test.tsx` prova com os módulos de crypto/api duplados).
+  e2e sobe, `aoAssinar` cai sempre no caminho de "sem sessão" (antes: falha de rede) --
+  `e2e/assinar-nota.spec.ts` prova o percurso de teclado até aí.
 - **`marcarAssinada` atualiza só a entrada de `notaId`** (desde S08-06, dentro do `Record`
   de `notas` -- ver a decisão no topo deste README; antes da fusão, era um `.map` sobre o
   array `itens`), pagando a dívida `ponytail:` da fatia 3 (que marcava a fila inteira, e só
@@ -95,12 +130,35 @@ sério -- ver o README de `widgets/soap-editor` para o histórico dessa decisão
   `FilaEEditor` → `FilaAssinatura` só para devolver o foco seria mais código para o mesmo
   resultado.
 
+## Correções da cadeia de review (S08-07, ronda 1)
+
+- **`kek` passou de opcional (default `= null`) a obrigatória: `kek: CryptoKey | null`,
+  sem `?`.** Alinha com o critério de aceite 2 do ticket, e com o mesmo padrão já usado por
+  `pages/biblioteca/BibliotecaPage`'s `dek: CryptoKey | null`. Quem decide o valor deixou
+  de ser `NotaPage` (via default) e passou a ser o call site: `router.tsx` cria
+  `NotaRouteComponent`, que monta `<NotaPage kek={null} />` -- mesmo padrão de
+  `BibliotecaRouteComponent`/`dek={null}` (ver `pages/biblioteca/README.md`). A rota
+  `/notas` usa `component: NotaRouteComponent` em vez de `component: NotaPage`
+  diretamente. Comportamento de produção inalterado: `/notas` continua a mostrar "Sem
+  sessão ativa..." pelo mesmo caminho de guarda, só que agora `kek={null}` chega por um
+  argumento explícito do call site em vez de um default escondido dentro de `NotaPage`.
+- **`KEK_FIXTURE` foi removida** -- só existia para ser o default do prop opcional; sem
+  prop opcional, não tem mais chamador.
+- **Correção de atribuição:** a frase "o ticket previa a válvula de escape" que descrevia
+  a decisão acima em `.harness/diff/S08-07.md` não vinha do ticket -- era uma instrução do
+  orquestrador no prompt de despacho do implementador dessa fatia, não texto do ficheiro do
+  ticket. O ticket S08-07 só tinha os três critérios de aceite; a bullet acima ("O ticket
+  S08-07 pedia a solução mais estreita...") já descrevia a razão técnica real (seam de
+  teste inexistente + piso de cobertura de branch) sem citar o ticket como fonte de
+  permissão -- mantida como estava, só reforçada aqui para não repetir o engano no
+  artefacto de diff.
+
 ## Fora de âmbito
 
 - Fila real (múltiplas notas/pacientes vindas de um backend) -- ver
   `widgets/soap-editor/README.md`.
-- Sessão/Keychain real (substituir os quatro valores fixture por props reais) -- ver a
-  decisão acima.
+- Sessão/Keychain real (substituir `record`/`baseUrl`/`accountId`/`accessToken` por props
+  reais, e `router.tsx` a passar uma `kek` não-nula) -- ver as decisões acima.
 - Reabrir uma nota já assinada e mostrar quando foi assinada é fluxo futuro, ainda sem
   nenhuma tela. `obterAssinatura` (`entities/nota/api.ts`) que serviria esse fluxo foi
   apagado no S08-02 por nunca ter tido chamador -- ver `entities/nota/README.md`,
