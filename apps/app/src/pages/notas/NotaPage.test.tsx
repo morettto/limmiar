@@ -117,7 +117,10 @@ describe('NotaPage', () => {
       const propsDepois = props()
       expect(propsDepois.itens.find((item) => item.id === notaId)?.estado).toBe('assinada')
       const status = screen.getByRole('status')
-      expect(status.textContent).toContain(new Date(SIGNED_AT).toLocaleString())
+      // Mesma locale que NotaPage.tsx usa para formatar (`toLocaleString(i18n.locale)`). Sem ela,
+      // o teste formatava na locale por omissão do host e passava só em máquinas pt-BR: no runner
+      // do CI a asserção comparava "8/27/2026, 10:05:00 AM" com "27/08/2026, 10:05:00".
+      expect(status.textContent).toContain(new Date(SIGNED_AT).toLocaleString(i18n.locale))
     })
 
     it('não marca o item de uma nota diferente -- prova que o filtro é por nota.id, não "todos os itens" (dívida da fatia 3)', async () => {
