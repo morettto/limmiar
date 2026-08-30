@@ -141,11 +141,9 @@ describe('router', () => {
 
     const { FilaEEditor } = await import('../../widgets/soap-editor/FilaEEditor')
     const props = vi.mocked(FilaEEditor).mock.calls[0]![0]
-    expect(props.itens).toHaveLength(1)
-    expect(props.itens[0]!.estado).toBe('pendente')
-    const notaId = props.itens[0]!.id
-    expect(props.notas[notaId]).toBeDefined()
-    expect(props.notas[notaId]!.frases.map((frase) => frase.secao)).toEqual(['S', 'O', 'A', 'P'])
+    expect(props.notas).toHaveLength(1)
+    expect(props.notas[0]!.estado).toBe('pendente')
+    expect(props.notas[0]!.frases.map((frase) => frase.secao)).toEqual(['S', 'O', 'A', 'P'])
   })
 
   it('/notas: aoTocar toca a âncora no reprodutor real (fatia 3)', async () => {
@@ -178,15 +176,15 @@ describe('router', () => {
 
     const { FilaEEditor } = await import('../../widgets/soap-editor/FilaEEditor')
     const props = vi.mocked(FilaEEditor).mock.calls[0]![0]
-    const notaId = props.itens[0]!.id
-    const notaEditada = { ...props.notas[notaId]!, revisao: 1 }
+    const notaId = props.notas[0]!.id
+    const notaEditada = { ...props.notas[0]!, revisao: 1 }
 
     await act(async () => {
       props.onChangeNota(notaEditada)
     })
 
     const propsDepois = vi.mocked(FilaEEditor).mock.calls.at(-1)![0]
-    expect(propsDepois.notas[notaId]).toEqual(notaEditada)
+    expect(propsDepois.notas.find((nota) => nota.id === notaId)).toEqual(notaEditada)
   })
 
   // NotaPage ainda não tem sessão/keychain real montada nesta rota (ver o comentário
@@ -206,14 +204,13 @@ describe('router', () => {
 
     const { FilaEEditor } = await import('../../widgets/soap-editor/FilaEEditor')
     const props = vi.mocked(FilaEEditor).mock.calls[0]![0]
-    const notaId = props.itens[0]!.id
 
     await act(async () => {
-      await (props.aoAssinar(props.notas[notaId]!) as unknown as Promise<void>)
+      await (props.aoAssinar(props.notas[0]!) as unknown as Promise<void>)
     })
 
     const propsDepois = vi.mocked(FilaEEditor).mock.calls.at(-1)![0]
-    expect(propsDepois.itens[0]!.estado).toBe('pendente')
+    expect(propsDepois.notas[0]!.estado).toBe('pendente')
     expect(screen.getByRole('alert')).toBeTruthy()
   })
 
@@ -230,7 +227,6 @@ describe('router', () => {
 
     const { BibliotecaPage } = await import('../../pages/biblioteca/BibliotecaPage')
     const props = vi.mocked(BibliotecaPage).mock.calls[0]![0]
-    expect(props.itens).toEqual([])
     expect(props.notas).toEqual([])
     expect(props.accountId).toBe('')
     expect(props.dek).toBeNull()

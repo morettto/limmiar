@@ -216,14 +216,14 @@ const notaRoute = createRoute({
 
 // ponytail: mesma situação, mesmo motivo do `kek={null}, accountId=""` de CopilotKeyPage/
 // NotaPage -- sem KeychainProvider/sessão real montada ainda. `dek={null}` faz
-// BibliotecaPage ficar em `a-preparar` sem tentar abrir OPFS nenhuma; `itens`/`notas`
-// vazios e `store` que nunca acha nada persistido são o equivalente, para esta rota, do
-// prontuário fixture de NotaPage. Quem ligar Keychain/sessão substitui os cinco valores por
-// props reais -- a lógica de BibliotecaPage não muda.
+// BibliotecaPage ficar em `a-preparar` sem tentar abrir OPFS nenhuma; `notas` vazias e
+// `store` que nunca acha nada persistido são o equivalente, para esta rota, do prontuário
+// fixture de NotaPage. Quem ligar Keychain/sessão substitui os quatro valores por props
+// reais -- a lógica de BibliotecaPage não muda.
 const BIBLIOTECA_STORE_FIXTURE = { ler: async () => null, gravar: async () => {} }
 
 function BibliotecaRouteComponent() {
-  return <BibliotecaPage itens={[]} notas={[]} accountId="" dek={null} store={BIBLIOTECA_STORE_FIXTURE} />
+  return <BibliotecaPage notas={[]} accountId="" dek={null} store={BIBLIOTECA_STORE_FIXTURE} />
 }
 
 // Ticket S08-02, fatias 4-5: biblioteca de notas com busca cifrada no cliente. Rota normal

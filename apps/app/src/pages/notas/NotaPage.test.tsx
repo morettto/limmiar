@@ -35,13 +35,26 @@ async function renderEObterProps() {
   renderNotaPage()
   const { FilaEEditor } = await import('../../widgets/soap-editor/FilaEEditor')
   const props = () => vi.mocked(FilaEEditor).mock.calls.at(-1)![0]
-  const notaId = props().itens[0]!.id
+  const notaId = props().notas[0]!.id
   return { props, notaId }
 }
 
-async function assinar(props: () => { notas: Record<string, import('../../entities/nota/nota').Nota>; aoAssinar: (nota: import('../../entities/nota/nota').Nota) => void }, notaId: string) {
+function notaPorId(
+  props: () => { notas: readonly import('../../entities/nota/nota').Nota[] },
+  notaId: string,
+): import('../../entities/nota/nota').Nota {
+  return props().notas.find((nota) => nota.id === notaId)!
+}
+
+async function assinar(
+  props: () => {
+    notas: readonly import('../../entities/nota/nota').Nota[]
+    aoAssinar: (nota: import('../../entities/nota/nota').Nota) => void
+  },
+  notaId: string,
+) {
   await act(async () => {
-    await (props().aoAssinar(props().notas[notaId]!) as unknown as Promise<void>)
+    await (props().aoAssinar(notaPorId(props, notaId)) as unknown as Promise<void>)
   })
 }
 
@@ -115,25 +128,25 @@ describe('NotaPage', () => {
       await assinar(props, notaId)
 
       const propsDepois = props()
-      expect(propsDepois.itens.find((item) => item.id === notaId)?.estado).toBe('assinada')
+      expect(propsDepois.notas.find((nota) => nota.id === notaId)?.estado).toBe('assinada')
       const status = screen.getByRole('status')
       expect(status.textContent).toContain(new Date(SIGNED_AT).toLocaleString())
     })
 
     it('não marca o item de uma nota diferente -- prova que o filtro é por nota.id, não "todos os itens" (dívida da fatia 3)', async () => {
       const { props, notaId } = await renderEObterProps()
-      const notaDeOutraId = { ...props().notas[notaId]!, id: 'outra-nota-id' }
+      const notaDeOutraId = { ...notaPorId(props, notaId), id: 'outra-nota-id' }
 
       await act(async () => {
         await (props().aoAssinar(notaDeOutraId) as unknown as Promise<void>)
       })
-      expect(props().itens.find((item) => item.id === notaId)?.estado).toBe('pendente')
+      expect(props().notas.find((nota) => nota.id === notaId)?.estado).toBe('pendente')
 
       // Sem este segundo assinar, a asserção acima passa mesmo com aoAssinar em no-op --
       // não prova o filtro por nota.id, só que nada aconteceu. Assinar a nota real a
       // seguir é que constrange: só marca 'assinada' quem tem o id certo.
       await assinar(props, notaId)
-      expect(props().itens.find((item) => item.id === notaId)?.estado).toBe('assinada')
+      expect(props().notas.find((nota) => nota.id === notaId)?.estado).toBe('assinada')
     })
 
     it('409 notes.already_signed marca o item assinado e mostra role=alert', async () => {
@@ -144,7 +157,7 @@ describe('NotaPage', () => {
       await assinar(props, notaId)
 
       const propsDepois = props()
-      expect(propsDepois.itens.find((item) => item.id === notaId)?.estado).toBe('assinada')
+      expect(propsDepois.notas.find((nota) => nota.id === notaId)?.estado).toBe('assinada')
       expect(screen.getByRole('alert')).toBeTruthy()
     })
 
@@ -156,7 +169,7 @@ describe('NotaPage', () => {
       await assinar(props, notaId)
 
       const propsDepois = props()
-      expect(propsDepois.itens.find((item) => item.id === notaId)?.estado).toBe('pendente')
+      expect(propsDepois.notas.find((nota) => nota.id === notaId)?.estado).toBe('pendente')
       expect(screen.getByRole('alert')).toBeTruthy()
     })
 
@@ -174,7 +187,7 @@ describe('NotaPage', () => {
 
       expect(vi.mocked(assinarNota)).not.toHaveBeenCalled()
       const propsDepois = props()
-      expect(propsDepois.itens.find((item) => item.id === notaId)?.estado).toBe('pendente')
+      expect(propsDepois.notas.find((nota) => nota.id === notaId)?.estado).toBe('pendente')
       expect(screen.getByRole('alert')).toBeTruthy()
     })
 

@@ -10,11 +10,22 @@ export interface FraseNota {
   readonly ancoras: readonly Ancora[]
 }
 
+export type EstadoNota = 'pendente' | 'assinada'
+
+// Constantes (não literais inline): lingui/no-unlocalized-strings varre todo `.tsx` à
+// procura de texto visível não traduzido; um `const` SCREAMING_SNAKE_CASE já está isento
+// por convenção deste repo (ver eslint.config.mjs) -- mais barato do que alargar a lista de
+// ignoreNames para um par de valores tão locais a este módulo. Movidas para aqui (fatia
+// S08-06) porque `estado` passou a viver em `Nota`, não só em `ItemFila`/FilaAssinatura.
+export const ESTADO_PENDENTE: EstadoNota = 'pendente'
+export const ESTADO_ASSINADA: EstadoNota = 'assinada'
+
 export interface Nota {
   readonly id: string
   readonly patientId: string
   readonly revisao: number
   readonly frases: readonly FraseNota[]
+  readonly estado: EstadoNota
 }
 
 // Exportada (fatia 2, S08-01): EditorSoap.tsx/NotaPage.tsx reusam esta mesma ordem em vez
@@ -37,7 +48,7 @@ export function rascunhoParaNota(
       ancoras: afirmacao.ancoras,
     })),
   )
-  return { id, patientId, revisao: 0, frases }
+  return { id, patientId, revisao: 0, frases, estado: ESTADO_PENDENTE }
 }
 
 // fraseId inexistente lança em vez de devolver a nota inalterada: um id que já não bate

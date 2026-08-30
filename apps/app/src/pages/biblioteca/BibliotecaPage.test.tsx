@@ -3,7 +3,6 @@ import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import { I18nProvider } from '@lingui/react'
 import { webcrypto as limmiarWebcrypto, type CryptoKey } from '@limmiar/crypto'
 import { dynamicActivate, i18n } from '../../shared/i18n'
-import type { ItemFila } from '../../features/nota-fila/FilaAssinatura'
 import type { Nota } from '../../entities/nota/nota'
 import { construirIndice, notaParaDoc, serializarIndice } from '../../features/nota-biblioteca/indice'
 import { selarIndice } from '../../features/nota-biblioteca/indice-crypto'
@@ -31,14 +30,13 @@ function deferred<T>() {
   return { promise, resolve, reject }
 }
 
-const ITENS: readonly ItemFila[] = [{ id: 'nota-1', patientId: 'paciente-1', estado: 'pendente' }]
-
 function nota(): Nota {
   return {
     id: 'nota-1',
     patientId: 'paciente-1',
     revisao: 0,
     frases: [{ id: 'S-0', secao: 'S', texto: 'termo-supersecreto-xyz', ancoras: [] }],
+    estado: 'pendente',
   }
 }
 
@@ -49,7 +47,6 @@ async function renderEObterProps(overrides: Partial<BibliotecaPageProps> = {}) {
   const utils = render(
     <I18nProvider i18n={i18n}>
       <BibliotecaPage
-        itens={overrides.itens ?? ITENS}
         notas={overrides.notas ?? [nota()]}
         accountId={overrides.accountId ?? ACCOUNT_ID}
         dek={dek}

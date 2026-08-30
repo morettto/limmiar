@@ -30,7 +30,7 @@ página já calculou.
 3. `termo` é estado local (`useState`), controlado pelo campo de busca via
    `onTermoChange={setTermo}` que o widget recebe.
 4. Cada render passa `resultado={buscar(indice, termo)}` e
-   `grupos={agruparPorPaciente(itens)}` ao widget -- os dois lados puros de
+   `grupos={agruparPorPaciente(notas)}` ao widget -- os dois lados puros de
    `features/nota-biblioteca` que esta página conecta.
 5. **Critério de aceite 1**: nenhum termo digitado sai por rede em canal nenhum. A busca
    (`buscar`) é inteiramente local (MiniSearch em memória); `persistirIndice`/
@@ -45,10 +45,13 @@ página já calculou.
 
 ## Pontos de entrada
 
-- `BibliotecaPage({ itens, notas, accountId, dek, store })` -- componente React. `itens`
-  é a fila de assinatura (`ItemFila[]`, `features/nota-fila`); `notas` são as notas
-  completas de onde o índice é construído; `store` é `{ ler: LerSelado; gravar:
-  GravarSelado }` (tipicamente `opfsIndice(dir)`, `features/nota-biblioteca/indice-store.ts`).
+- `BibliotecaPage({ notas, accountId, dek, store })` -- componente React. `notas`
+  (`readonly Nota[]`, `entities/nota/nota`) é a fila de assinatura inteira -- a mesma
+  coleção alimenta tanto `agruparPorPaciente` quanto a construção do índice de busca;
+  `store` é `{ ler: LerSelado; gravar: GravarSelado }` (tipicamente `opfsIndice(dir)`,
+  `features/nota-biblioteca/indice-store.ts`). Até ao ticket S08-06, `itens` (`ItemFila[]`)
+  e `notas` eram duas props/coleções separadas casadas à mão por `id` -- fundidas numa só
+  (ver `[[S08-06 Fundir ItemFila em Nota e eliminar as listas paralelas]]`).
   **`store` (e `notas`) têm de chegar estáveis por identidade entre renders** -- os dois
   estão na dependency array do `useEffect` que chama `restaurarIndice`/`persistirIndice`;
   um chamador que passe `store={opfsIndice(dir)}` inline recria o objeto a cada render do
@@ -61,11 +64,11 @@ página já calculou.
 
 ## Decisões desta fatia
 
-- **`itens`/`notas`/`accountId`/`dek`/`store` são todos props, sem fixture interna.**
+- **`notas`/`accountId`/`dek`/`store` são todos props, sem fixture interna.**
   Ao contrário de `NotaPage` (que guarda fixtures fixas dentro do próprio componente),
   a forma acordada no portão deste ticket exige que `BibliotecaPage` receba tudo por
   parâmetro -- é o container "fino" que a instrução de página deste harness pede. As
-  fixtures (`dek={null}`, `store` que nunca acha nada, `itens`/`notas` vazios) vivem em
+  fixtures (`dek={null}`, `store` que nunca acha nada, `notas` vazias) vivem em
   `BibliotecaRouteComponent`, no router -- mesmo padrão, mesmo motivo do
   `kek={null}, accountId=""` de `CopilotKeyPage`, só que um nível acima (na composição da
   rota, não dentro da página).

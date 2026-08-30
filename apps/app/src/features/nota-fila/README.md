@@ -4,8 +4,9 @@
 
 Fila de assinatura da Tela P4.1 (spec S08, fatia 2 de 5): abas de estado (pendente/assinada)
 sobre uma lista de notas, com uma listbox acessível e navegável só por teclado (`j`/`k`,
-Enter). Sem backend: recebe os itens já prontos (`ItemFila[]`) por prop -- buscá-los de um
-servidor é a fatia 4. Sem áudio, sem edição de nota: isso é `features/nota-editor`.
+Enter). Sem backend: recebe os itens já prontos (`Nota[]`, com o seu campo `estado`) por
+prop -- buscá-los de um servidor é a fatia 4. Sem áudio, sem edição de nota: isso é
+`features/nota-editor`.
 
 ## Fluxo principal
 
@@ -34,10 +35,11 @@ servidor é a fatia 4. Sem áudio, sem edição de nota: isso é `features/nota-
 
 ## Pontos de entrada
 
-- `FilaAssinatura` (`FilaAssinatura.tsx`) -- componente React, props `itens`,
-  `selecionadoId`, `onSelecionar`.
-- Tipos `EstadoNotaFila`, `ItemFila` (`FilaAssinatura.tsx`); constantes `ESTADO_PENDENTE`,
-  `ESTADO_ASSINADA` -- ver Decisões para o porquê de existirem em vez de literais inline.
+- `FilaAssinatura` (`FilaAssinatura.tsx`) -- componente React, props `itens: readonly
+  Nota[]`, `selecionadoId`, `onSelecionar`.
+- `EstadoNota`, `ESTADO_PENDENTE`, `ESTADO_ASSINADA` vivem em `entities/nota/nota.ts` desde
+  o ticket S08-06 (fundir `ItemFila` em `Nota`) -- este módulo importa-os de lá, não os
+  redeclara. Ver `entities/nota/README.md`, "Decisões da fatia S08-06".
 - `proximoIndice(indice, total, tecla)`, `ehAtalhoAssinar(e)` (`navegacao-teclado.ts`) --
   seam puro, sem React, sem browser. `ehAtalhoAssinar` também é consumido por
   `features/nota-editor/EditorSoap.tsx` (import lateral entre features do mesmo nível,
@@ -77,7 +79,8 @@ servidor é a fatia 4. Sem áudio, sem edição de nota: isso é `features/nota-
   esse teclado tivesse uma tecla Meta (na prática, nunca acontece por acidente).
 - **`ESTADO_PENDENTE`/`ESTADO_ASSINADA` são `const` exportadas, não literais inline.**
   Mesma justificação (`lingui/no-unlocalized-strings`, convenção `SCREAMING_SNAKE_CASE`
-  isenta) de `ORDEM_SECOES` -- ver README de `entities/nota` (dono do padrão).
+  isenta) de `ORDEM_SECOES` -- ver README de `entities/nota` (dono do padrão e, desde
+  S08-06, dono também destas duas constantes).
 
 ## Fora de âmbito (fatias seguintes da spec S08)
 

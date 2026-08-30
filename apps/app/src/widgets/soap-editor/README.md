@@ -11,10 +11,10 @@ uma da outra.
 
 ## Fluxo principal
 
-1. `FilaEEditor` recebe `itens` (a fila inteira), `notas` (mapa `id -> Nota`, chave =
-   `ItemFila.id`), `onChangeNota`, `aoTocar` e `aoAssinar`.
-2. Guarda em estado só `selecionadoId` (por omissão, o primeiro item de `itens`, se
-   existir). `notaSelecionada = notas[selecionadoId]`.
+1. `FilaEEditor` recebe `notas: readonly Nota[]` (a fila inteira, todas as abas, cada
+   `Nota` já com o seu `estado`), `onChangeNota`, `aoTocar` e `aoAssinar`.
+2. Guarda em estado só `selecionadoId` (por omissão, o primeiro item de `notas`, se
+   existir). `notaSelecionada = notas.find((nota) => nota.id === selecionadoId)`.
 3. `AdaptivePanel` recebe `FilaAssinatura` como filho -- em D é uma coluna fixa sempre
    visível; em T/M fica atrás de uma gaveta/faixa fechada por omissão (ver
    `packages/ui/src/AdaptivePanel.tsx`). `FilaAssinatura.onSelecionar` liga direto a
@@ -28,7 +28,7 @@ uma da outra.
 
 ## Pontos de entrada
 
-- `FilaEEditor` (`FilaEEditor.tsx`) -- componente React, props `itens`, `notas`,
+- `FilaEEditor` (`FilaEEditor.tsx`) -- componente React, props `notas: readonly Nota[]`,
   `onChangeNota`, `aoTocar`, `aoAssinar`.
 - Consumido por `pages/notas/NotaPage.tsx` (rota `/notas`, ver
   `app/routing/router.tsx`) -- ponto de entrada de produto para este widget, fora dele
@@ -46,10 +46,20 @@ uma da outra.
   alguma prop de posição do `AdaptivePanel` -- o primitivo é agnóstico a que lado do
   layout ocupa; quem o usa decide isso pela ordem em que o monta.
 
+## Decisões desta fatia (atualizado no ticket S08-06)
+
+- **Uma prop só, `notas: readonly Nota[]`, em vez de `itens`+`notas: Record<string, Nota>`.**
+  As duas coleções paralelas (`ItemFila[]` e `Record<string, Nota>`, casadas à mão por
+  `id`) eram a mesma entidade partida em duas, com `undefined` como resultado legítimo de
+  um id presente numa e ausente na outra -- ver
+  `[[S08-06 Fundir ItemFila em Nota e eliminar as listas paralelas]]`. `notaSelecionada`
+  passou de lookup por `Record` (`notas[selecionadoId]`) para
+  `notas.find((nota) => nota.id === selecionadoId)` -- mesmo resultado, uma coleção só.
+
 ## Fora de âmbito (fatias seguintes da spec S08)
 
-- `notas`/`itens` reais vindos de um backend (fila com múltiplas notas/pacientes) --
-  continuam sempre injetados pelo chamador. `pages/notas/NotaPage.tsx` continua a montar
+- `notas` reais vindas de um backend (fila com múltiplas notas/pacientes) --
+  continuam sempre injetadas pelo chamador. `pages/notas/NotaPage.tsx` continua a montar
   com uma única nota fixa em memória só para a rota `/notas` existir de facto (não um
   componente construído e nunca ligado) -- ver o README desse módulo para o que já é real
   (assinatura) e o que continua fixture (a própria fila/nota, a sessão/Keychain).

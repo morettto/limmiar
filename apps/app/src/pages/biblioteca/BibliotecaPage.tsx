@@ -3,7 +3,6 @@ import { useLingui } from '@lingui/react/macro'
 import type { CryptoKey } from '@limmiar/crypto'
 import type MiniSearch from 'minisearch'
 import type { Nota } from '../../entities/nota/nota'
-import type { ItemFila } from '../../features/nota-fila/FilaAssinatura'
 import { agruparPorPaciente } from '../../features/nota-biblioteca/biblioteca'
 import { buscar, construirIndice, notaParaDoc, type DocNota } from '../../features/nota-biblioteca/indice'
 import {
@@ -15,7 +14,6 @@ import {
 import { BibliotecaNotas } from '../../widgets/biblioteca/BibliotecaNotas'
 
 export interface BibliotecaPageProps {
-  itens: readonly ItemFila[]
   notas: readonly Nota[]
   accountId: string
   dek: CryptoKey | null
@@ -31,7 +29,7 @@ export interface BibliotecaPageProps {
  * `persistirIndice`/`restaurarIndice` só tocam OPFS via `store` -- nenhum termo digitado
  * aqui chega a `fetch` (critério de aceite 1 do ticket).
  */
-export function BibliotecaPage({ itens, notas, accountId, dek, store }: BibliotecaPageProps) {
+export function BibliotecaPage({ notas, accountId, dek, store }: BibliotecaPageProps) {
   const { t } = useLingui()
   const [indice, setIndice] = useState<MiniSearch<DocNota> | null>(null)
   const [termo, setTermo] = useState('')
@@ -83,7 +81,7 @@ export function BibliotecaPage({ itens, notas, accountId, dek, store }: Bibliote
 
   return (
     <BibliotecaNotas
-      grupos={agruparPorPaciente(itens)}
+      grupos={agruparPorPaciente(notas)}
       termo={termo}
       onTermoChange={setTermo}
       resultado={buscar(indice, termo)}

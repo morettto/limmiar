@@ -33,6 +33,22 @@ sério -- ver o README de `widgets/soap-editor` para o histórico dessa decisão
 
 - `NotaPage()` -- componente React sem props, montado em `/notas`.
 
+## Decisões desta fatia (atualizado no ticket S08-06)
+
+- **`itens` (`ItemFila[]`) e `notas` (`Record<string, Nota>`) fundiram-se num único
+  `useState<Record<string, Nota>>`, com `estado` a viver em `Nota`.** Eram duas
+  coleções paralelas do mesmo `id`, mantidas em sincronia à mão por `marcarAssinada` (metade
+  `itens`) e `onChangeNota` (metade `notas`) -- ver
+  `[[S08-06 Fundir ItemFila em Nota e eliminar as listas paralelas]]` para o defeito
+  completo. `notaFixture()` agora inclui `estado: ESTADO_PENDENTE`; `marcarAssinada(notaId)`
+  atualiza só a `estado` da entrada certa dentro do `Record` (guarda: se `notaId` não é uma
+  chave existente, não cria uma entrada nova) -- `onChangeNota` já mexia no mesmo `Record`,
+  sem alteração. `<FilaEEditor>` passa a receber `notas={Object.values(notas)}` numa prop
+  só, em vez de `itens`+`notas` separados.
+- **A lógica de `aoAssinar` (ordem, guardas, mensagens) não mudou.** Só a forma de
+  `marcarAssinada` por dentro mudou (map sobre array → update de chave num `Record`); os
+  três ramos de desfecho (sucesso, 409, falha de rede) continuam exatamente como estavam.
+
 ## Decisões desta fatia (S08-01, fatia 5 de 5)
 
 - **`kek`/`record`/`baseUrl`/`accountId`/`accessToken` são fixtures locais, não props.**
@@ -47,12 +63,13 @@ sério -- ver o README de `widgets/soap-editor` para o histórico dessa decisão
   e2e sobe, `aoAssinar` cai sempre no caminho de falha de rede -- `e2e/assinar-nota.spec.ts`
   prova o percurso de teclado até aí (o mesmo desfecho de rede que
   `NotaPage.test.tsx` prova com os módulos de crypto/api duplados).
-- **`marcarAssinada` filtra por `nota.id`** (`atuais.map(item => item.id === notaId ? ... : item)`),
-  pagando a dívida `ponytail:` da fatia 3 (que marcava a fila inteira, e só funcionava
-  porque a fixture tinha um único item). Com um único item ainda hoje, o ramo "outro item
-  passa incólume" só é exercitável chamando `aoAssinar` com uma nota de id diferente do
-  item existente -- é exatamente o que `NotaPage.test.tsx` faz para manter 100% de branch
-  sem inventar uma segunda fila.
+- **`marcarAssinada` atualiza só a entrada de `notaId`** (desde S08-06, dentro do `Record`
+  de `notas` -- ver a decisão no topo deste README; antes da fusão, era um `.map` sobre o
+  array `itens`), pagando a dívida `ponytail:` da fatia 3 (que marcava a fila inteira, e só
+  funcionava porque a fixture tinha um único item). Com um único item ainda hoje, o ramo
+  "outra nota passa incólume" só é exercitável chamando `aoAssinar` com uma nota de id
+  diferente da existente -- é exatamente o que `NotaPage.test.tsx` faz para manter 100% de
+  branch sem inventar uma segunda fila.
 - **Ordem que não inverte: grava no prontuário antes de assinar.** Falhar a assinatura
   depois de gravar deixa uma revisão por assinar no prontuário -- recuperável, um novo
   `⌘↵` assina a mesma revisão de novo. O inverso (assinar antes de gravar) deixaria, numa

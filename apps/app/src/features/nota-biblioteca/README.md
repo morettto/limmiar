@@ -13,8 +13,8 @@ ver os READMEs dos dois para o fluxo de composição.
 
 ## Fluxo principal
 
-1. `agruparPorPaciente(itens: readonly ItemFila[])` (`biblioteca.ts`) -- agrupa os itens da
-   fila de assinatura (`features/nota-fila/FilaAssinatura.tsx`) por `patientId`. Grupos
+1. `agruparPorPaciente(itens: readonly Nota[])` (`biblioteca.ts`) -- agrupa os itens da
+   fila de assinatura (`Nota[]`, cada uma já com o seu `estado`) por `patientId`. Grupos
    saem na ordem da primeira ocorrência de cada `patientId` em `itens` (`Map` preserva
    ordem de inserção); dentro de cada grupo, os itens com `estado === ESTADO_PENDENTE`
    (rascunho) vêm primeiro, e a ordem relativa dentro de cada partição (rascunhos entre si,
@@ -45,7 +45,9 @@ ver os READMEs dos dois para o fluxo de composição.
 
 ## Pontos de entrada
 
-- `agruparPorPaciente(itens: readonly ItemFila[]): GrupoPaciente[]` (`biblioteca.ts`).
+- `agruparPorPaciente(itens: readonly Nota[]): GrupoPaciente[]` (`biblioteca.ts`); `Nota`
+  vem de `entities/nota/nota.ts` (desde o ticket S08-06, `agruparPorPaciente` recebe
+  `Nota[]` em vez de `ItemFila[]` -- `GrupoPaciente.itens` mantém o nome, muda o tipo).
 - `DocNota`, `OPCOES_INDICE`, `notaParaDoc(nota: Nota): DocNota`,
   `construirIndice(docs: readonly DocNota[]): MiniSearch<DocNota>`,
   `serializarIndice(indice): Uint8Array<ArrayBuffer>`, `carregarIndice(json): MiniSearch<DocNota>`,
