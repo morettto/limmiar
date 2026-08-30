@@ -137,7 +137,7 @@ msgstr "Como você vai usar o Limmiar?"
 msgid "Concluindo o pareamento..."
 msgstr "Concluindo o pareamento..."
 
-#: src/app/routing/router.tsx:32
+#: src/app/routing/router.tsx:35
 msgid "Configurar copiloto de IA"
 msgstr "Configurar copiloto de IA"
 

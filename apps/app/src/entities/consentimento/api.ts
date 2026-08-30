@@ -2,7 +2,17 @@ import { request, type ProblemResult } from '../../shared/api'
 
 export type Finalidade = 'gravacao' | 'analiseIa'
 export type Decisao = 'concedido' | 'revogado'
-export type EstadoConsentimento = 'pendente' | 'concedido' | 'revogado'
+// Fonte unica do union. O array `as const` e o tipo derivado dele evitam a lista escrita duas
+// vezes -- quem acrescentar uma variante aqui muda tipo e parser na mesma linha.
+export const ESTADOS_CONSENTIMENTO = ['pendente', 'concedido', 'revogado'] as const
+export type EstadoConsentimento = (typeof ESTADOS_CONSENTIMENTO)[number]
+
+// Fronteira de confianca: entrada nao confiavel (query string do andaime e2e, corpo de resposta).
+// Qualquer valor fora do union -- incluindo ausente -- cai no estado mais restritivo, o mesmo
+// default que o servidor usa sem eventos (Api.Consent.ConsentState.Fold).
+export function parseEstadoConsentimento(value: unknown): EstadoConsentimento {
+  return ESTADOS_CONSENTIMENTO.includes(value as EstadoConsentimento) ? (value as EstadoConsentimento) : 'pendente'
+}
 
 export interface ConsentimentosDoPaciente {
   gravacao: EstadoConsentimento

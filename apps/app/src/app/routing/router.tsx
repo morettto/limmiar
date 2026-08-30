@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { createRootRoute, createRoute, createRouter, Link } from '@tanstack/react-router'
 import { Trans } from '@lingui/react/macro'
 import { AuthPage } from '../../pages/auth/AuthPage'
@@ -9,27 +8,14 @@ import { PairPrimaryPage } from '../../pages/device-pairing/PairPrimaryPage'
 import { PairNewPage } from '../../pages/device-pairing/PairNewPage'
 import { CopilotKeyPage } from '../../pages/settings/CopilotKeyPage'
 import { NotaPage } from '../../pages/notas/NotaPage'
-import { abrirMicrofone, type AbrirMicrofoneResult } from '../../features/live-session/microfone'
-import type { EstadoConsentimento } from '../../entities/consentimento/api'
+import { parseEstadoConsentimento, type EstadoConsentimento } from '../../entities/consentimento/api'
+import { E2eMicrofoneScaffold } from './E2eMicrofoneScaffold'
 
 function readSearchString(search: Record<string, unknown>, key: string): string {
   const value = search[key]
   return typeof value === 'string' ? value : ''
 }
 
-// `satisfies Record<EstadoConsentimento, 0>`: acrescentar uma variante ao union sem a listar aqui
-// deixa de compilar, em vez de a fazer cair em silêncio no default 'pendente'.
-const ESTADOS_CONSENTIMENTO: ReadonlySet<string> = new Set(
-  Object.keys({ pendente: 0, concedido: 0, revogado: 0 } satisfies Record<EstadoConsentimento, 0>),
-)
-
-// Fronteira de confiança: a query string é entrada não confiável (S10-02 fatia 6, andaime
-// e2e). Qualquer valor fora do enum -- incluindo ausente -- cai no estado mais restritivo
-// ('pendente'), o mesmo default que o servidor usa sem eventos (Api.Consent.ConsentState.Fold).
-function readEstadoConsentimento(search: Record<string, unknown>, key: string): EstadoConsentimento {
-  const value = search[key]
-  return typeof value === 'string' && ESTADOS_CONSENTIMENTO.has(value) ? (value as EstadoConsentimento) : 'pendente'
-}
 
 // The root route's own component is deliberately left unset: TanStack Router's default
 // root component already renders an <Outlet/> for whichever child route matched, which is
@@ -219,28 +205,14 @@ const e2eMicrofoneRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/e2e/microfone',
   validateSearch: (search: Record<string, unknown>): E2eMicrofoneSearch => ({
-    consentimento: readEstadoConsentimento(search, 'consentimento'),
+    consentimento: parseEstadoConsentimento(search.consentimento),
   }),
   component: E2eMicrofoneRouteComponent,
 })
 
 function E2eMicrofoneRouteComponent() {
   const { consentimento } = e2eMicrofoneRoute.useSearch()
-  const [resultado, setResultado] = useState<AbrirMicrofoneResult | null>(null)
-
-  async function abrir() {
-    setResultado(await abrirMicrofone(consentimento))
-  }
-
-  return (
-    <div>
-      <button type="button" onClick={() => void abrir()}>
-        Gravar
-      </button>
-      {resultado !== null && resultado.ok && <p role="status">microfone aberto</p>}
-      {resultado !== null && !resultado.ok && <p role="alert">{resultado.motivo}</p>}
-    </div>
-  )
+  return <E2eMicrofoneScaffold consentimento={consentimento} />
 }
 
 // All of these routes are E2E-only scaffolding (see the file-level doc comment above) and
