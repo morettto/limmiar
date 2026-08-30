@@ -72,17 +72,40 @@ describe('BibliotecaPage', () => {
     vi.unstubAllGlobals()
   })
 
-  it('critério de aceite 1: o termo buscado nunca aparece em nenhuma chamada de fetch', async () => {
+  it('critério de aceite 1: o termo buscado nunca sai por nenhum canal de rede', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response('{}'))
+    const sendBeaconMock = vi.fn().mockReturnValue(true)
+    const xhrOpenMock = vi.spyOn(XMLHttpRequest.prototype, 'open').mockImplementation(() => {})
+    const wsMock = vi.fn()
+    const imgSrcMock = vi.spyOn(HTMLImageElement.prototype, 'src', 'set').mockImplementation(() => {})
     vi.stubGlobal('fetch', fetchMock)
-    const { props } = await renderEObterProps()
-    await waitFor(() => expect(props().resultado.estado).not.toBe('a-preparar'))
+    vi.stubGlobal('WebSocket', wsMock)
+    // jsdom não define `navigator.sendBeacon` -- stub direto em vez de `vi.spyOn`,
+    // e desfeito no fim do teste para não vazar para os seguintes.
+    const sendBeaconOriginal = navigator.sendBeacon
+    navigator.sendBeacon = sendBeaconMock
 
-    const termo = 'termo-supersecreto-xyz'
-    act(() => props().onTermoChange(termo))
+    try {
+      const { props } = await renderEObterProps()
+      await waitFor(() => expect(props().resultado.estado).not.toBe('a-preparar'))
 
-    const chamadas = JSON.stringify(fetchMock.mock.calls)
-    expect(chamadas).not.toContain(termo)
+      const termo = 'termo-supersecreto-xyz'
+      act(() => props().onTermoChange(termo))
+      await Promise.resolve()
+
+      // Prova positiva de zero saída de rede: cada canal foi espiado e nenhum foi
+      // sequer chamado -- não basta "o termo não aparece na chamada" quando pode
+      // não haver chamada nenhuma (índice de busca é local, ver README do módulo).
+      expect(fetchMock).not.toHaveBeenCalled()
+      expect(sendBeaconMock).not.toHaveBeenCalled()
+      expect(xhrOpenMock).not.toHaveBeenCalled()
+      expect(wsMock).not.toHaveBeenCalled()
+      expect(imgSrcMock).not.toHaveBeenCalled()
+    } finally {
+      navigator.sendBeacon = sendBeaconOriginal
+      xhrOpenMock.mockRestore()
+      imgSrcMock.mockRestore()
+    }
   })
 
   it('store vazio (ler devolve null): constrói o índice a partir de notas e grava exatamente uma vez', async () => {

@@ -32,10 +32,16 @@ página já calculou.
 4. Cada render passa `resultado={buscar(indice, termo)}` e
    `grupos={agruparPorPaciente(itens)}` ao widget -- os dois lados puros de
    `features/nota-biblioteca` que esta página conecta.
-5. **Critério de aceite 1**: nenhum termo digitado chega a `fetch`. A busca (`buscar`) é
-   inteiramente local (MiniSearch em memória); `persistirIndice`/`restaurarIndice` só
-   tocam OPFS via `store` (injetado, tipicamente `opfsIndice(dir)`) -- nada nesta página
-   faz uma requisição de rede para buscar.
+5. **Critério de aceite 1**: nenhum termo digitado sai por rede em canal nenhum. A busca
+   (`buscar`) é inteiramente local (MiniSearch em memória); `persistirIndice`/
+   `restaurarIndice` só tocam OPFS via `store` (injetado, tipicamente `opfsIndice(dir)`) --
+   nada nesta página faz uma requisição de rede para buscar. O teste (`BibliotecaPage.test.tsx`,
+   S08-05) espia `fetch`, `navigator.sendBeacon`, `XMLHttpRequest.prototype.open`,
+   `WebSocket` e o setter `HTMLImageElement.prototype.src`, e afirma zero chamadas em
+   cada um após `onTermoChange` -- prova positiva ("nenhum canal chamado"), não "o termo
+   não aparece na string serializada de uma lista de chamadas que pode estar vazia".
+   Confirmado por mutação: injetar `fetch(...)` no handler de `onTermoChange` faz o teste
+   falhar; sem a mutação, passa.
 
 ## Pontos de entrada
 
