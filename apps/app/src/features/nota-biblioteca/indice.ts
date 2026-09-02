@@ -1,4 +1,4 @@
-import MiniSearch, { type Options } from 'minisearch'
+import MiniSearch, { type AsPlainObject, type Options } from 'minisearch'
 import type { Nota } from '../../entities/nota/nota'
 
 export interface DocNota {
@@ -22,18 +22,34 @@ export function notaParaDoc(nota: Nota): DocNota {
   }
 }
 
+/** `id:revisao` de cada nota, ordenados -- a ordem de `notas` não pode mudar a impressão.
+ *  Valor vive dentro do blob selado (envelope de `serializarIndice`); nunca sai daí. */
+export function impressaoDigital(notas: readonly Nota[]): string {
+  return notas
+    .map((nota) => `${nota.id}:${nota.revisao}`)
+    .sort()
+    .join('|')
+}
+
 export function construirIndice(docs: readonly DocNota[]): MiniSearch<DocNota> {
   const indice = new MiniSearch<DocNota>(OPCOES_INDICE)
   indice.addAll(docs)
   return indice
 }
 
-export function serializarIndice(indice: MiniSearch<DocNota>): Uint8Array<ArrayBuffer> {
-  return new TextEncoder().encode(JSON.stringify(indice.toJSON()))
+export function serializarIndice(indice: MiniSearch<DocNota>, impressao: string): Uint8Array<ArrayBuffer> {
+  return new TextEncoder().encode(JSON.stringify({ impressao, indice: indice.toJSON() }))
 }
 
-export function carregarIndice(json: Uint8Array): MiniSearch<DocNota> {
-  return MiniSearch.loadJSON<DocNota>(new TextDecoder().decode(json), OPCOES_INDICE)
+/** `null` quando a impressão do envelope não bate com `impressao` -- inclui um blob antigo
+ *  sem envelope (`impressao === undefined`), que cai no mesmo `!==` sem ramo especial. */
+export function carregarIndice(json: Uint8Array, impressao: string): MiniSearch<DocNota> | null {
+  const envelope = JSON.parse(new TextDecoder().decode(json)) as { impressao?: string; indice: AsPlainObject }
+  if (envelope.impressao !== impressao) {
+    return null
+  }
+  // `loadJS`, não `loadJSON`: o objeto já foi parseado acima, não voltamos a stringify-lo.
+  return MiniSearch.loadJS<DocNota>(envelope.indice, OPCOES_INDICE)
 }
 
 export type ResultadoBusca =

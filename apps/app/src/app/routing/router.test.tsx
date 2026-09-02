@@ -28,6 +28,9 @@ vi.mock('../../features/copilot-byok/CopilotKeySetup', () => ({
 vi.mock('../../widgets/soap-editor/FilaEEditor', () => ({
   FilaEEditor: vi.fn(() => <div data-testid="fila-e-editor" />),
 }))
+vi.mock('../../pages/biblioteca/BibliotecaPage', () => ({
+  BibliotecaPage: vi.fn(() => <div data-testid="biblioteca-page" />),
+}))
 vi.mock('../../features/live-session/microfone', () => ({
   abrirMicrofone: vi.fn(),
 }))
@@ -138,11 +141,9 @@ describe('router', () => {
 
     const { FilaEEditor } = await import('../../widgets/soap-editor/FilaEEditor')
     const props = vi.mocked(FilaEEditor).mock.calls[0]![0]
-    expect(props.itens).toHaveLength(1)
-    expect(props.itens[0]!.estado).toBe('pendente')
-    const notaId = props.itens[0]!.id
-    expect(props.notas[notaId]).toBeDefined()
-    expect(props.notas[notaId]!.frases.map((frase) => frase.secao)).toEqual(['S', 'O', 'A', 'P'])
+    expect(props.notas).toHaveLength(1)
+    expect(props.notas[0]!.estado).toBe('pendente')
+    expect(props.notas[0]!.frases.map((frase) => frase.secao)).toEqual(['S', 'O', 'A', 'P'])
   })
 
   it('/notas: aoTocar toca a âncora no reprodutor real (fatia 3)', async () => {
@@ -175,15 +176,15 @@ describe('router', () => {
 
     const { FilaEEditor } = await import('../../widgets/soap-editor/FilaEEditor')
     const props = vi.mocked(FilaEEditor).mock.calls[0]![0]
-    const notaId = props.itens[0]!.id
-    const notaEditada = { ...props.notas[notaId]!, revisao: 1 }
+    const notaId = props.notas[0]!.id
+    const notaEditada = { ...props.notas[0]!, revisao: 1 }
 
     await act(async () => {
       props.onChangeNota(notaEditada)
     })
 
     const propsDepois = vi.mocked(FilaEEditor).mock.calls.at(-1)![0]
-    expect(propsDepois.notas[notaId]).toEqual(notaEditada)
+    expect(propsDepois.notas.find((nota) => nota.id === notaId)).toEqual(notaEditada)
   })
 
   // NotaPage ainda não tem sessão/keychain real nesta rota: aoAssinar tenta a cadeia real e falha
@@ -200,15 +201,33 @@ describe('router', () => {
 
     const { FilaEEditor } = await import('../../widgets/soap-editor/FilaEEditor')
     const props = vi.mocked(FilaEEditor).mock.calls[0]![0]
-    const notaId = props.itens[0]!.id
 
     await act(async () => {
-      await (props.aoAssinar(props.notas[notaId]!) as unknown as Promise<void>)
+      await (props.aoAssinar(props.notas[0]!) as unknown as Promise<void>)
     })
 
     const propsDepois = vi.mocked(FilaEEditor).mock.calls.at(-1)![0]
-    expect(propsDepois.itens[0]!.estado).toBe('pendente')
+    expect(propsDepois.notas[0]!.estado).toBe('pendente')
     expect(screen.getByRole('alert')).toBeTruthy()
+  })
+
+  // BibliotecaPage é mockado aqui (não BibliotecaNotas): a fixture desta rota é o próprio
+  // `store`, então o teste chama `ler`/`gravar` diretamente em vez de depender de
+  // BibliotecaPage os invocar -- o que só aconteceria com um dek real, fora desta fatia.
+  it('resolves /biblioteca com fixtures vazias e dek=null; o store fixture nunca acha nada persistido', async () => {
+    const router = await loadRouterAt('/biblioteca')
+
+    render(<RouterProvider router={router} />)
+    await screen.findByTestId('biblioteca-page')
+
+    const { BibliotecaPage } = await import('../../pages/biblioteca/BibliotecaPage')
+    const props = vi.mocked(BibliotecaPage).mock.calls[0]![0]
+    expect(props.notas).toEqual([])
+    expect(props.accountId).toBe('')
+    expect(props.dek).toBeNull()
+    await expect(props.store.ler()).resolves.toBeNull()
+    await expect(props.store.gravar(new Uint8Array())).resolves.toBeUndefined()
+    await expect(props.store.apagar()).resolves.toBeUndefined()
   })
 
   it('resolves /auth/magic-link and passes baseUrl/token through to MagicLinkCallback', async () => {

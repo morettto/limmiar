@@ -1,58 +1,45 @@
 import { useState, type KeyboardEvent } from 'react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { proximoIndice } from './navegacao-teclado'
-
-export type EstadoNotaFila = 'pendente' | 'assinada'
-
-// Constantes, não literais inline, pela mesma razão que nota.ts exporta ORDEM_SECOES:
-// lingui/no-unlocalized-strings varre todo `.tsx` e um `const` SCREAMING_SNAKE_CASE já está isento
-// por convenção (eslint.config.mjs) — mais barato do que alargar ignoreNames.
-export const ESTADO_PENDENTE: EstadoNotaFila = 'pendente'
-export const ESTADO_ASSINADA: EstadoNotaFila = 'assinada'
-
-export interface ItemFila {
-  readonly id: string
-  readonly patientId: string
-  readonly estado: EstadoNotaFila
-}
+import { ESTADO_ASSINADA, ESTADO_PENDENTE, type EstadoNota, type Nota } from '../../entities/nota/nota'
 
 export interface FilaAssinaturaProps {
-  itens: readonly ItemFila[]
+  itens: readonly Nota[]
   /** Nota atualmente aberta no editor (fonte da verdade no widget-pai), não a que o teclado percorre. */
   selecionadoId: string | null
   onSelecionar: (id: string) => void
 }
 
-const ABAS: readonly EstadoNotaFila[] = [ESTADO_PENDENTE, ESTADO_ASSINADA]
+const ABAS: readonly EstadoNota[] = [ESTADO_PENDENTE, ESTADO_ASSINADA]
 
 function indiceInicial(total: number): number {
   return total > 0 ? 0 : -1
 }
 
-// `itens` pode encolher por fora sem que `trocarAba` tenha corrido, e o `indiceAtivo` guardado fica
-// maior do que o novo `filtrados.length`. Clampa em vez de deixar `filtrados[indiceAtivo]` apontar
-// para além do fim (ver README).
+// `itens` pode encolher "por fora" sem que `trocarAba` tenha corrido, deixando `indiceAtivo`
+// maior do que `filtrados.length` permite. Clampa em vez de apontar para além do fim (ver
+// README, "índice ativo sobrevive a itens que encolhem").
 function indiceClampado(indice: number, total: number): number {
   return total === 0 ? -1 : Math.min(Math.max(indice, 0), total - 1)
 }
 
 /**
- * Fila de assinatura: abas de estado + listbox acessível, navegação por teclado em
- * `navegacao-teclado.ts`. `aria-activedescendant` é o cursor do teclado e `aria-selected` a nota
- * aberta no editor — os dois divergem enquanto se navega sem premir Enter.
+ * Fila de assinatura: abas de estado + listbox acessível, navegação j/k sem wrap (ver README).
+ * `aria-activedescendant` é o cursor do teclado e `aria-selected` a nota aberta no editor --
+ * os dois divergem enquanto se navega sem premir Enter.
  */
 export function FilaAssinatura({ itens, selecionadoId, onSelecionar }: FilaAssinaturaProps) {
   const { t } = useLingui()
-  const [aba, setAba] = useState<EstadoNotaFila>(ESTADO_PENDENTE)
+  const [aba, setAba] = useState<EstadoNota>(ESTADO_PENDENTE)
   const filtrados = itens.filter((item) => item.estado === aba)
   const [indiceAtivo, setIndiceAtivo] = useState(() => indiceInicial(filtrados.length))
 
-  const rotulos: Record<EstadoNotaFila, string> = {
+  const rotulos: Record<EstadoNota, string> = {
     pendente: t`Pendentes`,
     assinada: t`Assinadas`,
   }
 
-  function trocarAba(proximaAba: EstadoNotaFila) {
+  function trocarAba(proximaAba: EstadoNota) {
     setAba(proximaAba)
     setIndiceAtivo(indiceInicial(itens.filter((item) => item.estado === proximaAba).length))
   }

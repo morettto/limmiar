@@ -15,6 +15,7 @@ const NOTA: Nota = {
     { id: 'A-0', secao: 'A', texto: 'hipótese', ancoras: [{ inicioMs: 2000, fimMs: 3000 }] },
     // P fica sem frases de propósito -- cobre a secção vazia.
   ],
+  estado: 'pendente',
 }
 
 function renderEditor(props?: Partial<{ nota: Nota; onChange: (nota: Nota) => void; aoTocar: (ancora: unknown) => void; aoAssinar: (nota: Nota) => void }>) {

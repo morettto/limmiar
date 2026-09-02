@@ -41,9 +41,20 @@ function deny(text) {
   }))
 }
 
+function mergeInProgress() {
+  try {
+    git(['rev-parse', '--verify', '--quiet', 'MERGE_HEAD'])
+    return true
+  } catch {
+    return false
+  }
+}
+
 function check(command) {
   if (!COMMIT_OR_PUSH.test(command) && !NEW_BRANCH.test(command)) return null
   if (MERGE_IN_PROGRESS.test(command)) return null
+  // O commit que fecha um merge é a própria sincronia: HEAD ainda está atrás, o resultado não.
+  if (mergeInProgress()) return null
   const base = baseBranch()
   let current
   try {

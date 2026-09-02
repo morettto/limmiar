@@ -3,7 +3,6 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { I18nProvider } from '@lingui/react'
 import { i18n, dynamicActivate } from '../../shared/i18n'
 import type { Nota } from '../../entities/nota/nota'
-import type { ItemFila } from '../../features/nota-fila/FilaAssinatura'
 import { FilaEEditor } from './FilaEEditor'
 
 function nota(id: string, patientId: string): Nota {
@@ -12,18 +11,11 @@ function nota(id: string, patientId: string): Nota {
     patientId,
     revisao: 0,
     frases: [{ id: `${id}-S-0`, secao: 'S', texto: `texto de ${id}`, ancoras: [] }],
+    estado: 'pendente',
   }
 }
 
-const ITENS: readonly ItemFila[] = [
-  { id: 'nota-1', patientId: 'paciente-1', estado: 'pendente' },
-  { id: 'nota-2', patientId: 'paciente-2', estado: 'pendente' },
-]
-
-const NOTAS: Record<string, Nota> = {
-  'nota-1': nota('nota-1', 'paciente-1'),
-  'nota-2': nota('nota-2', 'paciente-2'),
-}
+const NOTAS: readonly Nota[] = [nota('nota-1', 'paciente-1'), nota('nota-2', 'paciente-2')]
 
 // jsdom has no matchMedia and AdaptivePanel's useBreakpoint needs one to mount. A fixed
 // "matches: false" is enough here — breakpoint-specific rendering is proven by AdaptivePanel's own
@@ -38,8 +30,7 @@ function stubMatchMedia() {
 }
 
 function renderWidget(props?: Partial<{
-  itens: readonly ItemFila[]
-  notas: Record<string, Nota>
+  notas: readonly Nota[]
   onChangeNota: (nota: Nota) => void
   aoTocar: (ancora: unknown) => void
   aoAssinar: (nota: Nota) => void
@@ -47,7 +38,6 @@ function renderWidget(props?: Partial<{
   return render(
     <I18nProvider i18n={i18n}>
       <FilaEEditor
-        itens={props?.itens ?? ITENS}
         notas={props?.notas ?? NOTAS}
         onChangeNota={props?.onChangeNota ?? vi.fn()}
         aoTocar={(props?.aoTocar as () => void) ?? vi.fn()}
@@ -75,7 +65,7 @@ describe('FilaEEditor', () => {
   })
 
   it('sem itens na fila, mostra uma mensagem de estado em vez do editor', () => {
-    renderWidget({ itens: [] })
+    renderWidget({ notas: [] })
 
     expect(screen.getByRole('status').textContent).toBe('Selecione uma nota na fila.')
     expect(screen.queryByLabelText('Subjetivo 1')).toBeNull()
@@ -99,9 +89,9 @@ describe('FilaEEditor', () => {
     fireEvent.change(screen.getByLabelText('Subjetivo 1'), { target: { value: 'edição' } })
 
     expect(onChangeNota).toHaveBeenCalledWith({
-      ...NOTAS['nota-1'],
+      ...NOTAS[0]!,
       revisao: 1,
-      frases: [{ ...NOTAS['nota-1'].frases[0], texto: 'edição' }],
+      frases: [{ ...NOTAS[0]!.frases[0], texto: 'edição' }],
     })
   })
 })

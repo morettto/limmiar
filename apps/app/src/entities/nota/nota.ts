@@ -10,11 +10,20 @@ export interface FraseNota {
   readonly ancoras: readonly Ancora[]
 }
 
+export type EstadoNota = 'pendente' | 'assinada'
+
+// Constantes, não literais inline: lingui/no-unlocalized-strings varre `.tsx` à procura de
+// texto visível, e um `const` SCREAMING_SNAKE_CASE já está isento por convenção do repo
+// (ver eslint.config.mjs).
+export const ESTADO_PENDENTE: EstadoNota = 'pendente'
+export const ESTADO_ASSINADA: EstadoNota = 'assinada'
+
 export interface Nota {
   readonly id: string
   readonly patientId: string
   readonly revisao: number
   readonly frases: readonly FraseNota[]
+  readonly estado: EstadoNota
 }
 
 // Exportada (fatia 2, S08-01): EditorSoap.tsx/NotaPage.tsx reusam esta ordem em vez de a
@@ -35,7 +44,7 @@ export function rascunhoParaNota(
       ancoras: afirmacao.ancoras,
     })),
   )
-  return { id, patientId, revisao: 0, frases }
+  return { id, patientId, revisao: 0, frases, estado: ESTADO_PENDENTE }
 }
 
 // fraseId inexistente lança em vez de devolver a nota inalterada: um id que já não bate

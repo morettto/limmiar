@@ -1,15 +1,15 @@
-import { ESTADO_PENDENTE, type ItemFila } from '../nota-fila/FilaAssinatura'
+import { ESTADO_PENDENTE, type Nota } from '../../entities/nota/nota'
 
 export interface GrupoPaciente {
   readonly patientId: string
-  readonly itens: readonly ItemFila[]
+  readonly itens: readonly Nota[]
 }
 
-// Ordem determinística: os grupos saem pela ordem da primeira ocorrência de cada patientId, e
-// dentro do grupo os rascunhos vêm primeiro, com a ordem de entrada preservada (`filter` é estável).
-// Sem isto a lista saltaria entre renders, contra o critério 3.
-export function agruparPorPaciente(itens: readonly ItemFila[]): GrupoPaciente[] {
-  const porPaciente = new Map<string, ItemFila[]>()
+// Ordem determinística: grupos pela primeira ocorrência do patientId (Map preserva inserção)
+// e rascunhos primeiro dentro do grupo, com `filter` estável a manter a ordem de entrada.
+// Uma lista que salta entre renders seria bug (critério de aceite 3).
+export function agruparPorPaciente(itens: readonly Nota[]): GrupoPaciente[] {
+  const porPaciente = new Map<string, Nota[]>()
   for (const item of itens) {
     const grupo = porPaciente.get(item.patientId)
     if (grupo) {

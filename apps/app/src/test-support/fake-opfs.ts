@@ -1,6 +1,10 @@
-// Duplo mínimo da File System Access API (OPFS), partilhado por chunk-store, reprodutor e
-// indice-store: só a superfície que os três usam. Bytes só aparecem em `handle.bytes` depois de
-// `close()`, e `getFileHandle` sem `{ create }` lança NotFoundError, ambos como a API real.
+// Duplo mínimo da File System Access API (OPFS), partilhado pelos testes de chunk-store,
+// reprodutor e indice-store: só a superfície que os três usam. Nasceu na terceira duplicação
+// do duplo local (S08-02).
+
+// Bytes só ficam visíveis em `handle.bytes` depois de `close()`, como na API real, e
+// `getFileHandle`/`removeEntry` sobre um nome ausente lançam `NotFoundError` -- é disso que
+// `opfsIndice()` depende para distinguir "ficheiro ausente" de qualquer outro erro.
 
 export class FakeWritable {
   private readonly handle: FakeFileHandle
@@ -59,6 +63,12 @@ export class FakeDirectoryHandle {
 
   async *keys(): AsyncIterableIterator<string> {
     for (const name of this.files.keys()) yield name
+  }
+
+  async removeEntry(name: string): Promise<void> {
+    if (!this.files.delete(name)) {
+      throw new DOMException(`ficheiro inexistente: ${name}`, 'NotFoundError')
+    }
   }
 }
 

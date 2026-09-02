@@ -4,24 +4,22 @@ import type { Ancora } from '@limmiar/copilot'
 import type { CryptoKey } from '@limmiar/crypto'
 import { assinarNota } from '../../entities/nota/api'
 import { notaParaEntrada, selarAssinatura } from '../../entities/nota/nota-crypto'
-import { ORDEM_SECOES, type Nota } from '../../entities/nota/nota'
+import { ESTADO_ASSINADA, ESTADO_PENDENTE, ORDEM_SECOES, type Nota } from '../../entities/nota/nota'
 import { appendPatientEntry } from '../../entities/patient/api'
 import { openRecord, sealEntry } from '../../entities/patient/patient-crypto'
 import { translateProblemCode } from '../../shared/api'
-import { ESTADO_ASSINADA, ESTADO_PENDENTE, type ItemFila } from '../../features/nota-fila/FilaAssinatura'
 import { criarReprodutor } from '../../features/nota-audio/reprodutor'
 import { FilaEEditor } from '../../widgets/soap-editor/FilaEEditor'
 
 const NOTA_FIXTURE_ID = 'nota-fixture-1'
 const PATIENT_FIXTURE_ID = 'paciente-fixture-1'
 
-// ponytail: sem sessão/keychain real nesta rota ainda, tal como CopilotKeyPage. Com estes valores,
-// `appendPatientEntry`/`assinarNota` caem no caminho de falha de rede — sem perda de dados, só um
-// fluxo que não completa. Quem ligar a sessão troca os quatro por props; aoAssinar não muda.
+// ponytail: sem sessão/keychain real nesta rota ainda -- mesma situação de CopilotKeyPage.
+// Com estes valores, `appendPatientEntry`/`assinarNota` caem no caminho de "falha de rede",
+// sem perda de dados. Quem ligar a sessão substitui-os por props, sem mexer em `aoAssinar`.
 const BASE_URL_FIXTURE = ''
 const ACCOUNT_ID_FIXTURE = ''
 const ACCESS_TOKEN_FIXTURE = ''
-const KEK_FIXTURE = {} as CryptoKey
 const RECORD_FIXTURE = { wrappedDek: new Uint8Array(0), entries: [] as { sequence: number; ciphertext: Uint8Array<ArrayBuffer> }[] }
 
 function notaFixture(): Nota {
@@ -30,18 +28,23 @@ function notaFixture(): Nota {
     patientId: PATIENT_FIXTURE_ID,
     revisao: 0,
     frases: ORDEM_SECOES.map((secao) => ({ id: `${secao}-0`, secao, texto: '', ancoras: [] })),
+    estado: ESTADO_PENDENTE,
   }
 }
 
 type Mensagem = { status: 'sucesso' | 'erro'; texto: string }
 
-// ponytail: fila com um único item fixo — a fila real (fetch ao backend, várias notas) fica fora
-// desta fatia. `aoAssinar` já grava no prontuário e assina, e marca só o item de `nota.id`.
-export function NotaPage() {
+export interface NotaPageProps {
+  // Obrigatória desde a ronda 1 do S08-07 -- mesmo padrão do `dek: CryptoKey | null` de
+  // `BibliotecaPage`. `router.tsx` monta com `kek={null}` enquanto não há KeychainProvider;
+  // os testes injetam uma chave real para exercitar o caminho pós-guarda.
+  kek: CryptoKey | null
+}
+
+// ponytail: fila com um único item fixo -- a fila real continua fora desta fatia. `aoAssinar`
+// já grava no prontuário e assina de facto, e marca só o item de `nota.id`.
+export function NotaPage({ kek }: NotaPageProps) {
   const { t, i18n } = useLingui()
-  const [itens, setItens] = useState<readonly ItemFila[]>(() => [
-    { id: NOTA_FIXTURE_ID, patientId: PATIENT_FIXTURE_ID, estado: ESTADO_PENDENTE },
-  ])
   const [notas, setNotas] = useState<Record<string, Nota>>(() => ({ [NOTA_FIXTURE_ID]: notaFixture() }))
   const [mensagem, setMensagem] = useState<Mensagem | null>(null)
   const audioRef = useRef<HTMLAudioElement>(null)
@@ -52,7 +55,9 @@ export function NotaPage() {
   const proximaSequenciaRef = useRef(RECORD_FIXTURE.entries.length + 1)
 
   function marcarAssinada(notaId: string) {
-    setItens((atuais) => atuais.map((item) => (item.id === notaId ? { ...item, estado: ESTADO_ASSINADA } : item)))
+    setNotas((atuais) =>
+      atuais[notaId] ? { ...atuais, [notaId]: { ...atuais[notaId], estado: ESTADO_ASSINADA } } : atuais,
+    )
   }
 
   // Foca a listbox da fila (sem forwardRef através de FilaEEditor/FilaAssinatura -- é a
@@ -62,12 +67,16 @@ export function NotaPage() {
     document.querySelector<HTMLElement>('[role="listbox"]')?.focus()
   }
 
-  // Ordem que não inverte: gravar a revisão no prontuário ANTES de assinar. Falhar a assinatura
-  // depois de gravar é recuperável (novo `⌘↵` assina a mesma revisão). O inverso deixaria uma
-  // assinatura a apontar para uma revisão que não existe — essa linha não se apaga depois.
+  // Ordem que não inverte: grava a revisão no prontuário ANTES de assinar. Falhar a assinatura
+  // depois de gravar é recuperável (novo ⌘↵ assina a mesma revisão); o inverso deixaria uma
+  // assinatura a apontar para uma revisão que não existe no prontuário, e isso não se apaga.
   async function aoAssinar(nota: Nota) {
+    if (kek === null) {
+      setMensagem({ status: 'erro', texto: t`Sem sessão ativa. Não é possível assinar.` })
+      return
+    }
     try {
-      const { dek } = await openRecord(KEK_FIXTURE, RECORD_FIXTURE, nota.patientId)
+      const { dek } = await openRecord(kek, RECORD_FIXTURE, nota.patientId)
 
       if (ultimaRevisaoGravadaRef.current[nota.id] !== nota.revisao) {
         const sequence = proximaSequenciaRef.current
@@ -115,9 +124,9 @@ export function NotaPage() {
     setNotas((atuais) => ({ ...atuais, [nota.id]: nota }))
   }
 
-  // O <audio> renderiza sempre com este componente, logo `audioRef.current` já está atribuído em
-  // qualquer clique que chegue aqui; a guarda é só a fronteira de nulidade do ref (ADR contra `!`).
-  // Sem `src` ainda: carregar o áudio da sessão é fatia futura, e tocar antes disso é um no-op.
+  // Reprodutor real (fatia 3): o <audio> renderiza sempre com este componente, então a guarda
+  // é só a fronteira de nulidade do ref, não um caminho alcançável. Ainda sem `src` -- carregar
+  // o áudio da sessão é fatia futura, e tocar antes disso é um no-op honesto.
   function aoTocar(ancora: Ancora) {
     if (!audioRef.current) return
     criarReprodutor(audioRef.current).tocar(ancora.inicioMs)
@@ -128,7 +137,7 @@ export function NotaPage() {
       <audio ref={audioRef} hidden />
       {mensagem?.status === 'sucesso' && <p role="status">{mensagem.texto}</p>}
       {mensagem?.status === 'erro' && <p role="alert">{mensagem.texto}</p>}
-      <FilaEEditor itens={itens} notas={notas} onChangeNota={onChangeNota} aoTocar={aoTocar} aoAssinar={aoAssinar} />
+      <FilaEEditor notas={Object.values(notas)} onChangeNota={onChangeNota} aoTocar={aoTocar} aoAssinar={aoAssinar} />
     </>
   )
 }

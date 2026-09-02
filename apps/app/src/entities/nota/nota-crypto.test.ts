@@ -1,7 +1,7 @@
 import { webcrypto as limmiarWebcrypto } from '@limmiar/crypto'
 import { describe, expect, it } from 'vitest'
 import type { Nota } from './nota'
-import { digestNota } from './nota'
+import { digestNota, ESTADO_PENDENTE } from './nota'
 import { notaAssinaturaAad, notaParaEntrada, selarAssinatura } from './nota-crypto'
 
 const NOTE_ID = '33333333-3333-3333-3333-333333333333'
@@ -21,6 +21,7 @@ function notaFixture(overrides: Partial<Nota> = {}): Nota {
       { id: 'S-0', secao: 'S', texto: 'Paciente relata dor', ancoras: [{ inicioMs: 1000, fimMs: 2000 }] },
       { id: 'O-0', secao: 'O', texto: 'PA 120x80', ancoras: [] },
     ],
+    estado: ESTADO_PENDENTE,
     ...overrides,
   }
 }

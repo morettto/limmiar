@@ -1,8 +1,8 @@
 import { test, expect, type Page } from '@playwright/test'
 
-// S08-01, fatia 5: percurso só-teclado do editor SOAP — Tab até à listbox, j/k, Enter, escrever
-// e ⌘↵/Ctrl+↵ para assinar. `/notas` ainda não tem sessão/keychain real, por isso a cadeia real
-// resolve no caminho de falha de rede (role=alert), o mesmo desfecho de NotaPage.test.tsx.
+// S08-01 fatia 5: percurso só-teclado do editor SOAP -- Tab até à listbox, j/k, Enter, Tab,
+// escrever e ⌘↵/Ctrl+↵ para assinar. Com `kek={null}` (router.tsx), `aoAssinar` guarda cedo:
+// o que se prova aqui é o desfecho "sem sessão", determinístico e sem tocar no Postgres.
 
 async function tabAteListbox(page: Page): Promise<void> {
   for (let tentativa = 0; tentativa < 10; tentativa++) {
@@ -40,10 +40,10 @@ test.describe('Editor SOAP -- assinar só com teclado (S08-01)', () => {
 
     const alerta = page.getByRole('alert')
     await expect(alerta).toBeVisible()
-    await expect(alerta).toHaveText('Falha ao assinar a nota. Tente novamente.')
+    await expect(alerta).toHaveText('Sem sessão ativa. Não é possível assinar.')
 
-    // O item continua na aba "Pendentes" -- a cadeia real falhou antes de assinarNota
-    // devolver sucesso, então nada foi marcado como assinado.
+    // O item continua na aba "Pendentes" -- a guarda de sessão interrompeu antes de
+    // qualquer chamada à cadeia real, então nada foi marcado como assinado.
     await expect(page.getByRole('tab', { name: 'Pendentes', selected: true })).toBeVisible()
   })
 })
