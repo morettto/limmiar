@@ -77,7 +77,7 @@ async function requestMagicLinkFromUi(page: Page, email: string): Promise<void> 
   await expect(page.locator('input[type="password"]')).toHaveCount(0)
 
   await page.getByLabel('E-mail').fill(email)
-  await page.getByRole('button', { name: 'Criar conta' }).click()
+  await page.getByRole('button', { name: 'Enviar link mágico' }).click()
 
   await expect(page.getByRole('status')).toHaveText(
     'Verifique seu e-mail para continuar. Enviamos um link de acesso, se este e-mail existir.',
