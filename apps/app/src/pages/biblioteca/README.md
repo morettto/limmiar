@@ -5,16 +5,17 @@
 Monta a biblioteca de notas na rota `/biblioteca` (`app/routing/router.tsx`, spec S08,
 ticket S08-02, fatia 5 de 5): é o único lugar que sabe compor os três módulos puros de
 `features/nota-biblioteca` (agrupamento, índice de busca, persistência cifrada em OPFS)
-com o widget de render (`widgets/biblioteca/BibliotecaNotas.tsx`), e dono da DEK/ciclo de
+com o widget de render (`widgets/biblioteca/BibliotecaNotas.tsx`), e dona da chave/ciclo de
 vida do índice. O widget não decide nada disso -- só renderiza o `resultado` que esta
 página já calculou.
 
 ## Fluxo principal
 
-1. No mount (e sempre que `dek`/`accountId`/`store`/`notas` mudarem), se `dek !== null`:
+1. No mount (e sempre que `chaveIndice`/`accountId`/`store`/`notas` mudarem), se
+   `chaveIndice !== null`:
    a. Calcula `impressao = impressaoDigital(notas)` (ticket S08-09) -- resume que notas (e
       que revisão de cada uma) as `notas` atuais cobrem.
-   b. `restaurarIndice(store, dek, accountId, impressao)` -- tenta abrir um índice já
+   b. `restaurarIndice(store, chaveIndice, accountId, impressao)` -- tenta abrir um índice já
       persistido *e* que ainda cubra exatamente essas notas. Um blob de uma impressão
       diferente (nota nova/editada/apagada desde a última gravação) não é adotado: `null`,
       e o blob obsoleto já foi apagado por `restaurarIndice` (ver
@@ -28,12 +29,12 @@ página já calculou.
       (`persistirIndice(store.gravar, ...)`, que embrulha a mesma `impressao` no envelope
       antes de selar).
    e. Guarda o resultado em estado (`indice`).
-   f. Se qualquer um dos passos acima rejeitar (OPFS negada/corrompida, DEK ou AAD errada
+   f. Se qualquer um dos passos acima rejeitar (OPFS negada/corrompida, chave ou AAD errada
       em `abrirIndice`), a página cai num estado `erro` local e para de delegar a
       `BibliotecaNotas` -- renderiza o próprio `role="alert"` no lugar do widget, para não
       ficar presa em "Preparando a busca..." para sempre sem sinal ao utilizador. Mesmo
       padrão de `PatientWallet.tsx` (`load(kek).catch(...)`, `role="alert"`).
-2. Com `dek === null`, o efeito não faz nada -- `indice` fica `null` para sempre, e
+2. Com `chaveIndice === null`, o efeito não faz nada -- `indice` fica `null` para sempre, e
    `buscar(null, termo)` já devolve `a-preparar` (`indice.ts`) sozinho. Não há um branch de
    render "bloqueado" próprio aqui, ao contrário de `PatientWallet` -- `BibliotecaNotas` já
    sabe renderizar `a-preparar`.
@@ -55,7 +56,11 @@ página já calculou.
 
 ## Pontos de entrada
 
-- `BibliotecaPage({ notas, accountId, dek, store })` -- componente React. `notas`
+- `BibliotecaPage({ notas, accountId, chaveIndice, store })` -- componente React.
+  `chaveIndice: ChaveIndiceBusca | null` (`features/nota-biblioteca/indice-crypto.ts`,
+  ticket S08-10) só aceita o tipo marcado que `chaveIndiceDaConta(kek)` produz -- uma
+  `CryptoKey` crua (ex.: uma DEK de paciente) não compila aqui, ver
+  `features/nota-biblioteca/README.md`, "DEK de conta, não DEK de paciente". `notas`
   (`readonly Nota[]`, `entities/nota/nota`) é a fila de assinatura inteira -- a mesma
   coleção alimenta `agruparPorPaciente`, a construção do índice de busca **e**
   `impressaoDigital(notas)` (ticket S08-09); `store` é
@@ -75,18 +80,24 @@ página já calculou.
 
 ## Decisões desta fatia
 
-- **`notas`/`accountId`/`dek`/`store` são todos props, sem fixture interna.**
+- **`notas`/`accountId`/`chaveIndice`/`store` são todos props, sem fixture interna.**
   Ao contrário de `NotaPage` (que guarda fixtures fixas dentro do próprio componente),
   a forma acordada no portão deste ticket exige que `BibliotecaPage` receba tudo por
   parâmetro -- é o container "fino" que a instrução de página deste harness pede. As
-  fixtures (`dek={null}`, `store` que nunca acha nada, `notas` vazias) vivem em
+  fixtures (`chaveIndice={null}`, `store` que nunca acha nada, `notas` vazias) vivem em
   `BibliotecaRouteComponent`, no router -- mesmo padrão, mesmo motivo do
   `kek={null}, accountId=""` de `CopilotKeyPage`, só que um nível acima (na composição da
   rota, não dentro da página).
-- **`dek === null` não precisa de um estado "bloqueado" dedicado.** `buscar(null, termo)`
-  já devolve `a-preparar` (`features/nota-biblioteca/indice.ts`) -- reaproveitar esse
-  estado evita duplicar a decisão "o quê mostrar enquanto não há nada para buscar" que
-  `BibliotecaNotas` já sabe tomar.
+- **`chaveIndice: ChaveIndiceBusca | null`, não `dek: CryptoKey | null` (ticket S08-10).**
+  O nome/tipo antigo (`dek`) não dizia de quem era a chave -- quem ligasse a sessão real
+  teria uma DEK de paciente na mão e um prop `CryptoKey` à espera, e o texto de todas as
+  notas de todos os pacientes ficaria selado sob a chave de um só. `ChaveIndiceBusca` (tipo
+  marcado) e o prop renomeado fecham essa ambiguidade em compilação, não só em prosa; ver
+  `features/nota-biblioteca/README.md`, "DEK de conta, não DEK de paciente".
+- **`chaveIndice === null` não precisa de um estado "bloqueado" dedicado.**
+  `buscar(null, termo)` já devolve `a-preparar` (`features/nota-biblioteca/indice.ts`) --
+  reaproveitar esse estado evita duplicar a decisão "o quê mostrar enquanto não há nada
+  para buscar" que `BibliotecaNotas` já sabe tomar.
 - **Guarda de cancelamento (`cancelado`) depois de `restaurarIndice` E depois de
   `persistirIndice`.** Desmontar a página no meio do `await restaurarIndice(...)` não pode
   continuar para `construirIndice`/`persistirIndice` (gravaria em OPFS por um componente
@@ -101,9 +112,9 @@ página já calculou.
   (ticket S08-09).** `impressaoDigital(notas)` é O(n log n) e já roda a cada disparo do
   efeito, que já depende de `notas` -- mesma razão do "sem `useMemo`" abaixo, um valor a
   mais na dependency array do `useEffect` só duplicaria o que `notas` já expressa.
-- **`preparar(dek).catch(...)` para um estado `erro` local, não um `ResultadoBusca` novo.**
-  A rejeição de `restaurarIndice`/`persistirIndice` (OPFS negada/corrompida, DEK ou AAD
-  errada) não é "sem resultado" nem "a preparar" -- são estados de `ResultadoBusca` que
+- **`preparar(chaveIndice).catch(...)` para um estado `erro` local, não um `ResultadoBusca`
+  novo.** A rejeição de `restaurarIndice`/`persistirIndice` (OPFS negada/corrompida, chave
+  ou AAD errada) não é "sem resultado" nem "a preparar" -- são estados de `ResultadoBusca` que
   `buscar` decide, e essa página nunca finge que `buscar` devolveu algo que ele não
   devolveu. `erro` é `useState` próprio da página, igual em espírito ao `status: 'error'`
   de `PatientWallet`, só que aqui vira um branch de render cedo (não delega mais a

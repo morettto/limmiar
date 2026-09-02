@@ -1,7 +1,6 @@
-import type { CryptoKey } from '@limmiar/crypto'
 import type MiniSearch from 'minisearch'
 import { carregarIndice, serializarIndice, type DocNota } from './indice'
-import { abrirIndice, selarIndice } from './indice-crypto'
+import { abrirIndice, selarIndice, type ChaveIndiceBusca } from './indice-crypto'
 
 export type LerSelado = () => Promise<Uint8Array<ArrayBuffer> | null>
 export type GravarSelado = (selado: Uint8Array<ArrayBuffer>) => Promise<void>
@@ -49,13 +48,13 @@ export function opfsIndice(
 /** Serializa + sela + grava -- `gravar` só recebe ciphertext, nunca o JSON do índice. */
 export async function persistirIndice(
   gravar: GravarSelado,
-  dek: CryptoKey,
+  chave: ChaveIndiceBusca,
   accountId: string,
   indice: MiniSearch<DocNota>,
   impressao: string,
 ): Promise<void> {
   const json = serializarIndice(indice, impressao)
-  const selado = await selarIndice(dek, accountId, json)
+  const selado = await selarIndice(chave, accountId, json)
   await gravar(selado)
 }
 
@@ -64,7 +63,7 @@ export async function persistirIndice(
  *  texto em claro de uma nota corrigida não sobrevive no disco. */
 export async function restaurarIndice(
   store: { ler: LerSelado; apagar: ApagarSelado },
-  dek: CryptoKey,
+  chave: ChaveIndiceBusca,
   accountId: string,
   impressao: string,
 ): Promise<MiniSearch<DocNota> | null> {
@@ -72,7 +71,7 @@ export async function restaurarIndice(
   if (selado === null) {
     return null
   }
-  const json = await abrirIndice(dek, accountId, selado)
+  const json = await abrirIndice(chave, accountId, selado)
   const indice = carregarIndice(json, impressao)
   if (indice === null) {
     // Rejeição de `apagar` ignorada de propósito: o `gravar` seguinte usa `createWritable()`,

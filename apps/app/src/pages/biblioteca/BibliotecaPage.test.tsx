@@ -1,11 +1,11 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import { I18nProvider } from '@lingui/react'
-import { webcrypto as limmiarWebcrypto, type CryptoKey } from '@limmiar/crypto'
+import { webcrypto as limmiarWebcrypto } from '@limmiar/crypto'
 import { dynamicActivate, i18n } from '../../shared/i18n'
 import type { Nota } from '../../entities/nota/nota'
 import { construirIndice, impressaoDigital, notaParaDoc, serializarIndice } from '../../features/nota-biblioteca/indice'
-import { selarIndice } from '../../features/nota-biblioteca/indice-crypto'
+import { chaveIndiceDaConta, selarIndice, type ChaveIndiceBusca } from '../../features/nota-biblioteca/indice-crypto'
 import { BibliotecaPage, type BibliotecaPageProps } from './BibliotecaPage'
 
 vi.mock('../../widgets/biblioteca/BibliotecaNotas', () => ({
@@ -14,10 +14,9 @@ vi.mock('../../widgets/biblioteca/BibliotecaNotas', () => ({
 
 const ACCOUNT_ID = '77777777-7777-7777-7777-777777777777'
 
-async function makeDek(): Promise<CryptoKey> {
+async function makeChave(): Promise<ChaveIndiceBusca> {
   const kek = await limmiarWebcrypto.importKek(crypto.getRandomValues(new Uint8Array(32)))
-  const { dek } = await limmiarWebcrypto.generateWrappedDek(kek, new Uint8Array())
-  return dek
+  return chaveIndiceDaConta(kek)
 }
 
 function deferred<T>() {
@@ -42,7 +41,8 @@ function nota(): Nota {
 
 async function renderEObterProps(overrides: Partial<BibliotecaPageProps> = {}) {
   const { BibliotecaNotas } = await import('../../widgets/biblioteca/BibliotecaNotas')
-  const dek = 'dek' in overrides ? (overrides.dek as CryptoKey | null) : await makeDek()
+  const chaveIndice =
+    'chaveIndice' in overrides ? (overrides.chaveIndice as ChaveIndiceBusca | null) : await makeChave()
   const store = overrides.store ?? {
     ler: vi.fn().mockResolvedValue(null),
     gravar: vi.fn().mockResolvedValue(undefined),
@@ -53,7 +53,7 @@ async function renderEObterProps(overrides: Partial<BibliotecaPageProps> = {}) {
       <BibliotecaPage
         notas={overrides.notas ?? [nota()]}
         accountId={overrides.accountId ?? ACCOUNT_ID}
-        dek={dek}
+        chaveIndice={chaveIndice}
         store={store}
       />
     </I18nProvider>,
@@ -120,15 +120,15 @@ describe('BibliotecaPage', () => {
   })
 
   it('store já com blob selado: restaura o índice e não grava de novo', async () => {
-    const dek = await makeDek()
+    const chaveIndice = await makeChave()
     const notaAtual = nota()
     const indice = construirIndice([notaAtual].map(notaParaDoc))
-    const selado = await selarIndice(dek, ACCOUNT_ID, serializarIndice(indice, impressaoDigital([notaAtual])))
+    const selado = await selarIndice(chaveIndice, ACCOUNT_ID, serializarIndice(indice, impressaoDigital([notaAtual])))
     const ler = vi.fn().mockResolvedValue(selado)
     const gravar = vi.fn()
     const apagar = vi.fn()
     const store = { ler, gravar, apagar }
-    const { props } = await renderEObterProps({ dek, notas: [notaAtual], store })
+    const { props } = await renderEObterProps({ chaveIndice, notas: [notaAtual], store })
 
     await waitFor(() => expect(props().resultado.estado).not.toBe('a-preparar'))
 
@@ -140,16 +140,20 @@ describe('BibliotecaPage', () => {
   // notas atuais a `restaurarIndice`; um blob selado sob uma impressão antiga (revisão mudou
   // desde a última gravação) é obsoleto -- apaga e reconstrói, não adota o índice desatualizado.
   it('impressão do blob restaurado não bate com as notas atuais: apaga, reconstrói e grava de novo', async () => {
-    const dek = await makeDek()
+    const chaveIndice = await makeChave()
     const notaAntiga = nota()
     const indiceAntigo = construirIndice([notaAntiga].map(notaParaDoc))
-    const selado = await selarIndice(dek, ACCOUNT_ID, serializarIndice(indiceAntigo, impressaoDigital([notaAntiga])))
+    const selado = await selarIndice(
+      chaveIndice,
+      ACCOUNT_ID,
+      serializarIndice(indiceAntigo, impressaoDigital([notaAntiga])),
+    )
     const notaAtual = { ...notaAntiga, revisao: notaAntiga.revisao + 1 }
     const ler = vi.fn().mockResolvedValue(selado)
     const gravar = vi.fn().mockResolvedValue(undefined)
     const apagar = vi.fn().mockResolvedValue(undefined)
     const store = { ler, gravar, apagar }
-    const { props } = await renderEObterProps({ dek, notas: [notaAtual], store })
+    const { props } = await renderEObterProps({ chaveIndice, notas: [notaAtual], store })
 
     await waitFor(() => expect(props().resultado.estado).not.toBe('a-preparar'))
 
@@ -157,11 +161,11 @@ describe('BibliotecaPage', () => {
     expect(gravar).toHaveBeenCalledTimes(1)
   })
 
-  it('dek === null: o resultado fica em a-preparar, sem tocar em ler/gravar', async () => {
+  it('chaveIndice === null: o resultado fica em a-preparar, sem tocar em ler/gravar', async () => {
     const ler = vi.fn()
     const gravar = vi.fn()
     const apagar = vi.fn()
-    const { props } = await renderEObterProps({ dek: null, store: { ler, gravar, apagar } })
+    const { props } = await renderEObterProps({ chaveIndice: null, store: { ler, gravar, apagar } })
 
     expect(props().resultado.estado).toBe('a-preparar')
     expect(ler).not.toHaveBeenCalled()
@@ -200,7 +204,7 @@ describe('BibliotecaPage', () => {
     expect(vi.mocked(BibliotecaNotas).mock.calls.length).toBe(chamadasAntes)
   })
 
-  it('restaurarIndice rejeita (OPFS negado/corrompido, DEK ou AAD errada): mostra alerta e para de delegar ao widget', async () => {
+  it('restaurarIndice rejeita (OPFS negado/corrompido, chave ou AAD errada): mostra alerta e para de delegar ao widget', async () => {
     const ler = vi.fn().mockRejectedValue(new Error('OPFS negado'))
     const gravar = vi.fn()
     const apagar = vi.fn()
@@ -228,5 +232,21 @@ describe('BibliotecaPage', () => {
     await Promise.resolve()
 
     expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  // Critério de aceite 2 do ticket S08-10, literal: uma CryptoKey crua (DEK de paciente,
+  // ex. `generateWrappedDek`) não compila como `chaveIndice` -- só `ChaveIndiceBusca` de
+  // `chaveIndiceDaConta` passa. Prova em compilação, via `tsc --noEmit`, não em runtime.
+  it('type: chaveIndice recusa uma CryptoKey crua (DEK de paciente)', async () => {
+    const kek = await limmiarWebcrypto.importKek(crypto.getRandomValues(new Uint8Array(32)))
+    const { dek: chaveDePaciente } = await limmiarWebcrypto.generateWrappedDek(kek, new Uint8Array())
+    const store = { ler: vi.fn(), gravar: vi.fn(), apagar: vi.fn() }
+
+    render(
+      <I18nProvider i18n={i18n}>
+        {/* @ts-expect-error chaveIndiceDaConta é a única porta para ChaveIndiceBusca */}
+        <BibliotecaPage notas={[]} accountId={ACCOUNT_ID} chaveIndice={chaveDePaciente} store={store} />
+      </I18nProvider>,
+    )
   })
 })

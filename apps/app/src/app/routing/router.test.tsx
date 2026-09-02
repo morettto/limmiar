@@ -214,7 +214,7 @@ describe('router', () => {
   // BibliotecaPage é mockado aqui (não BibliotecaNotas): a fixture desta rota é o próprio
   // `store`, então o teste chama `ler`/`gravar` diretamente em vez de depender de
   // BibliotecaPage os invocar -- o que só aconteceria com um dek real, fora desta fatia.
-  it('resolves /biblioteca com fixtures vazias e dek=null; o store fixture nunca acha nada persistido', async () => {
+  it('resolves /biblioteca com fixtures vazias e chaveIndice=null; o store fixture nunca acha nada persistido', async () => {
     const router = await loadRouterAt('/biblioteca')
 
     render(<RouterProvider router={router} />)
@@ -224,7 +224,7 @@ describe('router', () => {
     const props = vi.mocked(BibliotecaPage).mock.calls[0]![0]
     expect(props.notas).toEqual([])
     expect(props.accountId).toBe('')
-    expect(props.dek).toBeNull()
+    expect(props.chaveIndice).toBeNull()
     await expect(props.store.ler()).resolves.toBeNull()
     await expect(props.store.gravar(new Uint8Array())).resolves.toBeUndefined()
     await expect(props.store.apagar()).resolves.toBeUndefined()

@@ -39,18 +39,26 @@ ver os READMEs dos dois para o fluxo de composição.
    (`indice === null`, ainda não construído/restaurado), `ocioso` (termo vazio -- mostra a
    biblioteca toda) ou `pronto` com `ids` (pode ser `[]`, sem resultados). Ver Decisões,
    "os três estados não colapsam em dois".
-7. `indiceBuscaAad(accountId)`/`selarIndice`/`abrirIndice` (`indice-crypto.ts`) cifram o
-   JSON do índice (já o envelope com impressão) sob a DEK da conta
-   (`webcrypto.encrypt`/`decrypt` de `@limmiar/crypto`), AAD
-   `limmiar/note-index/v1|{accountId}` -- rejeita se `accountId` não bater com o usado
-   para selar.
+7. `chaveIndiceDaConta(kek)` (`indice-crypto.ts`, ticket S08-10) é a única porta de
+   `ChaveIndiceBusca` -- um tipo marcado (`unique symbol`) que só ela produz, depois de
+   confirmar em runtime que `kek` tem usages de KEK (`wrapKey`/`unwrapKey`); uma DEK de
+   paciente (usages `encrypt`/`decrypt`) lança, e não compila onde `ChaveIndiceBusca` é
+   esperado. `selarIndice(chave, accountId, json)` gera uma DEK fresca por gravação
+   (`webcrypto.generateWrappedDek`), embrulhada por `chave` sob a AAD de
+   `indiceBuscaDekAad(accountId)` (`limmiar/note-index-dek/v1|{accountId}`, distinta da AAD
+   do conteúdo), cifra `json` sob essa DEK com `indiceBuscaAad(accountId)`
+   (`limmiar/note-index/v1|{accountId}`) e devolve `wrappedDek(60 bytes) || ciphertext`.
+   `abrirIndice(chave, accountId, selado)` é o inverso: corta os 60 bytes, desembrulha a
+   DEK, decifra o resto -- rejeita se `chave` não for a KEK que embrulhou, ou se
+   `accountId` não bater em qualquer uma das duas AAD. Ver Decisões, "DEK de conta, não DEK
+   de paciente, para o índice cross-paciente".
 8. `opfsIndice(dir)` (`indice-store.ts`) devolve `{ ler, gravar, apagar }`, o único trio
    autorizado a tocar a API OPFS para o índice de busca (um ficheiro fixo, `indice-busca`,
    por diretório já escopado à conta pelo chamador). `ler` devolve `null` quando o ficheiro
    ainda não existe (apanha só `NotFoundError`; qualquer outro erro propaga). `apagar`
    (ticket S08-09) faz `dir.removeEntry(ARQUIVO_INDICE)`.
-9. `persistirIndice(gravar, dek, accountId, indice, impressao)` (parâmetro solto, `gravar`
-   sozinho -- só usa esse campo) e `restaurarIndice(store, dek, accountId, impressao)`
+9. `persistirIndice(gravar, chave, accountId, indice, impressao)` (parâmetro solto, `gravar`
+   sozinho -- só usa esse campo) e `restaurarIndice(store, chave, accountId, impressao)`
    (`store: { ler, apagar }` inteiro -- os dois precisam de andar juntos) compõem os passos
    5+7+8: serializar (com a impressão) → selar → gravar, e ler → abrir → carregar (com a
    impressão). `gravar` nunca recebe o JSON em claro, só o blob selado. `restaurarIndice`:
@@ -73,12 +81,16 @@ ver os READMEs dos dois para o fluxo de composição.
   `carregarIndice(json, impressao: string): MiniSearch<DocNota> | null`,
   `ResultadoBusca`, `buscar(indice: MiniSearch<DocNota> | null, termo: string): ResultadoBusca`
   (`indice.ts`).
-- `indiceBuscaAad(accountId): Uint8Array<ArrayBuffer>`,
-  `selarIndice(dek, accountId, json): Promise<Uint8Array<ArrayBuffer>>`,
-  `abrirIndice(dek, accountId, selado): Promise<Uint8Array<ArrayBuffer>>` (`indice-crypto.ts`).
+- `ChaveIndiceBusca` (tipo marcado, `CryptoKey` de branding própria),
+  `chaveIndiceDaConta(kek: CryptoKey): ChaveIndiceBusca` (única porta de produção; lança se
+  `kek` não tiver usages `wrapKey`+`unwrapKey`), `indiceBuscaAad(accountId): Uint8Array<ArrayBuffer>`,
+  `indiceBuscaDekAad(accountId): Uint8Array<ArrayBuffer>`,
+  `selarIndice(chave: ChaveIndiceBusca, accountId, json): Promise<Uint8Array<ArrayBuffer>>`,
+  `abrirIndice(chave: ChaveIndiceBusca, accountId, selado): Promise<Uint8Array<ArrayBuffer>>`
+  (`indice-crypto.ts`).
 - `LerSelado`, `GravarSelado`, `ApagarSelado`, `opfsIndice(dir): { ler, gravar, apagar }`,
-  `persistirIndice(gravar: GravarSelado, dek, accountId, indice, impressao): Promise<void>`,
-  `restaurarIndice(store: { ler, apagar }, dek, accountId, impressao): Promise<MiniSearch<DocNota> | null>`
+  `persistirIndice(gravar: GravarSelado, chave: ChaveIndiceBusca, accountId, indice, impressao): Promise<void>`,
+  `restaurarIndice(store: { ler, apagar }, chave: ChaveIndiceBusca, accountId, impressao): Promise<MiniSearch<DocNota> | null>`
   (`indice-store.ts`).
 - Chamador (fatias 4-5): `widgets/biblioteca/BibliotecaNotas.tsx` renderiza `GrupoPaciente[]`
   e `ResultadoBusca`; `pages/biblioteca/BibliotecaPage.tsx` é quem chama
@@ -87,6 +99,10 @@ ver os READMEs dos dois para o fluxo de composição.
 
 ## Decisões desta fatia
 
+- **DEK de conta, não DEK de paciente, para o índice cross-paciente (ticket S08-10).** Chave
+  de conta (`ChaveIndiceBusca`, via `chaveIndiceDaConta(kek)`), DEK fresca por gravação
+  embrulhada e prefixada ao próprio blob selado. Wire format, alternativa rejeitada e
+  consequências: `docs/adr/ADR-S08-10-chave-de-conta-para-o-indice-de-busca.md`.
 - **OPFS, não Dexie, para persistir o índice.** A spec original apontava Dexie, mas o
   índice de busca não é um dado relacional/consultável por campo -- é um blob opaco
   (`MiniSearch.toJSON()` serializado) que só precisa de ser lido e escrito inteiro, de novo

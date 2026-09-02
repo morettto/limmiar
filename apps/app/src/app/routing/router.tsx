@@ -223,12 +223,12 @@ const notaRoute = createRoute({
 })
 
 // ponytail: mesma situação do `kek={null}` de CopilotKeyPage/NotaPage -- sem KeychainProvider
-// ainda. `dek={null}` deixa BibliotecaPage em `a-preparar` sem abrir OPFS. Quem ligar a sessão
-// substitui os quatro valores por props reais, sem mexer na lógica de BibliotecaPage.
+// ainda. `chaveIndice={null}` deixa BibliotecaPage em `a-preparar` sem abrir OPFS. Quem ligar
+// a sessão substitui os quatro valores por props reais, sem mexer na lógica de BibliotecaPage.
 const BIBLIOTECA_STORE_FIXTURE = { ler: async () => null, gravar: async () => {}, apagar: async () => {} }
 
 function BibliotecaRouteComponent() {
-  return <BibliotecaPage notas={[]} accountId="" dek={null} store={BIBLIOTECA_STORE_FIXTURE} />
+  return <BibliotecaPage notas={[]} accountId="" chaveIndice={null} store={BIBLIOTECA_STORE_FIXTURE} />
 }
 
 // Ticket S08-02, fatias 4-5: biblioteca de notas com busca cifrada no cliente. Rota normal
