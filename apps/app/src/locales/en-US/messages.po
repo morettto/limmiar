@@ -58,7 +58,7 @@ msgstr "Wait for the other device to read the code before releasing access."
 msgid "Aponte a câmera para o código QR exibido no outro dispositivo."
 msgstr "Point the camera at the QR code shown on the other device."
 
-#: src/features/nota-fila/FilaAssinatura.tsx:56
+#: src/features/nota-fila/FilaAssinatura.tsx:42
 msgid "Assinadas"
 msgstr "Signed"
 
@@ -74,6 +74,10 @@ msgstr "Database unavailable at the moment."
 #: src/App.tsx:10
 msgid "Bem-vindo ao Limmiar"
 msgstr "Welcome to Limmiar"
+
+#: src/widgets/biblioteca/BibliotecaNotas.tsx:39
+msgid "Buscar notas"
+msgstr "Search notes"
 
 #: src/features/copilot-byok/CopilotKeySetup.tsx:57
 msgid "Cadastrar chave de API de IA"
@@ -137,7 +141,7 @@ msgstr "How will you use Limmiar?"
 msgid "Concluindo o pareamento..."
 msgstr "Completing pairing..."
 
-#: src/app/routing/router.tsx:35
+#: src/app/routing/router.tsx:36
 msgid "Configurar copiloto de IA"
 msgstr "Set up AI copilot"
 
@@ -240,7 +244,7 @@ msgstr "This note has not been signed yet."
 msgid "notes.already_signed"
 msgstr "This note has already been signed."
 
-#: src/pages/notas/NotaPage.tsx:112
+#: src/pages/notas/NotaPage.tsx:124
 msgid "Esta nota já tinha sido assinada. As alterações feitas depois não estão cobertas por essa assinatura."
 msgstr "This note had already been signed. Changes made after that are not covered by that signature."
 
@@ -249,7 +253,7 @@ msgstr "This note had already been signed. Changes made after that are not cover
 msgid "agenda.session_cancelled"
 msgstr "This session was cancelled."
 
-#: src/features/nota-fila/FilaAssinatura.tsx:84
+#: src/features/nota-fila/FilaAssinatura.tsx:70
 msgid "Estado da nota"
 msgstr "Note status"
 
@@ -281,12 +285,12 @@ msgstr "This record changed on another device. Reload and try again."
 msgid "Estes códigos não serão exibidos novamente. Guarde-os em um local seguro: eles são a única forma de recuperar o acesso à sua conta caso você perca o aplicativo autenticador."
 msgstr "These codes will not be shown again. Store them somewhere safe: they are the only way to recover access to your account if you lose your authenticator app."
 
-#: src/pages/notas/NotaPage.tsx:117
+#: src/pages/notas/NotaPage.tsx:131
 msgid "Falha ao assinar a nota. Tente novamente."
 msgstr "Failed to sign the note. Try again."
 
-#: src/features/nota-fila/FilaAssinatura.tsx:100
-#: src/widgets/soap-editor/FilaEEditor.tsx:32
+#: src/features/nota-fila/FilaAssinatura.tsx:86
+#: src/widgets/soap-editor/FilaEEditor.tsx:31
 msgid "Fila de assinatura"
 msgstr "Signing queue"
 
@@ -378,6 +382,10 @@ msgstr "Could not decrypt the received key. Try pairing again."
 msgid "Não foi possível ler"
 msgstr "Could not read"
 
+#: src/pages/biblioteca/BibliotecaPage.tsx:66
+msgid "Não foi possível preparar a busca. Tente novamente."
+msgstr "Could not prepare the search. Try again."
+
 #: src/features/copilot-byok/CopilotKeySetup.tsx:61
 msgid "Não foi possível salvar a chave. Tente novamente."
 msgstr "Could not save the key. Try again."
@@ -392,11 +400,15 @@ msgstr "There is no pending two-factor verification setup for this account."
 msgid "voice.enrollment_not_found"
 msgstr "No voice enrollment found for this account."
 
-#: src/features/nota-fila/FilaAssinatura.tsx:108
+#: src/widgets/biblioteca/BibliotecaNotas.tsx:55
+msgid "Nenhuma nota encontrada."
+msgstr "No notes found."
+
+#: src/features/nota-fila/FilaAssinatura.tsx:94
 msgid "Nenhuma nota nesta aba."
 msgstr "No notes in this tab."
 
-#: src/pages/notas/NotaPage.tsx:105
+#: src/pages/notas/NotaPage.tsx:117
 msgid "Nota assinada em {dataAssinatura}."
 msgstr "Note signed on {dataAssinatura}."
 
@@ -432,13 +444,17 @@ msgstr "Patients"
 msgid "Parear novo dispositivo"
 msgstr "Pair new device"
 
-#: src/features/nota-fila/FilaAssinatura.tsx:55
+#: src/features/nota-fila/FilaAssinatura.tsx:41
 msgid "Pendentes"
 msgstr "Pending"
 
 #: src/features/nota-editor/EditorSoap.tsx:30
 msgid "Plano"
 msgstr "Plan"
+
+#: src/widgets/biblioteca/BibliotecaNotas.tsx:50
+msgid "Preparando a busca..."
+msgstr "Preparing search..."
 
 #: src/features/totp-enrollment/TotpSetup.tsx:78
 msgid "Preparando a verificação em duas etapas..."
@@ -478,9 +494,13 @@ msgstr "Risk"
 msgid "Salvar"
 msgstr "Save"
 
-#: src/widgets/soap-editor/FilaEEditor.tsx:40
+#: src/widgets/soap-editor/FilaEEditor.tsx:39
 msgid "Selecione uma nota na fila."
 msgstr "Select a note from the queue."
+
+#: src/pages/notas/NotaPage.tsx:87
+msgid "Sem sessão ativa. Não é possível assinar."
+msgstr "No active session. Signing is not possible."
 
 #: src/widgets/auth-screen/AuthScreen.tsx:204
 msgid "Senha"

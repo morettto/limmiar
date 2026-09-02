@@ -181,11 +181,11 @@ describe('NotaPage', () => {
       const { assinarNota } = await import('../../entities/nota/api')
       vi.mocked(assinarNota).mockResolvedValue({ ok: false, code: 'auth.access_token_invalid', params: {} })
 
-      const { props, notaId } = await renderEObterProps()
+      const { props, notaId } = await renderEObterProps(DEK)
       await assinar(props, notaId)
 
       const propsDepois = props()
-      expect(propsDepois.itens.find((item) => item.id === notaId)?.estado).toBe('pendente')
+      expect(propsDepois.notas.find((nota) => nota.id === notaId)?.estado).toBe('pendente')
       const alert = screen.getByRole('alert')
       expect(alert.textContent).toBe('Sua sessão expirou. Entre novamente.')
     })

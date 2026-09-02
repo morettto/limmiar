@@ -30,6 +30,7 @@ describe('notaParaDoc', () => {
         { id: 'S-0', secao: 'S', texto: 'febre há 3 dias', ancoras: [] },
         { id: 'O-0', secao: 'O', texto: '38.5 graus', ancoras: [] },
       ],
+      estado: 'pendente',
     }
 
     expect(notaParaDoc(nota)).toEqual({ id: 'nota-1', patientId: 'p1', texto: 'febre há 3 dias 38.5 graus' })
@@ -38,7 +39,7 @@ describe('notaParaDoc', () => {
 
 describe('impressaoDigital', () => {
   function notaComRevisao(id: string, revisao: number): Nota {
-    return { id, patientId: 'p1', revisao, frases: [] }
+    return { id, patientId: 'p1', revisao, frases: [], estado: 'pendente' }
   }
 
   it('é a mesma independentemente da ordem das notas', () => {

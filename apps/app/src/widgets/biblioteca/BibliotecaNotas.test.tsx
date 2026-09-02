@@ -10,8 +10,8 @@ const GRUPOS: readonly GrupoPaciente[] = [
   {
     patientId: 'paciente-1',
     itens: [
-      { id: 'nota-1', patientId: 'paciente-1', estado: 'pendente' },
-      { id: 'nota-2', patientId: 'paciente-1', estado: 'assinada' },
+      { id: 'nota-1', patientId: 'paciente-1', estado: 'pendente', revisao: 0, frases: [] },
+      { id: 'nota-2', patientId: 'paciente-1', estado: 'assinada', revisao: 0, frases: [] },
     ],
   },
 ]
@@ -80,15 +80,15 @@ describe('BibliotecaNotas', () => {
       {
         patientId: 'paciente-2',
         itens: [
-          { id: 'nota-3', patientId: 'paciente-2', estado: 'pendente' },
-          { id: 'nota-4', patientId: 'paciente-2', estado: 'assinada' },
+          { id: 'nota-3', patientId: 'paciente-2', estado: 'pendente', revisao: 0, frases: [] },
+          { id: 'nota-4', patientId: 'paciente-2', estado: 'assinada', revisao: 0, frases: [] },
         ],
       },
       {
         patientId: 'paciente-1',
         itens: [
-          { id: 'nota-1', patientId: 'paciente-1', estado: 'pendente' },
-          { id: 'nota-2', patientId: 'paciente-1', estado: 'assinada' },
+          { id: 'nota-1', patientId: 'paciente-1', estado: 'pendente', revisao: 0, frases: [] },
+          { id: 'nota-2', patientId: 'paciente-1', estado: 'assinada', revisao: 0, frases: [] },
         ],
       },
     ]
@@ -113,11 +113,11 @@ describe('BibliotecaNotas', () => {
     const grupos: readonly GrupoPaciente[] = [
       {
         patientId: 'paciente-1',
-        itens: [{ id: 'nota-1', patientId: 'paciente-1', estado: 'pendente' }],
+        itens: [{ id: 'nota-1', patientId: 'paciente-1', estado: 'pendente', revisao: 0, frases: [] }],
       },
       {
         patientId: 'paciente-2',
-        itens: [{ id: 'nota-3', patientId: 'paciente-2', estado: 'pendente' }],
+        itens: [{ id: 'nota-3', patientId: 'paciente-2', estado: 'pendente', revisao: 0, frases: [] }],
       },
     ]
     renderWidget({ grupos, resultado: { estado: 'pronto', ids: ['nota-1'] } })

@@ -11,8 +11,8 @@ const GRUPOS = [
   {
     patientId: 'paciente-1',
     itens: [
-      { id: 'nota-1', patientId: 'paciente-1', estado: 'pendente' as const },
-      { id: 'nota-2', patientId: 'paciente-1', estado: 'assinada' as const },
+      { id: 'nota-1', patientId: 'paciente-1', estado: 'pendente' as const, revisao: 0, frases: [] },
+      { id: 'nota-2', patientId: 'paciente-1', estado: 'assinada' as const, revisao: 0, frases: [] },
     ],
   },
 ]
