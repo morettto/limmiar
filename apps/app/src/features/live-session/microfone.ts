@@ -16,15 +16,12 @@ export type AbrirMicrofoneResult =
   | { ok: true; microfone: MicrofoneAutorizado }
   | { ok: false; motivo: 'consentimento-ausente' | 'permissao-negada' }
 
-/** A ÚNICA porta para `navigator.mediaDevices.getUserMedia` no código de captura ao
- *  vivo (ver invariante em README.md). Recusa sem nunca chamar `getUserMedia`
- *  quando o consentimento de gravação não está `'concedido'`.
- *
- *  ponytail: qualquer rejeição de `getUserMedia` (não só `NotAllowedError`) mapeia
- *  para `'permissao-negada'` -- `AbrirMicrofoneResult` só tem esses dois motivos, e
- *  distinguir `NotFoundError`/`NotReadableError` etc. exigiria um terceiro motivo que
- *  nenhum critério de aceite pede. Upgrade: acrescentar o motivo e ramificar por
- *  `erro.name` no dia em que a UI precisar de os distinguir. */
+// ponytail: qualquer rejeição de `getUserMedia` vira `'permissao-negada'`; acrescentar um
+// terceiro motivo e ramificar por `erro.name` no dia em que a UI precisar de os distinguir.
+
+/** A ÚNICA porta para `navigator.mediaDevices.getUserMedia` no código de captura ao vivo
+ *  (invariante em README.md): recusa sem nunca chamar `getUserMedia` quando o consentimento
+ *  de gravação não está `'concedido'`. */
 export async function abrirMicrofone(
   consentimentoGravacao: EstadoConsentimento,
   midia: MediaDevices = navigator.mediaDevices,

@@ -2,12 +2,9 @@ import { useState } from 'react'
 import { abrirMicrofone, type AbrirMicrofoneResult } from '../../features/live-session/microfone'
 import type { EstadoConsentimento } from '../../entities/consentimento/api'
 
-// Andaime de e2e, nunca produção: existe só para consentimento-microfone.spec.ts clicar "Gravar"
-// com um consentimento conhecido e ler no DOM o que `abrirMicrofone` devolveu, sem inventar UI
-// real. Vive num ficheiro próprio, e não dentro de router.tsx, por duas razões: o router volta a
-// ser tabela de rotas em vez de ganhar um componente com estado, e a copy visível daqui fica fora
-// do portão de i18n (ver a entrada deste caminho em eslint.config.mjs) sem que isso abra exceção
-// nenhuma a copy de produto.
+// Andaime de e2e, nunca produção: consentimento-microfone.spec.ts clica "Gravar" e lê no DOM o
+// que `abrirMicrofone` devolveu. Ficheiro próprio, e não router.tsx, para o router ficar tabela
+// de rotas e a copy daqui ficar fora do portão de i18n (ver eslint.config.mjs).
 export function E2eMicrofoneScaffold({ consentimento }: { consentimento: EstadoConsentimento }) {
   const [resultado, setResultado] = useState<AbrirMicrofoneResult | null>(null)
 
