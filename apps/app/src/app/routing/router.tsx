@@ -8,6 +8,7 @@ import { PairPrimaryPage } from '../../pages/device-pairing/PairPrimaryPage'
 import { PairNewPage } from '../../pages/device-pairing/PairNewPage'
 import { CopilotKeyPage } from '../../pages/settings/CopilotKeyPage'
 import { NotaPage } from '../../pages/notas/NotaPage'
+import { BibliotecaPage } from '../../pages/biblioteca/BibliotecaPage'
 import { parseEstadoConsentimento, type EstadoConsentimento } from '../../entities/consentimento/api'
 import { E2eMicrofoneScaffold } from './E2eMicrofoneScaffold'
 
@@ -236,12 +237,40 @@ const copilotSettingsRoute = createRoute({
   component: CopilotKeyPage,
 })
 
+// ponytail: mesma situação, mesmo motivo do `dek={null}` de BibliotecaRouteComponent --
+// sem KeychainProvider/sessão real montada ainda. Quem ligar Keychain/sessão substitui
+// `kek={null}` por uma `CryptoKey` real -- a lógica de NotaPage não muda.
+function NotaRouteComponent() {
+  return <NotaPage kek={null} />
+}
+
 // Ticket S08-01, fatia 2/5: Tela P4.1 (fila de assinatura + editor SOAP). Monta com uma
 // nota em memória -- ver o comentário no topo de pages/notas/NotaPage.tsx.
 const notaRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/notas',
-  component: NotaPage,
+  component: NotaRouteComponent,
+})
+
+// ponytail: mesma situação, mesmo motivo do `kek={null}, accountId=""` de CopilotKeyPage/
+// NotaPage -- sem KeychainProvider/sessão real montada ainda. `dek={null}` faz
+// BibliotecaPage ficar em `a-preparar` sem tentar abrir OPFS nenhuma; `notas` vazias e
+// `store` que nunca acha nada persistido são o equivalente, para esta rota, do prontuário
+// fixture de NotaPage. Quem ligar Keychain/sessão substitui os quatro valores por props
+// reais -- a lógica de BibliotecaPage não muda.
+const BIBLIOTECA_STORE_FIXTURE = { ler: async () => null, gravar: async () => {}, apagar: async () => {} }
+
+function BibliotecaRouteComponent() {
+  return <BibliotecaPage notas={[]} accountId="" dek={null} store={BIBLIOTECA_STORE_FIXTURE} />
+}
+
+// Ticket S08-02, fatias 4-5: biblioteca de notas com busca cifrada no cliente. Rota normal
+// de produto (não vai atrás do gate VITE_ENABLE_E2E_TEST_ROUTES) -- ao contrário dos blocos
+// acima, esta não é scaffolding só para o E2E alcançar a tela.
+const bibliotecaRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/biblioteca',
+  component: BibliotecaRouteComponent,
 })
 
 const routeTree =
@@ -251,6 +280,7 @@ const routeTree =
         magicLinkCallbackRoute,
         copilotSettingsRoute,
         notaRoute,
+        bibliotecaRoute,
         authScreenE2ERoute,
         pairPrimaryRoute,
         pairNewRoute,
@@ -258,7 +288,7 @@ const routeTree =
         recoveryPhraseSetupE2ERoute,
         e2eMicrofoneRoute,
       ])
-    : rootRoute.addChildren([indexRoute, magicLinkCallbackRoute, copilotSettingsRoute, notaRoute])
+    : rootRoute.addChildren([indexRoute, magicLinkCallbackRoute, copilotSettingsRoute, notaRoute, bibliotecaRoute])
 
 export const router = createRouter({ routeTree })
 

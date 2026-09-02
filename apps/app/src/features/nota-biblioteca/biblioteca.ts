@@ -1,8 +1,8 @@
-import { ESTADO_PENDENTE, type ItemFila } from '../nota-fila/FilaAssinatura'
+import { ESTADO_PENDENTE, type Nota } from '../../entities/nota/nota'
 
 export interface GrupoPaciente {
   readonly patientId: string
-  readonly itens: readonly ItemFila[]
+  readonly itens: readonly Nota[]
 }
 
 // Ordem determinística: os grupos saem pela ordem da primeira ocorrência de cada
@@ -11,8 +11,8 @@ export interface GrupoPaciente {
 // entre si, assinadas entre si) é a de entrada -- `Array.prototype.filter` é estável, então
 // não precisa de comparador de sort próprio. Sem isto uma lista que salta entre renders
 // seria bug (critério de aceite 3: "rascunhos em destaque no topo").
-export function agruparPorPaciente(itens: readonly ItemFila[]): GrupoPaciente[] {
-  const porPaciente = new Map<string, ItemFila[]>()
+export function agruparPorPaciente(itens: readonly Nota[]): GrupoPaciente[] {
+  const porPaciente = new Map<string, Nota[]>()
   for (const item of itens) {
     const grupo = porPaciente.get(item.patientId)
     if (grupo) {

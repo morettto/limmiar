@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { ESTADO_ASSINADA, ESTADO_PENDENTE, type ItemFila } from '../nota-fila/FilaAssinatura'
+import { ESTADO_ASSINADA, ESTADO_PENDENTE, type Nota } from '../../entities/nota/nota'
 import { agruparPorPaciente } from './biblioteca'
+
+function nota(id: string, patientId: string, estado: Nota['estado']): Nota {
+  return { id, patientId, revisao: 0, frases: [], estado }
+}
 
 describe('agruparPorPaciente', () => {
   it('agrupa por patientId e poe o rascunho no topo do seu grupo', () => {
-    const itens: ItemFila[] = [
-      { id: '1', patientId: 'p1', estado: ESTADO_ASSINADA },
-      { id: '2', patientId: 'p1', estado: ESTADO_PENDENTE },
-      { id: '3', patientId: 'p2', estado: ESTADO_ASSINADA },
+    const itens: Nota[] = [
+      nota('1', 'p1', ESTADO_ASSINADA),
+      nota('2', 'p1', ESTADO_PENDENTE),
+      nota('3', 'p2', ESTADO_ASSINADA),
     ]
 
     const grupos = agruparPorPaciente(itens)
@@ -15,14 +19,11 @@ describe('agruparPorPaciente', () => {
     expect(grupos).toEqual([
       {
         patientId: 'p1',
-        itens: [
-          { id: '2', patientId: 'p1', estado: ESTADO_PENDENTE },
-          { id: '1', patientId: 'p1', estado: ESTADO_ASSINADA },
-        ],
+        itens: [nota('2', 'p1', ESTADO_PENDENTE), nota('1', 'p1', ESTADO_ASSINADA)],
       },
       {
         patientId: 'p2',
-        itens: [{ id: '3', patientId: 'p2', estado: ESTADO_ASSINADA }],
+        itens: [nota('3', 'p2', ESTADO_ASSINADA)],
       },
     ])
   })

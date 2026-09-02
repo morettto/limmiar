@@ -7,13 +7,16 @@ import { test, expect, type Page } from '@playwright/test'
 // `/notas` (router.tsx) ainda não tem sessão/keychain real montada -- mesmo "sem ponto de
 // entrada de navegação real ainda" que CopilotKeySetup já documenta no seu próprio e2e
 // (copilot-key-setup.spec.ts), e NotaPage.tsx traz o mesmo comentário `ponytail:` no topo.
-// `aoAssinar` tenta mesmo assim a cadeia real (openRecord/appendPatientEntry/assinarNota) com
-// as credenciais fixture vazias -- contra o `wrangler dev` que este webServer sobe (a mesma
-// origem do frontend, não a API .NET), isso resolve de forma determinística para o caminho de
-// falha de rede desta fatia (role=alert, item continua pendente), o mesmo desfecho que
-// NotaPage.test.tsx cobre com os módulos de crypto/api duplados -- não depende de o Postgres
-// deste webServer estar alcançável (não está, ver playwright.config.ts) nem de uma sessão real
-// existir. Ligar `/notas` a uma sessão/Keychain real, e então provar aqui o desfecho de
+// S08-07: `kek` é prop obrigatória `CryptoKey | null` de NotaPage; `NotaRouteComponent`
+// em router.tsx monta `<NotaPage kek={null} />` explicitamente (mesmo padrão de
+// `BibliotecaRouteComponent`, sem KeychainProvider/sessão real montada ainda). `aoAssinar`
+// guarda cedo sobre `kek === null` e nem chega a tentar a cadeia real
+// (openRecord/appendPatientEntry/assinarNota) -- isso resolve de forma determinística para
+// o caminho "sem sessão" desta fatia (role=alert, item continua pendente), o mesmo
+// desfecho que NotaPage.test.tsx cobre com os módulos de crypto/api duplados -- não
+// depende de o Postgres deste webServer estar alcançável (não está, ver playwright.config.ts)
+// nem de uma sessão real existir. Ligar `/notas` a uma sessão/Keychain real (substituir
+// `kek={null}` por uma `CryptoKey` real em router.tsx), e então provar aqui o desfecho de
 // sucesso ("Assinada"), fica para quando esse ponto de entrada existir.
 
 async function tabAteListbox(page: Page): Promise<void> {
@@ -52,10 +55,10 @@ test.describe('Editor SOAP -- assinar só com teclado (S08-01)', () => {
 
     const alerta = page.getByRole('alert')
     await expect(alerta).toBeVisible()
-    await expect(alerta).toHaveText('Falha ao assinar a nota. Tente novamente.')
+    await expect(alerta).toHaveText('Sem sessão ativa. Não é possível assinar.')
 
-    // O item continua na aba "Pendentes" -- a cadeia real falhou antes de assinarNota
-    // devolver sucesso, então nada foi marcado como assinado.
+    // O item continua na aba "Pendentes" -- a guarda de sessão interrompeu antes de
+    // qualquer chamada à cadeia real, então nada foi marcado como assinado.
     await expect(page.getByRole('tab', { name: 'Pendentes', selected: true })).toBeVisible()
   })
 })

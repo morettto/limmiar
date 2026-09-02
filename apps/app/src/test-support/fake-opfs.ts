@@ -14,7 +14,8 @@
 //
 // `getFileHandle` sem `{ create }` sobre um nome ausente lança `DOMException` com
 // `name: 'NotFoundError'`, como a API real -- é o que `opfsIndice().ler` (indice-store.ts)
-// depende para distinguir "ficheiro ausente" de qualquer outro erro.
+// depende para distinguir "ficheiro ausente" de qualquer outro erro. `removeEntry` espelha
+// o mesmo: lança `NotFoundError` sobre um nome ausente, usado por `opfsIndice().apagar`.
 
 export class FakeWritable {
   private readonly handle: FakeFileHandle
@@ -73,6 +74,12 @@ export class FakeDirectoryHandle {
 
   async *keys(): AsyncIterableIterator<string> {
     for (const name of this.files.keys()) yield name
+  }
+
+  async removeEntry(name: string): Promise<void> {
+    if (!this.files.delete(name)) {
+      throw new DOMException(`ficheiro inexistente: ${name}`, 'NotFoundError')
+    }
   }
 }
 

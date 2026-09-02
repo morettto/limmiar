@@ -1,11 +1,16 @@
 {
-  "turno_iniciado": "2026-08-28",
+  "turno_iniciado": "2026-09-02",
   "tickets_planejados": [
-    "S08-01",
-    "S08-02"
+    "S08-09",
+    "S08-10",
+    "S08-11",
+    "S08-08"
   ],
   "tickets_concluidos": [
-    "S08-01"
+    "S08-09"
   ],
-  "ticket_atual": "S08-02"
+  "ticket_atual": "",
+  "spec_fechada": "",
+  "branch_da_mr": "",
+  "worktree": "C:/wt-S08 (S08 restante, branch feat/S08-02-busca-cifrada, local)"
 }

@@ -9,7 +9,9 @@ o módulo também sabe **selar** a nota -- assinatura sobre o digest (`nota-cryp
 cliente HTTP do endpoint de assinatura do backend (`api.ts`) -- mas continua sem UI e sem
 estado global: tudo entra e sai por parâmetro/retorno, mesmo padrão de `packages/copilot`
 e `apps/app/src/entities/patient` (`nota-crypto.ts` é, aliás, o molde literal de
-`entities/patient/patient-crypto.ts`; `api.ts` o de `entities/patient/api.ts`).
+`entities/patient/patient-crypto.ts`; `api.ts` o de `entities/patient/api.ts`). Desde o
+ticket S08-06, `Nota` também é dona do seu `estado` (`EstadoNota`, `ESTADO_PENDENTE`/
+`ESTADO_ASSINADA`) -- ver "Decisões da fatia S08-06" abaixo.
 
 ## Fluxo principal
 
@@ -31,8 +33,8 @@ e `apps/app/src/entities/patient` (`nota-crypto.ts` é, aliás, o molde literal 
    resultante (`iv(12) || ct(32) || tag(16)`) é o que `assinarNota` envia ao backend.
 6. `notaParaEntrada(nota)` (fatia 5) — serializa a nota inteira (não só o digest) para
    virar o `plaintext` de uma entrada de prontuário (`sealEntry`, `entities/patient`).
-7. `assinarNota`/`obterAssinatura` (fatia 5, `api.ts`) — cliente HTTP de
-   `POST`/`GET /accounts/{accountId}/notes/{noteId}/signature`.
+7. `assinarNota` (fatia 5, `api.ts`) — cliente HTTP de
+   `POST /accounts/{accountId}/notes/{noteId}/signature`.
 
 ## Pontos de entrada
 
@@ -55,8 +57,9 @@ e `apps/app/src/entities/patient` (`nota-crypto.ts` é, aliás, o molde literal 
   `ESTADO_PENDENTE`/`ESTADO_ASSINADA` de `features/nota-fila/FilaAssinatura.tsx`. Os
   READMEs de `features/nota-editor` e `features/nota-fila` linkam para aqui em vez de
   repetirem o parágrafo.
-- Tipos: `SecaoSoap`, `FraseNota`, `Nota` (`src/nota.ts`). `Afirmacao`/`Ancora` são
-  importados de `@limmiar/copilot`, não redeclarados.
+- Tipos: `SecaoSoap`, `FraseNota`, `Nota` (`src/nota.ts`), `EstadoNota` (`'pendente' |
+  'assinada'`); constantes `ESTADO_PENDENTE`, `ESTADO_ASSINADA` -- ver "Decisões da fatia
+  S08-06". `Afirmacao`/`Ancora` são importados de `@limmiar/copilot`, não redeclarados.
 - `notaAssinaturaAad(noteId: string, revisao: number): Uint8Array<ArrayBuffer>`
   (`nota-crypto.ts`, fatia 5) -- `"limmiar/note-signature/v1|{noteId}|{revisao}"` em UTF-8.
 - `selarAssinatura(dek: CryptoKey, noteId: string, nota: Nota): Promise<Uint8Array<ArrayBuffer>>`
@@ -64,11 +67,6 @@ e `apps/app/src/entities/patient` (`nota-crypto.ts` é, aliás, o molde literal 
 - `notaParaEntrada(nota: Nota): Uint8Array<ArrayBuffer>` (`nota-crypto.ts`, fatia 5).
 - `assinarNota(baseUrl, accountId, accessToken, noteId, { revisao, signature }): Promise<AssinarNotaResult>`
   (`api.ts`, fatia 5) -- `POST /accounts/{accountId}/notes/{noteId}/signature`, 201.
-- `obterAssinatura(baseUrl, accountId, accessToken, noteId): Promise<ObterAssinaturaResult>`
-  (`api.ts`, fatia 5) -- `GET /accounts/{accountId}/notes/{noteId}/signature`, 200 ou 404
-  `notes.signature_not_found`. Ainda sem chamador (fica pronto para a fatia que precisar de
-  reabrir uma nota já assinada e mostrar quando foi assinada sem depender só do estado
-  local de `NotaPage`).
 
 ## Decisões desta fatia
 
@@ -128,9 +126,34 @@ e `apps/app/src/entities/patient` (`nota-crypto.ts` é, aliás, o molde literal 
   mudou um único byte -- assinaturas já produzidas dependem disso, e os testes existentes
   de `textoCanonico`/`nota-crypto` continuam verdes sem alteração.
 
+## Decisões da fatia S08-06 (fundir `ItemFila` em `Nota`)
+
+- **`EstadoNota`/`ESTADO_PENDENTE`/`ESTADO_ASSINADA` mudaram-se para aqui, vindos de
+  `features/nota-fila/FilaAssinatura.tsx` (onde viviam como `EstadoNotaFila`/`ItemFila`).**
+  `ItemFila { id, patientId, estado }` era a mesma entidade que `Nota` partida em duas
+  coleções paralelas, com o mesmo `id` a servir de chave implícita entre elas e nada a
+  garantir que concordassem -- ver a origem completa do defeito em
+  `[[S08-06 Fundir ItemFila em Nota e eliminar as listas paralelas]]`. `estado` passou a
+  campo de `Nota`; `ItemFila` deixou de existir. `FilaAssinatura`/`agruparPorPaciente`
+  (`features/nota-fila`, `features/nota-biblioteca`) importam `EstadoNota`/
+  `ESTADO_PENDENTE`/`ESTADO_ASSINADA` daqui, em vez de os redeclararem.
+- **`rascunhoParaNota` agora devolve `estado: ESTADO_PENDENTE`.** Um rascunho recém-criado
+  nasce sempre pendente -- a única mudança de comportamento desta fatia neste ficheiro
+  (`digestNota`/`textoCanonico` continuam a ignorar `estado`, não faz parte da superfície
+  assinada).
+
 ## Fora de âmbito
 
 - UI de edição da nota, e a captura/transcrição de áudio — nenhuma delas é tocada aqui.
 - Ligar `selarAssinatura`/`assinarNota` ao ecrã (gravar no prontuário antes de assinar,
   reagir a 409/falha de rede, marcar a nota como assinada na fila) -- isso é
   `pages/notas/NotaPage.tsx` (fatia 5), ver o README desse módulo.
+
+## Removido (S08-02)
+
+- **`obterAssinatura`/`ObterAssinaturaResult`** (`api.ts`) foram apagados: nasceram na
+  fatia 5 do S08-01 sem chamador ("fica pronto para..."), e continuaram sem nenhum até o
+  ticket S08-02 -- reabrir uma nota já assinada é fluxo que ainda não existe em lado
+  nenhum da app. Veredicto herdado do S08-01 (já registado nesse README antes da remoção),
+  não reaberto aqui. `assinarNota` continua -- é o único lado do endpoint com chamador
+  real (`pages/notas/NotaPage.tsx`).

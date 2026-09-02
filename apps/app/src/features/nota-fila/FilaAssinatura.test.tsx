@@ -2,15 +2,20 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { I18nProvider } from '@lingui/react'
 import { i18n, dynamicActivate } from '../../shared/i18n'
-import { FilaAssinatura, type ItemFila } from './FilaAssinatura'
+import type { Nota } from '../../entities/nota/nota'
+import { FilaAssinatura } from './FilaAssinatura'
 
-const ITENS: readonly ItemFila[] = [
-  { id: 'nota-1', patientId: 'paciente-1', estado: 'pendente' },
-  { id: 'nota-2', patientId: 'paciente-2', estado: 'pendente' },
-  { id: 'nota-3', patientId: 'paciente-3', estado: 'assinada' },
+function nota(id: string, patientId: string, estado: Nota['estado']): Nota {
+  return { id, patientId, revisao: 0, frases: [], estado }
+}
+
+const ITENS: readonly Nota[] = [
+  nota('nota-1', 'paciente-1', 'pendente'),
+  nota('nota-2', 'paciente-2', 'pendente'),
+  nota('nota-3', 'paciente-3', 'assinada'),
 ]
 
-function renderFila(props?: Partial<{ itens: readonly ItemFila[]; selecionadoId: string | null; onSelecionar: (id: string) => void }>) {
+function renderFila(props?: Partial<{ itens: readonly Nota[]; selecionadoId: string | null; onSelecionar: (id: string) => void }>) {
   return render(
     <I18nProvider i18n={i18n}>
       <FilaAssinatura
@@ -152,9 +157,9 @@ describe('FilaAssinatura', () => {
       <I18nProvider i18n={i18n}>
         <FilaAssinatura
           itens={[
-            { id: 'nota-1', patientId: 'paciente-1', estado: 'pendente' },
-            { id: 'nota-2', patientId: 'paciente-2', estado: 'assinada' },
-            { id: 'nota-3', patientId: 'paciente-3', estado: 'assinada' },
+            nota('nota-1', 'paciente-1', 'pendente'),
+            nota('nota-2', 'paciente-2', 'assinada'),
+            nota('nota-3', 'paciente-3', 'assinada'),
           ]}
           selecionadoId={null}
           onSelecionar={onSelecionar}
@@ -182,10 +187,7 @@ describe('FilaAssinatura', () => {
     rerender(
       <I18nProvider i18n={i18n}>
         <FilaAssinatura
-          itens={[
-            { id: 'nota-1', patientId: 'paciente-1', estado: 'assinada' },
-            { id: 'nota-2', patientId: 'paciente-2', estado: 'assinada' },
-          ]}
+          itens={[nota('nota-1', 'paciente-1', 'assinada'), nota('nota-2', 'paciente-2', 'assinada')]}
           selecionadoId={null}
           onSelecionar={onSelecionar}
         />

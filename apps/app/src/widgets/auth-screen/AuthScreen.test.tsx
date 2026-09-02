@@ -85,7 +85,11 @@ describe('AuthScreen', () => {
     fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'correct horse battery staple' } })
     fireEvent.click(screen.getByRole('button', { name: 'Criar conta' }))
 
-    await waitFor(() => expect(registerMock).toHaveBeenCalledTimes(1))
+    // { timeout: 3000 }: "Criar conta" runs a real Argon2id derivation (no mock for that
+    // step) before register() is ever called -- RTL's default 1000ms waitFor timeout is a
+    // tight race against genuine CPU-bound work, not a leak between test files. Same
+    // headroom PairNewDevice.test.tsx already uses for its own slow async wait.
+    await waitFor(() => expect(registerMock).toHaveBeenCalledTimes(1), { timeout: 3000 })
 
     const call = registerMock.mock.calls[0]
     expect(call?.[0]).toBe('http://api.test')
@@ -210,14 +214,19 @@ describe('AuthScreen', () => {
     fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'correct horse battery staple' } })
     fireEvent.click(screen.getByRole('button', { name: 'Criar conta' }))
 
-    await waitFor(() =>
-      expect(beginTotpEnrollmentMock).toHaveBeenCalledWith(
-        'http://api.test',
-        '44444444-4444-4444-4444-444444444444',
-        'ticket-pro-setup',
-      ),
+    // { timeout: 3000 }: same real Argon2id derivation as the test above, ahead of
+    // register() -> beginTotpEnrollment() -> render. Default 1000ms is a tight margin
+    // against genuine CPU-bound work, not a cross-file leak.
+    await waitFor(
+      () =>
+        expect(beginTotpEnrollmentMock).toHaveBeenCalledWith(
+          'http://api.test',
+          '44444444-4444-4444-4444-444444444444',
+          'ticket-pro-setup',
+        ),
+      { timeout: 3000 },
     )
-    expect(await screen.findByDisplayValue('JBSWY3DPEHPK3PXP')).toBeTruthy()
+    expect(await screen.findByDisplayValue('JBSWY3DPEHPK3PXP', {}, { timeout: 3000 })).toBeTruthy()
 
     // Not authenticated yet: the registration form's own "success" copy and
     // onAuthenticated must not have fired.
@@ -324,7 +333,9 @@ describe('AuthScreen', () => {
     fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'correct horse battery staple' } })
     fireEvent.click(screen.getByRole('button', { name: 'Criar conta' }))
 
-    await screen.findByDisplayValue('JBSWY3DPEHPK3PXP')
+    // { timeout: 3000 }: same real Argon2id derivation ahead of render as the two tests
+    // above -- same fix, same reason.
+    await screen.findByDisplayValue('JBSWY3DPEHPK3PXP', {}, { timeout: 3000 })
     fireEvent.change(screen.getByLabelText(/código de 6 dígitos/i), { target: { value: '123456' } })
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }))
 

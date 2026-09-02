@@ -1,30 +1,16 @@
 import { useState, type KeyboardEvent } from 'react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { proximoIndice } from './navegacao-teclado'
-
-export type EstadoNotaFila = 'pendente' | 'assinada'
-
-// Constantes (não literais inline) pela mesma razão que entities/nota/nota.ts exporta
-// ORDEM_SECOES: lingui/no-unlocalized-strings varre todo `.tsx`, e um `const` SCREAMING_
-// SNAKE_CASE já está isento por convenção deste repo (ver eslint.config.mjs) -- mais barato
-// do que alargar a lista de ignoreNames para um par de valores tão locais a este módulo.
-export const ESTADO_PENDENTE: EstadoNotaFila = 'pendente'
-export const ESTADO_ASSINADA: EstadoNotaFila = 'assinada'
-
-export interface ItemFila {
-  readonly id: string
-  readonly patientId: string
-  readonly estado: EstadoNotaFila
-}
+import { ESTADO_ASSINADA, ESTADO_PENDENTE, type EstadoNota, type Nota } from '../../entities/nota/nota'
 
 export interface FilaAssinaturaProps {
-  itens: readonly ItemFila[]
+  itens: readonly Nota[]
   /** Nota atualmente aberta no editor (fonte da verdade no widget-pai), não a que o teclado percorre. */
   selecionadoId: string | null
   onSelecionar: (id: string) => void
 }
 
-const ABAS: readonly EstadoNotaFila[] = [ESTADO_PENDENTE, ESTADO_ASSINADA]
+const ABAS: readonly EstadoNota[] = [ESTADO_PENDENTE, ESTADO_ASSINADA]
 
 function indiceInicial(total: number): number {
   return total > 0 ? 0 : -1
@@ -47,16 +33,16 @@ function indiceClampado(indice: number, total: number): number {
  */
 export function FilaAssinatura({ itens, selecionadoId, onSelecionar }: FilaAssinaturaProps) {
   const { t } = useLingui()
-  const [aba, setAba] = useState<EstadoNotaFila>(ESTADO_PENDENTE)
+  const [aba, setAba] = useState<EstadoNota>(ESTADO_PENDENTE)
   const filtrados = itens.filter((item) => item.estado === aba)
   const [indiceAtivo, setIndiceAtivo] = useState(() => indiceInicial(filtrados.length))
 
-  const rotulos: Record<EstadoNotaFila, string> = {
+  const rotulos: Record<EstadoNota, string> = {
     pendente: t`Pendentes`,
     assinada: t`Assinadas`,
   }
 
-  function trocarAba(proximaAba: EstadoNotaFila) {
+  function trocarAba(proximaAba: EstadoNota) {
     setAba(proximaAba)
     setIndiceAtivo(indiceInicial(itens.filter((item) => item.estado === proximaAba).length))
   }
