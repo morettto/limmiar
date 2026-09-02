@@ -17,3 +17,6 @@
 - Write comments only for what the code cannot say: a *why*, a constraint, a decision that looks wrong without context. Never restate what the line below already shows.
 - Keep a comment block to 3 lines of text. `comments/no-long-comments` (oxlint, `tools/oxlint-plugin-comments`) fails the lint above that, in every workspace and in CI. Longer explanations belong in the module README, an ADR, or the spec — not inline.
 - Tool directives (`eslint-disable`, `Stryker disable`, `@ts-expect-error`, ...) are exempt and never counted.
+
+- Keep every branch synced with `origin/main` at all times, in both harnesses. Planning (`/plan:*`) branches off a freshly fetched `main`; implementation (`/build:*`) merges `origin/main` into the working branch at the start of each ticket, before each commit, and before opening the MR. Resolve conflicts one merge at a time, then re-run the gates that the merge could break (`pnpm -r --if-present lint`, the affected `test:unit`, `check:i18n-extract`, `check:i18n-complete`, `tsc -b`).
+- `tools/branch-sync-guard.mjs` (PreToolUse hook, `.claude/settings.json`) enforces this: a `git commit`, `git push` or new branch on a branch behind `origin/main` is refused until the merge happens. The merge itself is never blocked.
