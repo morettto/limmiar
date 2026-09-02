@@ -11,7 +11,7 @@ function iniciar(opcoes?: CriarMaquinaSessaoOpcoes) {
 
 function criarAtivaAquecendo() {
   const actor = iniciar()
-  actor.send({ type: 'CONSENTIMENTO_CONCEDIDO' })
+  actor.send({ type: 'CONSENTIMENTO_CONCEDIDO', concedidoEm: '2026-08-28T12:00:00.000Z' })
   return actor
 }
 
@@ -55,6 +55,12 @@ describe('aguardandoConsentimento', () => {
     const actor = iniciar()
     actor.send({ type: 'ENCERRAR' })
     expect(actor.getSnapshot().value).toBe('encerrado')
+  })
+
+  it('CONSENTIMENTO_CONCEDIDO carimba o instante do servidor, não o relógio local', () => {
+    const actor = iniciar()
+    actor.send({ type: 'CONSENTIMENTO_CONCEDIDO', concedidoEm: '2020-01-01T00:00:00.000Z' })
+    expect(actor.getSnapshot().context.consentimentoEm).toBe('2020-01-01T00:00:00.000Z')
   })
 })
 
@@ -176,14 +182,33 @@ describe('interrompido', () => {
     actor.send({ type: 'ENCERRAR' })
     expect(actor.getSnapshot().matches('encerrando')).toBe(true)
   })
+
+  it('TENTAR_NOVAMENTE sem consentimento não reabre ativa', () => {
+    // Chega a interrompido sem nunca passar por CONSENTIMENTO_CONCEDIDO: via
+    // recuperando.RECUPERACAO_FALHOU, o mesmo seam do teste 20 abaixo.
+    const actor = iniciar({ chunksOrfaos: 7 })
+    actor.send({ type: 'RECUPERACAO_FALHOU', motivo: 'chunk-corrompido' })
+    actor.send({ type: 'TENTAR_NOVAMENTE' })
+    const snapshot = actor.getSnapshot()
+    expect(snapshot.value).toBe('aguardandoConsentimento')
+    expect(snapshot.context.ultimaFalha).toBeNull()
+  })
 })
 
 describe('recuperando', () => {
   it('19. RECUPERACAO_CONCLUIDA leva a ativa.pausado e regista os chunks recuperados', () => {
-    const actor = iniciar({ chunksOrfaos: 7 })
+    const actor = iniciar({ chunksOrfaos: 7, consentimentoEm: '2026-08-28T12:00:00.000Z' })
     actor.send({ type: 'RECUPERACAO_CONCLUIDA', chunksRecuperados: 7 })
     const snapshot = actor.getSnapshot()
     expect(snapshot.value).toEqual({ ativa: 'pausado' })
+    expect(snapshot.context.chunksPersistidos).toBe(7)
+  })
+
+  it('RECUPERACAO_CONCLUIDA sem consentimento herdado volta a aguardandoConsentimento', () => {
+    const actor = iniciar({ chunksOrfaos: 7 })
+    actor.send({ type: 'RECUPERACAO_CONCLUIDA', chunksRecuperados: 7 })
+    const snapshot = actor.getSnapshot()
+    expect(snapshot.value).toBe('aguardandoConsentimento')
     expect(snapshot.context.chunksPersistidos).toBe(7)
   })
 

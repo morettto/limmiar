@@ -58,6 +58,14 @@ msgstr "Attendi che l'altro dispositivo legga il codice prima di consentire l'ac
 msgid "Aponte a câmera para o código QR exibido no outro dispositivo."
 msgstr "Inquadra con la fotocamera il codice QR mostrato sull'altro dispositivo."
 
+#: src/features/nota-fila/FilaAssinatura.tsx:56
+msgid "Assinadas"
+msgstr "Firmate"
+
+#: src/features/nota-editor/EditorSoap.tsx:29
+msgid "Avaliação"
+msgstr "Valutazione"
+
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:14
 msgid "health.database_unreachable"
@@ -129,7 +137,7 @@ msgstr "Come userai Limmiar?"
 msgid "Concluindo o pareamento..."
 msgstr "Completamento dell'abbinamento..."
 
-#: src/app/routing/router.tsx:31
+#: src/app/routing/router.tsx:35
 msgid "Configurar copiloto de IA"
 msgstr "Configura copilota IA"
 
@@ -223,9 +231,27 @@ msgid "Esta frase não será exibida novamente. Guarde-a em um local seguro: ela
 msgstr "Questa frase non verrà mostrata di nuovo. Conservala in un luogo sicuro: è l'unico modo per recuperare l'accesso al tuo account se perdi tutti i tuoi dispositivi."
 
 #. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:165
+msgid "notes.signature_not_found"
+msgstr "Questa nota non è ancora stata firmata."
+
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:161
+msgid "notes.already_signed"
+msgstr "Questa nota è già stata firmata."
+
+#: src/pages/notas/NotaPage.tsx:112
+msgid "Esta nota já tinha sido assinada. As alterações feitas depois não estão cobertas por essa assinatura."
+msgstr "Questa nota era già stata firmata. Le modifiche fatte dopo non sono coperte da questa firma."
+
+#. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:149
 msgid "agenda.session_cancelled"
 msgstr "Questa sessione è stata annullata."
+
+#: src/features/nota-fila/FilaAssinatura.tsx:84
+msgid "Estado da nota"
+msgstr "Stato della nota"
 
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:109
@@ -254,6 +280,15 @@ msgstr "Questa cartella è cambiata su un altro dispositivo. Ricarica e riprova.
 #: src/features/totp-enrollment/TotpSetup.tsx:101
 msgid "Estes códigos não serão exibidos novamente. Guarde-os em um local seguro: eles são a única forma de recuperar o acesso à sua conta caso você perca o aplicativo autenticador."
 msgstr "Questi codici non verranno mostrati di nuovo. Conservali in un luogo sicuro: sono l'unico modo per recuperare l'accesso al tuo account se perdi l'app di autenticazione."
+
+#: src/pages/notas/NotaPage.tsx:117
+msgid "Falha ao assinar a nota. Tente novamente."
+msgstr "Impossibile firmare la nota. Riprova."
+
+#: src/features/nota-fila/FilaAssinatura.tsx:100
+#: src/widgets/soap-editor/FilaEEditor.tsx:32
+msgid "Fila de assinatura"
+msgstr "Coda di firma"
 
 #: src/features/copilot-byok/CopilotKeySetup.tsx:66
 msgid "Fornecedor"
@@ -357,10 +392,22 @@ msgstr "Non c'è nessuna configurazione di verifica in due passaggi in sospeso p
 msgid "voice.enrollment_not_found"
 msgstr "Nessuna registrazione vocale trovata per questo account."
 
+#: src/features/nota-fila/FilaAssinatura.tsx:108
+msgid "Nenhuma nota nesta aba."
+msgstr "Nessuna nota in questa scheda."
+
+#: src/pages/notas/NotaPage.tsx:105
+msgid "Nota assinada em {dataAssinatura}."
+msgstr "Nota firmata il {dataAssinatura}."
+
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:121
 msgid "auth.device_pairing_payload_not_delivered"
 msgstr "Il dispositivo principale non ha ancora consentito l'accesso. Attendi."
+
+#: src/features/nota-editor/EditorSoap.tsx:28
+msgid "Objetivo"
+msgstr "Obiettivo"
 
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:18
@@ -368,7 +415,7 @@ msgid "unexpected_error"
 msgstr "Si è verificato un errore imprevisto sul server."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:165
+#: src/shared/api/problem-messages.ts:181
 msgid "errors.generic"
 msgstr "Si è verificato un errore imprevisto. Riprova."
 
@@ -384,6 +431,14 @@ msgstr "Pazienti"
 #: src/features/device-pairing-primary/PairingQr.tsx:149
 msgid "Parear novo dispositivo"
 msgstr "Abbina nuovo dispositivo"
+
+#: src/features/nota-fila/FilaAssinatura.tsx:55
+msgid "Pendentes"
+msgstr "In attesa"
+
+#: src/features/nota-editor/EditorSoap.tsx:30
+msgid "Plano"
+msgstr "Piano"
 
 #: src/features/totp-enrollment/TotpSetup.tsx:78
 msgid "Preparando a verificação em duas etapas..."
@@ -423,6 +478,10 @@ msgstr "Rischio"
 msgid "Salvar"
 msgstr "Salva"
 
+#: src/widgets/soap-editor/FilaEEditor.tsx:40
+msgid "Selecione uma nota na fila."
+msgstr "Seleziona una nota nella coda."
+
 #: src/widgets/auth-screen/AuthScreen.tsx:204
 msgid "Senha"
 msgstr "Password"
@@ -438,9 +497,19 @@ msgid "agenda.not_authorized_to_schedule"
 msgstr "Il tuo account non può ancora programmare sessioni."
 
 #. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:169
+msgid "notes.not_authorized_to_sign"
+msgstr "Il tuo account non può ancora firmare note."
+
+#. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:129
 msgid "patients.not_authorized_to_create_records"
 msgstr "Il tuo account non può ancora creare cartelle."
+
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:173
+msgid "consent.not_authorized_to_record"
+msgstr "Il tuo account non può ancora registrare il consenso."
 
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:98
@@ -457,9 +526,17 @@ msgstr "La tua sessione è scaduta. Accedi di nuovo."
 msgid "auth.totp_ticket_invalid"
 msgstr "La verifica in due passaggi è scaduta. Accedi di nuovo."
 
+#: src/features/nota-editor/EditorSoap.tsx:27
+msgid "Subjetivo"
+msgstr "Soggettivo"
+
 #: src/widgets/auth-screen/AuthScreen.tsx:157
 msgid "Tipo de conta"
 msgstr "Tipo di account"
+
+#: src/features/nota-editor/Citacao.tsx:32
+msgid "Tocar áudio de {inicio} a {fim}"
+msgstr "Riproduci audio da {inicio} a {fim}"
 
 #: src/features/totp-challenge/TotpChallenge.tsx:44
 msgid "Verificação em duas etapas"

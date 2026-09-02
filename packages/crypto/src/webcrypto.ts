@@ -141,6 +141,14 @@ export async function encrypt(
   return concat(iv, new Uint8Array(ciphertext))
 }
 
+// SHA-256 over arbitrary bytes, e.g. for a content digest that a signature later covers
+// (apps/app entities/nota's textoCanonico -> digestNota). Not a MAC/HMAC and not keyed —
+// callers needing tamper-evidence against an adversary who can also rewrite the digest
+// need a signature or HMAC on top, this alone only proves "these exact bytes".
+export async function sha256(data: Uint8Array<ArrayBuffer>): Promise<Uint8Array<ArrayBuffer>> {
+  return new Uint8Array(await crypto.subtle.digest('SHA-256', data))
+}
+
 // No manual length pre-check — subtle fails closed on malformed input.
 export async function decrypt(
   dek: WebCryptoKey,

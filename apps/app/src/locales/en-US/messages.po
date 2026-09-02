@@ -58,6 +58,14 @@ msgstr "Wait for the other device to read the code before releasing access."
 msgid "Aponte a câmera para o código QR exibido no outro dispositivo."
 msgstr "Point the camera at the QR code shown on the other device."
 
+#: src/features/nota-fila/FilaAssinatura.tsx:56
+msgid "Assinadas"
+msgstr "Signed"
+
+#: src/features/nota-editor/EditorSoap.tsx:29
+msgid "Avaliação"
+msgstr "Assessment"
+
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:14
 msgid "health.database_unreachable"
@@ -129,7 +137,7 @@ msgstr "How will you use Limmiar?"
 msgid "Concluindo o pareamento..."
 msgstr "Completing pairing..."
 
-#: src/app/routing/router.tsx:31
+#: src/app/routing/router.tsx:35
 msgid "Configurar copiloto de IA"
 msgstr "Set up AI copilot"
 
@@ -223,9 +231,27 @@ msgid "Esta frase não será exibida novamente. Guarde-a em um local seguro: ela
 msgstr "This phrase will not be shown again. Store it somewhere safe: it is the only way to recover access to your account if you lose all your devices."
 
 #. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:165
+msgid "notes.signature_not_found"
+msgstr "This note has not been signed yet."
+
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:161
+msgid "notes.already_signed"
+msgstr "This note has already been signed."
+
+#: src/pages/notas/NotaPage.tsx:112
+msgid "Esta nota já tinha sido assinada. As alterações feitas depois não estão cobertas por essa assinatura."
+msgstr "This note had already been signed. Changes made after that are not covered by that signature."
+
+#. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:149
 msgid "agenda.session_cancelled"
 msgstr "This session was cancelled."
+
+#: src/features/nota-fila/FilaAssinatura.tsx:84
+msgid "Estado da nota"
+msgstr "Note status"
 
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:109
@@ -254,6 +280,15 @@ msgstr "This record changed on another device. Reload and try again."
 #: src/features/totp-enrollment/TotpSetup.tsx:101
 msgid "Estes códigos não serão exibidos novamente. Guarde-os em um local seguro: eles são a única forma de recuperar o acesso à sua conta caso você perca o aplicativo autenticador."
 msgstr "These codes will not be shown again. Store them somewhere safe: they are the only way to recover access to your account if you lose your authenticator app."
+
+#: src/pages/notas/NotaPage.tsx:117
+msgid "Falha ao assinar a nota. Tente novamente."
+msgstr "Failed to sign the note. Try again."
+
+#: src/features/nota-fila/FilaAssinatura.tsx:100
+#: src/widgets/soap-editor/FilaEEditor.tsx:32
+msgid "Fila de assinatura"
+msgstr "Signing queue"
 
 #: src/features/copilot-byok/CopilotKeySetup.tsx:66
 msgid "Fornecedor"
@@ -357,10 +392,22 @@ msgstr "There is no pending two-factor verification setup for this account."
 msgid "voice.enrollment_not_found"
 msgstr "No voice enrollment found for this account."
 
+#: src/features/nota-fila/FilaAssinatura.tsx:108
+msgid "Nenhuma nota nesta aba."
+msgstr "No notes in this tab."
+
+#: src/pages/notas/NotaPage.tsx:105
+msgid "Nota assinada em {dataAssinatura}."
+msgstr "Note signed on {dataAssinatura}."
+
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:121
 msgid "auth.device_pairing_payload_not_delivered"
 msgstr "The primary device has not released access yet. Please wait."
+
+#: src/features/nota-editor/EditorSoap.tsx:28
+msgid "Objetivo"
+msgstr "Objective"
 
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:18
@@ -368,7 +415,7 @@ msgid "unexpected_error"
 msgstr "An unexpected server error occurred."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:165
+#: src/shared/api/problem-messages.ts:181
 msgid "errors.generic"
 msgstr "An unexpected error occurred. Please try again."
 
@@ -384,6 +431,14 @@ msgstr "Patients"
 #: src/features/device-pairing-primary/PairingQr.tsx:149
 msgid "Parear novo dispositivo"
 msgstr "Pair new device"
+
+#: src/features/nota-fila/FilaAssinatura.tsx:55
+msgid "Pendentes"
+msgstr "Pending"
+
+#: src/features/nota-editor/EditorSoap.tsx:30
+msgid "Plano"
+msgstr "Plan"
 
 #: src/features/totp-enrollment/TotpSetup.tsx:78
 msgid "Preparando a verificação em duas etapas..."
@@ -423,6 +478,10 @@ msgstr "Risk"
 msgid "Salvar"
 msgstr "Save"
 
+#: src/widgets/soap-editor/FilaEEditor.tsx:40
+msgid "Selecione uma nota na fila."
+msgstr "Select a note from the queue."
+
 #: src/widgets/auth-screen/AuthScreen.tsx:204
 msgid "Senha"
 msgstr "Password"
@@ -438,9 +497,19 @@ msgid "agenda.not_authorized_to_schedule"
 msgstr "Your account cannot schedule sessions yet."
 
 #. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:169
+msgid "notes.not_authorized_to_sign"
+msgstr "Your account cannot sign notes yet."
+
+#. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:129
 msgid "patients.not_authorized_to_create_records"
 msgstr "Your account cannot create records yet."
+
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:173
+msgid "consent.not_authorized_to_record"
+msgstr "Your account cannot record consent yet."
 
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:98
@@ -457,9 +526,17 @@ msgstr "Your session has expired. Sign in again."
 msgid "auth.totp_ticket_invalid"
 msgstr "Your two-factor verification has expired. Sign in again."
 
+#: src/features/nota-editor/EditorSoap.tsx:27
+msgid "Subjetivo"
+msgstr "Subjective"
+
 #: src/widgets/auth-screen/AuthScreen.tsx:157
 msgid "Tipo de conta"
 msgstr "Account type"
+
+#: src/features/nota-editor/Citacao.tsx:32
+msgid "Tocar áudio de {inicio} a {fim}"
+msgstr "Play audio from {inicio} to {fim}"
 
 #: src/features/totp-challenge/TotpChallenge.tsx:44
 msgid "Verificação em duas etapas"

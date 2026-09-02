@@ -17,3 +17,15 @@ export function sealChunk(
 ): Promise<Uint8Array<ArrayBuffer>> {
   return webcrypto.encrypt(dek, chunk, audioChunkAad(sessionId, seq))
 }
+
+/** Inverso de `sealChunk`. Rejeita se `sessionId`/`seq` não forem os mesmos usados para
+ *  selar (AAD errada) -- é o que impede um chunk de outra sessão, ou fora de ordem,
+ *  de abrir por bom. */
+export function abrirChunk(
+  dek: CryptoKey,
+  sessionId: string,
+  seq: number,
+  selado: Uint8Array<ArrayBuffer>,
+): Promise<Uint8Array<ArrayBuffer>> {
+  return webcrypto.decrypt(dek, selado, audioChunkAad(sessionId, seq))
+}

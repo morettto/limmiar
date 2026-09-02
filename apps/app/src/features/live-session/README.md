@@ -9,14 +9,18 @@ o pipeline de áudio real (tomada B) que alimenta esse ring: um
 `AudioWorklet` (`pcm-tap.processor.ts`/`pcm-tap.ts`) e um `TranscriptionEngine`
 escolhido por flag de build (`engine-for.ts`), hospedado num Worker
 (`asr.worker.ts`), mais o carregador que liga esse motor ao reconhecedor
-sherpa-onnx/Nemotron real (`nemotron-loader.ts`). Mesma disciplina de
+sherpa-onnx/Nemotron real (`nemotron-loader.ts`), mais a porta única para o
+microfone (`microfone.ts`, S10-02 fatia 4) que exige consentimento de
+gravação concedido antes de o abrir. Mesma disciplina de
 `patients/patient-crypto.ts`/`copilot/copilot-crypto.ts`: AAD versionada
 por contexto, cifra pela primitiva única de `@limmiar/crypto`, nunca
 reinventada aqui. Fatia 3 de S05-02 -- cifra + escrita OPFS + adapter
 (`live-session.ts`) + store de segmentos (`segment-store.ts`). Fatia 4 --
 tap + Worker ASR + motor por flag. Fatia 6 -- carregador do motor real
 (`nemotron-loader.ts`); o Worker passa a hospedar `nemotronEngine` em vez
-de `fakeEngine`. `SessaoAoVivo.tsx` fica para uma fatia seguinte.
+de `fakeEngine`. S10-02 fatia 4 -- `microfone.ts` passa a ser o único
+construtor de `LigarSessaoOpcoes.microfone`, substituindo o antigo campo
+`stream: MediaStream`. `SessaoAoVivo.tsx` fica para uma fatia seguinte.
 
 ## Fluxo -- cifra (`audio-crypto.ts`)
 
@@ -26,6 +30,13 @@ de `fakeEngine`. `SessaoAoVivo.tsx` fica para uma fatia seguinte.
 sob essa AAD via `webcrypto.encrypt` de `@limmiar/crypto` -- wire format
 `iv(12) || ciphertext || tag(16)`, mesma primitiva usada em todo o resto do
 app, não reimplementada.
+
+`abrirChunk(dek, sessionId, seq, selado)` é o inverso exato (fatia 3, S08-01)
+-- `webcrypto.decrypt` sob a mesma AAD. Rejeita se `sessionId`/`seq` não
+forem os mesmos usados para selar: é a AAD, não uma checagem extra, que
+impede um chunk de outra sessão ou fora de ordem de abrir por bom. Consumido
+por `features/nota-audio/reprodutor.ts` (`abrirSessaoComoBlob`), que também
+reusa `listarOrfaos` (abaixo) para listar os chunks de uma sessão por `seq`.
 
 ## Fluxo -- escrita OPFS (`chunk-store.ts`)
 
@@ -46,6 +57,50 @@ app, não reimplementada.
 OPFS (`createWritable`/`write` de `FileSystemFileHandle`). Nenhum outro
 módulo deve chamar `getFileHandle`/`createWritable` diretamente -- quem
 precisa de persistir um chunk passa por `persistChunk`.
+
+## Fluxo -- porta do microfone (`microfone.ts`, S10-02 fatia 4)
+
+`abrirMicrofone(consentimentoGravacao, midia = navigator.mediaDevices)` é a
+porta única para `getUserMedia` no caminho de captura ao vivo: sem
+`consentimentoGravacao === 'concedido'`, devolve
+`{ ok: false, motivo: 'consentimento-ausente' }` **sem nunca chamar
+`getUserMedia`** -- é o portão do critério de aceite 3 do ticket S10-02, e é
+por isso que existe um teste com um spy de zero chamadas. Com consentimento
+concedido, chama `midia.getUserMedia({ audio: true })`; qualquer rejeição
+(`NotAllowedError` incluído) mapeia para `{ ok: false, motivo:
+'permissao-negada' }` -- `ponytail:` o motivo não distingue
+`NotAllowedError` de outras falhas (`NotFoundError`, sem hardware, etc.)
+porque `AbrirMicrofoneResult` só tem esses dois motivos e nenhum critério de
+aceite pede um terceiro; se a UI precisar de os distinguir, é a hora de
+acrescentar o motivo e ramificar por `erro.name`. Em sucesso devolve `{ ok:
+true, microfone }`, onde `MicrofoneAutorizado` é um tipo com marca nominal
+cujo único construtor é esta função -- `LigarSessaoOpcoes.microfone` (abaixo)
+só aceita o que `abrirMicrofone` devolveu, e montar o objeto à mão não compila.
+
+### Prova em browser real (S10-02 fatia 6)
+
+O teste de `microfone.test.ts` acima corre em jsdom, com um `getUserMedia` falso -- prova a
+lógica, não que um browser de verdade se comporta assim. `e2e/consentimento-microfone.spec.ts`
+fecha essa lacuna: Chromium real, lançado com `--use-fake-device-for-media-stream` (microfone
+falso sempre disponível) e `permissions: ['microphone']` já concedida ao contexto -- ou seja, o
+browser abriria o microfone se lhe fosse pedido. Navega para o andaime `/e2e/microfone?
+consentimento=revogado` (`app/routing/router.tsx`, atrás de `VITE_ENABLE_E2E_TEST_ROUTES`,
+mesmo precedente de `/devices/pair-primary`), clica "Gravar" e confirma que aparece o `role=alert`
+com `'consentimento-ausente'` -- nunca o `role=status` de sucesso. Prova que o guard cedo de
+`abrirMicrofone` é real: se alguém o remover, este teste passa a abrir o microfone de verdade e
+falha. O andaime em si não é produção (ver o README de `entities/consentimento` e o comentário
+no próprio `router.tsx`); o ida-e-volta ao servidor (registar/obter consentimento) é provado
+pelas fatias 3 e 4, não por este spec.
+
+### Invariante -- só `microfone.ts` chama `getUserMedia`
+
+`microfone.ts` é o único ficheiro do caminho de captura ao vivo autorizado a
+chamar `navigator.mediaDevices.getUserMedia`. Mesmo precedente da invariante
+de `chunk-store.ts` sobre a escrita OPFS (acima): documentada, sem lint a
+impor -- sobe a lint se um segundo módulo deste caminho lhe tocar. **Não
+cobre `features/qr-scan/qr-decode.ts`**, que já chamava `getUserMedia`
+diretamente antes deste ticket (câmara para leitura de QR, não microfone) --
+essa chamada é anterior a esta invariante e fora do âmbito de S10-02.
 
 ## Fluxo -- sessão ao vivo (`live-session.ts` + `segment-store.ts`)
 
@@ -230,14 +285,24 @@ vive.
 ## Pontos de entrada
 
 - `audioChunkAad(sessionId, seq): Uint8Array<ArrayBuffer>`,
-  `sealChunk(dek, sessionId, seq, chunk): Promise<Uint8Array<ArrayBuffer>>`
+  `sealChunk(dek, sessionId, seq, chunk): Promise<Uint8Array<ArrayBuffer>>`,
+  `abrirChunk(dek, sessionId, seq, selado): Promise<Uint8Array<ArrayBuffer>>`
   (`audio-crypto.ts`).
 - `WriteSealed` (tipo), `opfsWriter(dir): WriteSealed`,
   `persistChunk(write, dek, sessionId, seq, blob): Promise<void>`,
   `listarOrfaos(dir): Promise<string[]>` (`chunk-store.ts`).
+- `abrirMicrofone(consentimentoGravacao: EstadoConsentimento, midia?: MediaDevices): Promise<AbrirMicrofoneResult>`
+  -- porta única para `getUserMedia`; `MicrofoneAutorizado` (tipo, construtor
+  único é esta função), `AbrirMicrofoneResult` (`microfone.ts`, S10-02 fatia 4).
 - `ligarSessao(opcoes: LigarSessaoOpcoes): SessaoAoVivo` -- controller com
   `pausar()`, `retomar()`, `encerrar(): Promise<void>` (idempotente, drena
-  a fila e emite `FILA_DRENADA`) (`live-session.ts`).
+  a fila e emite `FILA_DRENADA`) (`live-session.ts`). `opcoes.microfone:
+  MicrofoneAutorizado` (S10-02 fatia 4, substitui o antigo `stream:
+  MediaStream`) -- só `abrirMicrofone` o constrói, o que transforma "quem
+  liga a sessão tem de se lembrar do consentimento" em erro de compilação.
+  O que torna isto verdade e não convenção é a marca nominal (um `unique
+  symbol` não exportado no campo da interface): sem ela, a tipagem estrutural
+  do TypeScript aceitaria qualquer `{ stream }` montado à mão.
 - `SegmentStore` (tipo), `criarSegmentStore(): SegmentStore` --
   `subscribe`/`getSnapshot`/`acrescentar`, contrato `useSyncExternalStore`
   (`segment-store.ts`).
@@ -259,9 +324,15 @@ vive.
 **Sem mock de OPFS de repositório para reusar**: grepado
 `FileSystemDirectoryHandle`/`createWritable`/`getDirectory` em todo o repo
 antes de escrever um -- nenhum precedente. O mock (`FakeDirectoryHandle`/
-`FakeFileHandle`/`FakeWritable`) fica local a `chunk-store.test.ts`, só com
+`FakeFileHandle`/`FakeWritable`) começou local a `chunk-store.test.ts`, só com
 os métodos que `chunk-store.ts` de facto usa (`getFileHandle`,
-`createWritable`, `write`, `close`, `keys`), sem lib nova.
+`createWritable`, `write`, `close`, `keys`), sem lib nova. Desde S08-02
+(terceira duplicação -- `reprodutor.test.ts` já tinha duplicado uma vez, e
+`indice-store.test.ts` de `features/nota-biblioteca` precisava dos dois
+lados, leitura e escrita) vive em `apps/app/src/test-support/fake-opfs.ts`;
+`chunk-store.test.ts` importa de lá em vez de o redeclarar. `handle.bytes`
+só fica visível depois de `close()` -- espelha a API real e substitui o
+antigo campo `writable.closed`.
 
 **Nome de ficheiro é só o `seq`, sem `sessionId`**: o diretório passado a
 `opfsWriter` já é escopado a uma sessão (quem chama decide o diretório);

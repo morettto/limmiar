@@ -4,6 +4,7 @@ import { RouterProvider } from '@tanstack/react-router'
 import { I18nProvider } from '@lingui/react'
 import { i18n, dynamicActivate } from '../../shared/i18n'
 import { encodeBase64 } from '../../shared/lib/base64'
+import type { MicrofoneAutorizado } from '../../features/live-session/microfone'
 
 vi.mock('../../widgets/auth-screen/AuthScreen', () => ({ AuthScreen: vi.fn(() => <div data-testid="auth-screen" />) }))
 vi.mock('../../features/magic-link-auth/MagicLinkCallback', () => ({
@@ -23,6 +24,12 @@ vi.mock('../../features/device-pairing-new/PairNewDevice', () => ({
 }))
 vi.mock('../../features/copilot-byok/CopilotKeySetup', () => ({
   CopilotKeySetup: vi.fn(() => <div data-testid="copilot-key-setup" />),
+}))
+vi.mock('../../widgets/soap-editor/FilaEEditor', () => ({
+  FilaEEditor: vi.fn(() => <div data-testid="fila-e-editor" />),
+}))
+vi.mock('../../features/live-session/microfone', () => ({
+  abrirMicrofone: vi.fn(),
 }))
 
 // Route construction (createRoute/createRouter/routeTree, including the env-gated E2E
@@ -121,6 +128,94 @@ describe('router', () => {
     })
 
     expect(router.state.location.pathname).toBe('/settings/copilot')
+  })
+
+  it('resolves /notas and mounts FilaEEditor with a single in-memory nota fixture (pendente, S/O/A/P)', async () => {
+    const router = await loadRouterAt('/notas')
+
+    render(
+      <I18nProvider i18n={i18n}>
+        <RouterProvider router={router} />
+      </I18nProvider>,
+    )
+    await screen.findByTestId('fila-e-editor')
+
+    const { FilaEEditor } = await import('../../widgets/soap-editor/FilaEEditor')
+    const props = vi.mocked(FilaEEditor).mock.calls[0]![0]
+    expect(props.itens).toHaveLength(1)
+    expect(props.itens[0]!.estado).toBe('pendente')
+    const notaId = props.itens[0]!.id
+    expect(props.notas[notaId]).toBeDefined()
+    expect(props.notas[notaId]!.frases.map((frase) => frase.secao)).toEqual(['S', 'O', 'A', 'P'])
+  })
+
+  it('/notas: aoTocar toca a âncora no reprodutor real (fatia 3)', async () => {
+    const play = vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(() => Promise.resolve())
+    const router = await loadRouterAt('/notas')
+    render(
+      <I18nProvider i18n={i18n}>
+        <RouterProvider router={router} />
+      </I18nProvider>,
+    )
+    await screen.findByTestId('fila-e-editor')
+
+    const { FilaEEditor } = await import('../../widgets/soap-editor/FilaEEditor')
+    const props = vi.mocked(FilaEEditor).mock.calls[0]![0]
+
+    expect(props.aoTocar({ inicioMs: 2500, fimMs: 3000 })).toBeUndefined()
+    expect(play).toHaveBeenCalledTimes(1)
+
+    play.mockRestore()
+  })
+
+  it('/notas: onChangeNota atualiza a nota em memória, refletida na renderização seguinte', async () => {
+    const router = await loadRouterAt('/notas')
+    render(
+      <I18nProvider i18n={i18n}>
+        <RouterProvider router={router} />
+      </I18nProvider>,
+    )
+    await screen.findByTestId('fila-e-editor')
+
+    const { FilaEEditor } = await import('../../widgets/soap-editor/FilaEEditor')
+    const props = vi.mocked(FilaEEditor).mock.calls[0]![0]
+    const notaId = props.itens[0]!.id
+    const notaEditada = { ...props.notas[notaId]!, revisao: 1 }
+
+    await act(async () => {
+      props.onChangeNota(notaEditada)
+    })
+
+    const propsDepois = vi.mocked(FilaEEditor).mock.calls.at(-1)![0]
+    expect(propsDepois.notas[notaId]).toEqual(notaEditada)
+  })
+
+  // NotaPage ainda não tem sessão/keychain real montada nesta rota (ver o comentário
+  // ponytail: no topo de NotaPage.tsx) -- aoAssinar tenta mesmo assim a cadeia real
+  // (openRecord/appendPatientEntry/assinarNota), que aqui falha (kek/credenciais fixture),
+  // caindo no mesmo caminho de falha de rede que um apagão de rede genuíno cairia: o item
+  // fica pendente e um role=alert é anunciado. O caminho de sucesso (fatia 5) é coberto por
+  // NotaPage.test.tsx com os módulos de crypto/api duplados.
+  it('/notas: aoAssinar sem sessão real cai no caminho de falha de rede -- item continua pendente', async () => {
+    const router = await loadRouterAt('/notas')
+    render(
+      <I18nProvider i18n={i18n}>
+        <RouterProvider router={router} />
+      </I18nProvider>,
+    )
+    await screen.findByTestId('fila-e-editor')
+
+    const { FilaEEditor } = await import('../../widgets/soap-editor/FilaEEditor')
+    const props = vi.mocked(FilaEEditor).mock.calls[0]![0]
+    const notaId = props.itens[0]!.id
+
+    await act(async () => {
+      await (props.aoAssinar(props.notas[notaId]!) as unknown as Promise<void>)
+    })
+
+    const propsDepois = vi.mocked(FilaEEditor).mock.calls.at(-1)![0]
+    expect(propsDepois.itens[0]!.estado).toBe('pendente')
+    expect(screen.getByRole('alert')).toBeTruthy()
   })
 
   it('resolves /auth/magic-link and passes baseUrl/token through to MagicLinkCallback', async () => {
@@ -261,5 +356,63 @@ describe('router', () => {
     const kek = new Uint8Array([9, 9, 9])
     props.onKekAdopted(kek)
     expect(e2eKekAdopted).toHaveBeenCalledWith(encodeBase64(kek))
+  })
+
+  it('resolves /e2e/microfone (E2E-only): forwards a valid consentimento to abrirMicrofone and shows an alert on refusal', async () => {
+    const { abrirMicrofone } = await import('../../features/live-session/microfone')
+    vi.mocked(abrirMicrofone).mockResolvedValue({ ok: false, motivo: 'consentimento-ausente' })
+
+    const router = await loadRouterAt('/e2e/microfone?consentimento=revogado', true)
+    render(<RouterProvider router={router} />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Gravar' }))
+
+    expect(abrirMicrofone).toHaveBeenCalledWith('revogado')
+    expect((await screen.findByRole('alert')).textContent).toContain('consentimento-ausente')
+    expect(screen.queryByRole('status')).toBeNull()
+  })
+
+  it('/e2e/microfone falls back to "pendente" when consentimento is absent from the query string', async () => {
+    const { abrirMicrofone } = await import('../../features/live-session/microfone')
+    vi.mocked(abrirMicrofone).mockResolvedValue({ ok: false, motivo: 'consentimento-ausente' })
+
+    const router = await loadRouterAt('/e2e/microfone', true)
+    render(<RouterProvider router={router} />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Gravar' }))
+
+    expect(abrirMicrofone).toHaveBeenCalledWith('pendente')
+    await screen.findByRole('alert')
+  })
+
+  it('/e2e/microfone falls back to "pendente" when consentimento is not one of the three known states', async () => {
+    const { abrirMicrofone } = await import('../../features/live-session/microfone')
+    vi.mocked(abrirMicrofone).mockResolvedValue({ ok: false, motivo: 'consentimento-ausente' })
+
+    const router = await loadRouterAt('/e2e/microfone?consentimento=bogus', true)
+    render(<RouterProvider router={router} />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Gravar' }))
+
+    expect(abrirMicrofone).toHaveBeenCalledWith('pendente')
+    await screen.findByRole('alert')
+  })
+
+  it('/e2e/microfone shows a status when abrirMicrofone succeeds', async () => {
+    const { abrirMicrofone } = await import('../../features/live-session/microfone')
+    vi.mocked(abrirMicrofone).mockResolvedValue({
+      ok: true,
+      // A porta está mockada aqui, logo ninguém a atravessa para receber a marca nominal:
+      // o cast é do duplo, não de código de produção.
+      microfone: { stream: {} as MediaStream } as MicrofoneAutorizado,
+    })
+
+    const router = await loadRouterAt('/e2e/microfone?consentimento=concedido', true)
+    render(<RouterProvider router={router} />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Gravar' }))
+
+    expect((await screen.findByRole('status')).textContent).toContain('microfone aberto')
+    expect(screen.queryByRole('alert')).toBeNull()
   })
 })

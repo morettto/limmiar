@@ -1,5 +1,6 @@
 import { webcrypto as limmiarWebcrypto } from '@limmiar/crypto'
 import { describe, expect, it } from 'vitest'
+import { FakeDirectoryHandle, fakeDir } from '../../test-support/fake-opfs'
 import { audioChunkAad } from './audio-crypto'
 import { listarOrfaos, opfsWriter, persistChunk, type WriteSealed } from './chunk-store'
 
@@ -17,46 +18,6 @@ function toHex(bytes: Uint8Array): string {
     .join('')
 }
 
-// No OPFS in Node/Vitest and no repo precedent for a File System Access API mock (grepped
-// apps/app/src and beyond) -- minimal local mock, only the surface chunk-store.ts actually uses.
-class FakeWritable {
-  chunks: Uint8Array[] = []
-  closed = false
-  async write(data: Uint8Array): Promise<void> {
-    this.chunks.push(data)
-  }
-  async close(): Promise<void> {
-    this.closed = true
-  }
-}
-
-class FakeFileHandle {
-  writable?: FakeWritable
-  async createWritable(): Promise<FakeWritable> {
-    this.writable = new FakeWritable()
-    return this.writable
-  }
-}
-
-class FakeDirectoryHandle {
-  files = new Map<string, FakeFileHandle>()
-  async getFileHandle(name: string, options?: { create?: boolean }): Promise<FakeFileHandle> {
-    const existing = this.files.get(name)
-    if (existing) return existing
-    if (!options?.create) throw new Error(`no such file: ${name}`)
-    const handle = new FakeFileHandle()
-    this.files.set(name, handle)
-    return handle
-  }
-  async *keys(): AsyncIterableIterator<string> {
-    for (const name of this.files.keys()) yield name
-  }
-}
-
-function fakeDir(): FileSystemDirectoryHandle {
-  return new FakeDirectoryHandle() as unknown as FileSystemDirectoryHandle
-}
-
 describe('opfsWriter', () => {
   it('writes the sealed bytes to a file named by seq, then closes the stream', async () => {
     const dir = new FakeDirectoryHandle()
@@ -67,8 +28,9 @@ describe('opfsWriter', () => {
 
     const handle = dir.files.get('3')
     expect(handle).toBeDefined()
-    expect(handle!.writable!.chunks).toEqual([sealed])
-    expect(handle!.writable!.closed).toBe(true)
+    // `bytes` só existe depois de `close()` (ver test-support/fake-opfs.ts) -- isto prova
+    // as duas coisas de uma vez: os bytes selados chegaram, e o stream foi de facto fechado.
+    expect(handle!.bytes).toEqual(sealed)
   })
 
   it('names each chunk by its own seq, not overwriting siblings', async () => {
@@ -122,7 +84,7 @@ describe('persistChunk', () => {
 
     await persistChunk(write, dek, SESSION_ID, 2, blob)
 
-    const written = dir.files.get('2')!.writable!.chunks[0] as Uint8Array<ArrayBuffer>
+    const written = dir.files.get('2')!.bytes as Uint8Array<ArrayBuffer>
     expect(toHex(written)).not.toBe(toHex(blob))
     const opened = await limmiarWebcrypto.decrypt(dek, written, audioChunkAad(SESSION_ID, 2))
     expect(toHex(opened)).toBe(toHex(blob))

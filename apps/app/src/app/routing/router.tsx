@@ -7,11 +7,15 @@ import { RecoveryPhraseSetupPage } from '../../pages/recovery/RecoveryPhraseSetu
 import { PairPrimaryPage } from '../../pages/device-pairing/PairPrimaryPage'
 import { PairNewPage } from '../../pages/device-pairing/PairNewPage'
 import { CopilotKeyPage } from '../../pages/settings/CopilotKeyPage'
+import { NotaPage } from '../../pages/notas/NotaPage'
+import { parseEstadoConsentimento, type EstadoConsentimento } from '../../entities/consentimento/api'
+import { E2eMicrofoneScaffold } from './E2eMicrofoneScaffold'
 
 function readSearchString(search: Record<string, unknown>, key: string): string {
   const value = search[key]
   return typeof value === 'string' ? value : ''
 }
+
 
 // The root route's own component is deliberately left unset: TanStack Router's default
 // root component already renders an <Outlet/> for whichever child route matched, which is
@@ -185,13 +189,41 @@ function PairNewRouteComponent() {
   return <PairNewPage baseUrl={baseUrl} />
 }
 
+// S10-02 fatia 6 (decisão 6 do desenho -- zero UI de produção): a única exceção é este
+// andaime mínimo de E2E, no mesmo precedente de /devices/pair-primary acima -- consentimento
+// chega por query string, não há navegação real até este ecrã porque não existe nenhum ecrã
+// de produção para uma finalidade de consentimento revogar/conceder (decisão 6: "nenhuma rota
+// de produção"). Ao contrário de pair-primary (que reusa um componente de produção,
+// PairPrimaryDevice, montado por uma página real), este componente não tem equivalente de
+// produção nenhum -- existe só para consentimento-microfone.spec.ts clicar "Gravar" com um
+// consentimento conhecido e ler no DOM o que `abrirMicrofone` devolveu, sem inventar UI real.
+interface E2eMicrofoneSearch {
+  consentimento: EstadoConsentimento
+}
+
+const e2eMicrofoneRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/e2e/microfone',
+  validateSearch: (search: Record<string, unknown>): E2eMicrofoneSearch => ({
+    consentimento: parseEstadoConsentimento(search.consentimento),
+  }),
+  component: E2eMicrofoneRouteComponent,
+})
+
+function E2eMicrofoneRouteComponent() {
+  const { consentimento } = e2eMicrofoneRoute.useSearch()
+  return <E2eMicrofoneScaffold consentimento={consentimento} />
+}
+
 // All of these routes are E2E-only scaffolding (see the file-level doc comment above) and
 // must not ship in the real production bundle: auth/screen mounts AuthScreen with no
 // login-flow guard in front of it, pair-primary takes an accessToken + raw KEK straight off
 // the query string, pair-new is unusable without a window hook the E2E installs, auth/recover
-// mounts RecoveryScreen the same bare way auth/screen mounts AuthScreen, and
+// mounts RecoveryScreen the same bare way auth/screen mounts AuthScreen,
 // auth/recovery-phrase-setup takes an accessToken straight off the query string the same way
-// pair-primary does -- but "unusable in practice" isn't the same as "absent from the bundle",
+// pair-primary does, and e2e/microfone (S10-02 fatia 6, above) mounts a bare "Gravar" button
+// wired straight to `abrirMicrofone` with the consentimento state read off the query string --
+// but "unusable in practice" isn't the same as "absent from the bundle",
 // a route registered in the real tree is still shipped, crawlable, and linkable. Gating on
 // `import.meta.env.DEV` would also exclude them from THIS E2E, since playwright.config.ts
 // exercises a real `vite build` (not `vite dev`) to match production bundling as closely as
@@ -204,19 +236,29 @@ const copilotSettingsRoute = createRoute({
   component: CopilotKeyPage,
 })
 
+// Ticket S08-01, fatia 2/5: Tela P4.1 (fila de assinatura + editor SOAP). Monta com uma
+// nota em memória -- ver o comentário no topo de pages/notas/NotaPage.tsx.
+const notaRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/notas',
+  component: NotaPage,
+})
+
 const routeTree =
   import.meta.env.VITE_ENABLE_E2E_TEST_ROUTES === 'true'
     ? rootRoute.addChildren([
         indexRoute,
         magicLinkCallbackRoute,
         copilotSettingsRoute,
+        notaRoute,
         authScreenE2ERoute,
         pairPrimaryRoute,
         pairNewRoute,
         recoveryScreenE2ERoute,
         recoveryPhraseSetupE2ERoute,
+        e2eMicrofoneRoute,
       ])
-    : rootRoute.addChildren([indexRoute, magicLinkCallbackRoute, copilotSettingsRoute])
+    : rootRoute.addChildren([indexRoute, magicLinkCallbackRoute, copilotSettingsRoute, notaRoute])
 
 export const router = createRouter({ routeTree })
 
