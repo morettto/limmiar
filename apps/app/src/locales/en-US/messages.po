@@ -137,7 +137,7 @@ msgstr "How will you use Limmiar?"
 msgid "Concluindo o pareamento..."
 msgstr "Completing pairing..."
 
-#: src/app/routing/router.tsx:32
+#: src/app/routing/router.tsx:35
 msgid "Configurar copiloto de IA"
 msgstr "Set up AI copilot"
 
@@ -229,6 +229,16 @@ msgstr "This account is not awaiting review."
 #: src/features/recovery/RecoveryPhraseSetup.tsx:83
 msgid "Esta frase não será exibida novamente. Guarde-a em um local seguro: ela é a única forma de recuperar o acesso à sua conta caso você perca todos os seus dispositivos."
 msgstr "This phrase will not be shown again. Store it somewhere safe: it is the only way to recover access to your account if you lose all your devices."
+
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:165
+msgid "notes.signature_not_found"
+msgstr "This note has not been signed yet."
+
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:161
+msgid "notes.already_signed"
+msgstr "This note has already been signed."
 
 #: src/pages/notas/NotaPage.tsx:112
 msgid "Esta nota já tinha sido assinada. As alterações feitas depois não estão cobertas por essa assinatura."
@@ -405,7 +415,7 @@ msgid "unexpected_error"
 msgstr "An unexpected server error occurred."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:165
+#: src/shared/api/problem-messages.ts:181
 msgid "errors.generic"
 msgstr "An unexpected error occurred. Please try again."
 
@@ -487,9 +497,19 @@ msgid "agenda.not_authorized_to_schedule"
 msgstr "Your account cannot schedule sessions yet."
 
 #. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:169
+msgid "notes.not_authorized_to_sign"
+msgstr "Your account cannot sign notes yet."
+
+#. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:129
 msgid "patients.not_authorized_to_create_records"
 msgstr "Your account cannot create records yet."
+
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:173
+msgid "consent.not_authorized_to_record"
+msgstr "Your account cannot record consent yet."
 
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:98

@@ -1,4 +1,5 @@
 using Api.Accounts;
+using Api.Consent;
 using Api.Data;
 using Api.Health;
 using Api.ExceptionHandling;
@@ -49,6 +50,7 @@ public partial class Program
         builder.Services.AddPatients();
         builder.Services.AddScheduling();
         builder.Services.AddNotes();
+        builder.Services.AddConsent();
 
         var app = builder.Build();
 
@@ -66,6 +68,7 @@ public partial class Program
         app.MapPatients();
         app.MapScheduling();
         app.MapNotes();
+        app.MapConsent();
 
         return app;
     }

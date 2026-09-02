@@ -75,6 +75,23 @@ tentar arrancar o container, não passam silenciosamente. Os testes puramente un
   testes constroem o store diretamente. Ver
   `docs/adr/ADR-S10-01-campos-do-hash-da-trilha.md` e o README do módulo
   (`src/Api/Features/Audit/README.md`).
+- `src/Api/Features/Consent` -- consentimento por finalidade (`Gravacao`, `AnaliseIa`):
+  `ConsentState.Fold` é um fold puro (zero I/O, zero DI, molde `AuditChain`) sobre o log de
+  eventos `ConsentEvent`, mais antigo primeiro -- último evento daquela finalidade vence, sem
+  eventos é `Pendente`. `ConsentEventStore` persiste esse log em `consent_events`
+  (migração `0007_create_consent_events.sql`), append-only via `GRANT SELECT, INSERT` /
+  `REVOKE UPDATE, DELETE` para `app_role`. `ConsentService` (molde `Api.Notes.NoteService`)
+  reusa `AccountAuthorizationGuard.CanCreatePatientRecords` para autorizar o registo;
+  `ConsentEndpoints.MapConsentEndpoints` expõe
+  `POST`/`GET /accounts/{accountId}/patients/{patientId}/consents` -- sem `DELETE` nem
+  `PUT`, revogar é o mesmo `POST` com `decision: "revogado"`. `purpose`/`decision` no
+  pedido viajam como strings (`Enum.TryParse` + `Enum.IsDefined`, sem
+  `JsonStringEnumConverter` nesses dois campos, para controlar o `400
+  validation.invalid_field` num valor desconhecido); `ConsentStatus`, só na resposta do
+  `GET`, usa esse mesmo conversor (overload genérico fechado, seguro para AOT) para sair
+  como `"pendente"|"concedido"|"revogado"`. Fatia 3 de seis do ticket S10-02: ainda sem
+  consumidor real (o portão do microfone e a máquina de sessão são as fatias 4 e 5). Ver o
+  README do módulo (`src/Api/Features/Consent/README.md`).
 - `src/Api/Problems` -- `LimmiarProblemDetails` (RFC 7807 + `code` + `params` estruturado,
   nunca a mensagem de exceção crua) e o catálogo central `ProblemCodes` (ex.:
   `voice.enrollment_not_found` para o `GET`/`DELETE` de cadastro de voz sem cadastro

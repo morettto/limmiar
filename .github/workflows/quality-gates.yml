@@ -57,6 +57,15 @@ jobs:
       - name: Unit tests + coverage (site)
         run: pnpm --filter site test:unit
 
+      - name: Unit tests + coverage (session)
+        run: pnpm --filter session test:unit
+
+      - name: Unit tests + coverage (audio)
+        run: pnpm --filter audio test:unit
+
+      - name: Unit tests + coverage (agenda)
+        run: pnpm --filter agenda test:unit
+
   # S00-03 gate: the 7 adaptive primitives × 4 breakpoints (sm/md/lg/xl —
   # Wireframes - Responsivo (3 plataformas).dc.html) must render correctly
   # and stay axe-clean. Playwright Component Testing mounts each primitive
@@ -176,8 +185,8 @@ jobs:
         run: pnpm -r --if-present lint
 
   # The .NET side owns the problem `code` strings; apps/app used to re-type them by
-  # hand into errors/problem-messages.ts, and drifted to 13 of 24 — every
-  # device-pairing failure rendered the generic message. src/errors/problem-codes.ts
+  # hand into shared/api/problem-messages.ts, and drifted to 13 of 24 — every
+  # device-pairing failure rendered the generic message. shared/api/problem-codes.ts
   # is generated from apps/api/src/Api/**/*ProblemCodes.cs and keys the registry, so
   # a missing entry is a tsc error; this job is the other half, catching a code added
   # to the API whose generated file was never regenerated and committed. Same
@@ -208,9 +217,9 @@ jobs:
 
       - name: Fail if the generated file changed (API code with no committed regeneration)
         run: |
-          if [ -n "$(git status --porcelain -- apps/app/src/errors/problem-codes.ts)" ]; then
-            echo "::error::apps/app/src/errors/problem-codes.ts is stale — a problem code changed in apps/api. Run 'pnpm --filter app generate:problem-codes' locally, answer any new code in errors/problem-messages.ts, run 'pnpm --filter app check:i18n-extract', translate, and commit."
-            git diff -- apps/app/src/errors/problem-codes.ts
+          if [ -n "$(git status --porcelain -- apps/app/src/shared/api/problem-codes.ts)" ]; then
+            echo "::error::apps/app/src/shared/api/problem-codes.ts is stale — a problem code changed in apps/api. Run 'pnpm --filter app generate:problem-codes' locally, answer any new code in shared/api/problem-messages.ts, run 'pnpm --filter app check:i18n-extract', translate, and commit."
+            git diff -- apps/app/src/shared/api/problem-codes.ts
             exit 1
           fi
 

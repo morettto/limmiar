@@ -8,7 +8,7 @@ import type { SessaoEvento } from './types.ts'
 // esquecer um evento novo aqui vira erro de compilação, não cobertura silenciosamente
 // desatualizada.
 const exemplos: { [K in SessaoEvento['type']]: Extract<SessaoEvento, { type: K }> } = {
-  CONSENTIMENTO_CONCEDIDO: { type: 'CONSENTIMENTO_CONCEDIDO' },
+  CONSENTIMENTO_CONCEDIDO: { type: 'CONSENTIMENTO_CONCEDIDO', concedidoEm: '2026-08-28T12:00:00.000Z' },
   ENCERRAR: { type: 'ENCERRAR' },
   MODELO_PRONTO: { type: 'MODELO_PRONTO' },
   REDE_CAIU: { type: 'REDE_CAIU' },

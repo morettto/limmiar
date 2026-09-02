@@ -10,6 +10,9 @@ export function criarMaquinaSessao(opcoes: CriarMaquinaSessaoOpcoes = {}) {
       context: {} as SessaoContexto,
       events: {} as SessaoEvento,
     },
+    guards: {
+      temConsentimento: ({ context }) => context.consentimentoEm !== null,
+    },
   }).createMachine({
     id: 'sessao',
     context: {
@@ -25,8 +28,8 @@ export function criarMaquinaSessao(opcoes: CriarMaquinaSessaoOpcoes = {}) {
         on: {
           CONSENTIMENTO_CONCEDIDO: {
             target: 'ativa.aquecendoModelo',
-            // Carimbo do relógio local: sinal de UI, não prova de consentimento (ver README).
-            actions: assign({ consentimentoEm: () => new Date().toISOString() }),
+            // Instante do servidor no próprio evento — não o relógio local (ver README).
+            actions: assign({ consentimentoEm: ({ event }) => event.concedidoEm }),
           },
           ENCERRAR: 'encerrado',
         },
@@ -90,10 +93,19 @@ export function criarMaquinaSessao(opcoes: CriarMaquinaSessaoOpcoes = {}) {
       },
       recuperando: {
         on: {
-          RECUPERACAO_CONCLUIDA: {
-            target: 'ativa.pausado',
-            actions: assign({ chunksPersistidos: ({ event }) => event.chunksRecuperados }),
-          },
+          RECUPERACAO_CONCLUIDA: [
+            {
+              guard: 'temConsentimento',
+              target: 'ativa.pausado',
+              actions: assign({ chunksPersistidos: ({ event }) => event.chunksRecuperados }),
+            },
+            {
+              // Sem consentimento herdado, `ativa` fica fechado — chunksPersistidos
+              // sobrevive ao desvio, é o "sem afetar ação passada" dentro da máquina.
+              target: 'aguardandoConsentimento',
+              actions: assign({ chunksPersistidos: ({ event }) => event.chunksRecuperados }),
+            },
+          ],
           RECUPERACAO_FALHOU: {
             target: 'interrompido',
             actions: assign({
@@ -105,10 +117,18 @@ export function criarMaquinaSessao(opcoes: CriarMaquinaSessaoOpcoes = {}) {
       },
       interrompido: {
         on: {
-          TENTAR_NOVAMENTE: {
-            target: 'ativa.aquecendoModelo',
-            actions: assign({ ultimaFalha: () => null }),
-          },
+          TENTAR_NOVAMENTE: [
+            {
+              guard: 'temConsentimento',
+              target: 'ativa.aquecendoModelo',
+              actions: assign({ ultimaFalha: () => null }),
+            },
+            {
+              // Sem consentimento herdado, `ativa` (e o microfone) fica fechado.
+              target: 'aguardandoConsentimento',
+              actions: assign({ ultimaFalha: () => null }),
+            },
+          ],
           ENCERRAR: 'encerrando',
         },
       },

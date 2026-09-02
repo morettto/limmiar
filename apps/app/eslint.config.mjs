@@ -12,6 +12,11 @@ export default tseslint.config(
     // not user-facing copy). src/test-support/** holds CT-only mount helpers, never rendered in the
     // production app either.
     ignores: [
+      // src/app/routing/E2eMicrofoneScaffold.tsx: andaime de e2e atras de
+      // VITE_ENABLE_E2E_TEST_ROUTES, sem equivalente de producao nenhum -- a copy dele existe
+      // para o spec clicar nela e nunca chega a um utilizador, portanto traduzi-la seria encher
+      // os quatro catalogos com texto de fixture. Mesmo estatuto que os *.spec.tsx acima.
+      'src/app/routing/E2eMicrofoneScaffold.tsx',
       '**/*.test.{ts,tsx}',
       '**/*.spec.{ts,tsx}',
       'src/test-support/**',

@@ -8,15 +8,19 @@ import { PairPrimaryPage } from '../../pages/device-pairing/PairPrimaryPage'
 import { PairNewPage } from '../../pages/device-pairing/PairNewPage'
 import { CopilotKeyPage } from '../../pages/settings/CopilotKeyPage'
 import { NotaPage } from '../../pages/notas/NotaPage'
+import { parseEstadoConsentimento, type EstadoConsentimento } from '../../entities/consentimento/api'
+import { E2eMicrofoneScaffold } from './E2eMicrofoneScaffold'
 
 function readSearchString(search: Record<string, unknown>, key: string): string {
   const value = search[key]
   return typeof value === 'string' ? value : ''
 }
 
+
 // The root route's component is deliberately unset: TanStack Router's default root already
 // renders an <Outlet/> for the matched child, which is exactly this app's shell, so an explicit
 // one would be equivalent.
+
 const rootRoute = createRootRoute()
 
 // ponytail: this <div id="app-shell"> is a navigation stub, not a real landing page --
@@ -167,9 +171,34 @@ function PairNewRouteComponent() {
   return <PairNewPage baseUrl={baseUrl} />
 }
 
+// S10-02 fatia 6: andaime de E2E sem equivalente de producao -- o consentimento chega por query
+// string para consentimento-microfone.spec.ts clicar "Gravar" com um estado conhecido e ler no
+// DOM o que `abrirMicrofone` devolveu, sem inventar UI real.
+interface E2eMicrofoneSearch {
+  consentimento: EstadoConsentimento
+}
+
+const e2eMicrofoneRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/e2e/microfone',
+  validateSearch: (search: Record<string, unknown>): E2eMicrofoneSearch => ({
+    consentimento: parseEstadoConsentimento(search.consentimento),
+  }),
+  component: E2eMicrofoneRouteComponent,
+})
+
+function E2eMicrofoneRouteComponent() {
+  const { consentimento } = e2eMicrofoneRoute.useSearch()
+  return <E2eMicrofoneScaffold consentimento={consentimento} />
+}
+
 // These routes are E2E-only scaffolding and must not ship: each mounts a screen with no guard or
-// reads an accessToken/raw KEK off the query string, and a registered route is shipped and linkable
-// even when unusable. `import.meta.env.DEV` would hide them from the E2E's own `vite build` too.
+// reads an accessToken/raw KEK off the query string, and a registered route is shipped and
+// linkable even when unusable.
+
+// VITE_ENABLE_E2E_TEST_ROUTES gates them at build time; `import.meta.env.DEV` would not, since
+// playwright.config.ts exercises a real `vite build`, not `vite dev`.
+
 
 const copilotSettingsRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -197,6 +226,7 @@ const routeTree =
         pairNewRoute,
         recoveryScreenE2ERoute,
         recoveryPhraseSetupE2ERoute,
+        e2eMicrofoneRoute,
       ])
     : rootRoute.addChildren([indexRoute, magicLinkCallbackRoute, copilotSettingsRoute, notaRoute])
 
