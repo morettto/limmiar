@@ -7,9 +7,8 @@ export default {
   // (globbing "@stryker-mutator/*" in node_modules) can miss the runner;
   // list it explicitly so it's always found regardless of hoisting.
   plugins: ['@stryker-mutator/vitest-runner'],
-  // main.tsx is the bootstrap/entry point (createRoot + render), excluded
-  // from coverage in vite.config.ts for the same reason: no branching logic
-  // of its own to assert on. Test files are mutated targets' specs, not
+  // main.tsx is the bootstrap entry point, excluded from coverage in vite.config.ts for the same
+  // reason: no branching logic to assert on. Test files are the specs of mutated targets, not
   // targets themselves.
   mutate: [
     'src/**/*.{ts,tsx}',
@@ -25,9 +24,8 @@ export default {
     low: 90,
     break: 90,
   },
-  // `incremental` is controlled per-invocation via the CLI flag
-  // (`test:mutation` runs a full pass, `test:mutation:incremental` passes
-  // `--incremental`) rather than forced on here, so the two npm scripts stay
-  // meaningfully different.
+  // `incremental` is set per invocation via the CLI flag (`test:mutation` runs a full pass,
+  // `test:mutation:incremental` passes `--incremental`), so the two npm scripts stay meaningfully
+  // different.
   incrementalFile: '.stryker-tmp/incremental.json',
 }

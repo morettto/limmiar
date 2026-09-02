@@ -55,10 +55,9 @@ function itemsFor(locale: VisualLocale): AdaptiveNavItem[] {
   return ITEM_META.map((meta, index) => ({ ...meta, label: LABELS[locale][index], icon: icon() }))
 }
 
-// The M bottom bar is `fixed`, which positions relative to the *viewport* by
-// default — outside the bounding box a component screenshot captures
-// (confirmed empty without this fix). `transform` makes this wrapper the
-// containing block for fixed descendants too, per the CSS spec.
+// The M bottom bar is `fixed`, positioned against the viewport and thus outside a
+// component screenshot's bounding box; `transform` makes this wrapper the
+// containing block for fixed descendants.
 const wrapperStyle = {
   width: 900,
   height: 400,
@@ -149,10 +148,9 @@ test('M bottom bar renders at the height layout-constants.ts assumes', async ({ 
   expect(box?.height).toBe(MOBILE_NAV_HEIGHT_PX)
 })
 
-// R4's "acima da nav" composed with R1's M bottom bar (P1-M in the
-// wireframe: "Iniciar sessão" sits directly above the 5-item nav) — proves
-// HeaderAction's stackAboveMobileNav actually clears AdaptiveNav, not just
-// that the two numbers add up on paper.
+// R4's "acima da nav" composed with R1's M bottom bar (P1-M in the wireframe):
+// proves stackAboveMobileNav actually clears AdaptiveNav, not just that the two
+// numbers add up on paper.
 test('HeaderAction with stackAboveMobileNav does not overlap AdaptiveNav at M-sm', async ({ mount }, testInfo) => {
   test.skip(testInfo.project.name !== 'M-sm', 'both primitives only stack like this at sm')
 

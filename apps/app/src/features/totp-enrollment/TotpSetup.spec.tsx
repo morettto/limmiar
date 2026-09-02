@@ -3,11 +3,9 @@ import { TotpSetup } from './TotpSetup'
 import { CtI18nProvider } from '../../test-support/ct-i18n'
 import { componentAxeBuilder } from '../../test-support/axe'
 
-// Ticket S02-03: mandatory TOTP enrollment for AccountRole.Professional.
-// Same CT pattern as AuthScreen.spec.tsx (mount, toHaveScreenshot, axe-clean)
-// -- these are the two screens (enrollment form, dedicated backup-codes
-// reveal) a real professional sees, driven through a real browser with the
-// API calls intercepted via page.route (no real backend in CT).
+// Ticket S02-03: mandatory TOTP enrollment for AccountRole.Professional. Same CT pattern as
+// AuthScreen.spec.tsx (mount, toHaveScreenshot, axe-clean) over the two screens a real professional
+// sees, with the API calls intercepted via page.route.
 const ACCOUNT_ID = '11111111-1111-1111-1111-111111111111'
 // Security-review fix: begin/confirm now require the two-factor ticket register/login/
 // google issued for this account -- see api/client.ts's doc comments.

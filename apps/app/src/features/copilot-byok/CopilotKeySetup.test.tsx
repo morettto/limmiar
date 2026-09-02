@@ -202,10 +202,9 @@ describe('CopilotKeySetup', () => {
   it('masks the api key field visually via -webkit-text-security instead of type="password"', async () => {
     const kek = await makeKek()
 
-    // jsdom's CSSStyleDeclaration does not recognize/store the non-standard
-    // -webkit-text-security property (it silently drops it), so the only way to observe what
-    // React actually put in the style attribute is its own SSR string serializer, which builds
-    // the attribute string directly instead of round-tripping it through a real browser's CSSOM.
+    // jsdom's CSSStyleDeclaration silently drops the non-standard -webkit-text-security property, so
+    // the only way to observe what React put in the style attribute is its own SSR string
+    // serializer, which builds the attribute directly instead of through a real CSSOM.
     const html = renderToStaticMarkup(
       <I18nProvider i18n={i18n}>
         <CopilotKeySetup accountId={ACCOUNT_ID} kek={kek} providers={PROVIDERS} onDone={() => {}} />

@@ -3,10 +3,9 @@
 // decisão de aceitar ⌘ OU Ctrl em vez de detetar o sistema operativo.
 
 /**
- * Índice seguinte na listbox depois de premir `tecla`. `j` desce, `k` sobe.
- * Para nos limites (não dá a volta) -- ver README. Lista vazia (`total === 0`) ou tecla
- * irrelevante devolvem `indice` inalterado. Sem seleção (`indice === -1`), `j`/`k` pousam
- * ambos no primeiro item.
+ * Índice seguinte na listbox depois de premir `tecla`: `j` desce, `k` sobe, e para nos limites
+ * (não dá a volta). Lista vazia ou tecla irrelevante devolvem `indice`; sem seleção, ambos pousam
+ * no primeiro item.
  */
 export function proximoIndice(indice: number, total: number, tecla: string): number {
   if (total === 0) {

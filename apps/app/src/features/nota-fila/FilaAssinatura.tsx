@@ -16,20 +16,17 @@ function indiceInicial(total: number): number {
   return total > 0 ? 0 : -1
 }
 
-// `itens` pode encolher "por fora" (ex.: `aoAssinar` no widget-pai) sem que `trocarAba`
-// tenha corrido -- `indiceAtivo` guardado em estado fica então maior do que o novo
-// `filtrados.length` permite. Clampa em vez de deixar `filtrados[indiceAtivo]` apontar
-// para além do fim (ver README, "índice ativo sobrevive a itens que encolhem").
+// `itens` pode encolher "por fora" sem que `trocarAba` tenha corrido, deixando `indiceAtivo`
+// maior do que `filtrados.length` permite. Clampa em vez de apontar para além do fim (ver
+// README, "índice ativo sobrevive a itens que encolhem").
 function indiceClampado(indice: number, total: number): number {
   return total === 0 ? -1 : Math.min(Math.max(indice, 0), total - 1)
 }
 
 /**
- * Fila de assinatura: abas de estado (pendente/assinada) + listbox acessível das notas
- * dessa aba. Navegação por teclado via `navegacao-teclado.ts` (j/k, sem wrap -- ver
- * README). `aria-activedescendant` é o índice ativo (cursor do teclado); `aria-selected`
- * em cada opção é a nota realmente aberta no editor (`selecionadoId`, controlado pelo
- * widget-pai) -- os dois podem divergir (navegar sem ainda ter premido Enter/clicado).
+ * Fila de assinatura: abas de estado + listbox acessível, navegação j/k sem wrap (ver README).
+ * `aria-activedescendant` é o cursor do teclado e `aria-selected` a nota aberta no editor --
+ * os dois divergem enquanto se navega sem premir Enter.
  */
 export function FilaAssinatura({ itens, selecionadoId, onSelecionar }: FilaAssinaturaProps) {
   const { t } = useLingui()

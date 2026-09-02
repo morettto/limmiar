@@ -1,28 +1,19 @@
-// Manual calibration script — NOT run in CI. Run by hand:
-//   node packages/crypto/scripts/run-benchmark.mjs
-// Measures deriveKey on THIS machine ("desktop/CI") and derives two estimated
-// mobile profiles from a public single-core CPU benchmark ratio, then writes
-// packages/crypto/BENCHMARK.md.
+// Manual calibration, NOT run in CI: `node packages/crypto/scripts/run-benchmark.mjs`.
+// Measures deriveKey on this machine and scales two estimated mobile profiles from
+// a public CPU benchmark ratio, then writes packages/crypto/BENCHMARK.md.
 import { writeFile } from 'node:fs/promises'
 import { measureArgon2id } from '../src/benchmark.ts'
 
 // OWASP Password Storage Cheat Sheet, Argon2id section (fetched 2026-08-03):
 // https://github.com/OWASP/CheatSheetSeries/blob/master/cheatsheets/Password_Storage_Cheat_Sheet.md
-// "Use Argon2id with a minimum configuration of 19 MiB of memory, an
-// iteration count of 2, and 1 degree of parallelism."
+// Minimum configuration: 19 MiB of memory, 2 iterations, 1 degree of parallelism.
 const OWASP_SOURCE =
   'OWASP Password Storage Cheat Sheet (github.com/OWASP/CheatSheetSeries), Argon2id section, fetched 2026-08-03'
 const baselineParams = { memoryKiB: 19456, iterations: 2, parallelism: 1 }
 
-// Slowdown multipliers, single-core Geekbench 6 scores (topcpu.net, fetched 2026-08-03):
-//   mainstream desktop/laptop CPUs — Intel Core i5-14500 2667, i7-14700 2866,
-//   AMD Ryzen 5 7600 2995, Ryzen 7 7700 2829, i5-13600K 2692, Ryzen 7 5800X 2230
-//   -> average ~2713
-//   mobile mid-range — Snapdragon 7 Gen 3: 1139
-//   mobile low-end    — Snapdragon 4 Gen 2: 926
-// This repo has no physical mobile hardware to measure against, so the two
-// mobile rows below are ESTIMATES obtained by scaling the real desktop/CI
-// measurement by these public score ratios — not independent measurements.
+// Single-core Geekbench 6 scores (topcpu.net, fetched 2026-08-03): ~2713 desktop
+// average, 1139 Snapdragon 7 Gen 3, 926 Snapdragon 4 Gen 2. No physical mobile to
+// measure here, so the mobile rows are estimates scaled from the desktop run.
 const DESKTOP_REFERENCE_SCORE = 2713
 const MID_RANGE_MOBILE_SCORE = 1139
 const LOW_END_MOBILE_SCORE = 926

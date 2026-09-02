@@ -4,11 +4,9 @@ import type { TranscriptionEngine, TranscriptionSegment } from './transcription-
 const DEFAULT_WINDOW_FRAMES = 5 * CHUNK_FRAMES // ~1.6s @16kHz per transcribe() call
 const SAMPLE_RATE_HZ = 16000 // same rate CHUNK_FRAMES documents in ring-buffer.ts
 
-// ponytail: how often the loop re-checks `signal.aborted` while there is no
-// full window of audio yet — a fixed poll cadence, not an instant abort
-// reaction. Ceiling: up to this many ms of abort latency while idle.
-// Upgrade path: race `waitFor` against a promise resolved by the signal's
-// 'abort' event, if that latency ever matters for a real caller.
+// ponytail: fixed poll cadence, not an instant abort reaction. Ceiling: up to
+// this many ms of abort latency while idle. Upgrade path: race `waitFor`
+// against a promise resolved by the signal's 'abort' event.
 const POLL_TIMEOUT_MS = 200
 
 export interface AsrLoopStats {
@@ -28,11 +26,9 @@ export interface RunAsrLoopOptions {
 }
 
 /**
- * Consumes `ring` in fixed-size windows, feeding each one to `engine`, until
- * `signal.aborted`. A window shorter than `windowFrames` is never processed
- * partially — the loop waits for a full window or for abort, whichever
- * comes first; a trailing partial window at abort time is left unread (see
- * README.md, "O que este loop não faz").
+ * Consumes `ring` in fixed-size windows until `signal.aborted`. A partial
+ * window is never processed: the loop waits for a full one or for abort, and a
+ * trailing partial window is left unread (README.md, "O que este loop não faz").
  */
 function statsSnapshot(
   ring: Ring,
@@ -56,10 +52,9 @@ export async function runAsrLoop({
   onStats,
   now = Date.now,
 }: RunAsrLoopOptions): Promise<AsrLoopStats> {
-  // Single-producer/single-consumer ring: only `waitFor` grows `available`
-  // and only this loop shrinks it, so once `waitFor` confirms >= windowFrames
-  // are available, `pull` below is guaranteed to fill `windowBuffer` fully —
-  // no partial-window case to branch on here.
+  // Single-producer/single-consumer ring: only `waitFor` grows `available` and
+  // only this loop shrinks it, so after `waitFor` confirms a full window `pull`
+  // always fills `windowBuffer` — no partial-window branch here.
   const windowBuffer = new Float32Array(windowFrames)
   let processingMs = 0
   let audioMs = 0

@@ -22,13 +22,9 @@ export interface BibliotecaPageProps {
 }
 
 /**
- * Dona do ciclo restaurar -> (se `null`) construir + persistir -> `buscar(indice, termo)`, e
- * da DEK -- ver README, "Fluxo principal", para o passo a passo completo (inclui o caso
- * `dek === null`).
- *
- * Índice de busca nunca sai por rede: `buscar` é local (MiniSearch em memória), e
- * `persistirIndice`/`restaurarIndice` só tocam OPFS via `store` -- nenhum termo digitado
- * aqui chega a `fetch` (critério de aceite 1 do ticket).
+ * Dona do ciclo restaurar -> (se `null`) construir + persistir -> `buscar(indice, termo)` e da
+ * DEK; ver README, "Fluxo principal". O índice nunca sai por rede: `buscar` é local e
+ * `persistirIndice`/`restaurarIndice` só tocam OPFS (critério de aceite 1).
  */
 export function BibliotecaPage({ notas, accountId, dek, store }: BibliotecaPageProps) {
   const { t } = useLingui()
@@ -57,9 +53,8 @@ export function BibliotecaPage({ notas, accountId, dek, store }: BibliotecaPageP
     }
 
     setErro(null)
-    // Sem `.catch` aqui, uma OPFS negada/corrompida ou uma DEK/AAD errada (`restaurarIndice`/
-    // `abrirIndice` rejeitam) vira rejeição não tratada, e a página encalha em "Preparando a
-    // busca..." para sempre, sem sinal ao utilizador -- mesmo padrão de `PatientWallet.tsx`
+    // Sem `.catch`, uma OPFS negada ou uma DEK/AAD errada vira rejeição não tratada e a página
+    // encalha em "Preparando a busca..." sem sinal nenhum -- mesmo padrão de `PatientWallet.tsx`
     // (`load(kek).catch(...)`), mesmo `role="alert"`.
     preparar(dek).catch(() => {
       if (!cancelado) {

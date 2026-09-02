@@ -7,10 +7,9 @@ import { SECURITY_HEADERS } from './security-headers.ts'
 
 // https://vite.dev/config/
 export default defineConfig({
-  // @vitejs/plugin-react v6 dropped its own Babel integration (Oxc-based
-  // JSX transform now) — Lingui's macros (t/<Trans>) still need a Babel
-  // pass, so it runs as its own plugin via @rolldown/plugin-babel rather
-  // than through react()'s (now-removed) `babel` option.
+  // @vitejs/plugin-react v6 dropped its Babel integration (Oxc JSX transform now), so
+  // Lingui's macros run as their own @rolldown/plugin-babel pass instead of through
+  // react()'s removed `babel` option.
   plugins: [react(), lingui(), babel({ presets: [linguiTransformerBabelPreset()] }), tailwindcss()],
   // Mirrors public/_headers (the real Cloudflare-served headers) so `vite
   // preview` — used by the DAST (ZAP) CI job — reflects actual production
@@ -20,24 +19,13 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
-    // Playwright owns e2e/** (E2E) and, since S02-01, src/**/*.spec.tsx
-    // (Component Testing visual regression -- see playwright-ct.config.ts);
-    // keep Vitest scoped to *.test.{ts,tsx} unit specs under src/. Same
-    // split packages/ui/vitest.config.ts already draws between its own
-    // *.test.tsx (Vitest) and *.spec.tsx (Playwright CT) files -- before
-    // this, Vitest's default include also matched *.spec.tsx and would try
-    // (and fail) to run AuthScreen.spec.tsx's Playwright `test()` calls.
-    // security-headers.test.ts lives beside security-headers.ts at the app root (build layer,
-    // not a feature slice under src/) -- included explicitly since the src/** glob below doesn't
-    // reach it.
+    // Playwright owns e2e/** and src/**/*.spec.tsx (CT), so Vitest stays on
+    // *.test.{ts,tsx}; without the split it would try to run Playwright `test()` calls.
+    // security-headers.test.ts sits at the app root, outside the src glob.
     include: ['src/**/*.test.{ts,tsx}', '*.test.{ts,tsx}'],
-    // Pact consumer tests spin up a real mock-server process and hit a live
-    // .po-derived catalog through the whole client -> translateProblemCode
-    // pipeline — they're contract tests, not unit tests, and must stay out
-    // of this coverage-gated run (a separate "test:pact" script + CI job
-    // runs them via vitest.pact.config.ts instead). Spreading
-    // configDefaults.exclude keeps Vitest's own default ignores (node_modules,
-    // dist, etc.) intact instead of replacing them.
+    // Pact consumer tests drive a real mock-server process through the whole client
+    // pipeline: contract tests, not unit tests, run by test:pact instead. Spreading
+    // configDefaults.exclude keeps Vitest's own default ignores.
     exclude: [...configDefaults.exclude, '**/*.pact.test.ts'],
     // jsdom's CSS deps ship ESM-only files loaded via require(); the local
     // Node (22.11) needs this flag explicitly (it's unflagged from 22.12+).
@@ -45,19 +33,13 @@ export default defineConfig({
     coverage: {
       provider: 'istanbul',
       reporter: ['text', 'html'],
-      // Discover every source file (not just ones a test happens to import),
-      // so a new file added without a test fails the gate instead of being
-      // silently absent from the report.
-      // security-headers.ts is build layer (root, not src/) but still real logic (CSP directive
-      // derivation) -- gated at 100% like everything else, so it's listed explicitly here.
+      // Discover every source file, not just imported ones, so a new file with no test
+      // fails the gate instead of vanishing from the report. security-headers.ts is build
+      // layer but real logic (CSP derivation), so it is listed explicitly.
       include: ['src/**/*.{ts,tsx}', 'security-headers.ts'],
-      // main.tsx is the app's bootstrap/entry point (createRoot + render);
-      // it has no branching logic of its own to assert on, so it's excluded
-      // by the conventional "don't test the entry point" rule, not to dodge
-      // the 100% bar. src/**/*.spec.tsx (Playwright CT) and src/test-support/**
-      // (CT-only mount helpers, e.g. axe.ts/ct-i18n.tsx) are exercised by
-      // "test:visual", not this Vitest+Istanbul run -- same exclusions
-      // packages/ui/vitest.config.ts already carries for its own CT split.
+      // main.tsx is the bootstrap entry point with no branching to assert on; *.spec.tsx
+      // and test-support/** belong to the Playwright CT run ("test:visual"), not to this
+      // Vitest+Istanbul one.
       exclude: ['src/main.tsx', 'src/**/*.spec.{ts,tsx}', 'src/test-support/**'],
       thresholds: {
         perFile: true,

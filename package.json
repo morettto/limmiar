@@ -12,6 +12,12 @@
     "vitest": "4.1.10"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild", "workerd"]
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "workerd"
+    ]
+  },
+  "scripts": {
+    "test:lint-rules": "node --test tools/oxlint-plugin-comments/index.test.js && node tools/branch-sync-guard.mjs --demo"
   }
 }

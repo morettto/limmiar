@@ -1,12 +1,6 @@
-// Integration check for AC4 (S00.5-03): proves the CI-only pseudo-locale
-// pipeline (lingui.config.pseudo.ts) actually generates a pseudo-LOCALE
-// catalog from the real source catalog, end to end, with no mocking — this
-// script only runs after `pnpm build:i18n-pseudo` produced real compiled
-// output on disk.
-//
-// The compiled catalogs are CJS (`module.exports = ...`), which can't be
-// `import()`-ed directly under this package's `"type": "module"` — so the
-// JSON payload is pulled out of the file text instead of executing it.
+// Integration check for AC4 (S00.5-03): proves the CI-only pseudo-locale pipeline really generates
+// a catalog from the source one, end to end, after `pnpm build:i18n-pseudo`. The compiled catalogs
+// are CJS, so the JSON payload is pulled out of the file text instead of imported.
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 

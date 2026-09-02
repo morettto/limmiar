@@ -23,10 +23,8 @@ export function classificarLocutores(
   margemMinima = 0.05,
 ): Map<string, RotuloLocutor | null> {
   const resultado = new Map<string, RotuloLocutor | null>()
-  // guarda por clareza, não por necessidade em runtime: sem ela o resto do
-  // corpo ainda devolveria o mapa vazio correto (maior vira NaN, ambiguo vira
-  // false, o loop sobre `pontuados` vazio não escreve nada) — por isso este
-  // ramo é um mutante equivalente que a mutação nunca vai matar.
+  // Guarda por clareza: sem ela o corpo devolveria o mesmo mapa vazio, por isso
+  // é um mutante equivalente que a mutação nunca mata.
   if (candidatos.length === 0) return resultado
 
   const pontuados = candidatos.map((c) => ({

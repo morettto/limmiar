@@ -8,12 +8,9 @@ export async function deriveEmailPasswordVerifier(password: string, salt: Uint8A
   return deriveKey(passwordBytes, salt, ACCOUNT_VERIFIER_PARAMS)
 }
 
-// The backend stores no salt and login must re-derive the same verifier from just
-// (email, password), with no round trip to fetch one first. A salt derived
-// deterministically from the normalized email is still unique per account; Argon2id
-// salts do not need to be secret (RFC 9106), only unique enough to defeat rainbow
-// tables shared across accounts. Normalization must match AccountService.NormalizeEmail
-// exactly, so register and login agree on the salt.
+// The backend stores no salt and login must re-derive the verifier from (email, password) with
+// no round trip, so the salt is derived from the normalized email — unique per account, and
+// Argon2id salts need not be secret (RFC 9106). Normalization must match AccountService exactly.
 export async function deriveEmailSalt(email: string): Promise<Uint8Array> {
   const normalized = email.trim().toLowerCase()
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(normalized))

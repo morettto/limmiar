@@ -12,10 +12,8 @@ export type ApagarSelado = () => Promise<void>
 const ARQUIVO_INDICE = 'indice-busca'
 
 /**
- * A única função autorizada a tocar a API OPFS para o índice de busca, tal como
- * `opfsWriter` em `features/live-session/chunk-store.ts` -- `ler`/`gravar` nunca lidam com
- * plaintext, só com o blob já selado (`selarIndice`/`abrirIndice` ficam em `persistirIndice`/
- * `restaurarIndice`, abaixo).
+ * A única função autorizada a tocar a API OPFS para o índice de busca, tal como `opfsWriter` em
+ * `chunk-store.ts`: `ler`/`gravar` nunca lidam com plaintext, só com o blob já selado.
  */
 export function opfsIndice(
   dir: FileSystemDirectoryHandle,
@@ -61,11 +59,9 @@ export async function persistirIndice(
   await gravar(selado)
 }
 
-/** Inverso de `persistirIndice` -- `null` quando ainda não há índice persistido (primeira
- *  vez, ou OPFS limpa; não chama `apagar`, não há o que apagar); `accountId` diferente do
- *  usado para persistir rejeita (AAD errada em `abrirIndice`), não abre por bom. Impressão
- *  que não bate com a do envelope (nota nova/editada/apagada desde a última gravação) apaga
- *  o blob obsoleto -- texto em claro de uma nota corrigida não sobrevive no disco. */
+/** Inverso de `persistirIndice`: `null` quando não há índice persistido, rejeita quando o
+ *  `accountId` não bate (AAD errada), e apaga o blob obsoleto quando a impressão não bate --
+ *  texto em claro de uma nota corrigida não sobrevive no disco. */
 export async function restaurarIndice(
   store: { ler: LerSelado; apagar: ApagarSelado },
   dek: CryptoKey,
@@ -79,11 +75,9 @@ export async function restaurarIndice(
   const json = await abrirIndice(dek, accountId, selado)
   const indice = carregarIndice(json, impressao)
   if (indice === null) {
-    // A rejeição de `apagar` (OPFS negada/cheia/corrompida) é ignorada de propósito: o
-    // `gravar` que `BibliotecaPage` chama a seguir (via `persistirIndice`) usa
-    // `createWritable()`, que trunca o ficheiro -- o blob obsoleto é sobrescrito de qualquer
-    // forma. Propagar aqui deixaria o blob em claro obsoleto no disco E a página presa no
-    // erro, sem chegar ao passo que o resolveria.
+    // Rejeição de `apagar` ignorada de propósito: o `gravar` seguinte usa `createWritable()`,
+    // que trunca o ficheiro, então o blob obsoleto é sobrescrito de qualquer forma. Propagar
+    // deixaria o blob em claro no disco E a página presa no erro.
     await store.apagar().catch(() => {})
     return null
   }

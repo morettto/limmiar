@@ -17,11 +17,9 @@ vi.mock('@limmiar/audio', async (importOriginal) => {
   }
 })
 
-// `carregarReconhecedor` é substituído para não depender de glue/WASM real
-// (fatia 6); `capturado.importarGlue` guarda o `importarGlue` que
-// `asr.worker.ts` de facto constrói (`(url) => import(url)`), para provar
-// que essa linha de plataforma corre — ver o teste dedicado abaixo. `vi.mock`
-// é içado acima de qualquer `let`/`const` do módulo, daí `vi.hoisted`.
+// `carregarReconhecedor` é substituído para não depender de WASM real; `capturado.importarGlue`
+// guarda o `importarGlue` que `asr.worker.ts` constrói, para provar que essa linha corre. `vi.mock`
+// é içado acima de qualquer `const`, daí `vi.hoisted`.
 const capturado = vi.hoisted(() => ({
   importarGlue: undefined as ((url: string) => Promise<unknown>) | undefined,
 }))
@@ -32,10 +30,9 @@ vi.mock('./nemotron-loader', () => ({
   },
 }))
 
-// `self.onmessage` corre como efeito de import em jsdom (`self` é `window`) —
-// precedente `patient-summary.worker.test.ts`. O engine é substituído acima
-// (`vi.mock`) para poder provar o ramo de rejeição sem depender do
-// comportamento fixo do motor real.
+// `self.onmessage` corre como efeito de import em jsdom (`self` é `window`), precedente
+// `patient-summary.worker.test.ts`. O engine é substituído acima para provar o ramo de rejeição
+// sem depender do motor real.
 import './asr.worker'
 import type { AsrRequest } from './asr.worker'
 

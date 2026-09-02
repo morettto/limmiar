@@ -3,10 +3,8 @@ import { BibliotecaNotas } from './BibliotecaNotas'
 import { CtI18nProvider } from '../../test-support/ct-i18n'
 import { componentAxeBuilder } from '../../test-support/axe'
 
-// Ticket S08-02, fatia 4, critério de aceite 5 ("axe limpo"). Sem `toHaveScreenshot` --
-// não pedido pelo ticket (só "axe limpo com componentAxeBuilder"), e regressão visual é
-// scope à parte (ver AuthScreen.spec.tsx/TotpSetup.spec.tsx, cuja AC explícita inclui
-// screenshots nos 4 breakpoints).
+// Ticket S08-02, fatia 4, critério de aceite 5 ("axe limpo"). Sem `toHaveScreenshot`: não
+// pedido pelo ticket, e regressão visual é scope à parte (ver AuthScreen.spec.tsx).
 const GRUPOS = [
   {
     patientId: 'paciente-1',

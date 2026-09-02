@@ -6,10 +6,9 @@ export interface TranscriptionSegment {
 }
 
 /**
- * Contract for an ASR backend. Real implementations (ONNX/Nemotron worker)
- * and test doubles (`fakeEngine`) both implement this — see README.md for
- * why it stays a named interface even with one production implementation
- * (the seam a later slice's worker swaps a real engine into).
+ * Contract for an ASR backend, implemented by the Nemotron worker and by
+ * `fakeEngine`. README.md says why it stays a named interface with one
+ * production implementation.
  */
 export interface TranscriptionEngine {
   warmup(): Promise<void>

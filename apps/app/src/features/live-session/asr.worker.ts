@@ -12,20 +12,15 @@ export type AsrReply =
   | { id: number; ok: true; segments: TranscriptionSegment[] }
   | { id: number; ok: false; error: string }
 
-// Motor real (fatia 6 do desenho): `nemotronEngine` recebe a *promessa* do
-// reconhecedor — o carregamento (glue + WASM + pesos) arranca já aqui, e
-// `warmup()` é o ponto onde se espera por ele. `carregarReconhecedor` recebe
-// `importarGlue` como seam de plataforma (decisão 6 do desenho da fatia 6):
-// `import()` de uma URL só conhecida em runtime não é intercetável por
-// `vi.mock`.
+// Motor real: `nemotronEngine` recebe a *promessa* do reconhecedor, cujo carregamento arranca aqui
+// e é esperado em `warmup()`. `carregarReconhecedor` recebe `importarGlue` como seam de plataforma:
+// um `import()` de URL só conhecida em runtime não é intercetável por `vi.mock`.
 const engine = nemotronEngine(
   carregarReconhecedor((url) => import(/* @vite-ignore */ url) as Promise<GlueSherpa>),
 )
 
-// Fila serial (decisão 6 do desenho): uma sessão ONNX não é reentrante —
-// warmup/transcribe/close no engine nunca correm em paralelo, mesmo que
-// vários pedidos cheguem em voo ao mesmo tempo (`live-session` não aguarda
-// o warmup antes de começar a transcrever).
+// Fila serial (decisão 6): uma sessão ONNX não é reentrante, logo warmup/transcribe/close nunca
+// correm em paralelo, mesmo com vários pedidos em voo.
 let fila: Promise<void> = Promise.resolve()
 
 async function processar(request: AsrRequest): Promise<AsrReply> {

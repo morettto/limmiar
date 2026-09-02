@@ -9,11 +9,9 @@ export interface AdaptivePanelProps {
 }
 
 /**
- * R5 — Painel lateral: coluna fixa (D) → gaveta de 40% sob demanda (T) →
- * faixa recolhível no topo do conteúdo (M). Closed by default at T/M — the
- * wireframe's "estado lembrado" (remembered across the session) is an
- * application-level concern for the real screens this composes into later
- * (S02+), not this primitive's own contract.
+ * R5 — Painel lateral: coluna fixa (D), gaveta de 40% (T), faixa recolhível (M).
+ * Closed by default at T/M: the wireframe's remembered state is an application
+ * concern for the screens this composes into (S02+), not this primitive's.
  */
 export function AdaptivePanel({ children, label }: AdaptivePanelProps) {
   const breakpoint = useBreakpoint()

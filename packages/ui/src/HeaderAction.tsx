@@ -8,10 +8,9 @@ export interface HeaderActionProps {
   disabled?: boolean
   'aria-label'?: string
   /**
-   * Set when this HeaderAction is composed on the same M screen as an
-   * AdaptiveNav bottom bar (e.g. P1-M's "Iniciar sessão" — see the
-   * wireframe). Without it the two `fixed` elements would sit at the same
-   * `bottom-4` and overlap; R4 requires this bar sit "acima da nav".
+   * Set when this HeaderAction shares an M screen with an AdaptiveNav bottom bar
+   * (P1-M's "Iniciar sessão"): without it both `fixed` elements sit at `bottom-4`
+   * and overlap, and R4 requires this bar above the nav.
    */
   stackAboveMobileNav?: boolean
 }
@@ -19,17 +18,9 @@ export interface HeaderActionProps {
 const BASE_GAP_PX = 16 // matches the previous flat `bottom-4`
 
 /**
- * R4 — Ação primária: botão no cabeçalho (D/T) → barra fixa no rodapé, 48px,
- * acima da navegação (M). Purely CSS-responsive (same button, same
- * semantics — only position/size change), so no useBreakpoint dependency.
- *
- * Target height follows the spec's own "Alvos e densidade" table, not just
- * R4's 48px (that number is M-specific): min-h-12 (48px) at sm, min-h-11
- * (44px, T's touch minimum) from md, min-h-8 (32px, D's mouse minimum) from xl.
- *
- * The inline `bottom` style below is inert from md up: `md:static` makes
- * the element `position: static`, and `bottom` only applies to positioned
- * elements per the CSS spec — so `stackAboveMobileNav` never affects T/D.
+ * R4 — Ação primária: header button (D/T) to a fixed 48px footer bar above the
+ * nav (M), purely CSS-responsive. Heights follow the spec's "Alvos e densidade"
+ * table; the inline `bottom` is inert from md up, where `md:static` applies.
  */
 export function HeaderAction({
   children,

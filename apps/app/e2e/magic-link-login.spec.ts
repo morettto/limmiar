@@ -1,18 +1,9 @@
 import { test, expect, type Page } from '@playwright/test'
 import { API_BASE_URL } from '../playwright.config'
 
-// S02-05: magic-link + WebAuthn biometric login for patients. Single browser context/page --
-// one patient, one device -- unlike device-pairing.spec.ts's dual-context tests (this ticket's
-// flow never involves a second physical device). A real, running instance of this repo's own
-// API is required (same webServer as device-pairing.spec.ts, playwright.config.ts's third
-// entry); its MagicLink:TestCaptureEndpoint=true override is what lets `debugLastToken` below
-// read back a token this repo has no real e-mail infrastructure to deliver.
-//
-// The "biometric" itself is simulated with a Chrome DevTools Protocol virtual authenticator
-// (WebAuthn.addVirtualAuthenticator) -- a real cryptographic authenticator implementation the
-// browser talks to over the actual navigator.credentials.create()/get() APIs AuthScreen's
-// webauthn.ts calls, not a stub of those APIs. Every ceremony in this file produces and
-// verifies real signatures end to end (Api.Accounts.WebAuthnCeremonyVerifier, server-side).
+// S02-05: magic-link + WebAuthn para pacientes, num único contexto (um paciente, um dispositivo).
+// Precisa da API a correr (playwright.config.ts), cujo MagicLink:TestCaptureEndpoint deixa ler o
+// token. A biometria é um autenticador virtual do CDP, com assinaturas reais ponta a ponta.
 
 test.describe.configure({ mode: 'serial' })
 
@@ -35,10 +26,9 @@ async function installVirtualAuthenticator(page: Page) {
 }
 
 /**
- * Installed before every navigation (Playwright's `addInitScript` runs ahead of the page's own
- * scripts, on every subsequent navigation too) so it can observe the very first paint --
- * catching a password `<input>` that rendered and was removed again before any assertion ran,
- * not just one still present when a `locator` check happens to run.
+ * Installed before every navigation (`addInitScript` runs ahead of the page's own scripts) so it
+ * observes the very first paint, catching a password `<input>` that rendered and was removed
+ * again before any assertion ran.
  */
 async function watchForPasswordInput(page: Page): Promise<void> {
   await page.addInitScript(() => {
@@ -87,7 +77,7 @@ async function requestMagicLinkFromUi(page: Page, email: string): Promise<void> 
   await expect(page.locator('input[type="password"]')).toHaveCount(0)
 
   await page.getByLabel('E-mail').fill(email)
-  await page.getByRole('button', { name: 'Criar conta' }).click()
+  await page.getByRole('button', { name: 'Enviar link mágico' }).click()
 
   await expect(page.getByRole('status')).toHaveText(
     'Verifique seu e-mail para continuar. Enviamos um link de acesso, se este e-mail existir.',
@@ -107,12 +97,9 @@ test.describe('magic-link + WebAuthn biometric login (S02-05)', () => {
     const email = uniquePatientEmail('register')
     await requestMagicLinkFromUi(page, email)
 
-    // Installed only AFTER the first real-origin navigation above (not before, while `page`
-    // still sits on `about:blank`): CDP's WebAuthn domain is attached to the page's current
-    // target, and `about:blank` -> a real http(s) origin is a cross-process navigation in
-    // Chromium's site-isolation model -- an authenticator added beforehand would end up bound
-    // to a target this page has already left, and `navigator.credentials.create()` would then
-    // hang forever waiting for a (nonexistent, in headless mode) real platform authenticator.
+    // Installed only AFTER the first real-origin navigation: CDP's WebAuthn domain binds to the
+    // page's current target, and about:blank to a real origin is cross-process in Chromium, so an
+    // authenticator added earlier would be bound to a target the page has already left.
     await installVirtualAuthenticator(page)
 
     const token = await debugLastToken(page, email)
@@ -138,24 +125,18 @@ test.describe('magic-link + WebAuthn biometric login (S02-05)', () => {
 
     await requestMagicLinkFromUi(page, email)
 
-    // One virtual authenticator, attached once (after the first real-origin navigation --
-    // same "about:blank is cross-process" reasoning as the previous test), used for BOTH
-    // magic-link logins below -- it stands in for "the same physical device's secure-enclave
-    // credential storage", which is exactly what makes the second login a real assertion
-    // against an EXISTING credential (Api.Accounts.AccountService.VerifyMagicLinkAsync issues
-    // Assert, not Register, once the account already has a stored WebAuthnCredentialId)
-    // rather than a second registration.
+    // One virtual authenticator for BOTH logins below: it stands in for the same device's
+    // credential storage, which is what makes the second login a real assertion against an
+    // existing credential rather than a second registration.
     await installVirtualAuthenticator(page)
 
     const registerToken = await debugLastToken(page, email)
     await page.goto(magicLinkUrl(registerToken))
     await expect(page.getByRole('status')).toHaveText('Login realizado com sucesso.')
 
-    // Simulate "a later day" by clearing this session's own in-memory state (sessionStorage,
-    // AuthScreen/MagicLinkCallback's only client-side session record -- see
-    // AuthScreen.tsx's ACCOUNT_SESSION_STORAGE_KEY doc comment) before requesting the second
-    // magic link, so this second login is proven independently of the first, not merely a
-    // page that happened to still be "logged in".
+    // Simulate "a later day" by clearing sessionStorage (AuthScreen/MagicLinkCallback's only
+    // client-side session record) before the second magic link, so that login is proven
+    // independently of the first.
     await page.evaluate(() => window.sessionStorage.clear())
 
     await requestMagicLinkFromUi(page, email)

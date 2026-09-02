@@ -85,10 +85,9 @@ export function CopilotKeySetup({ accountId, kek, providers = SUPPORTED_PROVIDER
           type="text"
           autoComplete="off"
           spellCheck={false}
-          // ponytail: -webkit-text-security masks visually without type=password, which browser
-          // password managers key off of even outside a <form>. The DOM value stays plaintext
-          // (expected -- this is CSS-only masking, not a security boundary); id/name deliberately
-          // avoid "password"/"senha" so autofill heuristics have nothing else to latch onto.
+          // ponytail: -webkit-text-security masks visually without type=password, which password
+          // managers key off of. The DOM value stays plaintext (CSS-only masking, not a security
+          // boundary); id/name avoid "password"/"senha" so autofill has nothing to latch onto.
           style={{ WebkitTextSecurity: 'disc' } as CSSProperties}
           className="mb-4 w-full rounded-md border border-neutral-300 px-2 py-1"
           value={apiKey}

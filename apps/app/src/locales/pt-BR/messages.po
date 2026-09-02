@@ -14,22 +14,22 @@ msgstr ""
 "Plural-Forms: \n"
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:153
+#: src/shared/api/problem-messages.ts:150
 msgid "agenda.recording_active"
 msgstr "A sessão está gravando e não pode ser alterada agora."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:54
+#: src/shared/api/problem-messages.ts:51
 msgid "auth.totp_not_enabled"
 msgstr "A verificação em duas etapas ainda não foi ativada para esta conta."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:40
+#: src/shared/api/problem-messages.ts:37
 msgid "auth.totp_already_enabled"
 msgstr "A verificação em duas etapas já está ativada para esta conta."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:92
+#: src/shared/api/problem-messages.ts:89
 msgid "staff.unauthorized"
 msgstr "Acesso não autorizado."
 
@@ -45,12 +45,12 @@ msgstr "Acompanhe suas consultas e informações de saúde com segurança."
 msgid "Adicione esta conta no seu aplicativo autenticador, usando as informações abaixo."
 msgstr "Adicione esta conta no seu aplicativo autenticador, usando as informações abaixo."
 
-#: src/features/device-pairing-new/PairNewDevice.tsx:90
+#: src/features/device-pairing-new/PairNewDevice.tsx:89
 msgid "Aguardando o outro dispositivo enviar a chave..."
 msgstr "Aguardando o outro dispositivo enviar a chave..."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:115
+#: src/shared/api/problem-messages.ts:112
 msgid "auth.device_pairing_payload_not_ready"
 msgstr "Aguarde o outro dispositivo ler o código antes de liberar o acesso."
 
@@ -58,7 +58,7 @@ msgstr "Aguarde o outro dispositivo ler o código antes de liberar o acesso."
 msgid "Aponte a câmera para o código QR exibido no outro dispositivo."
 msgstr "Aponte a câmera para o código QR exibido no outro dispositivo."
 
-#: src/features/nota-fila/FilaAssinatura.tsx:42
+#: src/features/nota-fila/FilaAssinatura.tsx:39
 msgid "Assinadas"
 msgstr "Assinadas"
 
@@ -67,7 +67,7 @@ msgid "Avaliação"
 msgstr "Avaliação"
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:14
+#: src/shared/api/problem-messages.ts:11
 msgid "health.database_unreachable"
 msgstr "Banco de dados indisponível no momento."
 
@@ -75,7 +75,7 @@ msgstr "Banco de dados indisponível no momento."
 msgid "Bem-vindo ao Limmiar"
 msgstr "Bem-vindo ao Limmiar"
 
-#: src/widgets/biblioteca/BibliotecaNotas.tsx:39
+#: src/widgets/biblioteca/BibliotecaNotas.tsx:37
 msgid "Buscar notas"
 msgstr "Buscar notas"
 
@@ -84,7 +84,7 @@ msgid "Cadastrar chave de API de IA"
 msgstr "Cadastrar chave de API de IA"
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:36
+#: src/shared/api/problem-messages.ts:33
 msgid "validation.invalid_field"
 msgstr "Campo inválido: {field}."
 
@@ -113,7 +113,7 @@ msgid "Código de verificação"
 msgstr "Código de verificação"
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:50
+#: src/shared/api/problem-messages.ts:47
 msgid "auth.totp_invalid_code"
 msgstr "Código inválido. Verifique o app autenticador ou use um código de backup."
 
@@ -166,7 +166,7 @@ msgid "Conta criada. Você está cadastrado como profissional."
 msgstr "Conta criada. Você está cadastrado como profissional."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:72
+#: src/shared/api/problem-messages.ts:69
 msgid "auth.account_not_found"
 msgstr "Conta não encontrada."
 
@@ -186,7 +186,7 @@ msgstr "Digite o código de 6 dígitos do seu aplicativo autenticador ou um dos 
 msgid "Digite seu e-mail e sua frase de recuperação para recuperar o acesso à sua conta."
 msgstr "Digite seu e-mail e sua frase de recuperação para recuperar o acesso à sua conta."
 
-#: src/features/device-pairing-new/PairNewDevice.tsx:100
+#: src/features/device-pairing-new/PairNewDevice.tsx:99
 #: src/features/device-pairing-primary/PairingQr.tsx:140
 #: src/features/device-pairing-primary/PairPrimaryDevice.tsx:76
 #: src/features/qr-scan/PairingScan.tsx:103
@@ -199,12 +199,12 @@ msgid "E-mail"
 msgstr "E-mail"
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:68
+#: src/shared/api/problem-messages.ts:65
 msgid "auth.invalid_recovery_phrase"
 msgstr "E-mail ou frase de recuperação inválidos."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:28
+#: src/shared/api/problem-messages.ts:25
 msgid "auth.invalid_credentials"
 msgstr "E-mail ou senha inválidos."
 
@@ -221,12 +221,12 @@ msgid "Escaneie este código QR com o dispositivo que você quer parear."
 msgstr "Escaneie este código QR com o dispositivo que você quer parear."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:76
+#: src/shared/api/problem-messages.ts:73
 msgid "auth.not_a_professional_account"
 msgstr "Esta ação está disponível apenas para contas de profissional."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:84
+#: src/shared/api/problem-messages.ts:81
 msgid "auth.not_in_review"
 msgstr "Esta conta não está aguardando análise."
 
@@ -235,30 +235,30 @@ msgid "Esta frase não será exibida novamente. Guarde-a em um local seguro: ela
 msgstr "Esta frase não será exibida novamente. Guarde-a em um local seguro: ela é a única forma de recuperar o acesso à sua conta caso você perca todos os seus dispositivos."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:165
+#: src/shared/api/problem-messages.ts:162
 msgid "notes.signature_not_found"
 msgstr "Esta nota ainda não foi assinada."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:161
+#: src/shared/api/problem-messages.ts:158
 msgid "notes.already_signed"
 msgstr "Esta nota já foi assinada."
 
-#: src/pages/notas/NotaPage.tsx:124
+#: src/pages/notas/NotaPage.tsx:112
 msgid "Esta nota já tinha sido assinada. As alterações feitas depois não estão cobertas por essa assinatura."
 msgstr "Esta nota já tinha sido assinada. As alterações feitas depois não estão cobertas por essa assinatura."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:149
+#: src/shared/api/problem-messages.ts:146
 msgid "agenda.session_cancelled"
 msgstr "Esta sessão foi cancelada."
 
-#: src/features/nota-fila/FilaAssinatura.tsx:70
+#: src/features/nota-fila/FilaAssinatura.tsx:67
 msgid "Estado da nota"
 msgstr "Estado da nota"
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:109
+#: src/shared/api/problem-messages.ts:106
 msgid "auth.device_pairing_session_not_found"
 msgstr "Este código de pareamento não é mais válido. Gere um novo."
 
@@ -267,17 +267,17 @@ msgid "Este código expirou. Volte para gerar um novo."
 msgstr "Este código expirou. Volte para gerar um novo."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:22
+#: src/shared/api/problem-messages.ts:19
 msgid "auth.email_already_registered"
 msgstr "Este e-mail já está cadastrado."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:58
+#: src/shared/api/problem-messages.ts:55
 msgid "auth.magic_link_invalid"
 msgstr "Este link de acesso não é mais válido. Solicite um novo."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:133
+#: src/shared/api/problem-messages.ts:130
 msgid "patients.entry_sequence_conflict"
 msgstr "Este prontuário mudou em outro dispositivo. Recarregue e tente de novo."
 
@@ -285,11 +285,11 @@ msgstr "Este prontuário mudou em outro dispositivo. Recarregue e tente de novo.
 msgid "Estes códigos não serão exibidos novamente. Guarde-os em um local seguro: eles são a única forma de recuperar o acesso à sua conta caso você perca o aplicativo autenticador."
 msgstr "Estes códigos não serão exibidos novamente. Guarde-os em um local seguro: eles são a única forma de recuperar o acesso à sua conta caso você perca o aplicativo autenticador."
 
-#: src/pages/notas/NotaPage.tsx:131
+#: src/pages/notas/NotaPage.tsx:119
 msgid "Falha ao assinar a nota. Tente novamente."
 msgstr "Falha ao assinar a nota. Tente novamente."
 
-#: src/features/nota-fila/FilaAssinatura.tsx:86
+#: src/features/nota-fila/FilaAssinatura.tsx:83
 #: src/widgets/soap-editor/FilaEEditor.tsx:31
 msgid "Fila de assinatura"
 msgstr "Fila de assinatura"
@@ -331,11 +331,11 @@ msgid "Guardei minha frase"
 msgstr "Guardei minha frase"
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:141
+#: src/shared/api/problem-messages.ts:138
 msgid "agenda.slot_taken"
 msgstr "Já existe uma sessão neste horário."
 
-#: src/features/copilot-byok/CopilotKeySetup.tsx:104
+#: src/features/copilot-byok/CopilotKeySetup.tsx:103
 msgid "Lembrar neste dispositivo"
 msgstr "Lembrar neste dispositivo"
 
@@ -348,7 +348,7 @@ msgid "Login realizado com sucesso."
 msgstr "Login realizado com sucesso."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:80
+#: src/shared/api/problem-messages.ts:77
 msgid "auth.invalid_verification_state"
 msgstr "Não é possível enviar a comprovação com a conta no estado atual."
 
@@ -365,16 +365,16 @@ msgid "Não foi possível concluir o pareamento com segurança. Tente novamente.
 msgstr "Não foi possível concluir o pareamento com segurança. Tente novamente."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:62
+#: src/shared/api/problem-messages.ts:59
 msgid "auth.webauthn_ceremony_failed"
 msgstr "Não foi possível confirmar sua identidade neste dispositivo. Tente novamente."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:32
+#: src/shared/api/problem-messages.ts:29
 msgid "auth.google_token_invalid"
 msgstr "Não foi possível continuar com o Google. Tente novamente."
 
-#: src/features/device-pairing-new/PairNewDevice.tsx:57
+#: src/features/device-pairing-new/PairNewDevice.tsx:56
 msgid "Não foi possível decifrar a chave recebida. Tente parear novamente."
 msgstr "Não foi possível decifrar a chave recebida. Tente parear novamente."
 
@@ -382,7 +382,7 @@ msgstr "Não foi possível decifrar a chave recebida. Tente parear novamente."
 msgid "Não foi possível ler"
 msgstr "Não foi possível ler"
 
-#: src/pages/biblioteca/BibliotecaPage.tsx:66
+#: src/pages/biblioteca/BibliotecaPage.tsx:61
 msgid "Não foi possível preparar a busca. Tente novamente."
 msgstr "Não foi possível preparar a busca. Tente novamente."
 
@@ -391,29 +391,29 @@ msgid "Não foi possível salvar a chave. Tente novamente."
 msgstr "Não foi possível salvar a chave. Tente novamente."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:44
+#: src/shared/api/problem-messages.ts:41
 msgid "auth.totp_not_pending"
 msgstr "Não há uma configuração de verificação em duas etapas pendente para esta conta."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:157
+#: src/shared/api/problem-messages.ts:154
 msgid "voice.enrollment_not_found"
 msgstr "Nenhum cadastro de voz encontrado para esta conta."
 
-#: src/widgets/biblioteca/BibliotecaNotas.tsx:55
+#: src/widgets/biblioteca/BibliotecaNotas.tsx:53
 msgid "Nenhuma nota encontrada."
 msgstr "Nenhuma nota encontrada."
 
-#: src/features/nota-fila/FilaAssinatura.tsx:94
+#: src/features/nota-fila/FilaAssinatura.tsx:91
 msgid "Nenhuma nota nesta aba."
 msgstr "Nenhuma nota nesta aba."
 
-#: src/pages/notas/NotaPage.tsx:117
+#: src/pages/notas/NotaPage.tsx:105
 msgid "Nota assinada em {dataAssinatura}."
 msgstr "Nota assinada em {dataAssinatura}."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:121
+#: src/shared/api/problem-messages.ts:118
 msgid "auth.device_pairing_payload_not_delivered"
 msgstr "O dispositivo principal ainda não liberou o acesso. Aguarde."
 
@@ -422,12 +422,12 @@ msgid "Objetivo"
 msgstr "Objetivo"
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:18
+#: src/shared/api/problem-messages.ts:15
 msgid "unexpected_error"
 msgstr "Ocorreu um erro inesperado no servidor."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:181
+#: src/shared/api/problem-messages.ts:178
 msgid "errors.generic"
 msgstr "Ocorreu um erro inesperado. Tente novamente."
 
@@ -444,7 +444,7 @@ msgstr "Pacientes"
 msgid "Parear novo dispositivo"
 msgstr "Parear novo dispositivo"
 
-#: src/features/nota-fila/FilaAssinatura.tsx:41
+#: src/features/nota-fila/FilaAssinatura.tsx:38
 msgid "Pendentes"
 msgstr "Pendentes"
 
@@ -452,7 +452,7 @@ msgstr "Pendentes"
 msgid "Plano"
 msgstr "Plano"
 
-#: src/widgets/biblioteca/BibliotecaNotas.tsx:50
+#: src/widgets/biblioteca/BibliotecaNotas.tsx:48
 msgid "Preparando a busca..."
 msgstr "Preparando a busca..."
 
@@ -469,12 +469,12 @@ msgid "Profissional"
 msgstr "Profissional"
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:125
+#: src/shared/api/problem-messages.ts:122
 msgid "patients.not_found"
 msgstr "Prontuário não encontrado."
 
 #: src/features/copilot-byok/CopilotKeySetup.tsx:33
-#: src/features/copilot-byok/CopilotKeySetup.tsx:116
+#: src/features/copilot-byok/CopilotKeySetup.tsx:115
 msgid "Pular"
 msgstr "Pular"
 
@@ -490,7 +490,7 @@ msgstr "Recuperar acesso à conta"
 msgid "Risco"
 msgstr "Risco"
 
-#: src/features/copilot-byok/CopilotKeySetup.tsx:113
+#: src/features/copilot-byok/CopilotKeySetup.tsx:112
 msgid "Salvar"
 msgstr "Salvar"
 
@@ -498,7 +498,7 @@ msgstr "Salvar"
 msgid "Selecione uma nota na fila."
 msgstr "Selecione uma nota na fila."
 
-#: src/pages/notas/NotaPage.tsx:87
+#: src/pages/notas/NotaPage.tsx:75
 msgid "Sem sessão ativa. Não é possível assinar."
 msgstr "Sem sessão ativa. Não é possível assinar."
 
@@ -507,42 +507,42 @@ msgid "Senha"
 msgstr "Senha"
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:145
+#: src/shared/api/problem-messages.ts:142
 msgid "agenda.session_not_found"
 msgstr "Sessão não encontrada."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:137
+#: src/shared/api/problem-messages.ts:134
 msgid "agenda.not_authorized_to_schedule"
 msgstr "Sua conta ainda não pode agendar sessões."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:169
+#: src/shared/api/problem-messages.ts:166
 msgid "notes.not_authorized_to_sign"
 msgstr "Sua conta ainda não pode assinar notas."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:129
+#: src/shared/api/problem-messages.ts:126
 msgid "patients.not_authorized_to_create_records"
 msgstr "Sua conta ainda não pode criar prontuários."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:173
+#: src/shared/api/problem-messages.ts:170
 msgid "consent.not_authorized_to_record"
 msgstr "Sua conta ainda não pode registrar consentimento."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:98
+#: src/shared/api/problem-messages.ts:95
 msgid "auth.refresh_token_invalid"
 msgstr "Sua sessão expirou. Entre novamente."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:102
+#: src/shared/api/problem-messages.ts:99
 msgid "auth.access_token_invalid"
 msgstr "Sua sessão expirou. Entre novamente."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:88
+#: src/shared/api/problem-messages.ts:85
 msgid "auth.totp_ticket_invalid"
 msgstr "Sua verificação em duas etapas expirou. Entre novamente."
 
@@ -554,7 +554,7 @@ msgstr "Subjetivo"
 msgid "Tipo de conta"
 msgstr "Tipo de conta"
 
-#: src/features/nota-editor/Citacao.tsx:32
+#: src/features/nota-editor/Citacao.tsx:31
 msgid "Tocar áudio de {inicio} a {fim}"
 msgstr "Tocar áudio de {inicio} a {fim}"
 

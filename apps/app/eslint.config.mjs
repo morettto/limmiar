@@ -3,26 +3,17 @@ import tseslint from 'typescript-eslint'
 import pluginLingui from 'eslint-plugin-lingui'
 import noImplicitLocaleFormatting from './eslint-rules/no-implicit-locale-formatting.js'
 
-// Scoped, single-purpose ESLint config — the project's general-purpose
-// linter is oxlint (see package.json "lint"). This config exists only to
-// enforce the two i18n gates oxlint has no rule (and no stable custom-rule
-// API) for: AC "lint bloqueante" of S00.5-03. Same precedent as
-// dependency-cruiser already coexisting with oxlint in packages/i18n for
-// architecture rules oxlint doesn't cover either.
+// Scoped, single-purpose ESLint config — the general-purpose linter here is oxlint (package.json
+// "lint"). This exists only for the two i18n gates oxlint has no rule for, the same way
+// dependency-cruiser coexists with oxlint for architecture rules.
 export default tseslint.config(
   {
-    // *.spec.tsx (S02-01): Playwright Component Testing files, same
-    // test-only status as *.test.tsx (locators/screenshot filenames/stub
-    // fixture values aren't user-facing copy needing translation) -- see
-    // playwright-ct.config.ts and vite.config.ts's matching Vitest-vs-CT
-    // include split. src/test-support/**: CT-only mount helpers (axe
-    // rule ids, the pt-BR locale tag passed to i18n.loadAndActivate) --
-    // never rendered in the production app either.
+    // *.spec.tsx are Playwright CT files, test-only like *.test.tsx (locators and stub fixtures are
+    // not user-facing copy). src/test-support/** holds CT-only mount helpers, never rendered in the
+    // production app either.
     ignores: [
-      // src/app/routing/E2eMicrofoneScaffold.tsx: andaime de e2e atras de
-      // VITE_ENABLE_E2E_TEST_ROUTES, sem equivalente de producao nenhum -- a copy dele existe
-      // para o spec clicar nela e nunca chega a um utilizador, portanto traduzi-la seria encher
-      // os quatro catalogos com texto de fixture. Mesmo estatuto que os *.spec.tsx acima.
+      // E2eMicrofoneScaffold.tsx: andaime de e2e atras de VITE_ENABLE_E2E_TEST_ROUTES, a copy
+      // dele nunca chega a um utilizador -- traduzi-la so encheria os catalogos de fixture.
       'src/app/routing/E2eMicrofoneScaffold.tsx',
       '**/*.test.{ts,tsx}',
       '**/*.spec.{ts,tsx}',
@@ -53,14 +44,9 @@ export default tseslint.config(
       'lingui/no-unlocalized-strings': [
         'error',
         {
-          // "Limmiar" is the product name — identical in all 4 locales, so
-          // wrapping it in a translation macro everywhere it appears would
-          // be extraction noise with zero translation payoff.
-          // A bare URL path (TanStack Router's <Link to="/settings/copilot">) is
-          // routing config, not copy: no locale renders a slash-path with no spaces
-          // and no capitals as visible text. Matched by VALUE rather than added to
-          // ignoreNames, because ignoreNames matches the attribute name alone and
-          // would exempt every future JSX attribute called `to`, copy included.
+          // "Limmiar" is the product name, identical in all 4 locales, so wrapping it would be
+          // extraction noise. A bare URL path is routing config, not copy — matched by value, since
+          // ignoreNames would exempt every future attribute called `to`, copy included.
           ignore: ['^Limmiar$', '^/[a-z0-9/-]*$'],
           ignoreNames: [
             { regex: { pattern: 'className', flags: 'i' } },

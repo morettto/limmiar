@@ -100,10 +100,9 @@ describe('PairPrimaryDevice', () => {
     await vi.advanceTimersByTimeAsync(1000)
     await flushUntil(() => screen.queryByRole('status')?.textContent === 'Dispositivo pareado com sucesso.')
 
-    // waitFor's own retry loop uses a real setTimeout, which never fires under fake timers
-    // -- the microtask-flush loop above already drains the getKekForTransfer -> encrypt ->
-    // submitPairingPayload chain, so a direct assertion is enough (and correct: if it
-    // hasn't happened by now, waiting longer under fake time wouldn't help either).
+    // waitFor's retry loop uses a real setTimeout, which never fires under fake timers. The
+    // microtask-flush loop above already drains the whole submit chain, so a direct assertion is
+    // both enough and correct.
     expect(submitPairingPayloadMock).toHaveBeenCalledTimes(1)
     expect(onDelivered).toHaveBeenCalledTimes(1)
     expect(screen.getByRole('status').textContent).toBe('Dispositivo pareado com sucesso.')

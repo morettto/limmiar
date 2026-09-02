@@ -56,10 +56,8 @@ function workerEngine(): TranscriptionEngine {
 }
 
 /**
- * Motor por flag de build (decisão 8 do desenho, precedente
- * `router.tsx:236`). Sem parâmetros: o único chamador de produção é a UI, e
- * os testes de `live-session` já injetam `engine` direto — um `opts` hoje
- * seria especulativo.
+ * Motor por flag de build (decisão 8). Sem parâmetros: o único chamador de produção é a UI e os
+ * testes de `live-session` já injetam `engine` direto, logo um `opts` seria especulativo.
  */
 export function engineFor(): TranscriptionEngine {
   return import.meta.env.VITE_FAKE_ASR === 'true' ? fakeEngine() : workerEngine()

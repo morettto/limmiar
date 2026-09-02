@@ -26,11 +26,9 @@ const NIST_CAVP_VECTOR = {
   ctWithTag: '426e0efc693b7be1f3018db7ddbb7e4dee8257795be6a1164d7e1d2d6cac77a7',
 }
 
-// Test-only helper: builds an encrypt/decrypt-usage CryptoKey directly via
-// subtle.importKey, bypassing importKek() on purpose — importKek() scopes its
-// output to wrapKey/unwrapKey usages only (a KEK never encrypts application
-// data directly), so a DEK-shaped key for encrypt()/decrypt() tests has to be
-// constructed independently of this module's own public surface.
+// Test-only helper: importKek() scopes its output to wrapKey/unwrapKey (a KEK never
+// encrypts application data), so a DEK-shaped key for encrypt()/decrypt() tests is
+// built directly via subtle.importKey instead.
 async function importRawDekForTests(raw: Uint8Array<ArrayBuffer>): Promise<CryptoKey> {
   return crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt'])
 }

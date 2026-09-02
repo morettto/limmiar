@@ -23,11 +23,9 @@ function gruposFiltrados(grupos: readonly GrupoPaciente[], resultado: ResultadoB
 }
 
 /**
- * Biblioteca de notas: campo de busca + grupos por paciente. `resultado` já vem calculado
- * do chamador (`buscar`, `features/nota-biblioteca/indice.ts`) -- este widget só faz três
- * coisas: mostra "a preparar" sem esconder os grupos, filtra por `ids` quando `pronto`, e só
- * mostra "sem resultados" quando `ids` vier vazio (nunca com `a-preparar`, que confundiria
- * "índice ainda a carregar" com "busca sem resultado" -- ver README, "os três estados").
+ * Biblioteca de notas: campo de busca + grupos por paciente, com `resultado` já calculado pelo
+ * chamador. Só filtra por `ids` quando `pronto` e só mostra "sem resultados" com `ids` vazio --
+ * nunca com `a-preparar`, que confundiria "a carregar" com "sem resultado" (ver README).
  */
 export function BibliotecaNotas({ grupos, termo, onTermoChange, resultado }: BibliotecaNotasProps) {
   const semResultados = resultado.estado === 'pronto' && resultado.ids.length === 0

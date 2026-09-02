@@ -34,14 +34,9 @@ describe('syncDocumentLang', () => {
     syncDocumentLang(instance)
     expect(document.documentElement.lang).toBe('pt-BR')
 
-    // Same technique as apps/app/src/i18n.test.ts: importing a locale with no
-    // compiled catalog really rejects (module not found) — a genuine
-    // fallback failure, not a mock standing in for one. The path must stay a
-    // template literal over a variable (not a static string) so Vite treats
-    // it as a runtime-resolved dynamic import instead of failing at
-    // transform time. Because activate()/loadAndActivate() are never
-    // reached on that path, the 'change' event this module listens for
-    // correctly never fires.
+    // Same technique as i18n.test.ts: importing a locale with no compiled catalog really
+    // rejects — a genuine failure, not a mock. The path must stay a template literal so Vite
+    // resolves it at runtime; activate() is never reached, so 'change' correctly never fires.
     const locale = 'xx-XX'
     await expect(import(`../locales/${locale}/messages.po`)).rejects.toBeDefined()
 

@@ -167,10 +167,9 @@ describe('atribuirLocutores', () => {
   })
 
   it('palavra ASR invertida (fimMs < inicioMs) é tratada como ponto de 1ms em inicioMs', () => {
-    // Entrada hipotética inválida do ASR. A fórmula não distingue este caso
-    // do degenerado: `Math.max(p.fimMs, p.inicioMs + 1)` normaliza fimMs
-    // para inicioMs + 1 sempre que fimMs não excede esse valor, tratando a
-    // palavra como o ponto [inicioMs, inicioMs+1).
+    // Entrada hipotética inválida do ASR: `Math.max(p.fimMs, p.inicioMs + 1)`
+    // normaliza fimMs e trata a palavra como o ponto [inicioMs, inicioMs+1),
+    // igual ao caso degenerado.
     const palavras: PalavraAsr[] = [{ texto: 'x', inicioMs: 50, fimMs: 10 }]
     const turnos: TurnoLocutor[] = [
       { locutor: 'A', inicioMs: 0, fimMs: 50 },

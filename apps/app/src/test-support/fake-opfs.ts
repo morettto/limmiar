@@ -1,21 +1,10 @@
-// Duplo mínimo da File System Access API (OPFS), partilhado por quem só grava
-// (features/live-session/chunk-store.test.ts), quem só lê (features/nota-audio/
-// reprodutor.test.ts) e quem faz as duas coisas (features/nota-biblioteca/
-// indice-store.test.ts). Sem OPFS em Node/Vitest e sem precedente de mock de repositório
-// para esta API (grepped apps/app/src e beyond) -- só a superfície que os três chamadores
-// de facto usam: getFileHandle (com/sem `{ create }`), createWritable/write/close,
-// getFile/arrayBuffer, keys(). Nasceu na terceira duplicação deste duplo local (S08-02) --
-// ver handoff do S08-01 sobre chunk-store.test.ts/reprodutor.test.ts já terem duplicado uma
-// vez.
-//
-// Bytes só ficam visíveis em `handle.bytes` depois de `close()` -- espelha a API real (a
-// escrita não é persistida antes do stream fechar), e poupa um campo `closed` à parte só
-// para o mesmo facto: um chamador que esqueça `close()` nunca vê `handle.bytes` mudar.
-//
-// `getFileHandle` sem `{ create }` sobre um nome ausente lança `DOMException` com
-// `name: 'NotFoundError'`, como a API real -- é o que `opfsIndice().ler` (indice-store.ts)
-// depende para distinguir "ficheiro ausente" de qualquer outro erro. `removeEntry` espelha
-// o mesmo: lança `NotFoundError` sobre um nome ausente, usado por `opfsIndice().apagar`.
+// Duplo mínimo da File System Access API (OPFS), partilhado pelos testes de chunk-store,
+// reprodutor e indice-store: só a superfície que os três usam. Nasceu na terceira duplicação
+// do duplo local (S08-02).
+
+// Bytes só ficam visíveis em `handle.bytes` depois de `close()`, como na API real, e
+// `getFileHandle`/`removeEntry` sobre um nome ausente lançam `NotFoundError` -- é disso que
+// `opfsIndice()` depende para distinguir "ficheiro ausente" de qualquer outro erro.
 
 export class FakeWritable {
   private readonly handle: FakeFileHandle

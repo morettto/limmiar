@@ -19,12 +19,9 @@ export async function selarAssinatura(
   return webcrypto.encrypt(dek, await digestNota(nota), notaAssinaturaAad(noteId, nota.revisao))
 }
 
-// Serializador dedicado, deliberadamente distinto de `textoCanonico` (nota.ts): `textoCanonico`
-// omite `noteId` de propósito, porque é exatamente a superfície que a assinatura cobre; a
-// entrada de prontuário precisa de saber a que nota pertence -- é o registo clínico completo,
-// não o hash que a assinatura atesta. Fundir os dois obrigaria a assinatura a cobrir campos que
-// não são conteúdo clínico (o id da nota), então continuam dois serializadores por responderem
-// a perguntas diferentes -- só o map de `frases` é partilhado, via `serializarFrases`.
+// Serializador dedicado, distinto de `textoCanonico` (nota.ts): aquele omite `noteId` porque é a
+// superfície que a assinatura cobre, e a entrada de prontuário precisa de saber a que nota
+// pertence. Só o map de `frases` é partilhado, via `serializarFrases`.
 export function notaParaEntrada(nota: Nota): Uint8Array<ArrayBuffer> {
   return new TextEncoder().encode(
     JSON.stringify({

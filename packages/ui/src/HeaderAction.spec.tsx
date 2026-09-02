@@ -26,12 +26,9 @@ for (const locale of VISUAL_LOCALES) {
           minHeight: 200,
           padding: 16,
           position: 'relative',
-          // At sm the button is `fixed`, which positions relative to the
-          // *viewport* by default — outside the bounding box a component
-          // screenshot captures (confirmed empty without this: the fixed
-          // button rendered at the real viewport's bottom, past this div's
-          // own 200px height). `transform` makes this div the containing
-          // block for fixed descendants too, per the CSS spec.
+          // At sm the button is `fixed`, which positions against the viewport and
+          // falls outside a component screenshot's bounding box; `transform` makes
+          // this div the containing block for fixed descendants.
           transform: 'translateZ(0)',
         }}
       >

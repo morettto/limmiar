@@ -85,10 +85,9 @@ describe('AuthScreen', () => {
     fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'correct horse battery staple' } })
     fireEvent.click(screen.getByRole('button', { name: 'Criar conta' }))
 
-    // { timeout: 3000 }: "Criar conta" runs a real Argon2id derivation (no mock for that
-    // step) before register() is ever called -- RTL's default 1000ms waitFor timeout is a
-    // tight race against genuine CPU-bound work, not a leak between test files. Same
-    // headroom PairNewDevice.test.tsx already uses for its own slow async wait.
+    // { timeout: 3000 }: "Criar conta" runs a real Argon2id derivation before register() is
+    // called, and RTL's default 1000ms waitFor is a tight race against genuine CPU-bound work.
+    // Same headroom PairNewDevice.test.tsx already uses.
     await waitFor(() => expect(registerMock).toHaveBeenCalledTimes(1), { timeout: 3000 })
 
     const call = registerMock.mock.calls[0]

@@ -13,7 +13,7 @@ const CONFIG = {
     numThreads: 1, // o build WASM não tem pthreads — decisão 9
     provider: 'cpu', // único EP disponível
     modelType: 'nemotron', // rejeita decode que não seja greedy
-    debug: 0, // upstream traz 1 e enche a consola
+    debug: 0,
   },
   decodingMethod: 'greedy_search',
   maxActivePaths: 4,

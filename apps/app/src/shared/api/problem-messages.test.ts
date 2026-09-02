@@ -3,10 +3,9 @@ import { setupI18n } from '@lingui/core'
 import { translateProblemCode } from './problem-messages'
 import { problemCodes } from './problem-codes'
 
-// The type of knownProblemMessages already makes a missing entry a tsc error, but tsc
-// does not run in the unit-test job. These cases are the same guarantee enforced at
-// runtime, through the module's own interface: every code the backend declares must
-// render its own message, never the generic fallback and never the raw code.
+// The type of knownProblemMessages already makes a missing entry a tsc error, but tsc does not run
+// in the unit-test job. These cases enforce the same guarantee at runtime: every declared code
+// renders its own message, never the generic fallback and never the raw code.
 describe('translateProblemCode — answers every code the backend declares', () => {
   const GENERIC_SENTINEL = '__generic_fallback_sentinel__'
 

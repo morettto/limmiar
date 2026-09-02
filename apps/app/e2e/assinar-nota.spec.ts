@@ -1,23 +1,8 @@
 import { test, expect, type Page } from '@playwright/test'
 
-// S08-01, fatia 5: prova o percurso só-teclado do editor SOAP -- Tab até à listbox da fila,
-// j/k para navegar, Enter para abrir a nota, Tab para o editor, escrever, e ⌘↵/Ctrl+↵ para
-// assinar (ehAtalhoAssinar, features/nota-fila/navegacao-teclado.ts).
-//
-// `/notas` (router.tsx) ainda não tem sessão/keychain real montada -- mesmo "sem ponto de
-// entrada de navegação real ainda" que CopilotKeySetup já documenta no seu próprio e2e
-// (copilot-key-setup.spec.ts), e NotaPage.tsx traz o mesmo comentário `ponytail:` no topo.
-// S08-07: `kek` é prop obrigatória `CryptoKey | null` de NotaPage; `NotaRouteComponent`
-// em router.tsx monta `<NotaPage kek={null} />` explicitamente (mesmo padrão de
-// `BibliotecaRouteComponent`, sem KeychainProvider/sessão real montada ainda). `aoAssinar`
-// guarda cedo sobre `kek === null` e nem chega a tentar a cadeia real
-// (openRecord/appendPatientEntry/assinarNota) -- isso resolve de forma determinística para
-// o caminho "sem sessão" desta fatia (role=alert, item continua pendente), o mesmo
-// desfecho que NotaPage.test.tsx cobre com os módulos de crypto/api duplados -- não
-// depende de o Postgres deste webServer estar alcançável (não está, ver playwright.config.ts)
-// nem de uma sessão real existir. Ligar `/notas` a uma sessão/Keychain real (substituir
-// `kek={null}` por uma `CryptoKey` real em router.tsx), e então provar aqui o desfecho de
-// sucesso ("Assinada"), fica para quando esse ponto de entrada existir.
+// S08-01 fatia 5: percurso só-teclado do editor SOAP -- Tab até à listbox, j/k, Enter, Tab,
+// escrever e ⌘↵/Ctrl+↵ para assinar. Com `kek={null}` (router.tsx), `aoAssinar` guarda cedo:
+// o que se prova aqui é o desfecho "sem sessão", determinístico e sem tocar no Postgres.
 
 async function tabAteListbox(page: Page): Promise<void> {
   for (let tentativa = 0; tentativa < 10; tentativa++) {

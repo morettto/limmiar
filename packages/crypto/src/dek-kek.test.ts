@@ -15,11 +15,9 @@ describe('wrapDek/unwrapDek — round trip', () => {
 })
 
 describe('wrapDek/unwrapDek — AAD binds the wrapped DEK to its context', () => {
-  // ADR-S01-03: the envelope's AAD (schema version + record id, decided by
-  // the caller) binds a wrapped DEK to one context. A wrappedDek unwrapped
-  // under a DIFFERENT context's AAD must fail — this is what actually
-  // enforces "this patient's DEK doesn't open under that context", even
-  // though this ticket doesn't decide the AAD's byte format itself.
+  // ADR-S01-03: the envelope's AAD (schema version + record id) binds a wrapped
+  // DEK to one context. Unwrapping under a different AAD must fail — that is what
+  // enforces this patient's DEK not opening under another context.
   it('fails to unwrap when the AAD does not match the one used to wrap', () => {
     const kek = new Uint8Array(32).fill(0x33)
     const dek = new Uint8Array(32).fill(0x44)

@@ -14,15 +14,9 @@ import { FilaEEditor } from '../../widgets/soap-editor/FilaEEditor'
 const NOTA_FIXTURE_ID = 'nota-fixture-1'
 const PATIENT_FIXTURE_ID = 'paciente-fixture-1'
 
-// ponytail: sem sessão/keychain real montada nesta rota ainda -- mesma situação, mesmo
-// motivo, que CopilotKeyPage's `kek={null}, accountId=""`. `appendPatientEntry`/
-// `assinarNota` abaixo com estes valores falham contra um backend real (o mesmo caminho
-// de "falha de rede" que um apagão de rede genuíno cairia -- sem perda de dados, sem
-// estado inconsistente, só um fluxo que não completa até a sessão real existir). Quem
-// ligar Keychain/sessão substitui estes três valores por props (o quarto, `kek`, já é
-// prop obrigatória desde a ronda 1 de correção do S08-07 -- `router.tsx` monta
-// `NotaRouteComponent` com `kek={null}`, mesmo padrão de `BibliotecaRouteComponent`/
-// `dek={null}`); a lógica de aoAssinar abaixo não muda.
+// ponytail: sem sessão/keychain real nesta rota ainda -- mesma situação de CopilotKeyPage.
+// Com estes valores, `appendPatientEntry`/`assinarNota` caem no caminho de "falha de rede",
+// sem perda de dados. Quem ligar a sessão substitui-os por props, sem mexer em `aoAssinar`.
 const BASE_URL_FIXTURE = ''
 const ACCOUNT_ID_FIXTURE = ''
 const ACCESS_TOKEN_FIXTURE = ''
@@ -41,17 +35,14 @@ function notaFixture(): Nota {
 type Mensagem = { status: 'sucesso' | 'erro'; texto: string }
 
 export interface NotaPageProps {
-  // Obrigatória desde a ronda 1 de correção do S08-07 -- mesmo padrão de `BibliotecaPage`'s
-  // `dek: CryptoKey | null`. `router.tsx` monta via `NotaRouteComponent` com `kek={null}`
-  // enquanto não há KeychainProvider real; testes injetam uma chave real para exercitar o
-  // caminho pós-guarda.
+  // Obrigatória desde a ronda 1 do S08-07 -- mesmo padrão do `dek: CryptoKey | null` de
+  // `BibliotecaPage`. `router.tsx` monta com `kek={null}` enquanto não há KeychainProvider;
+  // os testes injetam uma chave real para exercitar o caminho pós-guarda.
   kek: CryptoKey | null
 }
 
-// ponytail: fila com um único item fixo -- a fila real (fetch ao backend, múltiplas
-// notas/pacientes) continua fora desta fatia. `aoAssinar` agora grava no prontuário e
-// assina de facto (fatia 5), e marca só o item de `nota.id` -- a dívida da fatia 3 (que
-// marcava todos os itens, e só funcionava por a fixture ter um único item) está paga.
+// ponytail: fila com um único item fixo -- a fila real continua fora desta fatia. `aoAssinar`
+// já grava no prontuário e assina de facto, e marca só o item de `nota.id`.
 export function NotaPage({ kek }: NotaPageProps) {
   const { t, i18n } = useLingui()
   const [notas, setNotas] = useState<Record<string, Nota>>(() => ({ [NOTA_FIXTURE_ID]: notaFixture() }))
@@ -76,12 +67,9 @@ export function NotaPage({ kek }: NotaPageProps) {
     document.querySelector<HTMLElement>('[role="listbox"]')?.focus()
   }
 
-  // Ordem que não inverte: grava a revisão no prontuário ANTES de assinar. Falhar a
-  // assinatura depois de gravar deixa uma revisão por assinar no prontuário -- recuperável,
-  // um novo `⌘↵` assina a mesma revisão de novo (guarda abaixo evita repetir a gravação).
-  // O inverso (assinar antes de gravar) deixaria, numa falha entre as duas chamadas, uma
-  // assinatura a apontar para uma revisão que não existe em lado nenhum do prontuário --
-  // essa linha não se pode apagar depois.
+  // Ordem que não inverte: grava a revisão no prontuário ANTES de assinar. Falhar a assinatura
+  // depois de gravar é recuperável (novo ⌘↵ assina a mesma revisão); o inverso deixaria uma
+  // assinatura a apontar para uma revisão que não existe no prontuário, e isso não se apaga.
   async function aoAssinar(nota: Nota) {
     if (kek === null) {
       setMensagem({ status: 'erro', texto: t`Sem sessão ativa. Não é possível assinar.` })
@@ -136,15 +124,9 @@ export function NotaPage({ kek }: NotaPageProps) {
     setNotas((atuais) => ({ ...atuais, [nota.id]: nota }))
   }
 
-  // Reprodutor real (fatia 3, features/nota-audio/reprodutor.ts) -- o <audio> abaixo
-  // renderiza sempre junto com este componente, então `audioRef.current` já está
-  // atribuído em qualquer clique/hover/foco que chegue a chamar `aoTocar` (nenhum
-  // caminho de UI o invoca antes do primeiro render commitar); a guarda abaixo é só a
-  // fronteira de nulidade do próprio ref (mesmo espírito do ADR contra `!` na fronteira
-  // api/store/service -- ver docs/adr/), não um caminho de facto alcançável. Ainda não
-  // tem `src`: carregar o áudio de verdade da sessão (`abrirSessaoComoBlob`, precisa de
-  // dir OPFS + dek + sessionId vindos do backend) é fatia futura. Tocar antes disso é um
-  // no-op honesto (elemento sem fonte), não um no-op escondido atrás de uma função vazia.
+  // Reprodutor real (fatia 3): o <audio> renderiza sempre com este componente, então a guarda
+  // é só a fronteira de nulidade do ref, não um caminho alcançável. Ainda sem `src` -- carregar
+  // o áudio da sessão é fatia futura, e tocar antes disso é um no-op honesto.
   function aoTocar(ancora: Ancora) {
     if (!audioRef.current) return
     criarReprodutor(audioRef.current).tocar(ancora.inicioMs)

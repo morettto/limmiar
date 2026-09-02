@@ -51,10 +51,9 @@ export function criarMaquinaRascunho(opcoes: CriarMaquinaRascunhoOpcoes) {
             target: 'aVencer',
             actions: assign({ avisoEmitidoEm: ({ event }) => resolverAgora(event.agora) }),
           },
-          // Rede de segurança: se o adapter falhar a janela de aviso (23-30
-          // dias) e disparar VENCEU direto a partir de `rascunho` sem passar
-          // por `aVencer`, o rascunho ainda assim é descartado aos 30 dias
-          // como a spec S07 promete — ver machine.test.ts.
+          // Rede de segurança: se o adapter disparar VENCEU direto a partir de
+          // `rascunho`, sem passar por `aVencer`, o rascunho ainda é descartado
+          // aos 30 dias como a spec S07 promete — ver machine.test.ts.
           VENCEU: 'descartado',
         },
       },

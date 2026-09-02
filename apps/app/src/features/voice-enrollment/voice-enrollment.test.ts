@@ -11,14 +11,9 @@ async function makeKek(): Promise<CryptoKey> {
   return limmiarWebcrypto.importKek(new Uint8Array(32).fill(0x07))
 }
 
-// Pins the IVs webcrypto.generateWrappedDek()/encrypt() draw internally (one for the DEK
-// wrap, one for the embedding ciphertext) via crypto.getRandomValues -- the only injection
-// point reachable from apps/app. packages/crypto's own __setIvSourceForTests seam is
-// deliberately NOT re-exported from the package barrel (see webcrypto.ts), and there is no
-// hook at all for generateKey's CSPRNG-derived DEK key material, so a literal byte-for-byte
-// KAT of the whole wrappedDek is out of reach from this layer. What *is* pinnable -- IV
-// prefix and exact ciphertext length -- is asserted below, plus a round-trip decrypt through
-// the real production primitives to prove the sealed bytes actually hold the embedding.
+// Pins the IVs that generateWrappedDek()/encrypt() draw internally, via crypto.getRandomValues — the
+// only injection point reachable from apps/app (packages/crypto's own seam is not re-exported). A
+// full KAT is out of reach, so IV prefix, ciphertext length and a round-trip decrypt are asserted.
 function stubDeterministicIvs(...ivs: Uint8Array[]): void {
   let call = 0
   vi.spyOn(crypto, 'getRandomValues').mockImplementation(((array: Uint8Array) => {

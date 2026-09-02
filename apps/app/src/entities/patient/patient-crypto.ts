@@ -36,16 +36,9 @@ export function sealEntry(
 }
 
 /**
- * Unwraps the DEK and decrypts every entry, in the order given.
- *
- * A malicious or malfunctioning server can withhold entries from the GET response --
- * the AAD binds each ciphertext to its own (patientId, sequence) so a swapped or
- * replayed entry fails to decrypt, but it says nothing about a *missing* one. This
- * checks the sequence run is exactly 1..N with no gaps before decrypting anything, so a
- * truncated or holed record throws instead of silently rendering an incomplete
- * prontuário as if it were complete. It does not (yet) prove nothing was dropped off
- * the *end* -- that needs entry-to-entry chaining and is tracked as follow-up work, not
- * solved here.
+ * Unwraps the DEK and decrypts every entry in order. The AAD binds each ciphertext to its own
+ * (patientId, sequence) but says nothing about a *missing* one, so the sequence run must be exactly
+ * 1..N. Drops off the end still need entry-to-entry chaining, tracked as follow-up.
  */
 export async function openRecord(
   kek: CryptoKey,

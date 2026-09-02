@@ -3,10 +3,9 @@ import { deriveChannelKey } from './device-pairing-channel'
 import { generateKeyPair, getSharedSecret } from './x25519'
 
 describe('deriveChannelKey — two devices derive the same channel key', () => {
-  // The real S02-04 pairing flow: the phone and the desktop each hold their
-  // own X25519 key pair, exchange public keys over the QR channel, and never
-  // transmit the derived key itself. Both sides must land on the same bytes
-  // from their own half of the exchange, or the channel simply doesn't work.
+  // The real S02-04 flow: each side holds its own X25519 pair, they exchange public
+  // keys over the QR channel, and the derived key is never transmitted. Both sides
+  // must land on the same bytes or the channel does not work.
   it('derives an identical key on both sides of an X25519 exchange with the same salt', () => {
     const alice = generateKeyPair()
     const bob = generateKeyPair()
@@ -34,10 +33,9 @@ describe('deriveChannelKey — the salt binds the key to one pairing session', (
 })
 
 describe('deriveChannelKey — determinism', () => {
-  // HKDF is a pure function of (secret, salt, info, length). Unlike this
-  // package's encrypt(), which deliberately hides a CSPRNG nonce inside, this
-  // one must have no entropy source of its own — a device that re-derived a
-  // different key on a second call could never rejoin its own session.
+  // HKDF is a pure function of (secret, salt, info, length) — unlike encrypt(),
+  // which hides a CSPRNG nonce. A device that re-derived a different key on a
+  // second call could never rejoin its own session.
   it('returns identical bytes when called twice with the same inputs', () => {
     const sharedSecret = new Uint8Array(32).fill(0x77)
     const salt = new TextEncoder().encode('session=C')

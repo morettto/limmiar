@@ -1,10 +1,8 @@
 import { test, expect } from '@playwright/test'
 
-// S07-04: proves the real navigation entry point into CopilotKeySetup -- the index route's
-// link -- and that "Pular" is reachable even with today's always-locked keychain (no
-// KeychainProvider mounted yet, see router.tsx's own doc comment on CopilotSettingsRouteComponent).
-// Own file, not a `describe` added to copilot-byok.spec.ts: that spec depends on real internet
-// access to three third-party APIs and can be red for reasons unrelated to this ticket.
+// S07-04: proves the real navigation entry point into CopilotKeySetup, and that "Pular" works
+// with today's always-locked keychain (router.tsx). Own file, not part of copilot-byok.spec.ts,
+// which depends on real internet access and can be red for unrelated reasons.
 
 test.describe('CopilotKeySetup reachable from the index route (S07-04)', () => {
   test.use({ locale: 'pt-BR' })

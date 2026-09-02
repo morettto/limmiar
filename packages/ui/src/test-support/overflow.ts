@@ -9,39 +9,9 @@ export interface OverflowViolation {
 }
 
 /**
- * AC3 (S00.5-04): "nenhum estouro de layout, nenhum texto cortado sem
- * reticências". Percorre todo elemento sob `root` e reporta qualquer eixo
- * (x/y) cujo conteúdo estoura a própria caixa (scrollWidth/Height >
- * clientWidth/Height, com tolerância de 1px pra anti-aliasing) E, nesse
- * mesmo eixo, o elemento de fato CORTA o conteúdo — não basta estourar.
- * Um eixo só conta como violação se o `overflow` computado NAQUELE eixo for
- * `hidden`/`clip` e não houver affordance visível de truncamento
- * (`text-overflow: ellipsis` ou `-webkit-line-clamp`). Um eixo é sempre
- * benigno quando:
- *  (a) `overflow: visible` (o padrão do CSS) — nada é escondido, o conteúdo
- *      só extrapola a caixa visualmente, o que não é "corte";
- *  (b) alcançável por scroll — `overflow-x/y: auto|scroll` (mesmo padrão de
- *      região-com-scroll do WCAG 2.1.1 que KpiStrip e o rail de dias do
- *      CalendarViewport já usam, já coberto pela regra
- *      scrollable-region-focusable do axe);
- *  (c) truncado com affordance visível (`text-overflow: ellipsis` +
- *      `overflow` não-visible, ou `-webkit-line-clamp`).
- *
- * (a) é o motivo de checar por eixo, não a caixa inteira de uma vez: um
- * `div` de altura fixa com `overflow: visible` (o padrão) e conteúdo mais
- * alto que a caixa tem `scrollHeight > clientHeight`, mas nada é cortado —
- * o conteúdo só continua visível abaixo da borda declarada da caixa. Sem
- * essa exceção, qualquer elemento de altura fixa cujo conteúdo cresça sob
- * pseudo-locale dispararia falso positivo, mesmo sem nenhum corte real.
- *
- * Elemento sem altura/largura fixa nunca dispara isso: sem uma restrição
- * explícita, scrollHeight/Width e clientHeight/Width ficam iguais por
- * construção — então isto só pega corte de verdade, não reflow saudável sob
- * expansão de texto do pseudo-locale.
- *
- * Assume zero portal React dentro de root (nenhuma das 7 primitivas usa
- * createPortal), então um simples querySelectorAll('*') a partir de root vê
- * todo descendente renderizado, incluindo fixed/absolute.
+ * AC3 (S00.5-04): reporta um eixo cujo conteúdo estoura a caixa (tolerância de 1px)
+ * E é de facto cortado — `overflow: hidden|clip` sem ellipsis nem line-clamp.
+ * `visible`, scroll e truncagem com affordance são benignos. Assume zero portais.
  */
 export async function findOverflowViolations(root: Locator): Promise<OverflowViolation[]> {
   return root.evaluate((rootEl: HTMLElement) => {

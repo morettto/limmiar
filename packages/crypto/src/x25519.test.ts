@@ -3,10 +3,9 @@ import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import { generateKeyPair, getPublicKey, getSharedSecret } from './x25519'
 
-// RFC 7748 §5.2 "Test Vectors" — X25519 raw scalarmult (input scalar k, input
-// u-coordinate, output u-coordinate), https://www.rfc-editor.org/rfc/rfc7748#section-5.2
-// Cross-checked byte-for-byte against the installed @noble/curves x25519
-// output (both scalarMult() and getSharedSecret()) before being hardcoded here.
+// RFC 7748 §5.2 test vectors — X25519 raw scalarmult (scalar k, input u, output u):
+// https://www.rfc-editor.org/rfc/rfc7748#section-5.2
+// Cross-checked byte-for-byte against the installed @noble/curves before hardcoding.
 const RFC7748_SCALARMULT_VECTOR = {
   k: 'a546e36bf0527c9d3b16154b82465edd62144c0ac1fc5a18506a2244ba449ac4',
   u: 'e6db6867583030db3594c1a424b15f7c726624ec26b3353b10a903a6d0ab1c4c',
@@ -24,11 +23,9 @@ describe('getSharedSecret — RFC 7748 §5.2 known-answer test', () => {
   })
 })
 
-// RFC 7748 §6.1 "Diffie-Hellman" — Alice/Bob key exchange example,
+// RFC 7748 §6.1 Diffie-Hellman example (Alice/Bob key exchange):
 // https://www.rfc-editor.org/rfc/rfc7748#section-6.1
-// Cross-checked byte-for-byte against the installed @noble/curves x25519
-// output (getPublicKey and getSharedSecret, both directions) before being
-// hardcoded here.
+// Cross-checked byte-for-byte against @noble/curves in both directions.
 const RFC7748_DH_VECTOR = {
   alicePrivate: '77076d0a7318a57d3c16c17251b26645df4c2f87ebc0992ab177fba51db92c2a',
   alicePublic: '8520f0098930a754748b7ddcb43ef75a0dbf3a0d26381af4eba4a98eaa9b4e6a',
@@ -114,13 +111,9 @@ describe('getSharedSecret — ECDH symmetry property', () => {
 })
 
 describe('getSharedSecret — degenerate (all-zero) peer public key', () => {
-  // RFC 7748 §6.1: an all-zero output (which an all-zero, order-1 peer
-  // public key always produces) MUST be rejected — accepting it would let a
-  // malicious peer force a shared secret of zero, known in advance to
-  // anyone. @noble/curves already enforces this itself; this test locks
-  // that library behavior in as an invariant this package relies on,
-  // instead of adding a second, unreachable guard of our own that no
-  // mutation test could ever prove necessary.
+  // RFC 7748 §6.1: an all-zero output (what an order-1 peer key always produces)
+  // MUST be rejected, or a peer forces a shared secret known in advance.
+  // @noble/curves enforces it; this locks that behavior in as our invariant.
   it('throws instead of returning an all-zero shared secret', () => {
     const { privateKey } = generateKeyPair()
     const allZeroPeerPublicKey = new Uint8Array(32)
