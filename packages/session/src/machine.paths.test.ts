@@ -30,11 +30,9 @@ const exemplos: { [K in SessaoEvento['type']]: Extract<SessaoEvento, { type: K }
 }
 const eventosDeExemplo: SessaoEvento[] = Object.values(exemplos)
 
-// `serializeState` ignora o contexto de propósito: eventos como CHUNK_PERSISTIDO e
-// MARCAR_MOMENTO fazem transição interna (mesmo estado, contexto novo) — sem isso, a
-// travessia veria cada incremento de `chunksPersistidos` como um estado nunca visitado
-// e nunca terminaria. Os valores de contexto já têm cobertura própria em
-// machine.test.ts; aqui o que importa é a topologia de estados alcançáveis.
+// `serializeState` ignora o contexto: eventos como CHUNK_PERSISTIDO fazem transição
+// interna (mesmo estado, contexto novo) e a travessia nunca terminaria. Aqui importa a
+// topologia; os valores de contexto têm cobertura própria em machine.test.ts.
 const opcoesTravessia = {
   events: eventosDeExemplo,
   serializeState: (snapshot: AnyMachineSnapshot) => JSON.stringify(snapshot.value),

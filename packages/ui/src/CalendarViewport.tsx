@@ -1,11 +1,9 @@
 import type { ReactNode } from 'react'
 import { type Breakpoint, useBreakpoint } from './use-breakpoint'
 
-// R8 — Calendário: xl → semana de 5 dias · lg → 5 dias, densidade maior ·
-// md → 3 dias com rolagem horizontal · sm → 1 dia + seletor de data.
-// (Wireframes - Responsivo (3 plataformas).dc.html, "Renderização por
-// largura (R8)" — this is the one rule where lg tracks xl, not md/sm, so it
-// needs the full 4-way Breakpoint, not a collapsed D/T/M split.)
+// R8 — Calendário: xl/lg semana de 5 dias (lg mais denso), md 3 dias com rolagem,
+// sm 1 dia + seletor. É a única regra em que lg acompanha xl, por isso precisa do
+// Breakpoint de 4 valores e não de um D/T/M colapsado.
 const VISIBLE_DAYS: Record<Breakpoint, number> = {
   sm: 1,
   md: 3,
@@ -29,15 +27,9 @@ export interface CalendarViewportProps {
 }
 
 /**
- * R8 — the visible day window narrows with viewport width; below md, a date
- * selector replaces the (now single) day header so the user can still jump
- * anywhere in `days` without a multi-day grid to tap through.
- *
- * `children` takes pre-built columns (one per day) rather than a `renderDay`
- * render-prop: besides matching this project's composition convention
- * (children over render props), a function prop that returns JSX can't
- * cross Playwright Component Testing's mount() boundary — it renders a
- * permanently blank component with no error.
+ * R8 — the visible day window narrows with width; below md a date selector
+ * replaces the day header. `children` takes pre-built columns because a
+ * render-prop returning JSX cannot cross Playwright CT's mount() boundary.
  */
 export function CalendarViewport({
   days,

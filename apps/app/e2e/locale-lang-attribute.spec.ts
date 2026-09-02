@@ -70,10 +70,9 @@ test.describe('fallback: window.limmiarI18n.dynamicActivate for a locale with no
     await page.goto('/')
     await expect(page.locator('html')).toHaveAttribute('lang', 'it-IT')
 
-    // No catalog exists for this made-up locale, so the dynamic import
-    // genuinely rejects inside the app (module/chunk not found) — the same
-    // real-rejection technique used by the unit tests, exercised here
-    // against the actually-running app instead of an imported function.
+    // No catalog exists for this made-up locale, so the dynamic import genuinely rejects
+    // inside the app — the same real-rejection technique as the unit tests, exercised here
+    // against the running app.
     await page.evaluate(() => window.limmiarI18n?.dynamicActivate('xx-XX'))
 
     await expect(page.locator('html')).toHaveAttribute('lang', 'it-IT')

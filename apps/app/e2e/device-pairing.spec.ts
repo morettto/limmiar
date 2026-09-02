@@ -2,39 +2,20 @@ import { test, expect, type Browser, type Page, type BrowserContext, type APIReq
 import { unwrapDek, wrapDek } from '@limmiar/crypto'
 import { API_BASE_URL } from '../playwright.config'
 
-// S02-04 slice 7: the first multi-browser-context, network-capturing E2E test in this repo.
-// Two independently-generated `browser.newContext()`s stand in for "two physically different
-// devices" (separate cookie/storage jars -- unlike two tabs, neither can see the other's
-// state), which is what makes this a real test of the RELAY (this repo's actual API, running
-// as a Playwright `webServer` -- see playwright.config.ts's third `webServer` entry) rather
-// than two components exercising each other's mocks.
-//
-// PairPrimaryDevice/PairNewDevice have no real navigation entry point yet -- router.tsx's own
-// doc comment explains the two test-only routes ('/devices/pair-primary', '/devices/pair-new')
-// this spec drives them through instead, and why that is a deliberate, ticket-scoped shortcut
-// rather than production UI.
-//
-// This spec exercises the PAIRING PROTOCOL specifically -- not login (already covered by
-// S02-01's own E2E) and not a real Keychain/DEK-KEK unlock (S01/S03): every test authenticates
-// via a direct POST /auth/register call (Patient role, so registration alone returns a session
-// -- no TOTP dance), and every test's KEK is a fixed, known 32-byte value the test itself
-// supplies, never one derived from a real password.
+// S02-04 fatia 7: dois `browser.newContext()` fazem de dois dispositivos físicos, contra o relay
+// real (a API deste repo como webServer). Exercita o protocolo de pareamento: cada teste regista-se
+// por POST /auth/register e usa uma KEK fixa, nunca derivada de password.
 
 /**
- * A fixed, known, non-zero 32-byte KEK, distinct from anything a real Argon2id/BIP39
- * derivation could plausibly produce by coincidence -- deliberately NOT all-zero, so a bug
- * that zero-fills a buffer instead of actually copying the KEK would not silently pass the
- * "adopts a working KEK" test.
+ * A fixed, known, non-zero 32-byte KEK, deliberately not all-zero so a bug that zero-fills a
+ * buffer instead of copying the KEK cannot silently pass the "adopts a working KEK" test.
  */
 const TEST_KEK = Uint8Array.from({ length: 32 }, (_, i) => (i * 7 + 11) % 256)
 
 /**
- * `browser.newContext()` (unlike the `context`/`page` fixtures `test.use({ locale })` would
- * otherwise configure) picks up the OS/CI host's locale by default -- ADR-S00.5-05's boot
- * order (see i18n.ts's `initialLocale`) then resolves whatever that host locale is, which is
- * not necessarily one this repo ships a compiled catalog for. Pinning it to pt-BR (the
- * source locale, per lingui.config.ts -- guaranteed to have every message compiled) keeps
- * this spec's UI-text assertions independent of the host machine's locale.
+ * `browser.newContext()` picks up the host's locale, which ADR-S00.5-05's boot order then resolves
+ * — possibly to a locale with no compiled catalog. Pinning pt-BR (the source locale) keeps this
+ * spec's UI-text assertions independent of the host machine.
  */
 function newDeviceContext(browser: Browser): Promise<BrowserContext> {
   return browser.newContext({ locale: 'pt-BR' })
@@ -92,11 +73,9 @@ async function readQrPayload(page: Page): Promise<string> {
 }
 
 /**
- * Navigates a context to the pair-new test route with `decode` wired to resolve with
- * `qrPayload` (standing in for a camera scan of the primary's QR code -- see
- * PairingScan.tsx's own `decode` prop doc comment for why this seam exists in production
- * code, not just tests). `onKekAdopted` results are relayed back to this Node process via
- * `page.exposeFunction`, captured into the returned `kekAdopted` promise.
+ * Navigates to the pair-new test route with `decode` wired to resolve with `qrPayload` (a stand-in
+ * for the camera scan — see PairingScan.tsx). `onKekAdopted` is relayed back to this Node process
+ * via `page.exposeFunction`, captured into the returned `kekAdopted` promise.
  */
 async function gotoPairNew(
   context: BrowserContext,
@@ -119,12 +98,9 @@ async function gotoPairNew(
 }
 
 test.describe('device pairing by QR (S02-04)', () => {
-  // Serial, not this file's default `fullyParallel`: every test in this file shares ONE
-  // running API process (playwright.config.ts's webServer), and that process's pairing
-  // session TTL is configured short (DevicePairing:SessionLifetimeSeconds=8) specifically so
-  // "expired QR is rejected" can observe a real expiry without a 2-minute wait. Running the
-  // four tests one at a time keeps that shared 8-second budget from ever being squeezed by
-  // unrelated parallel work on the same machine.
+  // Serial, not the file's default `fullyParallel`: every test shares one API process whose pairing
+  // TTL is 8s so "expired QR" can observe a real expiry. One test at a time keeps that budget from
+  // being squeezed by unrelated parallel work.
   test.describe.configure({ mode: 'serial' })
 
   test('expired QR is rejected', async ({ request, browser }) => {
@@ -261,12 +237,9 @@ test.describe('device pairing by QR (S02-04)', () => {
   test('new device adopts a working KEK', async ({ request, browser }) => {
     const { accountId, accessToken } = await registerPatientAccount(request)
 
-    // S03/patient-records does not exist yet -- this stands in for a real "unwrap a
-    // per-patient DEK with the account's KEK" scenario (this ticket's own plan calls for a
-    // wrapDek/unwrapDek round trip in its place): prove the KEK the new device actually
-    // adopted is not just "some 32 bytes" but the SAME key material a real wrapDek/unwrapDek
-    // round trip needs, by wrapping a known DEK with the ORIGINAL (Node-side) KEK ahead of
-    // time and unwrapping it with whatever KEK the browser reports back.
+    // S03/patient-records does not exist yet, so this stands in for a real unwrap: wrap a known DEK
+    // with the original Node-side KEK and unwrap it with whatever KEK the browser reports back,
+    // proving the adopted bytes are the same key material.
     const testDek = Uint8Array.from({ length: 32 }, (_, i) => (i * 3 + 5) % 256)
     const aad = new TextEncoder().encode('device-pairing-e2e-wrap-aad')
     const wrappedDek = wrapDek(TEST_KEK, testDek, aad)

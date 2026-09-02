@@ -24,14 +24,9 @@ const PRIMARY_PUBLIC_KEY = 'cHJpbWFyeS1wdWJsaWMta2V5'
 const NEW_DEVICE_PUBLIC_KEY = 'bmV3LWRldmljZS1wdWJsaWMta2V5'
 const SESSION_ID = 'session-abc'
 
-// Tests that run under vi.useFakeTimers() must not depend on QRCode.toDataURL's real
-// implementation: it's the `qrcode` library's Node renderer, which schedules its own
-// work via setImmediate, and how many setImmediate/promise hops that takes is an
-// implementation detail of that library that has already shifted across Node versions
-// and made this suite flaky under fake timers. mockToDataURLForFakeTimers replaces it
-// with a promise that resolves on the microtask queue only, so a single
-// `vi.advanceTimersByTimeAsync(0)` reliably drains the mount effect's
-// createPairingSession -> toDataURL -> setState chain.
+// Under fake timers these tests must not depend on QRCode.toDataURL's real implementation: it
+// schedules work via setImmediate, and how many hops that takes has shifted across Node versions and
+// made the suite flaky. The mock resolves on the microtask queue only.
 function mockToDataURLForFakeTimers() {
   return vi
     .spyOn(QRCode, 'toDataURL')

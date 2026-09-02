@@ -55,11 +55,9 @@ describe('NotaPage', () => {
     vi.clearAllMocks()
   })
 
-  // O <audio> renderiza sempre junto com este componente (ver comentário em NotaPage.tsx),
-  // então este ramo nunca é alcançado por um caminho de UI real -- mas a guarda existe
-  // (ADR contra `!` na fronteira) e precisa do próprio teste para provar que, se o ref
-  // alguma vez estiver nulo (aqui: componente já desmontado), aoTocar é um no-op seguro
-  // em vez de rebentar com `audioRef.current!`.
+  // O <audio> renderiza sempre com o componente, por isso este ramo não é alcançável pela UI — mas
+  // a guarda existe (ADR contra `!`) e precisa deste teste para provar que, com o ref nulo
+  // (componente desmontado), aoTocar é um no-op em vez de rebentar.
   it('aoTocar não rebenta se o ref do <audio> estiver nulo', async () => {
     const play = vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined)
     renderNotaPage()

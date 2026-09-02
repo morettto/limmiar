@@ -48,10 +48,9 @@ describe('dynamicActivate — catalog load failure', () => {
     await dynamicActivate('pt-BR')
     expect(i18n.locale).toBe('pt-BR')
 
-    // No catalog exists for this made-up locale, so the dynamic import
-    // genuinely rejects (module not found) — a real, not mocked, stand-in
-    // for "the catalog failed to load" (network 404, chunk load error,
-    // etc. all surface the same way: a rejected import()).
+    // No catalog exists for this made-up locale, so the dynamic import genuinely rejects — a
+    // real stand-in for "the catalog failed to load" (a 404 or a chunk error surfaces the same
+    // way: a rejected import()).
     await expect(dynamicActivate('xx-XX' as never)).resolves.toBeUndefined()
 
     expect(i18n.locale).toBe('pt-BR')
@@ -102,18 +101,16 @@ describe('window.limmiarI18n — deliberate E2E test seam', () => {
   })
 
   it('exposes setLocale and dynamicActivate on window when a window exists (real browser/jsdom)', () => {
-    // The module-scope assignment already ran once when this file's static
-    // import at the top pulled in ./i18n under the normal jsdom `window` —
-    // asserting against those same exported references confirms it went
-    // through the truthy branch of the window guard.
+    // The module-scope assignment already ran when this file's static import pulled in ./i18n
+    // under the normal jsdom `window`, so asserting against those same exported references
+    // confirms it took the truthy branch of the window guard.
     expect(window.limmiarI18n).toEqual({ setLocale, dynamicActivate })
   })
 
   it('skips the assignment without throwing when window is undefined (defensive non-DOM guard)', async () => {
-    // Re-imported fresh (vi.resetModules + dynamic import) so the
-    // module-top-level guard actually re-executes under this test's own
-    // call stack with `window` stubbed out, instead of only ever running
-    // once at file-load time under the real jsdom window.
+    // Re-imported fresh (vi.resetModules + dynamic import) so the module-top-level guard
+    // re-executes with `window` stubbed out, instead of only ever running once at file-load time
+    // under the real jsdom window.
     vi.resetModules()
     vi.stubGlobal('window', undefined)
 

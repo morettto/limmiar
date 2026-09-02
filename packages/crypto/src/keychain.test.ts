@@ -228,11 +228,9 @@ describe('createKeychain — wrong password vs. tampered ciphertext are indistin
       const wrongPasswordMedian = median(wrongPasswordTimings)
       const tamperedMedian = median(tamperedTimings)
 
-      // Statistical timing tests are inherently noisy in CI, so this
-      // tolerance is deliberately loose: calibrated to catch a gross
-      // regression (e.g. an accidental early-return that skips real work on
-      // an "obviously wrong" input), not a nanosecond-level side channel.
-      // Subtler timing analysis is the external ASVS L3 crypto review's job.
+      // Statistical timing in CI is noisy, so the tolerance is loose on purpose: it
+      // catches a gross regression (an early return that skips real work), not a
+      // nanosecond side channel — that is the external ASVS L3 review's job.
       const ratio = Math.max(wrongPasswordMedian, tamperedMedian) / Math.min(wrongPasswordMedian, tamperedMedian)
       expect(ratio).toBeLessThan(3)
     },

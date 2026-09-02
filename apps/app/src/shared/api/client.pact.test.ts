@@ -6,16 +6,9 @@ import { dynamicActivate, i18n } from '../i18n'
 import { translateProblemCode } from './problem-messages'
 import { getHealthDb } from './client'
 
-// Deliberately NOT `new URL('../../../../../pacts', import.meta.url)`: under
-// this file's jsdom test environment, Vite's transform special-cases that
-// exact syntactic pattern as a browser asset-URL import and rewrites it to a
-// dev-server "/@fs/..." URL instead of leaving it as a real file path.
-// Resolving the two steps separately (bare `import.meta.url`, then
-// `path.resolve`) sidesteps that rewrite and keeps a genuine filesystem path.
-// 5 levels up from apps/app/src/shared/api/ to the repo root: api -> shared ->
-// src -> app -> apps -> repo root. Both this consumer test and the .NET
-// provider verification test (written separately) read/write the exact same
-// pacts/limmiar-app-limmiar-api.json file, so they must agree on this path.
+// Deliberately NOT `new URL('../../../../../pacts', import.meta.url)`: under jsdom, Vite rewrites
+// that exact pattern into a dev-server "/@fs/..." URL. Resolving in two steps keeps a real
+// filesystem path — the same pacts/ file the .NET provider verification reads.
 const currentFile = fileURLToPath(import.meta.url)
 const pactDir = path.resolve(path.dirname(currentFile), '../../../../../pacts')
 

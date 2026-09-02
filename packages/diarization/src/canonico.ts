@@ -14,10 +14,8 @@ export function montarTranscricaoCanonica(
   let atual: { locutor: RotuloLocutor; palavras: PalavraAtribuida[] } | null = null
 
   for (const palavra of palavras) {
-    // `=== null` aqui é para o tipo (Map.get exige `string`, não `string | null`);
-    // em runtime `.get(null)` também devolveria `undefined` normalmente
-    // (nenhuma chave de `rotulos` é null), então este ramo é outro mutante
-    // equivalente — comportamento idêntico, guarda só para o compilador.
+    // `=== null` é para o tipo (Map.get exige `string`); em runtime `.get(null)`
+    // devolveria `undefined` na mesma, por isso é um mutante equivalente.
     const rotulo = palavra.locutor === null ? null : (rotulos.get(palavra.locutor) ?? null)
 
     if (rotulo === null) {

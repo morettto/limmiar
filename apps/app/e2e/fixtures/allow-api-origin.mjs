@@ -1,13 +1,6 @@
-// A CSP que o E2E recebe vem de dist-e2e/_headers (cópia de public/_headers), cujo
-// connect-src é `'self'` mais os três fornecedores de IA -- ver apps/app/security-headers.ts.
-// Em produção a API .NET é servida na mesma origem do app, então `'self'` cobre-a; no E2E ela
-// corre num processo à parte (playwright.config.ts, API_BASE_URL), noutra porta e portanto
-// noutra origem, e sem esta entrada o browser bloqueia toda chamada de API -- as páginas de
-// pareamento e de recuperação ficam presas no estado "a preparar" e o spec falha a apontar
-// para um elemento que nunca chega a existir.
-//
-// Corre depois de `build:e2e` e só toca no artefacto de teste: public/_headers e o build de
-// produção (dist/) ficam intactos, e security-headers.test.ts continua a comparar a fonte.
+// A CSP do E2E vem de dist-e2e/_headers, cujo connect-src é `'self'` mais os fornecedores de IA.
+// Em produção a API é da mesma origem; no E2E corre noutra porta, e sem esta entrada o browser
+// bloqueia as chamadas. Corre depois de build:e2e e só toca no artefacto de teste.
 import { readFile, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'

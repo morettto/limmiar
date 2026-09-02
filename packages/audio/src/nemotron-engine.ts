@@ -1,8 +1,7 @@
 import type { TranscriptionEngine, TranscriptionSegment } from './transcription-engine.ts'
 
-const SAMPLE_RATE_HZ = 16000 // ring-buffer.ts:27 documents it; asr-loop.ts and
-// fake-engine.ts each keep their own copy too — see README.md decision on
-// why a shared `SAMPLE_RATE_HZ` export isn't worth reopening 100%-covered
+const SAMPLE_RATE_HZ = 16000 // asr-loop.ts and fake-engine.ts keep their own
+// copy; README.md says why a shared export is not worth reopening covered
 // modules for a value that never changes.
 
 // 320ms of silence @16kHz — same quantum `CHUNK_FRAMES` documents in
@@ -86,10 +85,9 @@ export function nemotronEngine(recognizer: Promise<AsrRecognizer>): Transcriptio
     },
 
     async transcribe(pcm) {
-      // live-session.ts chama warmup() sem `await` antes de arrancar o loop
-      // que chama transcribe() — esperar a mesma promessa (em vez de ler
-      // `rec`/`stream` soltos) é o que fecha essa corrida: se warmup() ainda
-      // não resolveu, transcribe() espera por ela em vez de ver `undefined`.
+      // live-session.ts chama warmup() sem `await` antes do loop que chama
+      // transcribe(): esperar a mesma promessa (em vez de ler `rec`/`stream`
+      // soltos) fecha essa corrida.
       if (!readyPromise) throw new Error('transcribe() chamado antes de warmup()')
       const { rec, stream } = await readyPromise
 

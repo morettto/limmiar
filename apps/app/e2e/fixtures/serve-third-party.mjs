@@ -8,17 +8,9 @@ const port = Number(process.env.PORT ?? 5333)
 
 createServer(async (_req, res) => {
   const body = await readFile(join(dir, 'third-party-stub', 'index.html'))
-  // Terceiro cooperante: precisa mandar CORP cross-origin + algum COEP
-  // pra ser embutível como iframe sob COEP (qualquer variante — require-corp
-  // ou credentialless). Achado do spike: credentialless SÓ dispensa isso
-  // pra subresource (img/script/etc, request no-cors); pra navegação de
-  // iframe completa, sem os dois headers no lado do terceiro o Chromium
-  // bloqueia com "coep-frame-resource-needs-coep-header" (falta COEP) ou
-  // "corp-not-same-origin-after-defaulted-to-same-origin-by-coep" (COEP
-  // presente mas CORP ausente vira same-origin por default, e falha porque
-  // a origem realmente é cross-origin). É exatamente por isso que o
-  // checkout real foi tirado do escopo isolado (ADR-S00-02/D8) — terceiro
-  // de pagamento raramente coopera com esses dois headers.
+  // Terceiro cooperante: precisa de CORP cross-origin E de algum COEP para ser embutível como
+  // iframe; credentialless só dispensa isso para subresource. Sem os dois, o Chromium bloqueia
+  // a navegação do iframe — por isso o checkout real saiu do escopo isolado (ADR-S00-02/D8).
   res.writeHead(200, {
     'Content-Type': 'text/html',
     'Cross-Origin-Resource-Policy': 'cross-origin',

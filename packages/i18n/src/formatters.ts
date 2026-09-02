@@ -5,11 +5,9 @@ function createMemoizedFactory<TFormat, TOptions extends object>(
 ): (locale: Locale, options?: TOptions) => TFormat {
   const cache = new Map<string, TFormat>()
   return (locale, options) => {
-    // Cache key is a plain JSON.stringify of the options object: two call
-    // sites that build an equivalent options object with different key
-    // order will miss the cache and construct a duplicate (but still
-    // correct) formatter — accepted trade-off for staying a simple pure
-    // function per the ticket's acceptance criteria.
+    // Cache key is a plain JSON.stringify: two call sites building the same
+    // options in a different key order miss the cache and build a duplicate
+    // (still correct) formatter — accepted to keep this a pure function.
     const key = `${locale}::${JSON.stringify(options ?? {})}`
     const cached = cache.get(key)
     if (cached) return cached

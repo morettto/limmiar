@@ -1,10 +1,9 @@
 import type { CryptoKey } from '@limmiar/crypto'
 import type { SealedSummary, SummaryResult } from './patient-summary'
 
-// ponytail: one round-trip, no comlink/chunking/transferable objects -- a 500-item batch
-// of small JSON summaries is a few hundred KB at most, not enough to justify structured-
-// clone-avoidance machinery. Revisit only if profiling shows the postMessage clone itself
-// (not the decrypt work) is the bottleneck.
+// ponytail: one round-trip, no comlink/chunking/transferables — a 500-item batch of small JSON
+// summaries is a few hundred KB. Upgrade only if profiling shows the postMessage clone itself,
+// not the decrypt work, is the bottleneck.
 export function openSummariesInWorker(
   kek: CryptoKey,
   items: SealedSummary[],

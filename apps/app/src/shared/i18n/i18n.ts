@@ -5,11 +5,9 @@ import { syncDocumentLang } from './locale/document-lang-sync'
 
 export { i18n }
 
-// The 2 store-backed levels of ADR-S00.5-05's 4-level order (profile →
-// device → navigator → base). This repo has no auth/profile backend yet
-// (that starts in S02), so profileStore is the deliberate no-op seam from
-// packages/i18n; deviceStore is the real localStorage-backed store, the
-// only concrete implementation that exists today.
+// The 2 store-backed levels of ADR-S00.5-05's order (profile, device, navigator, base). There is
+// no auth/profile backend yet (S02), so profileStore is the no-op seam from packages/i18n and
+// deviceStore is the real localStorage-backed store.
 const localeStores = { profileStore: noopProfileLocaleStore, deviceStore: localStorageLocaleStore }
 
 export async function initialLocale(): Promise<Locale> {
@@ -56,12 +54,9 @@ declare global {
   }
 }
 
-// Deliberate E2E test seam, not a leftover debug hook: this app has no
-// locale-switcher UI yet, so a real browser E2E test (unlike Vitest, which
-// can just `import` these functions directly) has no other way to trigger a
-// live locale switch or a fallback against the actually-running app.
-// Revisit — most likely remove in favor of driving the UI directly — once a
-// real switcher UI exists.
+// Deliberate E2E seam, not a leftover debug hook: with no locale-switcher UI yet, a browser test
+// has no other way to trigger a live locale switch or a fallback. Remove in favor of driving the
+// UI once a real switcher exists.
 if (typeof window !== 'undefined') {
   window.limmiarI18n = { setLocale, dynamicActivate }
 }

@@ -2,13 +2,9 @@ import { useSyncExternalStore } from 'react'
 
 export type Breakpoint = 'sm' | 'md' | 'lg' | 'xl'
 
-// Matches the wireframe spec's 4 buckets exactly — sm ≤767 / md 768–1023 /
-// lg 1024–1279 / xl ≥1280 (Wireframes - Responsivo (3 plataformas).dc.html,
-// "Nomenclatura, breakpoints e regras"). These also happen to equal Tailwind
-// v4's default md/lg/xl thresholds, so components style with plain
-// `md:`/`lg:`/`xl:` utilities and never need custom breakpoint config — the
-// one rule is to never use Tailwind's own `sm:` (640px), which isn't one of
-// the spec's 4 buckets; unprefixed utilities already cover "sm" as the base.
+// The spec's 4 buckets: sm ≤767 / md 768–1023 / lg 1024–1279 / xl ≥1280, equal to
+// Tailwind v4's md/lg/xl defaults, so components use plain `md:`/`lg:`/`xl:`.
+// Never Tailwind's own `sm:` (640px), which is not one of the 4 buckets.
 const QUERY_MD = '(min-width: 768px)'
 const QUERY_LG = '(min-width: 1024px)'
 const QUERY_XL = '(min-width: 1280px)'
@@ -37,10 +33,9 @@ function subscribe(onStoreChange: () => void): () => void {
 }
 
 /**
- * Width-only breakpoint bucket (R1–R12's mandate: never detect device by
- * user-agent). Structural JSX branching in the 7 primitives reads this;
- * pure visual/layout differences within a branch use Tailwind's
- * `md:`/`lg:`/`xl:` utilities directly instead.
+ * Width-only breakpoint bucket (R1–R12: never detect device by user-agent).
+ * Structural JSX branching reads this; purely visual differences inside a branch
+ * use Tailwind's `md:`/`lg:`/`xl:` utilities.
  */
 export function useBreakpoint(): Breakpoint {
   return useSyncExternalStore(subscribe, getSnapshot)

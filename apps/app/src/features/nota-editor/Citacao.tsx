@@ -15,10 +15,9 @@ function formatarMs(ms: number): string {
   return `${minutos}:${segundos.toString().padStart(2, '0')}`
 }
 
-/** Citação clicável de uma âncora temporal: mostra `mm:ss–mm:ss` e delega o "tocar" ao
- *  chamador. Critério de aceite: passar o rato por cima toca o instante -- mas um gatilho
- *  só de mouse deixaria quem navega por teclado sem forma de o disparar, então ganhar
- *  foco (`Tab`) toca também o mesmo instante; o clique continua a tocar por cima disso. */
+/** Citação clicável de uma âncora temporal: mostra `mm:ss–mm:ss` e delega o tocar ao chamador.
+ *  Passar o rato toca o instante; ganhar foco (`Tab`) toca também, senão quem navega por teclado
+ *  ficaria sem forma de o disparar. */
 export function Citacao({ ancora, aoTocar }: CitacaoProps) {
   const { t } = useLingui()
   const inicio = formatarMs(ancora.inicioMs)

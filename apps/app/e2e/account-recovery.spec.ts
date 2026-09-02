@@ -2,12 +2,9 @@ import { createHmac } from 'node:crypto'
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test'
 import { API_BASE_URL } from '../playwright.config'
 
-// S02-06: BIP39 recovery-phrase account recovery. Registration and TOTP enrollment happen
-// via direct API calls (same "raw request, no UI" precedent as device-pairing.spec.ts's
-// registerPatientAccount) -- only the two screens actually under test, RecoveryPhraseSetup
-// and RecoveryScreen, are driven through the real UI. A fresh `browser.newContext()` (no
-// shared storage with the setup context) stands in for "a clean browser on a device that
-// never had a session here", which is the whole point of recovery-by-phrase.
+// S02-06: recuperação de conta por frase BIP39. Registo e TOTP por chamadas diretas à API
+// (mesmo precedente de device-pairing.spec.ts); só RecoveryPhraseSetup e RecoveryScreen passam
+// pela UI real. Um `browser.newContext()` limpo faz de dispositivo que nunca teve sessão.
 
 test.describe.configure({ mode: 'serial' })
 

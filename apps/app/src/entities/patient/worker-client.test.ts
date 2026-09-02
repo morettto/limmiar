@@ -25,11 +25,9 @@ describe('openSummariesInWorker', () => {
     vi.unstubAllGlobals()
   })
 
-  // Load-criterion test: 500 patients through the real dedicated Worker (patient-summary.worker.ts
-  // running off the main thread via @vitest/web-worker's worker_threads-backed Worker), not the
-  // mocked seam PatientWallet.test.tsx exercises. Proves the roundtrip decrypts correctly at scale
-  // and that a batch mixing good and tampered items still isolates the failure through the real
-  // postMessage/onmessage path.
+  // Load-criterion test: 500 patients through the real dedicated Worker, not the mocked seam
+  // PatientWallet.test.tsx uses. Proves the roundtrip decrypts at scale and that a batch mixing
+  // good and tampered items still isolates the failure through the real postMessage path.
   it('decrypts a 500-item batch through a real Worker, order preserved, one bad item isolated', async () => {
     const kek = await makeKek()
     const wrongKek = await makeKek()

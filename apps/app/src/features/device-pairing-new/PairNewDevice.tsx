@@ -12,10 +12,9 @@ export interface PairNewDeviceProps {
   onKekAdopted: (kek: Uint8Array) => void
 }
 
-// The payload endpoint returns the same 404 whether the primary hasn't submitted yet or
-// the session is gone, so callers cannot distinguish "keep polling" from "give up" by
-// response shape. The timeout below must match the backend's PairingSessionLifetime (2
-// minutes): a session cannot succeed after that window closes.
+// The payload endpoint returns the same 404 whether the primary has not submitted yet or the
+// session is gone, so callers cannot tell "keep polling" from "give up" by shape. The timeout must
+// match the backend's PairingSessionLifetime (2 minutes).
 const PAYLOAD_POLL_INTERVAL_MS = 1000
 const PAYLOAD_POLL_TIMEOUT_MS = 2 * 60 * 1000
 

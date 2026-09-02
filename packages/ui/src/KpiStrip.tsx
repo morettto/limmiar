@@ -21,14 +21,9 @@ export interface KpiStripProps {
 }
 
 /**
- * R6 — KPIs: 4 col (D) → 2×2 (T) → carrossel com snap, 1,5 card visível (M).
- * Purely CSS-responsive (no structural DOM change across breakpoints, only
- * the container's layout mode), so this doesn't depend on useBreakpoint.
- *
- * `tabIndex={0}` is unconditional (not just below md): below md the strip is
- * `overflow-x-auto` and WCAG 2.1.1 requires a scrollable region be reachable
- * by keyboard (axe's scrollable-region-focusable). From md up it's a
- * non-scrolling grid, where the same attribute is harmless.
+ * R6 — KPIs: 4 col (D), 2×2 (T), carrossel com snap (M), purely CSS-responsive.
+ * `tabIndex={0}` is unconditional: below md the strip scrolls and WCAG 2.1.1
+ * requires it reachable by keyboard; from md up it is a harmless attribute.
  */
 export function KpiStrip({ children, 'aria-label': ariaLabel = 'Indicadores' }: KpiStripProps) {
   return (

@@ -3,43 +3,9 @@ import { lingui, linguiTransformerBabelPreset } from '@lingui/vite-plugin'
 import babel from '@rolldown/plugin-babel'
 import tailwindcss from '@tailwindcss/vite'
 
-// Visual-regression harness for Tela A1 (ticket S02-01's AuthScreen, AC "A1
-// verde nos 4 breakpoints com axe bloqueante"). Same pattern as
-// packages/ui/playwright-ct.config.ts (S00-03/S00.5-04) -- one project per
-// breakpoint bucket from the wireframe spec (sm/md/lg/xl -- see Wireframes -
-// Responsivo (3 plataformas).dc.html, section "Nomenclatura, breakpoints e
-// regras"). T/M projects set hasTouch so `pointer: coarse` media queries
-// activate the same way they would on a real device.
-//
-// ctViteConfig differs from packages/ui's: AuthScreen's copy is entirely
-// Lingui macros (<Trans>/t), so this CT bundle needs the same
-// lingui() + babel(linguiTransformerBabelPreset()) pair apps/app's own
-// vite.config.ts runs for the real app -- @vitejs/plugin-react v6 dropped
-// its own Babel integration, so the macro transform needs its own pass.
-// react() itself is NOT listed here (same as packages/ui's config):
-// @playwright/experimental-ct-react depends on @vitejs/plugin-react
-// directly and wires its own copy in automatically whenever ctViteConfig
-// supplies no plugins of its own -- and Vite's own default esbuild-based
-// JSX handling covers plain JSX fine either way (verified: the screenshots
-// this config produces render real React output, not blank/broken JSX).
-//
-// Getting AuthScreen's Portuguese copy to actually render here (not the
-// raw hashed catalog id, e.g. "1hNmgK" instead of "Profissional") needed a
-// separate, real fix: apps/app/src/locales/*/messages.po had never been
-// re-extracted since AuthScreen.tsx was written, so its <Trans>/t strings
-// had no catalog entries at all. `vite build` (what CT's bundler always
-// runs, even for this dev-loop) builds in production mode, where Lingui's
-// babel macro strips each message's inline fallback default text -- so
-// with no catalog entry AND no fallback, `i18n._()` had nothing left to
-// render but the id itself. Ran `pnpm --filter app check:i18n-extract`
-// (`lingui extract`) to populate the missing entries; pt-BR (this repo's
-// sourceLocale) autofills msgstr from the source text, so no manual
-// translation was needed for this catalog. The other 3 catalogs
-// (en-US/es-419/it-IT) picked up the same new msgids with empty msgstr --
-// real translation work for whoever owns those locales, out of this
-// ticket's "4 breakpoints com axe bloqueante" AC. See
-// src/test-support/ct-i18n.tsx for how the catalog gets activated for
-// this CT bundle.
+// Visual-regression harness for Tela A1 (S02-01), same shape as packages/ui's config:
+// one project per breakpoint, hasTouch on T/M. ctViteConfig adds Lingui's macro pass
+// (react() comes from @playwright/experimental-ct-react itself); see ct-i18n.tsx.
 export default defineConfig({
   testDir: './src',
   testMatch: '**/*.spec.tsx',
@@ -48,12 +14,9 @@ export default defineConfig({
   fullyParallel: true,
   reporter: 'list',
   forbidOnly: !!process.env.CI,
-  // Same rationale as packages/ui's config: baselines are generated on
-  // win32 (no Linux/Docker runner available in this session), CI runs
-  // ubuntu-latest, whose font stack differs enough that pixel-identical
-  // matching isn't realistic -- this tolerance absorbs anti-aliasing/hinting
-  // noise while still catching real layout regressions (wrong breakpoint,
-  // missing element, wrong color) nowhere near this magnitude.
+  // Baselines were generated on win32 while CI runs on ubuntu-latest, whose font stack
+  // differs; this tolerance absorbs anti-aliasing noise while still catching real layout
+  // regressions, which are nowhere near this magnitude.
   expect: {
     toHaveScreenshot: { maxDiffPixelRatio: 0.05 },
   },
@@ -80,11 +43,9 @@ export default defineConfig({
       use: { viewport: { width: 900, height: 1100 }, hasTouch: true },
     },
     {
-      // isMobile deliberately omitted -- same finding as packages/ui's
-      // config: on this Playwright/Chromium version it makes CT's internal
-      // page ignore the explicit `viewport` below. hasTouch alone is enough
-      // to activate `pointer: coarse`, the only device-emulation signal the
-      // spec's rules actually key off of.
+      // isMobile deliberately omitted: on this Chromium it makes CT's page ignore the
+      // explicit `viewport` below. hasTouch alone activates `pointer: coarse`, the only
+      // device-emulation signal the spec's rules key off of.
       name: 'M-sm',
       use: { viewport: { width: 375, height: 800 }, hasTouch: true },
     },

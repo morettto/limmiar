@@ -2,10 +2,9 @@ import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useBreakpoint } from './use-breakpoint'
 
-// jsdom has no matchMedia implementation. This fake evaluates `(min-width:
-// Npx)` against a shared, mutable width and fires real 'change' events
-// (via EventTarget) when that width moves — exercising the hook's actual
-// subscribe/unsubscribe wiring instead of stubbing the hook itself.
+// jsdom has no matchMedia. This fake evaluates `(min-width: Npx)` against a shared
+// mutable width and fires real 'change' events, exercising the hook's own
+// subscribe/unsubscribe wiring instead of stubbing the hook.
 class FakeMediaQueryList extends EventTarget {
   readonly media: string
   private readonly minWidth: number

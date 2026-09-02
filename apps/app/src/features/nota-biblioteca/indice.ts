@@ -7,16 +7,9 @@ export interface DocNota {
   texto: string
 }
 
-// `Options<DocNota>` (não `as const`) de propósito: os tipos de `minisearch` querem
-// `fields`/`storeFields` mutáveis (`string[]`), e uma tupla `readonly` de `as const` não é
-// atribuível a isso. Mesmo sem `as const`, isto continua a ser uma única constante
-// exportada -- `construirIndice` e `carregarIndice` (abaixo) têm de a reusar literalmente,
-// nunca redeclarar `{ fields: [...], storeFields: [...] }` cada um a seu lado: o teste de
-// roundtrip (construir -> serializar -> carregar -> buscar) é o que trava esse invariante --
-// separar as opções faria o `carregarIndice` reidratar um índice cujos campos indexados/
-// guardados não batem com os que `construirIndice` de facto usou, e a busca por um termo
-// que só existe fora do campo indexado passaria a devolver algo diferente do que devolvia
-// antes de serializar.
+// `Options<DocNota>` sem `as const`: os tipos de `minisearch` querem `fields`/`storeFields`
+// mutáveis. `construirIndice` e `carregarIndice` têm de reusar esta constante literalmente — opções
+// separadas reidratariam um índice com campos diferentes dos indexados, e a busca mudaria.
 export const OPCOES_INDICE: Options<DocNota> = { fields: ['texto'], storeFields: ['patientId'] }
 
 /** Concatena o texto de todas as frases da nota (ordem de `nota.frases`, já em `ORDEM_SECOES`
@@ -48,12 +41,9 @@ export type ResultadoBusca =
   | { estado: 'ocioso' }
   | { estado: 'pronto'; ids: readonly string[] }
 
-// Os três estados não são intercambiáveis: `a-preparar` (índice ainda `null`, nada para
-// mostrar) e `pronto` com `ids: []` (índice existe, buscou, não achou nada) parecem "sem
-// resultado" na UI, mas são estados diferentes -- confundi-los é exatamente o "sem
-// resultados enganoso" que o critério de aceite 2 proíbe (mostrar "nada encontrado"
-// enquanto o índice ainda nem carregou). `ocioso` (termo vazio) é o terceiro, distinto dos
-// outros dois: mostra a biblioteca inteira, não uma busca vazia.
+// Os três estados não são intercambiáveis: `a-preparar` (índice ainda `null`) e `pronto` com
+// `ids: []` parecem iguais na UI mas não são — confundi-los é o "sem resultados enganoso" que o
+// critério 2 proíbe. `ocioso` (termo vazio) mostra a biblioteca inteira, não uma busca vazia.
 export function buscar(indice: MiniSearch<DocNota> | null, termo: string): ResultadoBusca {
   if (indice === null) {
     return { estado: 'a-preparar' }

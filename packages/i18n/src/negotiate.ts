@@ -12,18 +12,9 @@ function parseWeightedTag(entry: string): WeightedTag {
   return { tag: tagPart, q: Number.isFinite(parsedQ) ? parsedQ : 1 }
 }
 
-// RFC 4647 §3.4 basic filtering "lookup": try the tag as-is against the
-// available locales, then progressively truncate from the last '-' and
-// retry. Lookup only ever shortens the *preference* — it never matches a
-// short preference (e.g. "pt") against a longer available tag ("pt-BR").
-// `tag` is always already trimmed by `parseWeightedTag` before it reaches
-// here, and truncation can never produce a spurious match against our fixed
-// 4-entry LOCALES table (none of them are single characters or partial
-// prefixes of each other), so the `.trim()` and the `length > 0` loop guard
-// below are unreachable in practice given today's only call site. They stay
-// as a deliberate safety net — without the length guard, a mutation (or a
-// future caller) that skips the `lastDash === -1` exit would slice(0, -1) on
-// an empty string forever and hang instead of terminating.
+// RFC 4647 §3.4 lookup: try the tag, then truncate from the last '-' and retry;
+// it only shortens the preference, never matching "pt" against "pt-BR". The
+// `length > 0` guard keeps a mutation from slicing an empty string forever.
 function lookupSingle(tag: string): Locale | undefined {
   let candidate = tag.trim().toLowerCase()
   while (candidate.length > 0) {

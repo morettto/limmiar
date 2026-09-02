@@ -15,9 +15,8 @@ export default {
     low: 90,
     break: 90,
   },
-  // `incremental` is controlled per-invocation via the CLI flag
-  // (`test:mutation` runs a full pass, `test:mutation:incremental` passes
-  // `--incremental`) rather than forced on here, so the two npm scripts stay
-  // meaningfully different.
+  // `incremental` is set per invocation via the CLI flag (`test:mutation` runs
+  // a full pass, `test:mutation:incremental` passes `--incremental`), so the
+  // two npm scripts stay meaningfully different.
   incrementalFile: '.stryker-tmp/incremental.json',
 }

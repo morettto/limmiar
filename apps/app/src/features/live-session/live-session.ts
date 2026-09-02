@@ -74,10 +74,9 @@ export function ligarSessao(opcoes: LigarSessaoOpcoes): SessaoAoVivo {
   function onDataAvailable(event: BlobEvent): void {
     const blob = event.data
     const currentSeq = seq++
-    // A cadeia nunca pode rejeitar: uma rejeição envenenaria `fila` para
-    // sempre e todo chunk futuro seria descartado em silêncio, quebrando o
-    // invariante "tomada A nunca perde". Por isso o catch de fallback (falha
-    // de storage.estimate()) também está protegido.
+    // A cadeia nunca pode rejeitar: uma rejeição envenenaria `fila` para sempre e todo chunk
+    // futuro seria descartado em silêncio, quebrando o invariante "tomada A nunca perde". Daí o
+    // catch de fallback estar também protegido.
     fila = fila.then(async () => {
       try {
         const bytes = new Uint8Array(await blob.arrayBuffer())

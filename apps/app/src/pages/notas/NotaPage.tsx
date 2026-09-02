@@ -15,13 +15,9 @@ import { FilaEEditor } from '../../widgets/soap-editor/FilaEEditor'
 const NOTA_FIXTURE_ID = 'nota-fixture-1'
 const PATIENT_FIXTURE_ID = 'paciente-fixture-1'
 
-// ponytail: sem sessão/keychain real montada nesta rota ainda -- mesma situação, mesmo
-// motivo, que CopilotKeyPage's `kek={null}, accountId=""`. `appendPatientEntry`/
-// `assinarNota` abaixo com estes valores falham contra um backend real (o mesmo caminho
-// de "falha de rede" que um apagão de rede genuíno cairia -- sem perda de dados, sem
-// estado inconsistente, só um fluxo que não completa até a sessão real existir). Quem
-// ligar Keychain/sessão substitui estes quatro valores por props; a lógica de aoAssinar
-// abaixo não muda.
+// ponytail: sem sessão/keychain real nesta rota ainda, tal como CopilotKeyPage. Com estes valores,
+// `appendPatientEntry`/`assinarNota` caem no caminho de falha de rede — sem perda de dados, só um
+// fluxo que não completa. Quem ligar a sessão troca os quatro por props; aoAssinar não muda.
 const BASE_URL_FIXTURE = ''
 const ACCOUNT_ID_FIXTURE = ''
 const ACCESS_TOKEN_FIXTURE = ''
@@ -39,10 +35,8 @@ function notaFixture(): Nota {
 
 type Mensagem = { status: 'sucesso' | 'erro'; texto: string }
 
-// ponytail: fila com um único item fixo -- a fila real (fetch ao backend, múltiplas
-// notas/pacientes) continua fora desta fatia. `aoAssinar` agora grava no prontuário e
-// assina de facto (fatia 5), e marca só o item de `nota.id` -- a dívida da fatia 3 (que
-// marcava todos os itens, e só funcionava por a fixture ter um único item) está paga.
+// ponytail: fila com um único item fixo — a fila real (fetch ao backend, várias notas) fica fora
+// desta fatia. `aoAssinar` já grava no prontuário e assina, e marca só o item de `nota.id`.
 export function NotaPage() {
   const { t, i18n } = useLingui()
   const [itens, setItens] = useState<readonly ItemFila[]>(() => [
@@ -68,12 +62,9 @@ export function NotaPage() {
     document.querySelector<HTMLElement>('[role="listbox"]')?.focus()
   }
 
-  // Ordem que não inverte: grava a revisão no prontuário ANTES de assinar. Falhar a
-  // assinatura depois de gravar deixa uma revisão por assinar no prontuário -- recuperável,
-  // um novo `⌘↵` assina a mesma revisão de novo (guarda abaixo evita repetir a gravação).
-  // O inverso (assinar antes de gravar) deixaria, numa falha entre as duas chamadas, uma
-  // assinatura a apontar para uma revisão que não existe em lado nenhum do prontuário --
-  // essa linha não se pode apagar depois.
+  // Ordem que não inverte: gravar a revisão no prontuário ANTES de assinar. Falhar a assinatura
+  // depois de gravar é recuperável (novo `⌘↵` assina a mesma revisão). O inverso deixaria uma
+  // assinatura a apontar para uma revisão que não existe — essa linha não se apaga depois.
   async function aoAssinar(nota: Nota) {
     try {
       const { dek } = await openRecord(KEK_FIXTURE, RECORD_FIXTURE, nota.patientId)
@@ -122,15 +113,9 @@ export function NotaPage() {
     setNotas((atuais) => ({ ...atuais, [nota.id]: nota }))
   }
 
-  // Reprodutor real (fatia 3, features/nota-audio/reprodutor.ts) -- o <audio> abaixo
-  // renderiza sempre junto com este componente, então `audioRef.current` já está
-  // atribuído em qualquer clique/hover/foco que chegue a chamar `aoTocar` (nenhum
-  // caminho de UI o invoca antes do primeiro render commitar); a guarda abaixo é só a
-  // fronteira de nulidade do próprio ref (mesmo espírito do ADR contra `!` na fronteira
-  // api/store/service -- ver docs/adr/), não um caminho de facto alcançável. Ainda não
-  // tem `src`: carregar o áudio de verdade da sessão (`abrirSessaoComoBlob`, precisa de
-  // dir OPFS + dek + sessionId vindos do backend) é fatia futura. Tocar antes disso é um
-  // no-op honesto (elemento sem fonte), não um no-op escondido atrás de uma função vazia.
+  // O <audio> renderiza sempre com este componente, logo `audioRef.current` já está atribuído em
+  // qualquer clique que chegue aqui; a guarda é só a fronteira de nulidade do ref (ADR contra `!`).
+  // Sem `src` ainda: carregar o áudio da sessão é fatia futura, e tocar antes disso é um no-op.
   function aoTocar(ancora: Ancora) {
     if (!audioRef.current) return
     criarReprodutor(audioRef.current).tocar(ancora.inicioMs)

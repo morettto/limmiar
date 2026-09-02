@@ -17,10 +17,9 @@ interface StoredCopilotKey {
  */
 let inMemoryKey: { accountId: string; providerId: string; apiKey: string } | null = null
 
-// Shared entry guard: every one of saveApiKey/loadApiKey/clearApiKey namespaces its storage slot
-// (and, for save/load, its AAD) by accountId. An empty accountId collapses that namespacing to a
-// single slot shared by whoever else also forgot to pass one -- reject it once, here, at the top
-// of each public function, instead of trusting every call site to have checked already.
+// Shared entry guard: save/load/clear namespace their storage slot (and AAD) by accountId, and an
+// empty one collapses that to a single shared slot. Rejected once here instead of trusting every
+// call site to have checked.
 function assertAccountId(accountId: string): void {
   if (accountId === '') {
     throw new Error('key-store: accountId must not be empty')
@@ -32,12 +31,9 @@ function storageKeyFor(accountId: string): string {
 }
 
 /**
- * Always updates the in-memory copy (plaintext, this tab only). Only when `persist` is true does
- * it also envelope `apiKey` under a fresh per-secret DEK (wrapped by `kek`, same pattern as
- * patients/patient-crypto.ts's sealNewPatient) and write it to localStorage, namespaced by
- * `accountId` so two accounts on the same device never share -- and silently overwrite -- one
- * storage slot. The result never leaves the browser either way: never sent in a request to our
- * server.
+ * Always updates the in-memory copy (plaintext, this tab only). With `persist`, also envelopes
+ * `apiKey` under a fresh per-secret DEK wrapped by `kek` and writes it to localStorage namespaced by
+ * `accountId`, so two accounts never share a slot. Either way it is never sent to our server.
  */
 export async function saveApiKey(
   kek: CryptoKey,

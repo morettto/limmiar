@@ -21,13 +21,9 @@ export interface AdaptiveTableProps {
 }
 
 /**
- * R3 — Tabelas: tabela (D/T paisagem) → cartão de 2 linhas por registro (T
- * retrato/M); colunas secundárias viram a 2ª linha.
- *
- * `rows[].cells` are pre-built ReactNode, not a `render(row)` callback: a
- * prop function that returns JSX and gets invoked inside the mounted
- * component can't cross Playwright Component Testing's mount() boundary
- * (see CalendarViewport for the same fix, and the ticket's Handoff for why).
+ * R3 — Tabelas: tabela (D/T paisagem) para cartão de 2 linhas (T retrato/M).
+ * `rows[].cells` are pre-built ReactNode, not a `render(row)` callback: a prop
+ * returning JSX cannot cross Playwright CT's mount() boundary (see CalendarViewport).
  */
 export function AdaptiveTable({ columns, rows, caption }: AdaptiveTableProps) {
   const breakpoint = useBreakpoint()

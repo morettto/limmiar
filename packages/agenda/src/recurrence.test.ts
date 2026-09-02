@@ -53,12 +53,9 @@ describe('expandOccurrences — EXDATE', () => {
 })
 
 describe('expandOccurrences — EXDATE inside a DST spring-forward gap', () => {
-  // Same gap as the "DST spring-forward gap" suite below: the naive input
-  // 00:30 on 2017-10-15 never happened locally; the engine resolves it to
-  // 01:30. The exdate is supplied in the same naive space as startsAt
-  // (00:30) and must still cancel the occurrence reported as 01:30 —
-  // filtering happens post-resolution, in the space Occurrence.localStart
-  // actually lives in, not the pre-resolution naive space.
+  // Same DST gap as the suite below: naive 00:30 on 2017-10-15 never happened
+  // and resolves to 01:30. The exdate is given in naive space and must still
+  // cancel it, because filtering runs post-resolution.
   it('cancels the occurrence whose resolved localStart (01:30) lands after the gap, using the naive (never-happened) exdate input (00:30)', () => {
     const series: RecurringSeries = {
       rrule: 'FREQ=WEEKLY;BYDAY=SU',
@@ -206,16 +203,9 @@ describe('expandOccurrences — unbounded expansion guard', () => {
     expect(expandOccurrences(dense, window)).toEqual(expandOccurrences(bare, window))
   })
 
-  // The occurrence ceiling (documented as MAX_OCCURRENCES in recurrence.ts) was the "safety net"
-  // for dense BYHOUR/BYMINUTE grids under the old spread-everything-into-RRule construction. Now
-  // that BYHOUR/BYMINUTE/BYSECOND are outside the allowlist (see the test above) and the window is
-  // capped at ~730 days, the allowed rrule shapes (freq/interval/count/until/byweekday/bymonth/
-  // bymonthday/bysetpos) can never produce more than one candidate per day — so no legal input
-  // reaches 10 000 candidates any more. The ceiling is genuinely defense-in-depth now: still worth
-  // failing closed on, but only reachable if the rrule engine's own behavior changes. We prove the
-  // fail-closed behavior directly by substituting the engine's output, rather than by contorting a
-  // legal rrule string (impossible with this allowlist) or temporarily lowering the constant
-  // (see task guidance — not a good practice for this kind of assertion).
+  // No legal rrule reaches MAX_OCCURRENCES any more (field allowlist plus the
+  // ~730-day window), so the fail-closed path is proven by substituting the
+  // engine's output instead of by an input or by lowering the constant.
   it('throws (fails closed) instead of silently truncating, when the recurrence engine returns more naive occurrences than the ceiling', () => {
     const spy = vi.spyOn(RRule.prototype, 'between').mockReturnValue(
       Array.from({ length: 10_001 }, (_, i) => new Date(Date.UTC(2024, 0, 1 + i))),
@@ -240,10 +230,9 @@ describe('expandOccurrences — unbounded expansion guard', () => {
 })
 
 describe('expandOccurrences — allowlisted rrule fields take effect', () => {
-  // Coverage for each field the allowlist actually passes through to RRule
-  // when the input string sets it (the "defined" branch of each conditional
-  // spread in recurrence.ts) — not just that they're not silently dropped,
-  // but that each one changes the expansion the way RFC5545 says it should.
+  // Covers the "defined" branch of each conditional spread in recurrence.ts:
+  // every allowlisted field must change the expansion the way RFC5545 says,
+  // not merely survive the pass-through.
   const window = {
     from: new Date('2024-01-01T00:00:00.000Z'),
     until: new Date('2024-07-01T00:00:00.000Z'),

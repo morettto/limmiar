@@ -14,11 +14,9 @@ export interface UseDisclosureResult {
 }
 
 /**
- * Shared show/hide-behind-a-trigger state, used by every primitive that
- * collapses a region behind a button at some breakpoint (AdaptiveNav's T
- * rail drawer and M overflow menu, AdaptivePanel's T/M disclosure,
- * Columns' T drawer) — same aria-expanded/aria-controls wiring each time,
- * only the trigger's label/className and the revealed content differ.
+ * Shared show/hide-behind-a-trigger state for every primitive that collapses a
+ * region at some breakpoint (AdaptiveNav, AdaptivePanel, Columns): same
+ * aria-expanded/aria-controls wiring, only label and revealed content differ.
  */
 export function useDisclosure(): UseDisclosureResult {
   const [isOpen, setIsOpen] = useState(false)

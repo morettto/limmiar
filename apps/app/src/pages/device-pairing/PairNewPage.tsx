@@ -5,12 +5,9 @@ export interface PairNewPageProps {
   baseUrl: string
 }
 
-// Test-only hooks the E2E installs via `page.exposeFunction` before navigating here --
-// `decodeFromCamera` (PairNewDevice's real default) needs an actual camera, which CI does
-// not have; `__e2eKekAdopted` lets the Node test process observe the KEK this screen
-// actually adopted, to prove it independently (see device-pairing.spec.ts's "adopts a
-// working KEK" test). Both are undefined outside the E2E, so this page simply cannot be
-// used for anything but the E2E it exists for.
+// Test-only hooks the E2E installs via `page.exposeFunction` before navigating here:
+// `decodeFromCamera` needs a real camera, which CI has none of, and `__e2eKekAdopted` lets the Node
+// process observe the adopted KEK. Both are undefined outside the E2E.
 interface PairingE2EWindow {
   __e2eDecodeQr?: () => Promise<string>
   __e2eKekAdopted?: (kekBase64: string) => void

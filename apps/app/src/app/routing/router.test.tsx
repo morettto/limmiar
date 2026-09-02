@@ -28,13 +28,9 @@ vi.mock('../../widgets/soap-editor/FilaEEditor', () => ({
   FilaEEditor: vi.fn(() => <div data-testid="fila-e-editor" />),
 }))
 
-// Route construction (createRoute/createRouter/routeTree, including the env-gated E2E
-// branch) runs once at module top level. Each test needs its own fresh evaluation of that
-// top level -- both to pick up window.history's current URL as the router's initial match,
-// and (via vi.stubEnv) to pick either branch of the VITE_ENABLE_E2E_TEST_ROUTES ternary --
-// so every test resets the module registry and re-imports router.tsx (and whichever mocked
-// screen module it wants to inspect) from scratch, same technique the pre-existing index-
-// route test already used.
+// Route construction runs once at module top level, so each test needs its own fresh evaluation —
+// both to pick up window.history's current URL as the initial match and to choose either branch of
+// the VITE_ENABLE_E2E_TEST_ROUTES ternary via vi.stubEnv.
 async function loadRouterAt(url: string, enableE2ERoutes = false) {
   window.history.pushState({}, '', url)
   if (enableE2ERoutes) {
@@ -186,12 +182,9 @@ describe('router', () => {
     expect(propsDepois.notas[notaId]).toEqual(notaEditada)
   })
 
-  // NotaPage ainda não tem sessão/keychain real montada nesta rota (ver o comentário
-  // ponytail: no topo de NotaPage.tsx) -- aoAssinar tenta mesmo assim a cadeia real
-  // (openRecord/appendPatientEntry/assinarNota), que aqui falha (kek/credenciais fixture),
-  // caindo no mesmo caminho de falha de rede que um apagão de rede genuíno cairia: o item
-  // fica pendente e um role=alert é anunciado. O caminho de sucesso (fatia 5) é coberto por
-  // NotaPage.test.tsx com os módulos de crypto/api duplados.
+  // NotaPage ainda não tem sessão/keychain real nesta rota: aoAssinar tenta a cadeia real e falha
+  // com as credenciais fixture, caindo no mesmo caminho de falha de rede (item pendente, role=alert).
+  // O caminho de sucesso é coberto por NotaPage.test.tsx com os módulos duplados.
   it('/notas: aoAssinar sem sessão real cai no caminho de falha de rede -- item continua pendente', async () => {
     const router = await loadRouterAt('/notas')
     render(

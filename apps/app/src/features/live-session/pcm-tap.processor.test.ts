@@ -5,10 +5,9 @@ type ProcessorCtor = new (options: { processorOptions: { sab: SharedArrayBuffer 
   process(inputs: Float32Array[][]): boolean
 }
 
-// `PcmTap` extends the global `AudioWorkletProcessor` and self-registers via
-// `registerProcessor` at module-eval time — both globals are stubbed before
-// a fresh import (precedente `worker-client.test.ts:57-71`), and the stub of
-// `registerProcessor` captures the constructor the module hands it.
+// `PcmTap` estende o `AudioWorkletProcessor` global e auto-regista-se ao avaliar o módulo: ambos
+// os globais são substituídos antes de um import fresco, e o stub de `registerProcessor` captura o
+// construtor que o módulo lhe entrega.
 async function carregarPcmTap(): Promise<{ ctor: ProcessorCtor; nomeRegistado: string | undefined }> {
   let ctor: ProcessorCtor | undefined
   let nomeRegistado: string | undefined

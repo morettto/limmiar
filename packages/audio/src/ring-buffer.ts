@@ -1,21 +1,7 @@
 /**
- * Single-producer/single-consumer ring buffer over a SharedArrayBuffer, for
- * the audio hot path (AudioWorklet -> ASR worker) added in a later slice.
- *
- * Layout: an Int32Array(4) header —
- *   [0] writeFrames   monotonically increasing count, wraps mod 2^32
- *   [1] readFrames    monotonically increasing count, wraps mod 2^32
- *   [2] droppedFrames monotonically increasing count of frames lost to overflow
- *   [3] reserved      unused, kept for alignment/future use
- * — followed by a Float32Array(capacity) of PCM samples. `capacity` must be
- * a power of 2 so the write/read index is a cheap mask (`counter & (capacity - 1)`)
- * instead of a modulo.
- *
- * `push`/`pull` copy via `.set()`. That is not zero-copy in the literal
- * sense — see packages/audio/README.md, "Cópia, mas zero-alocação" — but on
- * the hot path (called once per audio quantum) they allocate nothing, never
- * call `postMessage`, and never trigger structured-clone. That is the
- * guarantee this module exists to provide.
+ * Single-producer/single-consumer ring buffer over a SharedArrayBuffer for the
+ * audio hot path: Int32Array(4) header plus Float32Array(capacity), capacity a
+ * power of 2 so the index is a mask. Guarantees in README.md.
  */
 
 const WRITE_IDX = 0

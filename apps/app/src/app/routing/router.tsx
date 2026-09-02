@@ -14,10 +14,9 @@ function readSearchString(search: Record<string, unknown>, key: string): string 
   return typeof value === 'string' ? value : ''
 }
 
-// The root route's own component is deliberately left unset: TanStack Router's default
-// root component already renders an <Outlet/> for whichever child route matched, which is
-// exactly this app's current shell -- an explicit `component: () => <Outlet/>` here would
-// be equivalent, not a behavior change, so it is left implicit.
+// The root route's component is deliberately unset: TanStack Router's default root already
+// renders an <Outlet/> for the matched child, which is exactly this app's shell, so an explicit
+// one would be equivalent.
 const rootRoute = createRootRoute()
 
 // ponytail: this <div id="app-shell"> is a navigation stub, not a real landing page --
@@ -55,24 +54,9 @@ function MagicLinkCallbackRouteComponent() {
   return <MagicLinkCallbackPage baseUrl={baseUrl} token={token} />
 }
 
-// S02-04 slice 7 / S02-05 (E2E) -- PRAGMATIC, TICKET-SCOPED ROUTING DECISION, NOT PRODUCTION UI:
-//
-// AuthScreen/PairPrimaryDevice/PairNewDevice have no real navigation entry point yet (no real
-// "landing page" or settings screen exists to reach them from -- building either is out of
-// scope for the tickets that built these screens). The routes below are the smallest possible
-// way for the E2E to reach each screen directly by URL: `accountId`/`accessToken`/`baseUrl`
-// come straight off the query string (mirroring entities/session's sessionStorage-backed
-// recorder -- this is the same kind of "no real navigation flow to reach a protected route
-// through yet" shortcut, just via the URL instead of a signed-in session, since the E2E drives
-// independent browser CONTEXTS that do not share sessionStorage with each other or with a
-// `beforeEach` setup step), and pages/device-pairing/PairPrimaryPage's `getKekForTransfer`
-// resolves a fixed/known KEK (also carried in the query string, base64) instead of a real
-// Keychain unlock -- S02-04's E2E proves the PAIRING PROTOCOL, not login (S02-01/S02-05) or
-// DEK/KEK unlock (S01/S03), both already covered by their own tests.
-//
-// FOLLOW-UP (flagged for whoever builds the real landing-page/settings-screen entry points):
-// these routes should be replaced, not built on top of -- they exist only so Playwright can
-// open each screen without a full login UI flow in front of it.
+// S02-04 fatia 7 / S02-05 — E2E scaffolding, not production UI: these screens have no navigation
+// entry point yet, so the routes below let Playwright reach each one by URL, with the ids, tokens
+// and a fixed KEK off the query string. Replace them once the real entry points exist.
 
 interface AuthScreenE2ESearch {
   baseUrl: string
@@ -113,12 +97,9 @@ function RecoveryScreenE2ERouteComponent() {
   return <RecoveryPage baseUrl={baseUrl} />
 }
 
-// Judgment call (S02-06, not spelled out by the ticket the way /auth/recover was): same
-// "no real navigation entry point yet" situation as PairPrimaryDevice/PairNewDevice above --
-// RecoveryPhraseSetup is only ever reached from inside a real Professional session (there is
-// no settings screen to launch it from yet), so account-recovery.spec.ts needs a direct-by-URL
-// way in too. `accountId`/`accessToken`/`email` come straight off the query string, same
-// shortcut as PairPrimarySearch's `accessToken`/`kek`.
+// Judgment call (S02-06): same "no navigation entry point yet" situation as the pairing routes
+// above — RecoveryPhraseSetup is only reached from inside a real Professional session, so
+// account-recovery.spec.ts needs a direct-by-URL way in, with the same query-string shortcut.
 interface RecoveryPhraseSetupE2ESearch {
   baseUrl: string
   accountId: string
@@ -186,18 +167,9 @@ function PairNewRouteComponent() {
   return <PairNewPage baseUrl={baseUrl} />
 }
 
-// All of these routes are E2E-only scaffolding (see the file-level doc comment above) and
-// must not ship in the real production bundle: auth/screen mounts AuthScreen with no
-// login-flow guard in front of it, pair-primary takes an accessToken + raw KEK straight off
-// the query string, pair-new is unusable without a window hook the E2E installs, auth/recover
-// mounts RecoveryScreen the same bare way auth/screen mounts AuthScreen, and
-// auth/recovery-phrase-setup takes an accessToken straight off the query string the same way
-// pair-primary does -- but "unusable in practice" isn't the same as "absent from the bundle",
-// a route registered in the real tree is still shipped, crawlable, and linkable. Gating on
-// `import.meta.env.DEV` would also exclude them from THIS E2E, since playwright.config.ts
-// exercises a real `vite build` (not `vite dev`) to match production bundling as closely as
-// possible -- so this is a dedicated build-time flag the E2E's build command sets
-// (VITE_ENABLE_E2E_TEST_ROUTES=true) and no other build (including local `vite dev`) does.
+// These routes are E2E-only scaffolding and must not ship: each mounts a screen with no guard or
+// reads an accessToken/raw KEK off the query string, and a registered route is shipped and linkable
+// even when unusable. `import.meta.env.DEV` would hide them from the E2E's own `vite build` too.
 
 const copilotSettingsRoute = createRoute({
   getParentRoute: () => rootRoute,

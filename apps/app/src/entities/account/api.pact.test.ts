@@ -6,17 +6,9 @@ import { dynamicActivate, i18n } from '../../shared/i18n'
 import { translateProblemCode } from '../../shared/api/problem-messages'
 import { login, register } from './api'
 
-// Deliberately NOT `new URL('../../../../../pacts', import.meta.url)`: under
-// this file's jsdom test environment, Vite's transform special-cases that
-// exact syntactic pattern as a browser asset-URL import and rewrites it to a
-// dev-server "/@fs/..." URL instead of leaving it as a real file path.
-// Resolving the two steps separately (bare `import.meta.url`, then
-// `path.resolve`) sidesteps that rewrite and keeps a genuine filesystem path.
-// 5 levels up from apps/app/src/entities/account/ to the repo root: account ->
-// entities -> src -> app -> apps -> repo root. Both this consumer test and
-// the .NET provider verification test (written separately) read/write the
-// exact same pacts/limmiar-app-limmiar-api.json file, so they must agree on
-// this path.
+// Deliberately NOT `new URL('../../../../../pacts', import.meta.url)`: under jsdom, Vite rewrites
+// that exact pattern into a dev-server "/@fs/..." URL. Resolving in two steps keeps a real
+// filesystem path — the same pacts/ file the .NET provider verification reads.
 const currentFile = fileURLToPath(import.meta.url)
 const pactDir = path.resolve(path.dirname(currentFile), '../../../../../pacts')
 
@@ -26,10 +18,9 @@ const provider = new PactV3({
   dir: pactDir,
 })
 
-// 32 bytes of 0x0a, base64-encoded (System.Text.Json's byte[] wire format --
-// see client.ts's passwordVerifierToBase64). The actual Argon2id derivation
-// is covered on its own in auth/password-verifier.test.ts; these contract
-// interactions only need SOME 32-byte value on the wire.
+// 32 bytes of 0x0a, base64-encoded (System.Text.Json's byte[] wire format — see client.ts). The
+// Argon2id derivation is covered in password-verifier.test.ts; these interactions only need some
+// 32-byte value on the wire.
 const PASSWORD_VERIFIER = new Uint8Array(32).fill(0x0a)
 const PASSWORD_VERIFIER_BASE64 = 'CgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgo='
 

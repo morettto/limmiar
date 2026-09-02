@@ -5,12 +5,9 @@ export interface GrupoPaciente {
   readonly itens: readonly ItemFila[]
 }
 
-// Ordem determinística: os grupos saem pela ordem da primeira ocorrência de cada
-// patientId em `itens` (Map preserva ordem de inserção); dentro do grupo, os rascunhos
-// (ESTADO_PENDENTE) vêm primeiro e a ordem relativa dentro de cada partição (rascunhos
-// entre si, assinadas entre si) é a de entrada -- `Array.prototype.filter` é estável, então
-// não precisa de comparador de sort próprio. Sem isto uma lista que salta entre renders
-// seria bug (critério de aceite 3: "rascunhos em destaque no topo").
+// Ordem determinística: os grupos saem pela ordem da primeira ocorrência de cada patientId, e
+// dentro do grupo os rascunhos vêm primeiro, com a ordem de entrada preservada (`filter` é estável).
+// Sem isto a lista saltaria entre renders, contra o critério 3.
 export function agruparPorPaciente(itens: readonly ItemFila[]): GrupoPaciente[] {
   const porPaciente = new Map<string, ItemFila[]>()
   for (const item of itens) {

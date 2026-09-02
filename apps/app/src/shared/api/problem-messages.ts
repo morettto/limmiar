@@ -3,12 +3,9 @@ import { i18n } from '@lingui/core'
 import type { MessageDescriptor } from '@lingui/core'
 import { problemCodes, type ProblemCode } from './problem-codes'
 
-// Elsewhere in this app, the pt-BR source text is the Lingui message id. Here, each
-// entry must use msg()'s explicit-id form instead, with `id` set to the exact backend
-// `code` string, since that string is the object key this registry is looked up by.
-// Keying on ProblemCode (generated from the backend's *ProblemCodes.cs) is what makes a
-// code the backend can emit but this registry does not answer a type error instead of a
-// silent fall-through to the generic message.
+// Each entry uses msg()'s explicit-id form (elsewhere the pt-BR text is the id) because the id must
+// be the exact backend `code` this registry is keyed by. Keying on ProblemCode makes an unanswered
+// code a type error instead of a silent generic fallback.
 // Stryker disable all
 const knownProblemMessages: Record<ProblemCode, MessageDescriptor> = {
   'health.database_unreachable': msg({

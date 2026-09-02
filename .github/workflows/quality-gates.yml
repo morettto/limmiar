@@ -146,6 +146,35 @@ jobs:
       - name: Dependency rules (app — Feature-Sliced Design layering)
         run: pnpm --filter app lint:arch
 
+  # oxlint over every workspace, including comments/no-long-comments (the local JS plugin in
+  # tools/oxlint-plugin-comments): a comment block over 3 lines of text fails the build, so
+  # generated prose that restates the code never lands. The rule itself is unit-tested first.
+  lint:
+    name: "Lint (oxlint — includes the 3-line comment ceiling)"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Unit tests (comment-length rule)
+        run: pnpm test:lint-rules
+
+      - name: oxlint (all workspaces)
+        run: pnpm -r --if-present lint
+
   # The .NET side owns the problem `code` strings; apps/app used to re-type them by
   # hand into errors/problem-messages.ts, and drifted to 13 of 24 — every
   # device-pairing failure rendered the generic message. src/errors/problem-codes.ts

@@ -11,10 +11,8 @@ export type GravarSelado = (selado: Uint8Array<ArrayBuffer>) => Promise<void>
 const ARQUIVO_INDICE = 'indice-busca'
 
 /**
- * A única função autorizada a tocar a API OPFS para o índice de busca, tal como
- * `opfsWriter` em `features/live-session/chunk-store.ts` -- `ler`/`gravar` nunca lidam com
- * plaintext, só com o blob já selado (`selarIndice`/`abrirIndice` ficam em `persistirIndice`/
- * `restaurarIndice`, abaixo).
+ * A única função autorizada a tocar a API OPFS para o índice de busca, tal como `opfsWriter` em
+ * `chunk-store.ts`: `ler`/`gravar` nunca lidam com plaintext, só com o blob já selado.
  */
 export function opfsIndice(dir: FileSystemDirectoryHandle): { ler: LerSelado; gravar: GravarSelado } {
   return {

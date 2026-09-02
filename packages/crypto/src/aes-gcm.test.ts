@@ -4,13 +4,9 @@ import fc from 'fast-check'
 import { afterEach, describe, expect, it } from 'vitest'
 import { __resetNonceSourceForTests, __setNonceSourceForTests, decrypt, encrypt } from './aes-gcm'
 
-// NIST CAVP "GCM Decrypt with keysize 256" — CAVS 14.0, generated 2012-08-31.
-// Vendored (byte-identical to the original NIST gcmtestvectors.zip
-// distribution) at:
-// https://raw.githubusercontent.com/mko-x/SharedAES-GCM/master/Sources/gcm_test_vectors/gcmDecrypt256.rsp
-// Section [Keylen = 256] [IVlen = 96] [PTlen = 128] [AADlen = 128] [Taglen = 128], Count = 0.
-// Cross-checked byte-for-byte against the installed @noble/ciphers `gcm()`
-// output (both encrypt and decrypt directions) before being hardcoded here.
+// NIST CAVP GCM Decrypt with keysize 256 (CAVS 14.0, 2012-08-31), section
+// [Keylen=256][IVlen=96][PTlen=128][AADlen=128][Taglen=128] Count 0, cross-checked
+// against @noble/ciphers: https://raw.githubusercontent.com/mko-x/SharedAES-GCM/master/Sources/gcm_test_vectors/gcmDecrypt256.rsp
 const NIST_CAVP_VECTOR = {
   key: '54e352ea1d84bfe64a1011096111fbe7668ad2203d902a01458c3bbd85bfce14',
   iv: 'df7c3bca00396d0c018495d9',
@@ -44,9 +40,8 @@ describe('encrypt — NIST CAVP known-answer test', () => {
     const iv = hexToBytes(NIST_CAVP_VECTOR.iv)
 
     // Pin the internally-generated nonce to the vector's IV so the output is
-    // byte-comparable to the official ciphertext+tag. This is the test seam
-    // ADR-S01-02 calls for: the nonce source is swappable here, never as a
-    // parameter of encrypt() itself.
+    // byte-comparable to the official ciphertext+tag. ADR-S01-02's test seam: the
+    // nonce source is swappable here, never a parameter of encrypt().
     __setNonceSourceForTests(() => iv)
 
     const result = encrypt(key, plaintext, aad)
@@ -81,10 +76,9 @@ describe('encrypt — NIST CAVP known-answer test', () => {
 })
 
 describe('encrypt/decrypt — AES-256 key length validation', () => {
-  // The underlying @noble/ciphers gcm() accepts any of the three AES key
-  // sizes (16/24/32 bytes) — this module's contract is specifically
-  // AES-256-GCM, so a non-32-byte key must be rejected here rather than
-  // silently downgrading to AES-128/192.
+  // @noble/ciphers gcm() accepts 16/24/32-byte keys; this module's contract is
+  // AES-256-GCM, so a non-32-byte key must be rejected rather than silently
+  // downgrading to AES-128/192.
   it('rejects an encrypt() key that is not 32 bytes', () => {
     const key = new Uint8Array(16).fill(0x01)
     const plaintext = new Uint8Array([1])

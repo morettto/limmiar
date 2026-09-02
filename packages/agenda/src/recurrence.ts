@@ -22,32 +22,23 @@ export interface Window {
 
 const SLACK_MS = 24 * 60 * 60 * 1000
 
-// This is a psychologist-session agenda: no sub-daily recurrence makes
-// product sense, and FREQ=SECONDLY/MINUTELY (especially from an old
-// startsAt) forces the rrule engine through hundreds of millions of
-// candidates before the first result, blocking the single-threaded Node
-// event loop. Reject at the domain boundary, before any expansion runs.
+// Sub-daily recurrence makes no sense for a session agenda, and SECONDLY/
+// MINUTELY from an old startsAt walks hundreds of millions of candidates on
+// the single-threaded event loop. Reject at the domain boundary.
 const SUB_DAILY_FREQUENCIES = new Set([RRule.HOURLY, RRule.MINUTELY, RRule.SECONDLY])
 
 // ~2 years — a wider window multiplies the same unbounded-cost risk even at
 // allowed frequencies (e.g. FREQ=DAILY over a decade).
 const MAX_WINDOW_MS = 730 * 24 * 60 * 60 * 1000
 
-// Defense in depth under the guards above: caps how many occurrences a
-// single expansion ever materializes. With the rrule field allowlist below
-// (no byhour/byminute/bysecond) and the ~730-day window ceiling, no legal
-// input can produce more than roughly one candidate per day any more — this
-// stays as a fail-closed backstop against a change in the allowlist or the
-// rrule engine's own behavior, not a ceiling reachable through normal use.
+// Fail-closed backstop, not a ceiling reachable through normal use: with the
+// field allowlist below and the ~730-day window, no legal input produces more
+// than roughly one candidate per day.
 const MAX_OCCURRENCES = 10_000
 
-// Defense in depth: `series.rrule`/`startsAt`/`exdates` used to be
-// concatenated into an ICS multi-line string that rrule parsed line by
-// line, so a `\r` or `\n` inside any of them could inject a synthetic
-// RDATE/EXDATE/second RRULE line. Building the series through the RRule API
-// below removes that vector by construction, but the guard stays as an
-// explicit, tested boundary check rather than relying solely on the
-// parser's (incidental) handling of embedded line breaks.
+// The series used to be built as an ICS string, where a CR or LF inside any
+// field injected an extra RDATE/EXDATE/RRULE line. The RRule API below removes
+// that vector; this stays as an explicit, tested boundary check.
 const LINE_BREAK = /[\r\n]/
 
 function assertNoLineBreak(value: string, field: string): void {
@@ -58,10 +49,9 @@ function assertNoLineBreak(value: string, field: string): void {
 
 const WALL_CLOCK_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/
 
-// 'YYYY-MM-DDTHH:mm' wall-clock string → naive Date whose UTC fields carry
-// those same values (rrule's own convention: it reads a Date's UTC getters
-// as "the local time", so this is how we hand it a DTSTART/EXDATE without
-// rrule ever knowing about the real time zone).
+// 'YYYY-MM-DDTHH:mm' to a naive Date whose UTC fields carry those same values:
+// rrule reads a Date's UTC getters as "the local time", so this is how DTSTART
+// and EXDATE are handed over without rrule knowing the real time zone.
 function parseWallClock(value: string): Date {
   const match = WALL_CLOCK_PATTERN.exec(value)
   if (!match) {
@@ -71,11 +61,9 @@ function parseWallClock(value: string): Date {
   }
   const [, year, month, day, hour, minute] = match
   const date = new Date(`${value}:00Z`)
-  // Round-trip check: `new Date(...)` silently overflows an out-of-range
-  // day/month (e.g. 2024-02-30 → 2024-03-01) instead of throwing, so
-  // Number.isNaN alone doesn't catch it. Re-reading the constructed date's
-  // UTC fields and comparing them against the digits we parsed out of the
-  // input string catches that overflow without a separate calendar parser.
+  // `new Date(...)` overflows an out-of-range day (2024-02-30 to 2024-03-01)
+  // instead of throwing, so Number.isNaN misses it: re-read the constructed
+  // date's UTC fields and compare them against the parsed digits.
   if (
     Number.isNaN(date.getTime()) ||
     date.getUTCFullYear() !== Number(year) ||
@@ -109,16 +97,9 @@ export function expandOccurrences(series: RecurringSeries, window: Window): Occu
     )
   }
 
-  // Explicit allowlist, not `{ ...RRule.parseString(series.rrule), dtstart }`:
-  // parseString echoes back every field it recognized in the input string,
-  // including `tzid` and its own `dtstart` (only the latter was overwritten
-  // by the old spread). A `TZID=...` on the same line as FREQ (no line
-  // break, so the injection guard above never sees it) silently re-zoned
-  // every occurrence. Naming exactly the fields this product's rrule shape
-  // needs means nothing else — tzid, an embedded dtstart, byhour/byminute/
-  // bysecond, wkst — ever reaches the RRule constructor. dtstart always
-  // comes from `series.startsAt` via parseWallClock, never from the parsed
-  // string.
+  // Explicit allowlist, not a spread of parseString's output: a `TZID=` on the
+  // FREQ line (no line break, so the injection guard misses it) silently
+  // re-zoned every occurrence. dtstart always comes from parseWallClock.
   const { freq, interval, count, until, byweekday, bymonth, bymonthday, bysetpos } = RRule.parseString(
     series.rrule,
   )
@@ -134,22 +115,17 @@ export function expandOccurrences(series: RecurringSeries, window: Window): Occu
     )
   }
   if (interval !== undefined && (!Number.isInteger(interval) || interval < 1 || interval > 366)) {
-    // A negative/zero INTERVAL makes rrule's iterator walk away from dtstart
-    // and never reach its own acceptance condition — the callback below
-    // never fires, so MAX_OCCURRENCES never has a chance to cut it off: an
-    // unrecoverable, synchronous infinite loop. Reject before it's built.
+    // A negative or zero INTERVAL makes rrule's iterator walk away from dtstart
+    // forever: the callback below never fires, so MAX_OCCURRENCES never gets to
+    // cut it off. Reject before the rule is built.
     throw new Error(
       `expandOccurrences: rrule INTERVAL must be an integer between 1 and 366 (got ${interval}).`,
     )
   }
 
-  // Conditional spreads, not plain keys: rrule merges the options object it
-  // receives on top of its own defaults, but an explicit `key: undefined`
-  // is still an *own property* — it overwrites the default (e.g. interval's
-  // default of 1) with `undefined` instead of leaving it untouched. That
-  // breaks the internal date-arithmetic the same way a negative INTERVAL
-  // does (see above): the iterator never advances to a valid candidate and
-  // spins forever. Only fields the input string actually set are included.
+  // Conditional spreads: an explicit `key: undefined` is still an own property
+  // and overwrites rrule's default (interval 1), which spins the iterator the
+  // same way a negative INTERVAL does.
   const rule = new RRule({
     freq,
     ...(interval !== undefined && { interval }),
@@ -165,11 +141,9 @@ export function expandOccurrences(series: RecurringSeries, window: Window): Occu
   const fromNaive = new Date(toWallClock(window.from, tz).getTime() - SLACK_MS)
   const untilNaive = new Date(toWallClock(window.until, tz).getTime() + SLACK_MS)
 
-  // `<= MAX_OCCURRENCES` (not `<`) deliberately lets one candidate past the
-  // ceiling through, so the length check right below can tell "exactly at
-  // the ceiling" apart from "truncated" and fail closed instead of
-  // returning a partial result indistinguishable from a complete one (this
-  // function is also used to detect schedule overlaps).
+  // `<= MAX_OCCURRENCES` lets one candidate past the ceiling so the length
+  // check below can tell "exactly at the ceiling" from "truncated" and fail
+  // closed instead of returning a partial result.
   const naiveOccurrences = rule.between(
     fromNaive,
     untilNaive,
@@ -180,12 +154,9 @@ export function expandOccurrences(series: RecurringSeries, window: Window): Occu
     throw new Error('expandOccurrences: série excede o teto de ocorrências para esta janela.')
   }
 
-  // exdates are filtered post-resolution, in the same space Occurrence.
-  // localStart is reported in — not pre-expansion via RRuleSet.exdate(),
-  // which compares against the naive input space. Inside a DST gap those
-  // two spaces diverge (naive 00:30 vs. resolved 01:30), and an exdate
-  // supplied in the input's naive format would silently fail to cancel the
-  // occurrence the API actually reports.
+  // exdates are filtered post-resolution, in the space Occurrence.localStart is
+  // reported in: inside a DST gap the naive input (00:30) and the resolved
+  // value (01:30) diverge, and a pre-expansion exdate would fail to cancel.
   const excluded = new Set(
     (series.exdates ?? []).map((exdate) =>
       formatWallClock(toWallClock(fromWallClock(parseWallClock(exdate), tz), tz)),
@@ -195,10 +166,8 @@ export function expandOccurrences(series: RecurringSeries, window: Window): Occu
   return naiveOccurrences
     .map((naive): Occurrence => {
       const start = fromWallClock(naive, tz)
-      // Re-derive from the resolved absolute instant, not the naive input:
-      // when the requested wall-clock time falls in a DST spring-forward
-      // gap, `start` already reflects the clock jump — localStart must match
-      // (see the "DST spring-forward gap" test).
+      // Re-derive from the resolved absolute instant: in a DST spring-forward
+      // gap `start` already reflects the clock jump, and localStart must match.
       return {
         start,
         end: new Date(start.getTime() + series.durationMinutes * 60_000),

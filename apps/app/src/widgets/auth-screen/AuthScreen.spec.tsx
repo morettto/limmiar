@@ -3,16 +3,9 @@ import { AuthScreen } from './AuthScreen'
 import { CtI18nProvider } from '../../test-support/ct-i18n'
 import { componentAxeBuilder } from '../../test-support/axe'
 
-// Ticket S02-01, Tela A1, AC "A1 verde nos 4 breakpoints com axe
-// bloqueante". Breakpoint coverage comes for free from
-// playwright-ct.config.ts's 4 projects (D-xl/T-lg/T-md/M-sm) -- each test
-// below runs once per project. Structure mirrors
-// packages/ui/src/AdaptivePanel.spec.tsx (S00-03): mount, toHaveScreenshot,
-// componentAxeBuilder(page).analyze() with a zero-violations assertion.
-//
-// getGoogleIdToken is a required prop (see AuthScreen.tsx's doc comment: no
-// pre-agreed Google Identity Services integration yet) -- stubbed here since
-// nothing in these tests clicks the Google button.
+// Ticket S02-01, Tela A1: breakpoint coverage comes from playwright-ct.config.ts's 4 projects, and
+// the structure mirrors packages/ui's specs (mount, toHaveScreenshot, axe with zero violations).
+// getGoogleIdToken is stubbed — nothing here clicks the Google button.
 function mountAuthScreen() {
   return (
     <CtI18nProvider>

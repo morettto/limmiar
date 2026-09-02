@@ -37,10 +37,9 @@ test('clipping com text-overflow: ellipsis não é pego', async ({ mount }) => {
   expect(await findOverflowViolations(component)).toEqual([])
 })
 
-// Achado real ao instrumentar AdaptiveNav.spec.tsx: um wrapper de altura
-// fixa com overflow padrão (visible) e conteúdo mais alto que a caixa NÃO
-// deve contar como violação — nada é cortado, o conteúdo só continua visível
-// abaixo da borda declarada da caixa.
+// Achado ao instrumentar AdaptiveNav.spec.tsx: wrapper de altura fixa com overflow
+// visible e conteúdo mais alto NÃO é violação — nada é cortado, o conteúdo só
+// segue visível abaixo da borda.
 test('estouro com overflow: visible (padrão) não é clipping — não é pego', async ({ mount }) => {
   const component = await mount(
     <div style={{ width: 200, height: 20 }}>

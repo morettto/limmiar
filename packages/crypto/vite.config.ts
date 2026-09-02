@@ -11,11 +11,9 @@ export default defineConfig({
       // so a new file added without a test fails the gate instead of being
       // silently absent from the report.
       include: ['src/**/*.ts'],
-      // index.ts is a pure re-export barrel with no branching logic of its
-      // own to assert on — same "don't test the entry point" exclusion
-      // apps/app applies to main.tsx. benchmark.ts (and any scripts/ dir) is
-      // a manual calibration tool run by a human against real hardware, not
-      // gated logic — same rationale as index.ts, just a different reason.
+      // index.ts is a re-export barrel with no logic to assert on (same as
+      // apps/app's main.tsx); benchmark.ts and scripts/ are manual calibration
+      // tools run against real hardware, not gated logic.
       exclude: ['src/**/*.test.ts', 'src/index.ts', 'src/benchmark.ts'],
       thresholds: {
         perFile: true,

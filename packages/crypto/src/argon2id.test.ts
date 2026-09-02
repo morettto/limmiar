@@ -2,10 +2,9 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { deriveKey } from './argon2id'
 
-// RFC 9106 §5.3 "Test Vectors" — Argon2id, https://www.rfc-editor.org/rfc/rfc9106#section-5.3
-// password: 32× 0x01, salt: 16× 0x02, secret: 8× 0x03, associated data: 12× 0x04,
-// m=32 KiB, t=3, p=4, dkLen=32, version 0x13. Cross-checked byte-for-byte against
-// the installed @noble/hashes argon2idAsync output before being hardcoded here.
+// RFC 9106 §5.3 Argon2id vector (password 32×0x01, salt 16×0x02, secret 8×0x03,
+// AD 12×0x04, m=32 KiB, t=3, p=4, dkLen=32, v=0x13), cross-checked against the
+// installed @noble/hashes: https://www.rfc-editor.org/rfc/rfc9106#section-5.3
 const RFC9106_TAG_HEX = '0d640df58d78766c08c037a34a8b53c9d01ef0452d75b65eb52520e96b01e659'
 
 describe('deriveKey — RFC 9106 §5.3 known-answer test', () => {
@@ -56,10 +55,9 @@ describe('deriveKey — memoryKiB validation (RFC 9106 §3.1: m must be >= 8*p)'
   const salt = new Uint8Array(8).fill(1)
 
   it('rejects before ever calling the library when memoryKiB is below 8*parallelism', async () => {
-    // Exact message (not a loose substring): @noble/hashes has its own m>=8*p
-    // check with different wording, so a weak assertion here would still pass
-    // if this package's own guard were deleted and the library's fallback
-    // error fired instead — the point of this test is that THIS guard fires.
+    // Exact message, not a substring: @noble/hashes has its own m>=8*p check with
+    // different wording, so a loose assertion would still pass with this package's
+    // own guard deleted.
     await expect(deriveKey(password, salt, { memoryKiB: 15, iterations: 1, parallelism: 2 })).rejects.toThrow(
       'Argon2Params.memoryKiB (15) must be at least 8 * parallelism (16)',
     )
@@ -77,10 +75,9 @@ describe('deriveKey — iterations validation', () => {
   const salt = new Uint8Array(8).fill(1)
 
   it('rejects iterations below 1', async () => {
-    // Exact message, same reasoning as the memoryKiB test above: @noble/hashes
-    // also rejects t<1 on its own, with wording that happens to contain the
-    // word "iterations" too, so only an exact match on this guard's specific
-    // message proves this guard — not the library's — is what fired.
+    // Exact message, same reasoning as the memoryKiB test: @noble/hashes also
+    // rejects t<1, with wording that contains iterations too, so only an exact
+    // match proves this guard fired.
     await expect(
       deriveKey(password, salt, { memoryKiB: 8, iterations: 0, parallelism: 1 }),
     ).rejects.toThrow('Argon2Params.iterations (0) must be >= 1')

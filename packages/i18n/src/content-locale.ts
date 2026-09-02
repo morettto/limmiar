@@ -1,12 +1,8 @@
 import type { Locale } from './locale'
 
-// Branded/opaque: a ContentLocale is only ever produced by toContentLocale, never
-// assignable from a bare Locale/string. S01's encrypted flow and S03/S05's
-// Patient/Session entities don't exist in this repo yet, so there is no runtime
-// boundary to enforce D20 ("contentLocale nunca sai em claro fora do fluxo
-// cifrado") against today. The brand is the guardrail available now: it stops the
-// UI's interface locale (D17, plain Locale) from being silently reused as a
-// session's content locale at the type level, ahead of the real encrypted path.
+// Branded/opaque: a ContentLocale only ever comes from toContentLocale. With no
+// encrypted flow in the repo yet, the brand is the guardrail available for D20 —
+// it stops the UI's interface locale being reused as a content locale.
 declare const contentLocaleBrand: unique symbol
 
 export type ContentLocale = Locale & { readonly [contentLocaleBrand]: true }

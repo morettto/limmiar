@@ -11,14 +11,9 @@ import {
   validateMnemonic,
 } from './bip39'
 
-// Official BIP39 reference vectors — Trezor `python-mnemonic` vectors.json
-// ("english" list), https://github.com/trezor/python-mnemonic/blob/master/vectors.json
-// One vector per entropy length actually present in that file (16/24/32
-// bytes = 128/192/256 bits). Downloaded raw and read verbatim (not via an
-// AI-summarized fetch, to avoid hex transcription risk), then cross-checked
-// byte-for-byte against the installed @scure/bip39 output (entropy roundtrip
-// and seed, passphrase "TREZOR" per that vector set) before being hardcoded
-// here.
+// Official BIP39 vectors (Trezor python-mnemonic vectors.json, english list), one
+// per entropy length (16/24/32 bytes), read verbatim and cross-checked against the
+// installed @scure/bip39: https://github.com/trezor/python-mnemonic/blob/master/vectors.json
 const TREZOR_VECTORS = [
   {
     entropy: '00000000000000000000000000000000',
@@ -59,10 +54,9 @@ describe.each(TREZOR_VECTORS)(
 
 describe('mnemonicToEntropy / validateMnemonic — invalid checksum rejected', () => {
   const valid = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
-  // Same 11 "abandon" words as the vector above, last word swapped for
-  // another valid wordlist word that does not satisfy this entropy's
-  // checksum — verified against the installed @scure/bip39
-  // (mnemonicToEntropy throws Error("Invalid checksum")) before hardcoding.
+  // Same 11 abandon words as the vector above with the last word swapped for a
+  // valid wordlist word that breaks the checksum — verified against @scure/bip39
+  // (mnemonicToEntropy throws Invalid checksum).
   const brokenChecksum = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon zoo'
 
   it('sanity: the unmodified vector is valid', () => {
@@ -138,12 +132,9 @@ describe('generateMnemonic — property', () => {
 })
 
 describe('generateMnemonic — invalid strength (library-enforced)', () => {
-  // Bip39Strength is a literal union covering the full BIP39 domain, so
-  // TypeScript already rejects every invalid value at compile time — see
-  // bip39.ts. This test locks in @scure/bip39's own runtime rejection for a
-  // caller that bypasses the type system, instead of adding an unreachable
-  // guard of our own (same discipline as the X25519 all-zero peer-key test
-  // in x25519.test.ts).
+  // Bip39Strength is a literal union, so TypeScript rejects invalid values at
+  // compile time. This locks in @scure/bip39's runtime rejection for a caller that
+  // bypasses the types, instead of an unreachable guard of our own.
   it('throws for a strength not on the BIP39 union, via the underlying library', () => {
     expect(() => generateMnemonic(100 as Bip39Strength)).toThrow('Invalid entropy')
   })
@@ -160,13 +151,9 @@ describe('bip39.ts — no serialization/logging of the recovery phrase (static g
 
 describe('mnemonicToEntropy — error messages never echo the input phrase', () => {
   it('always throws, and never includes the invalid input string in the thrown message, for arbitrary invalid input', () => {
-    // minLength 24 is deliberate, not arbitrary: every reachable error
-    // message from this call ("Invalid mnemonic", "invalid entropy length",
-    // "Invalid checksum") is at most 23 characters, so a message can never
-    // contain a 24+ character input as a substring — this keeps the
-    // assertion a real leak guard instead of a coincidental short-string
-    // collision (e.g. a 1-character input like " " is trivially "contained"
-    // in "Invalid mnemonic" without anything actually leaking).
+    // minLength 24 is deliberate: every reachable error message here is at most 23
+    // characters, so a message can never contain the input as a substring — that
+    // keeps this a real leak guard, not a short-string collision.
     fc.assert(
       fc.property(fc.string({ minLength: 24, maxLength: 200 }), (input) => {
         let thrown: unknown

@@ -1,4 +1,13 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["typescript", "oxc"]
+  "plugins": [
+    "typescript",
+    "oxc"
+  ],
+  "jsPlugins": [
+    "../../tools/oxlint-plugin-comments/index.js"
+  ],
+  "rules": {
+    "comments/no-long-comments": "error"
+  }
 }

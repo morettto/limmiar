@@ -25,10 +25,9 @@ const NOTAS: Record<string, Nota> = {
   'nota-2': nota('nota-2', 'paciente-2'),
 }
 
-// jsdom has no matchMedia; AdaptivePanel's useBreakpoint hook needs one to mount at all.
-// A fixed "matches: false" (-> sm/disclosure layout) is enough here -- breakpoint-specific
-// rendering is proven by AdaptivePanel's own suite, not here. Same stub as
-// widgets/patient-wallet/PatientWallet.test.tsx.
+// jsdom has no matchMedia and AdaptivePanel's useBreakpoint needs one to mount. A fixed
+// "matches: false" is enough here — breakpoint-specific rendering is proven by AdaptivePanel's own
+// suite. Same stub as PatientWallet.test.tsx.
 function stubMatchMedia() {
   window.matchMedia = vi.fn().mockImplementation((query: string) => ({
     matches: false,

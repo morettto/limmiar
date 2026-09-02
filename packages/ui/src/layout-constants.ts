@@ -1,8 +1,6 @@
 /**
- * Rendered height (px) of AdaptiveNav's M bottom bar. Single source of
- * truth so HeaderAction's `stackAboveMobileNav` offset never silently
- * drifts from AdaptiveNav's actual layout; kept honest by a boundingBox()
- * assertion in AdaptiveNav.spec.tsx (measured with the overflow "Mais"
- * trigger present, which renders 2px taller than a bar with no overflow).
+ * Rendered height (px) of AdaptiveNav's M bottom bar — single source of truth for
+ * HeaderAction's `stackAboveMobileNav` offset, kept honest by a boundingBox()
+ * assertion in AdaptiveNav.spec.tsx (measured with the overflow trigger present).
  */
 export const MOBILE_NAV_HEIGHT_PX = 47

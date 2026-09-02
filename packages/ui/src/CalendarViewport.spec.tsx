@@ -19,11 +19,9 @@ const PT_BR_LABELS: DaySlotLabels = {
   dayPrefix: 'dia',
 }
 
-// busyLabel é horário + nome abreviado (dado, sem palavra traduzível) — fica
-// idêntico nas 4 entradas reais; freeLabel e dayPrefix são rótulo de UI de
-// verdade. pseudo sempre derivado de pt-BR via pseudoLocalize, nunca escrito
-// à mão (inclusive busyLabel — mesmo padrão de HeaderAction, que
-// pseudolocaliza a string inteira mesmo com dado embutido).
+// busyLabel é horário + nome abreviado (dado, sem palavra traduzível), idêntico nas
+// 4 entradas reais; freeLabel e dayPrefix são rótulo de UI. pseudo é sempre derivado
+// de pt-BR via pseudoLocalize, nunca escrito à mão.
 const LABELS: Record<VisualLocale, DaySlotLabels> = {
   'pt-BR': PT_BR_LABELS,
   'es-419': { busyLabel: '15:30 Amelia H.', freeLabel: 'libre', dayPrefix: 'día' },
@@ -36,9 +34,8 @@ const LABELS: Record<VisualLocale, DaySlotLabels> = {
   },
 }
 
-// Inlined as plain DOM elements (not a local component function): Playwright
-// CT's mount() can only resolve custom components that are imported from
-// another module — a component declared in the test file itself fails with
+// Inlined as plain DOM elements: Playwright CT's mount() only resolves components
+// imported from another module — one declared in the test file itself fails with
 // "cannot be mounted... Create a test story instead".
 function daySlots(labels: DaySlotLabels) {
   return WEEK.map((day) => (

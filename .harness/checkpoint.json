@@ -1,11 +1,23 @@
 {
-  "turno_iniciado": "2026-08-28",
+  "turno_iniciado": "2026-08-30",
   "tickets_planejados": [
-    "S08-01",
-    "S08-02"
+    "S10-02",
+    "S08-03",
+    "S08-04",
+    "S08-05",
+    "S08-06",
+    "S08-07"
   ],
   "tickets_concluidos": [
-    "S08-01"
+    "S10-02",
+    "S08-03",
+    "S08-04",
+    "S08-05",
+    "S08-06",
+    "S08-07"
   ],
-  "ticket_atual": "S08-02"
+  "ticket_atual": "",
+  "spec_fechada": "",
+  "branch_da_mr": "",
+  "worktree": "C:/wt-S08 (S08 restante), C:/Users/m0retto/Documents/projects/limmiar-S10-02 (S10/S08-03, ja empurrado)"
 }
