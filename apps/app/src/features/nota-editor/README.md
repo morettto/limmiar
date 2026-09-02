@@ -22,12 +22,15 @@ pelo chamador -- hoje `pages/notas/NotaPage.tsx`).
    `entities/nota/nota.ts`, já testada a 100% na fatia 1) e propaga o resultado via
    `onChange` -- a nota nova (com `revisao` incrementada) só existe de facto se o chamador
    a guardar em algum estado.
-4. Cada âncora de cada frase vira uma `Citacao` (`aoTocar` passado direto). Frase sem
+4. Cada `<textarea>` recebe `readOnly={nota.estado === ESTADO_ASSINADA}` (S08-11) -- nenhuma
+   prop nova, `Nota` já é dona do `estado` desde o S08-06. Ver Decisões, "Leitura apenas
+   depois de assinada".
+5. Cada âncora de cada frase vira uma `Citacao` (`aoTocar` passado direto). Frase sem
    âncoras não mostra nenhuma. `Citacao` (fatia 3) chama `aoTocar(ancora)` em três
    gatilhos: `onClick`, `onMouseEnter` (critério de aceite -- "ao passar o rato") e
    `onFocus` (o mesmo instante tem de tocar para quem navega por `Tab`, já que hover é
    um caminho só de mouse).
-5. Um `onKeyDown` no container raiz do editor chama `ehAtalhoAssinar` (seam de
+6. Um `onKeyDown` no container raiz do editor chama `ehAtalhoAssinar` (seam de
    `features/nota-fila/navegacao-teclado.ts`, reusado aqui -- ver README dessa feature para
    a decisão de aceitar `⌘` OU `Ctrl`); se verdadeiro, chama `aoAssinar(nota)` com a nota
    **atual** (a mesma que está a ser editada, não uma cópia obsoleta) e previne o
@@ -44,6 +47,19 @@ pelo chamador -- hoje `pages/notas/NotaPage.tsx`).
 
 ## Decisões desta fatia
 
+- **Leitura apenas depois de assinada (S08-11): `readOnly`, não `disabled`.** Cada
+  `<textarea>` recebe `readOnly={nota.estado === ESTADO_ASSINADA}` (constante importada de
+  `entities/nota/nota.ts`, dona do `estado`). `disabled` tiraria o campo da ordem de
+  tabulação e do leitor de ecrã -- uma nota assinada continua algo que se lê e se navega,
+  só não se edita. O estilo (`read-only:bg-neutral-100`) sai do variante nativo `read-only:`
+  do Tailwind 4, já instalado -- sem classe condicional em JS. Nenhuma guarda em `onChange`:
+  com `readOnly` o browser nunca emite `input`, uma guarda em JS seria um ramo inalcançável
+  (e sem cobertura possível). **O atalho `⌘↵`/`Ctrl+↵` não é travado aqui** -- `aoTeclar`
+  continua a chamar `aoAssinar(nota)` mesmo com a nota assinada; a guarda vive em
+  `pages/notas/NotaPage.tsx` (`aoAssinar`, funil único de assinatura -- `FilaAssinatura` não
+  chama `aoAssinar` diretamente), porque é aí que se decide o que fazer com uma tentativa de
+  assinar de novo (mensagem de erro), não neste componente controlado que só repassa a nota
+  atual.
 - **`aoTocar` já é real (fatia 3): `criarReprodutor`/`abrirSessaoComoBlob` de
   `features/nota-audio`, ligado pelo chamador.** Este módulo continua sem saber de onde
   vem o áudio -- só garante que o gatilho certo (clique, hover, foco) chama `aoTocar` com

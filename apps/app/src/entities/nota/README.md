@@ -67,6 +67,9 @@ ticket S08-06, `Nota` também é dona do seu `estado` (`EstadoNota`, `ESTADO_PEN
 - `notaParaEntrada(nota: Nota): Uint8Array<ArrayBuffer>` (`nota-crypto.ts`, fatia 5).
 - `assinarNota(baseUrl, accountId, accessToken, noteId, { revisao, signature }): Promise<AssinarNotaResult>`
   (`api.ts`, fatia 5) -- `POST /accounts/{accountId}/notes/{noteId}/signature`, 201.
+- `obterAssinatura(baseUrl: string, accountId: string, accessToken: string, noteId: string): Promise<ObterAssinaturaResult>`
+  (`api.ts`, S08-11) -- `GET /accounts/{accountId}/notes/{noteId}/signature`. Ver "Removido
+  (S08-02), reposto no S08-11" abaixo.
 
 ## Decisões desta fatia
 
@@ -149,11 +152,18 @@ ticket S08-06, `Nota` também é dona do seu `estado` (`EstadoNota`, `ESTADO_PEN
   reagir a 409/falha de rede, marcar a nota como assinada na fila) -- isso é
   `pages/notas/NotaPage.tsx` (fatia 5), ver o README desse módulo.
 
-## Removido (S08-02)
+## Removido (S08-02), reposto no S08-11
 
-- **`obterAssinatura`/`ObterAssinaturaResult`** (`api.ts`) foram apagados: nasceram na
-  fatia 5 do S08-01 sem chamador ("fica pronto para..."), e continuaram sem nenhum até o
-  ticket S08-02 -- reabrir uma nota já assinada é fluxo que ainda não existe em lado
-  nenhum da app. Veredicto herdado do S08-01 (já registado nesse README antes da remoção),
-  não reaberto aqui. `assinarNota` continua -- é o único lado do endpoint com chamador
-  real (`pages/notas/NotaPage.tsx`).
+- **`obterAssinatura`/`ObterAssinaturaResult`** (`api.ts`) foram apagados no S08-02: nasceram
+  na fatia 5 do S08-01 sem chamador ("fica pronto para..."), e continuaram sem nenhum até
+  esse ticket -- reabrir uma nota já assinada era fluxo que ainda não existia em lado nenhum
+  da app. O S08-11 repôs a função **com chamador**: `pages/notas/NotaPage.tsx` pergunta ao
+  servidor no mount se a nota já está assinada, para o editor abrir em leitura apenas sem
+  depender só do estado local (ver README de `pages/notas`). `GET
+  /accounts/{accountId}/notes/{noteId}/signature` -- 404 `notes.signature_not_found` é o caso
+  normal (nota por assinar).
+  - `obterAssinatura(baseUrl: string, accountId: string, accessToken: string, noteId: string): Promise<ObterAssinaturaResult>`
+    -- `ObterAssinaturaResult = { ok: true; noteId: string; revisao: number; signedAt: string } | ProblemResult`.
+    O blob `signature` do body é lido e descartado de propósito: decodificá-lo só serviria a
+    uma verificação client-side que nenhum critério pede e nenhum chamador faz. Molde literal
+    de `assinarNota`, logo acima no mesmo ficheiro.

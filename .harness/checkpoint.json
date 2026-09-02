@@ -7,10 +7,14 @@
     "S08-08"
   ],
   "tickets_concluidos": [
-    "S08-09"
+    "S08-09",
+    "S08-10",
+    "S08-11"
   ],
   "ticket_atual": "",
+  "ticket": "S08-11",
+  "receipt": "C:/Users/m0retto/Documents/obsidian/limmiar/limmiar/Limmiar/Receipts/2026-09-02T1912-S08-11.md",
   "spec_fechada": "",
   "branch_da_mr": "",
-  "worktree": "C:/wt-S08 (S08 restante, branch feat/S08-02-busca-cifrada, local)"
+  "worktree": "C:/wt-S08 (S08 restante, branch feat/S08-11-editor-leitura-apenas, local)"
 }

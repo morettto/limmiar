@@ -105,4 +105,16 @@ describe('EditorSoap', () => {
 
     expect(aoAssinar).not.toHaveBeenCalled()
   })
+
+  it('nota assinada renderiza os textarea em leitura apenas', () => {
+    renderEditor({ nota: { ...NOTA, estado: 'assinada' } })
+
+    expect((screen.getByLabelText('Subjetivo 1') as HTMLTextAreaElement).readOnly).toBe(true)
+  })
+
+  it('nota pendente renderiza os textarea editáveis', () => {
+    renderEditor()
+
+    expect((screen.getByLabelText('Subjetivo 1') as HTMLTextAreaElement).readOnly).toBe(false)
+  })
 })

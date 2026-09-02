@@ -62,7 +62,7 @@ msgstr "Aponte a câmera para o código QR exibido no outro dispositivo."
 msgid "Assinadas"
 msgstr "Assinadas"
 
-#: src/features/nota-editor/EditorSoap.tsx:29
+#: src/features/nota-editor/EditorSoap.tsx:30
 msgid "Avaliação"
 msgstr "Avaliação"
 
@@ -239,12 +239,16 @@ msgstr "Esta frase não será exibida novamente. Guarde-a em um local seguro: el
 msgid "notes.signature_not_found"
 msgstr "Esta nota ainda não foi assinada."
 
+#: src/pages/notas/NotaPage.tsx:85
+msgid "Esta nota já está assinada."
+msgstr "Esta nota já está assinada."
+
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:158
 msgid "notes.already_signed"
 msgstr "Esta nota já foi assinada."
 
-#: src/pages/notas/NotaPage.tsx:112
+#: src/pages/notas/NotaPage.tsx:126
 msgid "Esta nota já tinha sido assinada. As alterações feitas depois não estão cobertas por essa assinatura."
 msgstr "Esta nota já tinha sido assinada. As alterações feitas depois não estão cobertas por essa assinatura."
 
@@ -285,7 +289,7 @@ msgstr "Este prontuário mudou em outro dispositivo. Recarregue e tente de novo.
 msgid "Estes códigos não serão exibidos novamente. Guarde-os em um local seguro: eles são a única forma de recuperar o acesso à sua conta caso você perca o aplicativo autenticador."
 msgstr "Estes códigos não serão exibidos novamente. Guarde-os em um local seguro: eles são a única forma de recuperar o acesso à sua conta caso você perca o aplicativo autenticador."
 
-#: src/pages/notas/NotaPage.tsx:119
+#: src/pages/notas/NotaPage.tsx:133
 msgid "Falha ao assinar a nota. Tente novamente."
 msgstr "Falha ao assinar a nota. Tente novamente."
 
@@ -408,7 +412,7 @@ msgstr "Nenhuma nota encontrada."
 msgid "Nenhuma nota nesta aba."
 msgstr "Nenhuma nota nesta aba."
 
-#: src/pages/notas/NotaPage.tsx:105
+#: src/pages/notas/NotaPage.tsx:119
 msgid "Nota assinada em {dataAssinatura}."
 msgstr "Nota assinada em {dataAssinatura}."
 
@@ -417,7 +421,7 @@ msgstr "Nota assinada em {dataAssinatura}."
 msgid "auth.device_pairing_payload_not_delivered"
 msgstr "O dispositivo principal ainda não liberou o acesso. Aguarde."
 
-#: src/features/nota-editor/EditorSoap.tsx:28
+#: src/features/nota-editor/EditorSoap.tsx:29
 msgid "Objetivo"
 msgstr "Objetivo"
 
@@ -448,7 +452,7 @@ msgstr "Parear novo dispositivo"
 msgid "Pendentes"
 msgstr "Pendentes"
 
-#: src/features/nota-editor/EditorSoap.tsx:30
+#: src/features/nota-editor/EditorSoap.tsx:31
 msgid "Plano"
 msgstr "Plano"
 
@@ -498,7 +502,7 @@ msgstr "Salvar"
 msgid "Selecione uma nota na fila."
 msgstr "Selecione uma nota na fila."
 
-#: src/pages/notas/NotaPage.tsx:75
+#: src/pages/notas/NotaPage.tsx:89
 msgid "Sem sessão ativa. Não é possível assinar."
 msgstr "Sem sessão ativa. Não é possível assinar."
 
@@ -546,7 +550,7 @@ msgstr "Sua sessão expirou. Entre novamente."
 msgid "auth.totp_ticket_invalid"
 msgstr "Sua verificação em duas etapas expirou. Entre novamente."
 
-#: src/features/nota-editor/EditorSoap.tsx:27
+#: src/features/nota-editor/EditorSoap.tsx:28
 msgid "Subjetivo"
 msgstr "Subjetivo"
 
