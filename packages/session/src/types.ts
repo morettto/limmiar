@@ -17,7 +17,7 @@ export interface SessaoContexto {
 }
 
 export type SessaoEvento =
-  | { type: 'CONSENTIMENTO_CONCEDIDO' }
+  | { type: 'CONSENTIMENTO_CONCEDIDO'; concedidoEm: string } // instante do servidor, não o relógio local
   | { type: 'ENCERRAR' }
   | { type: 'MODELO_PRONTO' }
   | { type: 'REDE_CAIU' }

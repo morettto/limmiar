@@ -75,10 +75,6 @@ msgstr "Database non disponibile al momento."
 msgid "Bem-vindo ao Limmiar"
 msgstr "Benvenuto/a su Limmiar"
 
-#: src/widgets/biblioteca/BibliotecaNotas.tsx:37
-msgid "Buscar notas"
-msgstr "Cerca note"
-
 #: src/features/copilot-byok/CopilotKeySetup.tsx:57
 msgid "Cadastrar chave de API de IA"
 msgstr "Registra chiave API di IA"
@@ -141,7 +137,7 @@ msgstr "Come userai Limmiar?"
 msgid "Concluindo o pareamento..."
 msgstr "Completamento dell'abbinamento..."
 
-#: src/app/routing/router.tsx:33
+#: src/app/routing/router.tsx:35
 msgid "Configurar copiloto de IA"
 msgstr "Configura copilota IA"
 
@@ -233,6 +229,16 @@ msgstr "Questo account non è in attesa di revisione."
 #: src/features/recovery/RecoveryPhraseSetup.tsx:83
 msgid "Esta frase não será exibida novamente. Guarde-a em um local seguro: ela é a única forma de recuperar o acesso à sua conta caso você perca todos os seus dispositivos."
 msgstr "Questa frase non verrà mostrata di nuovo. Conservala in un luogo sicuro: è l'unico modo per recuperare l'accesso al tuo account se perdi tutti i tuoi dispositivi."
+
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:165
+msgid "notes.signature_not_found"
+msgstr "Questa nota non è ancora stata firmata."
+
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:161
+msgid "notes.already_signed"
+msgstr "Questa nota è già stata firmata."
 
 #: src/pages/notas/NotaPage.tsx:112
 msgid "Esta nota já tinha sido assinada. As alterações feitas depois não estão cobertas por essa assinatura."
@@ -372,10 +378,6 @@ msgstr "Impossibile decifrare la chiave ricevuta. Prova ad abbinare di nuovo."
 msgid "Não foi possível ler"
 msgstr "Impossibile leggere"
 
-#: src/pages/biblioteca/BibliotecaPage.tsx:66
-msgid "Não foi possível preparar a busca. Tente novamente."
-msgstr "Impossibile preparare la ricerca. Riprova."
-
 #: src/features/copilot-byok/CopilotKeySetup.tsx:61
 msgid "Não foi possível salvar a chave. Tente novamente."
 msgstr "Impossibile salvare la chiave. Riprova."
@@ -389,10 +391,6 @@ msgstr "Non c'è nessuna configurazione di verifica in due passaggi in sospeso p
 #: src/shared/api/problem-messages.ts:157
 msgid "voice.enrollment_not_found"
 msgstr "Nessuna registrazione vocale trovata per questo account."
-
-#: src/widgets/biblioteca/BibliotecaNotas.tsx:53
-msgid "Nenhuma nota encontrada."
-msgstr "Nessuna nota trovata."
 
 #: src/features/nota-fila/FilaAssinatura.tsx:108
 msgid "Nenhuma nota nesta aba."
@@ -417,7 +415,7 @@ msgid "unexpected_error"
 msgstr "Si è verificato un errore imprevisto sul server."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:165
+#: src/shared/api/problem-messages.ts:181
 msgid "errors.generic"
 msgstr "Si è verificato un errore imprevisto. Riprova."
 
@@ -441,10 +439,6 @@ msgstr "In attesa"
 #: src/features/nota-editor/EditorSoap.tsx:30
 msgid "Plano"
 msgstr "Piano"
-
-#: src/widgets/biblioteca/BibliotecaNotas.tsx:48
-msgid "Preparando a busca..."
-msgstr "Preparazione della ricerca in corso..."
 
 #: src/features/totp-enrollment/TotpSetup.tsx:78
 msgid "Preparando a verificação em duas etapas..."
@@ -503,9 +497,19 @@ msgid "agenda.not_authorized_to_schedule"
 msgstr "Il tuo account non può ancora programmare sessioni."
 
 #. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:169
+msgid "notes.not_authorized_to_sign"
+msgstr "Il tuo account non può ancora firmare note."
+
+#. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:129
 msgid "patients.not_authorized_to_create_records"
 msgstr "Il tuo account non può ancora creare cartelle."
+
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:173
+msgid "consent.not_authorized_to_record"
+msgstr "Il tuo account non può ancora registrare il consenso."
 
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:98

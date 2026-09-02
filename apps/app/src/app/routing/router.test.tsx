@@ -4,6 +4,7 @@ import { RouterProvider } from '@tanstack/react-router'
 import { I18nProvider } from '@lingui/react'
 import { i18n, dynamicActivate } from '../../shared/i18n'
 import { encodeBase64 } from '../../shared/lib/base64'
+import type { MicrofoneAutorizado } from '../../features/live-session/microfone'
 
 vi.mock('../../widgets/auth-screen/AuthScreen', () => ({ AuthScreen: vi.fn(() => <div data-testid="auth-screen" />) }))
 vi.mock('../../features/magic-link-auth/MagicLinkCallback', () => ({
@@ -29,6 +30,9 @@ vi.mock('../../widgets/soap-editor/FilaEEditor', () => ({
 }))
 vi.mock('../../pages/biblioteca/BibliotecaPage', () => ({
   BibliotecaPage: vi.fn(() => <div data-testid="biblioteca-page" />),
+}))
+vi.mock('../../features/live-session/microfone', () => ({
+  abrirMicrofone: vi.fn(),
 }))
 
 // Route construction (createRoute/createRouter/routeTree, including the env-gated E2E
@@ -373,5 +377,63 @@ describe('router', () => {
     const kek = new Uint8Array([9, 9, 9])
     props.onKekAdopted(kek)
     expect(e2eKekAdopted).toHaveBeenCalledWith(encodeBase64(kek))
+  })
+
+  it('resolves /e2e/microfone (E2E-only): forwards a valid consentimento to abrirMicrofone and shows an alert on refusal', async () => {
+    const { abrirMicrofone } = await import('../../features/live-session/microfone')
+    vi.mocked(abrirMicrofone).mockResolvedValue({ ok: false, motivo: 'consentimento-ausente' })
+
+    const router = await loadRouterAt('/e2e/microfone?consentimento=revogado', true)
+    render(<RouterProvider router={router} />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Gravar' }))
+
+    expect(abrirMicrofone).toHaveBeenCalledWith('revogado')
+    expect((await screen.findByRole('alert')).textContent).toContain('consentimento-ausente')
+    expect(screen.queryByRole('status')).toBeNull()
+  })
+
+  it('/e2e/microfone falls back to "pendente" when consentimento is absent from the query string', async () => {
+    const { abrirMicrofone } = await import('../../features/live-session/microfone')
+    vi.mocked(abrirMicrofone).mockResolvedValue({ ok: false, motivo: 'consentimento-ausente' })
+
+    const router = await loadRouterAt('/e2e/microfone', true)
+    render(<RouterProvider router={router} />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Gravar' }))
+
+    expect(abrirMicrofone).toHaveBeenCalledWith('pendente')
+    await screen.findByRole('alert')
+  })
+
+  it('/e2e/microfone falls back to "pendente" when consentimento is not one of the three known states', async () => {
+    const { abrirMicrofone } = await import('../../features/live-session/microfone')
+    vi.mocked(abrirMicrofone).mockResolvedValue({ ok: false, motivo: 'consentimento-ausente' })
+
+    const router = await loadRouterAt('/e2e/microfone?consentimento=bogus', true)
+    render(<RouterProvider router={router} />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Gravar' }))
+
+    expect(abrirMicrofone).toHaveBeenCalledWith('pendente')
+    await screen.findByRole('alert')
+  })
+
+  it('/e2e/microfone shows a status when abrirMicrofone succeeds', async () => {
+    const { abrirMicrofone } = await import('../../features/live-session/microfone')
+    vi.mocked(abrirMicrofone).mockResolvedValue({
+      ok: true,
+      // A porta está mockada aqui, logo ninguém a atravessa para receber a marca nominal:
+      // o cast é do duplo, não de código de produção.
+      microfone: { stream: {} as MediaStream } as MicrofoneAutorizado,
+    })
+
+    const router = await loadRouterAt('/e2e/microfone?consentimento=concedido', true)
+    render(<RouterProvider router={router} />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Gravar' }))
+
+    expect((await screen.findByRole('status')).textContent).toContain('microfone aberto')
+    expect(screen.queryByRole('alert')).toBeNull()
   })
 })

@@ -28,9 +28,10 @@ decisão.
       `notaParaEntrada(nota)`, **antes** de assinar.
    d. Sela a assinatura (`selarAssinatura`) e chama `assinarNota`.
    e. Marca **só o item com `nota.id`** (não a fila inteira) como assinado, e anuncia o
-      desfecho: sucesso (`role="status"`, data da assinatura), 409 `notes.already_signed`
-      (`role="alert"`, mas marca assinada também -- o servidor é a verdade), ou falha de
-      rede (`role="alert"`, item continua pendente).
+      desfecho, um de três: sucesso (`role="status"`, data da assinatura, marca assinada);
+      409 `notes.already_signed` (`role="alert"`, mas marca assinada também -- o servidor é
+      a verdade); ou qualquer outro `ProblemResult`/falha de rede (`role="alert"`, item
+      continua pendente -- ver decisão abaixo).
    f. Foca de volta a listbox da fila, para o `j`/`k` seguinte continuar dali.
 3. `onChangeNota`/`aoTocar` continuam simples repasses para estado local / o reprodutor
    real (`features/nota-audio`, fatia 3) -- nenhuma mudança nesta fatia.
@@ -121,10 +122,20 @@ decisão.
   `selarAssinatura`/`assinarNota`/`marcarAssinada`. Antes desta correção o `Result` era
   descartado (`await appendPatientEntry(...)` sem checar `.ok`), e um conflito seguia o
   mesmo caminho de um sucesso até `marcarAssinada` -- partindo o invariante "grava antes de
-  assinar" que a decisão acima declara. O resultado de `assinarNota` != `ok` continua com
-  uma única exceção tratada (`notes.already_signed`, ver acima); qualquer outro
-  `ProblemResult` de `assinarNota` cai no `catch` genérico (mesmo teto de sempre: só um
-  escritor por nota nesta fatia).
+  assinar" que a decisão acima declara.
+- **O resultado de `assinarNota` != `ok` tem três desfechos, não dois (ronda 2 de
+  correção, S08-03).** `marcarAssinada` só corre se `resultado.ok` for verdadeiro, ou se
+  `resultado.code === 'notes.already_signed'` -- essa é a única exceção, porque aí o
+  servidor é a verdade: a nota já estava assinada antes desta chamada, então marcar
+  "assinada" no cliente só está a alinhar com um facto que já existe no backend. Qualquer
+  outro `ProblemResult` (ex.: `auth.access_token_invalid`, token a expirar entre gravar e
+  assinar) cai no terceiro ramo: `translateProblemCode(resultado.code, resultado.params,
+  i18n)` em `role="alert"`, **sem** marcar assinada -- porque, ao contrário do 409, aqui o
+  servidor não guardou assinatura nenhuma, e marcar assinada mandaria a nota para
+  "Assinadas" sem existir um único byte de assinatura do outro lado, sem caminho de volta
+  para "Pendentes". Um `catch` genérico continua a cobrir só falha de rede/exceção lançada
+  antes de `assinarNota` devolver um `Result` (mesmo teto de sempre: só um escritor por
+  nota nesta fatia).
 - **Foco de volta à listbox via `document.querySelector('[role="listbox"]')`, não
   `forwardRef`.** É a única instância desse role na página; encadear `forwardRef` por
   `FilaEEditor` → `FilaAssinatura` só para devolver o foco seria mais código para o mesmo
