@@ -4,10 +4,11 @@ import type { CryptoKey } from '@limmiar/crypto'
 import type MiniSearch from 'minisearch'
 import type { Nota } from '../../entities/nota/nota'
 import { agruparPorPaciente } from '../../features/nota-biblioteca/biblioteca'
-import { buscar, construirIndice, notaParaDoc, type DocNota } from '../../features/nota-biblioteca/indice'
+import { buscar, construirIndice, impressaoDigital, notaParaDoc, type DocNota } from '../../features/nota-biblioteca/indice'
 import {
   persistirIndice,
   restaurarIndice,
+  type ApagarSelado,
   type GravarSelado,
   type LerSelado,
 } from '../../features/nota-biblioteca/indice-store'
@@ -17,7 +18,7 @@ export interface BibliotecaPageProps {
   notas: readonly Nota[]
   accountId: string
   dek: CryptoKey | null
-  store: { ler: LerSelado; gravar: GravarSelado }
+  store: { ler: LerSelado; gravar: GravarSelado; apagar: ApagarSelado }
 }
 
 /**
@@ -42,14 +43,15 @@ export function BibliotecaPage({ notas, accountId, dek, store }: BibliotecaPageP
     let cancelado = false
 
     async function preparar(dekAtual: CryptoKey) {
-      const restaurado = await restaurarIndice(store.ler, dekAtual, accountId)
+      const impressao = impressaoDigital(notas)
+      const restaurado = await restaurarIndice(store, dekAtual, accountId, impressao)
       if (cancelado) return
       if (restaurado) {
         setIndice(restaurado)
         return
       }
       const construido = construirIndice(notas.map(notaParaDoc))
-      await persistirIndice(store.gravar, dekAtual, accountId, construido)
+      await persistirIndice(store.gravar, dekAtual, accountId, construido, impressao)
       if (cancelado) return
       setIndice(construido)
     }

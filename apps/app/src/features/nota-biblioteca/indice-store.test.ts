@@ -1,10 +1,11 @@
 import { webcrypto as limmiarWebcrypto } from '@limmiar/crypto'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { FakeDirectoryHandle } from '../../test-support/fake-opfs'
 import { construirIndice } from './indice'
 import { opfsIndice, persistirIndice, restaurarIndice } from './indice-store'
 
 const ACCOUNT_ID = '11111111-1111-1111-1111-111111111111'
+const IMPRESSAO = '1:0|2:0'
 
 async function makeDek(): Promise<CryptoKey> {
   const kek = await limmiarWebcrypto.importKek(crypto.getRandomValues(new Uint8Array(32)))
@@ -18,15 +19,31 @@ function toHex(bytes: Uint8Array): string {
     .join('')
 }
 
-describe('restaurarIndice', () => {
-  it('devolve null quando o ficheiro ainda não existe', async () => {
+describe('opfsIndice', () => {
+  it('apagar remove o ficheiro selado do diretório', async () => {
     const dek = await makeDek()
     const dir = new FakeDirectoryHandle()
-    const { ler } = opfsIndice(dir as unknown as FileSystemDirectoryHandle)
+    const { gravar, apagar, ler } = opfsIndice(dir as unknown as FileSystemDirectoryHandle)
+    const indice = construirIndice([{ id: '1', patientId: 'p1', texto: 'febre' }])
+    await persistirIndice(gravar, dek, ACCOUNT_ID, indice, IMPRESSAO)
 
-    const indice = await restaurarIndice(ler, dek, ACCOUNT_ID)
+    await apagar()
+
+    expect(await ler()).toBeNull()
+  })
+})
+
+describe('restaurarIndice', () => {
+  it('devolve null quando o ficheiro ainda não existe, sem chamar apagar', async () => {
+    const dek = await makeDek()
+    const dir = new FakeDirectoryHandle()
+    const { ler, apagar } = opfsIndice(dir as unknown as FileSystemDirectoryHandle)
+    const apagarEspiado = vi.fn(apagar)
+
+    const indice = await restaurarIndice({ ler, apagar: apagarEspiado }, dek, ACCOUNT_ID, IMPRESSAO)
 
     expect(indice).toBeNull()
+    expect(apagarEspiado).not.toHaveBeenCalled()
   })
 
   // Só NotFoundError vira null (ficheiro ausente é o único caso "normal"); qualquer outro
@@ -38,9 +55,48 @@ describe('restaurarIndice', () => {
         throw new DOMException('sem permissão', 'NotAllowedError')
       },
     } as unknown as FileSystemDirectoryHandle
-    const { ler } = opfsIndice(dirComErro)
+    const { ler, apagar } = opfsIndice(dirComErro)
 
-    await expect(restaurarIndice(ler, dek, ACCOUNT_ID)).rejects.toThrow('sem permissão')
+    await expect(restaurarIndice({ ler, apagar }, dek, ACCOUNT_ID, IMPRESSAO)).rejects.toThrow('sem permissão')
+  })
+
+  // O vermelho do ticket: persistir com duas notas, mudar a revisão de uma, restaurar tem
+  // de devolver null -- e o blob obsoleto é apagado, não só ignorado (critério de aceite 3).
+  it('devolve null e apaga o blob quando a impressão não bate (revisão de uma nota mudou)', async () => {
+    const dek = await makeDek()
+    const dir = new FakeDirectoryHandle()
+    const { ler, gravar, apagar } = opfsIndice(dir as unknown as FileSystemDirectoryHandle)
+    const indice = construirIndice([
+      { id: '1', patientId: 'p1', texto: 'febre alta' },
+      { id: '2', patientId: 'p2', texto: 'dor de cabeça' },
+    ])
+    await persistirIndice(gravar, dek, ACCOUNT_ID, indice, '1:0|2:0')
+    const apagarEspiado = vi.fn(apagar)
+
+    const restaurado = await restaurarIndice({ ler, apagar: apagarEspiado }, dek, ACCOUNT_ID, '1:1|2:0')
+
+    expect(restaurado).toBeNull()
+    expect(apagarEspiado).toHaveBeenCalledTimes(1)
+    expect(await ler()).toBeNull()
+  })
+
+  // Achado da review, ronda 2: uma rejeição de `apagar` (OPFS negada/cheia/corrompida) não
+  // pode propagar -- `restaurarIndice` já está no caminho de recuperação do índice obsoleto,
+  // e o `gravar` seguinte de `persistirIndice` sobrescreve o blob de qualquer forma.
+  it('devolve null mesmo quando apagar rejeita (índice obsoleto, OPFS falha ao remover)', async () => {
+    const dek = await makeDek()
+    const dir = new FakeDirectoryHandle()
+    const { ler, gravar } = opfsIndice(dir as unknown as FileSystemDirectoryHandle)
+    const indice = construirIndice([{ id: '1', patientId: 'p1', texto: 'febre' }])
+    await persistirIndice(gravar, dek, ACCOUNT_ID, indice, '1:0')
+    const apagarQueRejeita = vi.fn(async () => {
+      throw new Error('sem permissão para remover')
+    })
+
+    const restaurado = await restaurarIndice({ ler, apagar: apagarQueRejeita }, dek, ACCOUNT_ID, '1:1')
+
+    expect(restaurado).toBeNull()
+    expect(apagarQueRejeita).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -48,14 +104,14 @@ describe('persistirIndice / restaurarIndice', () => {
   it('restaura um índice que acha o mesmo que o original', async () => {
     const dek = await makeDek()
     const dir = new FakeDirectoryHandle()
-    const { ler, gravar } = opfsIndice(dir as unknown as FileSystemDirectoryHandle)
+    const { ler, gravar, apagar } = opfsIndice(dir as unknown as FileSystemDirectoryHandle)
     const indiceOriginal = construirIndice([
       { id: '1', patientId: 'p1', texto: 'febre alta e tosse' },
       { id: '2', patientId: 'p2', texto: 'dor de cabeça' },
     ])
 
-    await persistirIndice(gravar, dek, ACCOUNT_ID, indiceOriginal)
-    const indiceRestaurado = await restaurarIndice(ler, dek, ACCOUNT_ID)
+    await persistirIndice(gravar, dek, ACCOUNT_ID, indiceOriginal, IMPRESSAO)
+    const indiceRestaurado = await restaurarIndice({ ler, apagar }, dek, ACCOUNT_ID, IMPRESSAO)
 
     expect(indiceRestaurado).not.toBeNull()
     expect(indiceRestaurado!.search('febre').map((r) => r.id)).toEqual(['1'])
@@ -71,7 +127,7 @@ describe('persistirIndice / restaurarIndice', () => {
     }
     const indice = construirIndice([{ id: '1', patientId: 'p1', texto: 'diagnostico-super-especifico' }])
 
-    await persistirIndice(gravar, dek, ACCOUNT_ID, indice)
+    await persistirIndice(gravar, dek, ACCOUNT_ID, indice, IMPRESSAO)
 
     expect(capturado).toBeDefined()
     const termoEmBytes = new TextEncoder().encode('diagnostico-super-especifico')
@@ -81,11 +137,11 @@ describe('persistirIndice / restaurarIndice', () => {
   it('rejeita restaurar sob um accountId diferente do usado para persistir', async () => {
     const dek = await makeDek()
     const dir = new FakeDirectoryHandle()
-    const { ler, gravar } = opfsIndice(dir as unknown as FileSystemDirectoryHandle)
+    const { ler, gravar, apagar } = opfsIndice(dir as unknown as FileSystemDirectoryHandle)
     const indice = construirIndice([{ id: '1', patientId: 'p1', texto: 'febre' }])
 
-    await persistirIndice(gravar, dek, ACCOUNT_ID, indice)
+    await persistirIndice(gravar, dek, ACCOUNT_ID, indice, IMPRESSAO)
 
-    await expect(restaurarIndice(ler, dek, 'outra-conta')).rejects.toThrow()
+    await expect(restaurarIndice({ ler, apagar }, dek, 'outra-conta', IMPRESSAO)).rejects.toThrow()
   })
 })

@@ -12,13 +12,23 @@ página já calculou.
 ## Fluxo principal
 
 1. No mount (e sempre que `dek`/`accountId`/`store`/`notas` mudarem), se `dek !== null`:
-   a. `restaurarIndice(store.ler, dek, accountId)` -- tenta abrir um índice já persistido.
-   b. Se achou (`restaurado !== null`), usa-o direto -- **não** grava de novo.
-   c. Se não achou (primeira vez, ou OPFS limpa), constrói um novo a partir de `notas`
-      (`notaParaDoc` + `construirIndice`) e persiste (`persistirIndice`, que sela sob a
-      DEK antes de gravar).
-   d. Guarda o resultado em estado (`indice`).
-   e. Se qualquer um dos passos acima rejeitar (OPFS negada/corrompida, DEK ou AAD errada
+   a. Calcula `impressao = impressaoDigital(notas)` (ticket S08-09) -- resume que notas (e
+      que revisão de cada uma) as `notas` atuais cobrem.
+   b. `restaurarIndice(store, dek, accountId, impressao)` -- tenta abrir um índice já
+      persistido *e* que ainda cubra exatamente essas notas. Um blob de uma impressão
+      diferente (nota nova/editada/apagada desde a última gravação) não é adotado: `null`,
+      e o blob obsoleto já foi apagado por `restaurarIndice` (ver
+      `features/nota-biblioteca/README.md`, "blob obsoleto é apagado, não só ignorado"). Se
+      esse `apagar` falhar (OPFS negada/cheia), `restaurarIndice` engole a rejeição e devolve
+      `null` na mesma -- esta página nunca vê esse erro; o passo seguinte (d) sobrescreve o
+      mesmo ficheiro de qualquer forma.
+   c. Se achou (`restaurado !== null`), usa-o direto -- **não** grava de novo.
+   d. Se não achou (primeira vez, OPFS limpa, ou impressão obsoleta), constrói um novo a
+      partir de `notas` (`notaParaDoc` + `construirIndice`) e persiste
+      (`persistirIndice(store.gravar, ...)`, que embrulha a mesma `impressao` no envelope
+      antes de selar).
+   e. Guarda o resultado em estado (`indice`).
+   f. Se qualquer um dos passos acima rejeitar (OPFS negada/corrompida, DEK ou AAD errada
       em `abrirIndice`), a página cai num estado `erro` local e para de delegar a
       `BibliotecaNotas` -- renderiza o próprio `role="alert"` no lugar do widget, para não
       ficar presa em "Preparando a busca..." para sempre sem sinal ao utilizador. Mesmo
@@ -47,9 +57,10 @@ página já calculou.
 
 - `BibliotecaPage({ notas, accountId, dek, store })` -- componente React. `notas`
   (`readonly Nota[]`, `entities/nota/nota`) é a fila de assinatura inteira -- a mesma
-  coleção alimenta tanto `agruparPorPaciente` quanto a construção do índice de busca;
-  `store` é `{ ler: LerSelado; gravar: GravarSelado }` (tipicamente `opfsIndice(dir)`,
-  `features/nota-biblioteca/indice-store.ts`). Até ao ticket S08-06, `itens` (`ItemFila[]`)
+  coleção alimenta `agruparPorPaciente`, a construção do índice de busca **e**
+  `impressaoDigital(notas)` (ticket S08-09); `store` é
+  `{ ler: LerSelado; gravar: GravarSelado; apagar: ApagarSelado }` (tipicamente
+  `opfsIndice(dir)`, `features/nota-biblioteca/indice-store.ts`). Até ao ticket S08-06, `itens` (`ItemFila[]`)
   e `notas` eram duas props/coleções separadas casadas à mão por `id` -- fundidas numa só
   (ver `[[S08-06 Fundir ItemFila em Nota e eliminar as listas paralelas]]`).
   **`store` (e `notas`) têm de chegar estáveis por identidade entre renders** -- os dois
@@ -86,6 +97,10 @@ página já calculou.
 - **Sem `useMemo` em `agruparPorPaciente(itens)`/`buscar(indice, termo)`.** As duas são
   baratas (uma fila de assinatura, não uma tabela grande) e recalculam a cada render de
   qualquer forma -- sem sinal medido de que isso seja um problema real nesta fatia.
+- **`impressao` calculada dentro de `preparar`, não em `useMemo`/dependência própria
+  (ticket S08-09).** `impressaoDigital(notas)` é O(n log n) e já roda a cada disparo do
+  efeito, que já depende de `notas` -- mesma razão do "sem `useMemo`" abaixo, um valor a
+  mais na dependency array do `useEffect` só duplicaria o que `notas` já expressa.
 - **`preparar(dek).catch(...)` para um estado `erro` local, não um `ResultadoBusca` novo.**
   A rejeição de `restaurarIndice`/`persistirIndice` (OPFS negada/corrompida, DEK ou AAD
   errada) não é "sem resultado" nem "a preparar" -- são estados de `ResultadoBusca` que
@@ -104,3 +119,10 @@ página já calculou.
 - Reindexar automaticamente quando uma nota é assinada/editada fora desta página (ex.: via
   `NotaPage`) -- este componente só constrói/restaura o índice no seu próprio ciclo de
   vida; sincronizar as duas telas é trabalho futuro, fora deste ticket.
+- Apagar o blob no logout ou na troca de conta como evento explícito (terceiro critério de
+  aceite do ticket S08-09) -- não há hoje um hook de logout/troca de conta real chamando
+  esta página (ver "Sessão/Keychain real", acima); a via coberta nesta fatia é indireta,
+  via `impressaoDigital`: reabrir com `notas` diferentes das que o blob cobre já dispara
+  `store.apagar()` dentro de `restaurarIndice`. Um logout/troca de conta que chame
+  `store.apagar()` diretamente (sem depender de `notas` terem mudado) fica para quando a
+  sessão real existir.

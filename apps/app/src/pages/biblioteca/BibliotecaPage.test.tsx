@@ -4,7 +4,7 @@ import { I18nProvider } from '@lingui/react'
 import { webcrypto as limmiarWebcrypto, type CryptoKey } from '@limmiar/crypto'
 import { dynamicActivate, i18n } from '../../shared/i18n'
 import type { Nota } from '../../entities/nota/nota'
-import { construirIndice, notaParaDoc, serializarIndice } from '../../features/nota-biblioteca/indice'
+import { construirIndice, impressaoDigital, notaParaDoc, serializarIndice } from '../../features/nota-biblioteca/indice'
 import { selarIndice } from '../../features/nota-biblioteca/indice-crypto'
 import { BibliotecaPage, type BibliotecaPageProps } from './BibliotecaPage'
 
@@ -43,7 +43,11 @@ function nota(): Nota {
 async function renderEObterProps(overrides: Partial<BibliotecaPageProps> = {}) {
   const { BibliotecaNotas } = await import('../../widgets/biblioteca/BibliotecaNotas')
   const dek = 'dek' in overrides ? (overrides.dek as CryptoKey | null) : await makeDek()
-  const store = overrides.store ?? { ler: vi.fn().mockResolvedValue(null), gravar: vi.fn().mockResolvedValue(undefined) }
+  const store = overrides.store ?? {
+    ler: vi.fn().mockResolvedValue(null),
+    gravar: vi.fn().mockResolvedValue(undefined),
+    apagar: vi.fn().mockResolvedValue(undefined),
+  }
   const utils = render(
     <I18nProvider i18n={i18n}>
       <BibliotecaPage
@@ -107,7 +111,7 @@ describe('BibliotecaPage', () => {
 
   it('store vazio (ler devolve null): constrói o índice a partir de notas e grava exatamente uma vez', async () => {
     const gravar = vi.fn().mockResolvedValue(undefined)
-    const store = { ler: vi.fn().mockResolvedValue(null), gravar }
+    const store = { ler: vi.fn().mockResolvedValue(null), gravar, apagar: vi.fn() }
     const { props } = await renderEObterProps({ store })
 
     await waitFor(() => expect(props().resultado.estado).not.toBe('a-preparar'))
@@ -117,22 +121,47 @@ describe('BibliotecaPage', () => {
 
   it('store já com blob selado: restaura o índice e não grava de novo', async () => {
     const dek = await makeDek()
-    const indice = construirIndice([nota()].map(notaParaDoc))
-    const selado = await selarIndice(dek, ACCOUNT_ID, serializarIndice(indice))
+    const notaAtual = nota()
+    const indice = construirIndice([notaAtual].map(notaParaDoc))
+    const selado = await selarIndice(dek, ACCOUNT_ID, serializarIndice(indice, impressaoDigital([notaAtual])))
     const ler = vi.fn().mockResolvedValue(selado)
     const gravar = vi.fn()
-    const store = { ler, gravar }
-    const { props } = await renderEObterProps({ dek, store })
+    const apagar = vi.fn()
+    const store = { ler, gravar, apagar }
+    const { props } = await renderEObterProps({ dek, notas: [notaAtual], store })
 
     await waitFor(() => expect(props().resultado.estado).not.toBe('a-preparar'))
 
     expect(gravar).not.toHaveBeenCalled()
+    expect(apagar).not.toHaveBeenCalled()
+  })
+
+  // Ponte do critério de aceite 2/3 do ticket S08-09: a página passa a impressão digital das
+  // notas atuais a `restaurarIndice`; um blob selado sob uma impressão antiga (revisão mudou
+  // desde a última gravação) é obsoleto -- apaga e reconstrói, não adota o índice desatualizado.
+  it('impressão do blob restaurado não bate com as notas atuais: apaga, reconstrói e grava de novo', async () => {
+    const dek = await makeDek()
+    const notaAntiga = nota()
+    const indiceAntigo = construirIndice([notaAntiga].map(notaParaDoc))
+    const selado = await selarIndice(dek, ACCOUNT_ID, serializarIndice(indiceAntigo, impressaoDigital([notaAntiga])))
+    const notaAtual = { ...notaAntiga, revisao: notaAntiga.revisao + 1 }
+    const ler = vi.fn().mockResolvedValue(selado)
+    const gravar = vi.fn().mockResolvedValue(undefined)
+    const apagar = vi.fn().mockResolvedValue(undefined)
+    const store = { ler, gravar, apagar }
+    const { props } = await renderEObterProps({ dek, notas: [notaAtual], store })
+
+    await waitFor(() => expect(props().resultado.estado).not.toBe('a-preparar'))
+
+    expect(apagar).toHaveBeenCalledTimes(1)
+    expect(gravar).toHaveBeenCalledTimes(1)
   })
 
   it('dek === null: o resultado fica em a-preparar, sem tocar em ler/gravar', async () => {
     const ler = vi.fn()
     const gravar = vi.fn()
-    const { props } = await renderEObterProps({ dek: null, store: { ler, gravar } })
+    const apagar = vi.fn()
+    const { props } = await renderEObterProps({ dek: null, store: { ler, gravar, apagar } })
 
     expect(props().resultado.estado).toBe('a-preparar')
     expect(ler).not.toHaveBeenCalled()
@@ -142,7 +171,7 @@ describe('BibliotecaPage', () => {
   it('desmontar antes de restaurarIndice resolver não chega a construir/gravar', async () => {
     const lerCall = deferred<Uint8Array<ArrayBuffer> | null>()
     const gravar = vi.fn()
-    const store = { ler: vi.fn().mockReturnValue(lerCall.promise), gravar }
+    const store = { ler: vi.fn().mockReturnValue(lerCall.promise), gravar, apagar: vi.fn() }
     const { unmount } = await renderEObterProps({ store })
 
     unmount()
@@ -157,7 +186,7 @@ describe('BibliotecaPage', () => {
     const { BibliotecaNotas } = await import('../../widgets/biblioteca/BibliotecaNotas')
     const gravarCall = deferred<void>()
     const gravar = vi.fn().mockReturnValue(gravarCall.promise)
-    const store = { ler: vi.fn().mockResolvedValue(null), gravar }
+    const store = { ler: vi.fn().mockResolvedValue(null), gravar, apagar: vi.fn() }
     const { unmount } = await renderEObterProps({ store })
 
     await waitFor(() => expect(gravar).toHaveBeenCalledTimes(1))
@@ -174,7 +203,8 @@ describe('BibliotecaPage', () => {
   it('restaurarIndice rejeita (OPFS negado/corrompido, DEK ou AAD errada): mostra alerta e para de delegar ao widget', async () => {
     const ler = vi.fn().mockRejectedValue(new Error('OPFS negado'))
     const gravar = vi.fn()
-    const { props } = await renderEObterProps({ store: { ler, gravar } })
+    const apagar = vi.fn()
+    const { props } = await renderEObterProps({ store: { ler, gravar, apagar } })
 
     // Antes do erro, a página ainda delega ao widget (que mostraria "Preparando a busca...").
     expect(props().resultado.estado).toBe('a-preparar')
@@ -189,7 +219,7 @@ describe('BibliotecaPage', () => {
   it('desmontar antes de restaurarIndice rejeitar não atualiza o estado de erro', async () => {
     const lerCall = deferred<Uint8Array<ArrayBuffer> | null>()
     const gravar = vi.fn()
-    const store = { ler: vi.fn().mockReturnValue(lerCall.promise), gravar }
+    const store = { ler: vi.fn().mockReturnValue(lerCall.promise), gravar, apagar: vi.fn() }
     const { unmount } = await renderEObterProps({ store })
 
     unmount()

@@ -5,6 +5,7 @@ import { abrirIndice, selarIndice } from './indice-crypto'
 
 export type LerSelado = () => Promise<Uint8Array<ArrayBuffer> | null>
 export type GravarSelado = (selado: Uint8Array<ArrayBuffer>) => Promise<void>
+export type ApagarSelado = () => Promise<void>
 
 // Um único ficheiro por diretório (o índice de busca é um blob por conta, não um chunk por
 // seq como live-session/chunk-store.ts) -- o chamador escolhe o `dir` já escopado à conta.
@@ -16,7 +17,9 @@ const ARQUIVO_INDICE = 'indice-busca'
  * plaintext, só com o blob já selado (`selarIndice`/`abrirIndice` ficam em `persistirIndice`/
  * `restaurarIndice`, abaixo).
  */
-export function opfsIndice(dir: FileSystemDirectoryHandle): { ler: LerSelado; gravar: GravarSelado } {
+export function opfsIndice(
+  dir: FileSystemDirectoryHandle,
+): { ler: LerSelado; gravar: GravarSelado; apagar: ApagarSelado } {
   return {
     async ler() {
       let handle: FileSystemFileHandle
@@ -39,6 +42,9 @@ export function opfsIndice(dir: FileSystemDirectoryHandle): { ler: LerSelado; gr
       await writable.write(selado)
       await writable.close()
     },
+    async apagar() {
+      await dir.removeEntry(ARQUIVO_INDICE)
+    },
   }
 }
 
@@ -48,24 +54,38 @@ export async function persistirIndice(
   dek: CryptoKey,
   accountId: string,
   indice: MiniSearch<DocNota>,
+  impressao: string,
 ): Promise<void> {
-  const json = serializarIndice(indice)
+  const json = serializarIndice(indice, impressao)
   const selado = await selarIndice(dek, accountId, json)
   await gravar(selado)
 }
 
 /** Inverso de `persistirIndice` -- `null` quando ainda não há índice persistido (primeira
- *  vez, ou OPFS limpa); `accountId` diferente do usado para persistir rejeita (AAD errada
- *  em `abrirIndice`), não abre por bom. */
+ *  vez, ou OPFS limpa; não chama `apagar`, não há o que apagar); `accountId` diferente do
+ *  usado para persistir rejeita (AAD errada em `abrirIndice`), não abre por bom. Impressão
+ *  que não bate com a do envelope (nota nova/editada/apagada desde a última gravação) apaga
+ *  o blob obsoleto -- texto em claro de uma nota corrigida não sobrevive no disco. */
 export async function restaurarIndice(
-  ler: LerSelado,
+  store: { ler: LerSelado; apagar: ApagarSelado },
   dek: CryptoKey,
   accountId: string,
+  impressao: string,
 ): Promise<MiniSearch<DocNota> | null> {
-  const selado = await ler()
+  const selado = await store.ler()
   if (selado === null) {
     return null
   }
   const json = await abrirIndice(dek, accountId, selado)
-  return carregarIndice(json)
+  const indice = carregarIndice(json, impressao)
+  if (indice === null) {
+    // A rejeição de `apagar` (OPFS negada/cheia/corrompida) é ignorada de propósito: o
+    // `gravar` que `BibliotecaPage` chama a seguir (via `persistirIndice`) usa
+    // `createWritable()`, que trunca o ficheiro -- o blob obsoleto é sobrescrito de qualquer
+    // forma. Propagar aqui deixaria o blob em claro obsoleto no disco E a página presa no
+    // erro, sem chegar ao passo que o resolveria.
+    await store.apagar().catch(() => {})
+    return null
+  }
+  return indice
 }

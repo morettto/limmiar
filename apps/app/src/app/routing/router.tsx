@@ -227,7 +227,7 @@ const notaRoute = createRoute({
 // `store` que nunca acha nada persistido são o equivalente, para esta rota, do prontuário
 // fixture de NotaPage. Quem ligar Keychain/sessão substitui os quatro valores por props
 // reais -- a lógica de BibliotecaPage não muda.
-const BIBLIOTECA_STORE_FIXTURE = { ler: async () => null, gravar: async () => {} }
+const BIBLIOTECA_STORE_FIXTURE = { ler: async () => null, gravar: async () => {}, apagar: async () => {} }
 
 function BibliotecaRouteComponent() {
   return <BibliotecaPage notas={[]} accountId="" dek={null} store={BIBLIOTECA_STORE_FIXTURE} />

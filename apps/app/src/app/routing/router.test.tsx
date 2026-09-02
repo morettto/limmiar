@@ -232,6 +232,7 @@ describe('router', () => {
     expect(props.dek).toBeNull()
     await expect(props.store.ler()).resolves.toBeNull()
     await expect(props.store.gravar(new Uint8Array())).resolves.toBeUndefined()
+    await expect(props.store.apagar()).resolves.toBeUndefined()
   })
 
   it('resolves /auth/magic-link and passes baseUrl/token through to MagicLinkCallback', async () => {
