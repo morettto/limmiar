@@ -1,4 +1,4 @@
-import type { Account } from '../account'
+import type { Account } from './account'
 
 const SESSION_STORAGE_KEY = 'limmiar:account'
 
@@ -13,3 +13,8 @@ export function createSessionRecorder(storage: KeyValueStorage): (account: Accou
     storage.setItem(SESSION_STORAGE_KEY, JSON.stringify(account))
   }
 }
+
+// The one place this module reaches for the real browser storage. Deliberately not
+// re-exported by the `entities/account` barrel (S08-08 review): that barrel is imported
+// all over the app for unrelated reasons (`Account`, `login`...) -- import this file directly.
+export const recordSession = createSessionRecorder(window.sessionStorage)

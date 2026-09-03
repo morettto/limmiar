@@ -31,10 +31,9 @@ pelo chamador -- hoje `pages/notas/NotaPage.tsx`).
    `onFocus` (o mesmo instante tem de tocar para quem navega por `Tab`, já que hover é
    um caminho só de mouse).
 6. Um `onKeyDown` no container raiz do editor chama `ehAtalhoAssinar` (seam de
-   `features/nota-fila/navegacao-teclado.ts`, reusado aqui -- ver README dessa feature para
-   a decisão de aceitar `⌘` OU `Ctrl`); se verdadeiro, chama `aoAssinar(nota)` com a nota
-   **atual** (a mesma que está a ser editada, não uma cópia obsoleta) e previne o
-   comportamento nativo da tecla.
+   `./atalho-assinar.ts` -- ver Decisões, "aceita `⌘` OU `Ctrl`"); se verdadeiro, chama
+   `aoAssinar(nota)` com a nota **atual** (a mesma que está a ser editada, não uma cópia
+   obsoleta) e previne o comportamento nativo da tecla.
 
 ## Pontos de entrada
 
@@ -43,10 +42,28 @@ pelo chamador -- hoje `pages/notas/NotaPage.tsx`).
 - `Citacao` (`Citacao.tsx`) -- componente React, props `ancora` (`{ inicioMs, fimMs }` de
   `@limmiar/copilot`), `aoTocar`. Mostra `mm:ss–mm:ss` e chama `aoTocar(ancora)` ao
   clicar, passar o rato (`onMouseEnter`) ou ganhar foco (`onFocus`).
+- `ehAtalhoAssinar(e)` (`atalho-assinar.ts`, desde S08-08) -- seam puro, sem React, sem
+  browser, 100% interno a esta feature. Viveu em `features/nota-fila/navegacao-teclado.ts`
+  até essa fatia; moveu porque a regra de isolamento de slices (`.dependency-cruiser.cjs`,
+  `fsd-no-cross-slice`) deixou de permitir uma feature a importar diretamente de outra do
+  mesmo nível -- as únicas exceções de composição aceites são pares exatos
+  (`recovery`→`totp-challenge`/`totp-enrollment`, `device-pairing-new`→`qr-scan`), e
+  nenhuma delas cobria `nota-editor`→`nota-fila`.
 - Consumido por `widgets/soap-editor/FilaEEditor.tsx`.
 
 ## Decisões desta fatia
 
+- **`ehAtalhoAssinar` aceita `metaKey` OU `ctrlKey`, sem detetar o sistema operativo (mudou
+  de casa para aqui em S08-08, texto original de `features/nota-fila`).** A spec S08 escreve
+  o atalho como `⌘↵` (Mac), mas a assinatura do seam (`Pick<KeyboardEvent, 'key' | 'metaKey'
+  | 'ctrlKey'>`) não carrega nenhuma informação de plataforma de propósito: detetar o SO
+  exigiria ler `navigator.platform`/`userAgent` (não fiável, e o próprio seam deixaria de
+  ser uma função pura testável só com um objeto literal). Em vez disso, `Enter` com
+  **qualquer um** dos dois modificadores conta -- `⌘↵` funciona no Mac, `Ctrl+↵` funciona
+  fora dele, e nenhum profissional fica sem atalho de teclado por causa do sistema
+  operativo que usa. Efeito colateral aceite: `Ctrl+Enter` também funciona num Mac
+  (inofensivo) e `Cmd+Enter` "funcionaria" num Windows/Linux se esse teclado tivesse uma
+  tecla Meta (na prática, nunca acontece por acidente).
 - **Leitura apenas depois de assinada (S08-11): `readOnly`, não `disabled`.** Cada
   `<textarea>` recebe `readOnly={nota.estado === ESTADO_ASSINADA}` (constante importada de
   `entities/nota/nota.ts`, dona do `estado`). `disabled` tiraria o campo da ordem de

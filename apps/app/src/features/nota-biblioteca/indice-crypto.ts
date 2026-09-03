@@ -1,6 +1,6 @@
 import { type CryptoKey, webcrypto } from '@limmiar/crypto'
 
-// Mesma disciplina de features/live-session/audio-crypto.ts: prefixo com versão, AAD
+// Mesma disciplina de entities/gravacao/audio-crypto.ts: prefixo com versão, AAD
 // vinculada ao dono do conteúdo (aqui a conta, não a sessão) -- se o formato mudar um dia,
 // um novo prefixo evita colidir com índices já selados sob o `v1`.
 const NOTE_INDEX_AAD_PREFIX = 'limmiar/note-index/v1|'

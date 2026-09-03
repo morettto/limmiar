@@ -1,8 +1,8 @@
 import { webcrypto as limmiarWebcrypto } from '@limmiar/crypto'
 import { describe, expect, it } from 'vitest'
-import { FakeDirectoryHandle, fakeDir } from '../../test-support/fake-opfs'
-import { audioChunkAad } from './audio-crypto'
-import { listarOrfaos, opfsWriter, persistChunk, type WriteSealed } from './chunk-store'
+import { FakeDirectoryHandle } from '../../test-support/fake-opfs'
+import { audioChunkAad } from '../../entities/gravacao/audio-crypto'
+import { opfsWriter, persistChunk, type WriteSealed } from './chunk-store'
 
 const SESSION_ID = '11111111-1111-1111-1111-111111111111'
 
@@ -88,23 +88,5 @@ describe('persistChunk', () => {
     expect(toHex(written)).not.toBe(toHex(blob))
     const opened = await limmiarWebcrypto.decrypt(dek, written, audioChunkAad(SESSION_ID, 2))
     expect(toHex(opened)).toBe(toHex(blob))
-  })
-})
-
-describe('listarOrfaos', () => {
-  it('lists file names present in the directory', async () => {
-    const dir = new FakeDirectoryHandle()
-    await dir.getFileHandle('1', { create: true })
-    await dir.getFileHandle('2', { create: true })
-
-    const names = await listarOrfaos(dir as unknown as FileSystemDirectoryHandle)
-
-    expect(names.sort()).toEqual(['1', '2'])
-  })
-
-  it('returns an empty list for an empty directory', async () => {
-    const names = await listarOrfaos(fakeDir())
-
-    expect(names).toEqual([])
   })
 })

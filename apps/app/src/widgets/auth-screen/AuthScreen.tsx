@@ -1,7 +1,6 @@
 import { useId, useState } from 'react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { translateProblemCode } from '../../shared/api'
-import { recordSession } from '../../entities/session'
 import {
   continueWithGoogle,
   deriveEmailPasswordVerifier,
@@ -11,6 +10,7 @@ import {
   type Account,
   type AccountRole,
 } from '../../entities/account'
+import { recordSession } from '../../entities/account/session'
 import { TotpChallenge } from '../../features/totp-challenge/TotpChallenge'
 import { TotpSetup } from '../../features/totp-enrollment/TotpSetup'
 

@@ -2,7 +2,7 @@ import type { KeyboardEvent } from 'react'
 import { useLingui } from '@lingui/react/macro'
 import type { Ancora } from '@limmiar/copilot'
 import { editarFrase, ESTADO_ASSINADA, ORDEM_SECOES, type Nota, type SecaoSoap } from '../../entities/nota/nota'
-import { ehAtalhoAssinar } from '../nota-fila/navegacao-teclado'
+import { ehAtalhoAssinar } from './atalho-assinar'
 import { Citacao } from './Citacao'
 
 export interface EditorSoapProps {
@@ -18,8 +18,8 @@ export interface EditorSoapProps {
 
 /**
  * Editor SOAP: as quatro secções (S/O/A/P) na ordem certa, frases editáveis e uma
- * `Citacao` por âncora de cada frase. `⌘↵`/`Ctrl+↵` (ver `ehAtalhoAssinar`, seam
- * partilhado com a fila) disparam `aoAssinar(nota)` a partir de qualquer ponto do editor.
+ * `Citacao` por âncora de cada frase. `⌘↵`/`Ctrl+↵` (ver `ehAtalhoAssinar`, `./atalho-assinar.ts`)
+ * disparam `aoAssinar(nota)` a partir de qualquer ponto do editor.
  */
 export function EditorSoap({ nota, onChange, aoTocar, aoAssinar }: EditorSoapProps) {
   const { t } = useLingui()

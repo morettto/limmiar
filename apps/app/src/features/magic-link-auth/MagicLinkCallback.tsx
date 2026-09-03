@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { translateProblemCode } from '../../shared/api'
 import { decodeBase64, encodeBase64 } from '../../shared/lib/base64'
-import { recordSession } from '../../entities/session'
 import { completeWebAuthnCeremony, verifyMagicLink, type Account } from '../../entities/account'
+import { recordSession } from '../../entities/account/session'
 import {
   createCredentialWithBrowser,
   getCredentialWithBrowser,

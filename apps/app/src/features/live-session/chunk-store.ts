@@ -1,5 +1,5 @@
 import type { CryptoKey } from '@limmiar/crypto'
-import { sealChunk } from './audio-crypto'
+import { sealChunk } from '../../entities/gravacao/audio-crypto'
 
 export type WriteSealed = (sessionId: string, seq: number, sealed: Uint8Array<ArrayBuffer>) => Promise<void>
 
@@ -27,13 +27,4 @@ export async function persistChunk(
 ): Promise<void> {
   const sealed = await sealChunk(dek, sessionId, seq, blob)
   await write(sessionId, seq, sealed)
-}
-
-/** Lists file names left in `dir` — chunks orphaned by a session that never closed cleanly. */
-export async function listarOrfaos(dir: FileSystemDirectoryHandle): Promise<string[]> {
-  const names: string[] = []
-  for await (const name of dir.keys()) {
-    names.push(name)
-  }
-  return names
 }

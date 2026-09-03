@@ -86,7 +86,7 @@ describe('EditorSoap', () => {
   })
 
   // Só um ramo (metaKey) é coberto aqui de propósito -- o wiring é único e a exaustividade
-  // metaKey/ctrlKey de `ehAtalhoAssinar` já está provada em navegacao-teclado.test.ts;
+  // metaKey/ctrlKey de `ehAtalhoAssinar` já está provada em atalho-assinar.test.ts;
   // duplicar os dois modificadores aqui provaria o mesmo ramo duas vezes.
   it('Cmd+Enter (metaKey) chama aoAssinar com a nota atual', () => {
     const aoAssinar = vi.fn()
