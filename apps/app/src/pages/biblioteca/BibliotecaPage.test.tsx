@@ -136,6 +136,60 @@ describe('BibliotecaPage', () => {
     expect(apagar).not.toHaveBeenCalled()
   })
 
+  it('rerender do pai com notas/store novos por identidade mas iguais em conteúdo: não repete leitura/gravação de OPFS', async () => {
+    const chaveIndice = await makeChave()
+    const notaAtual = nota()
+    const ler = vi.fn().mockResolvedValue(null)
+    const gravar = vi.fn().mockResolvedValue(undefined)
+    const apagar = vi.fn().mockResolvedValue(undefined)
+    const { rerender, props } = await renderEObterProps({
+      chaveIndice,
+      notas: [notaAtual],
+      store: { ler, gravar, apagar },
+    })
+
+    await waitFor(() => expect(props().resultado.estado).not.toBe('a-preparar'))
+    expect(ler).toHaveBeenCalledTimes(1)
+    expect(gravar).toHaveBeenCalledTimes(1)
+
+    // `notas` e `store` novos por identidade (literais recriados, como um chamador que não
+    // memoiza faria) mas com o mesmo conteúdo -- o pai rerenderizando sozinho não pode
+    // disparar uma segunda leitura/gravação em OPFS.
+    rerender(
+      <I18nProvider i18n={i18n}>
+        <BibliotecaPage
+          notas={[{ ...notaAtual }]}
+          accountId={ACCOUNT_ID}
+          chaveIndice={chaveIndice}
+          store={{ ler, gravar, apagar }}
+        />
+      </I18nProvider>,
+    )
+    // `ler` já reflete o rerender espúrio -- `store.ler()` roda até ao primeiro `await`
+    // dentro do próprio `act()` do `rerender`. `gravar` não: a cadeia WebCrypto por trás
+    // (packages/crypto/src/webcrypto.ts) só termina em ciclos reais do event loop.
+    expect(ler).toHaveBeenCalledTimes(1)
+
+    // Disparo legítimo (accountId novo) + `waitFor` sobre `gravar` (idioma já usado acima,
+    // "desmontar antes de persistirIndice resolver") ancora a espera num sinal real: se o
+    // rerender espúrio também tivesse disparado o efeito, `gravar` chegaria a 3, não 2.
+    const OUTRA_CONTA_ID = '88888888-8888-8888-8888-888888888888'
+    rerender(
+      <I18nProvider i18n={i18n}>
+        <BibliotecaPage
+          notas={[{ ...notaAtual }]}
+          accountId={OUTRA_CONTA_ID}
+          chaveIndice={chaveIndice}
+          store={{ ler, gravar, apagar }}
+        />
+      </I18nProvider>,
+    )
+    await waitFor(() => expect(gravar).toHaveBeenCalledTimes(2))
+
+    expect(ler).toHaveBeenCalledTimes(2)
+    expect(gravar).toHaveBeenCalledTimes(2)
+  })
+
   // Ponte do critério de aceite 2/3 do ticket S08-09: a página passa a impressão digital das
   // notas atuais a `restaurarIndice`; um blob selado sob uma impressão antiga (revisão mudou
   // desde a última gravação) é obsoleto -- apaga e reconstrói, não adota o índice desatualizado.

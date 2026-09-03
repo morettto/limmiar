@@ -11,7 +11,7 @@ página já calculou.
 
 ## Fluxo principal
 
-1. No mount (e sempre que `chaveIndice`/`accountId`/`store`/`notas` mudarem), se
+1. No mount (e sempre que `chaveIndice`/`accountId` mudarem), se
    `chaveIndice !== null`:
    a. Calcula `impressao = impressaoDigital(notas)` (ticket S08-09) -- resume que notas (e
       que revisão de cada uma) as `notas` atuais cobrem.
@@ -68,13 +68,6 @@ página já calculou.
   `opfsIndice(dir)`, `features/nota-biblioteca/indice-store.ts`). Até ao ticket S08-06, `itens` (`ItemFila[]`)
   e `notas` eram duas props/coleções separadas casadas à mão por `id` -- fundidas numa só
   (ver `[[S08-06 Fundir ItemFila em Nota e eliminar as listas paralelas]]`).
-  **`store` (e `notas`) têm de chegar estáveis por identidade entre renders** -- os dois
-  estão na dependency array do `useEffect` que chama `restaurarIndice`/`persistirIndice`;
-  um chamador que passe `store={opfsIndice(dir)}` inline recria o objeto a cada render do
-  pai e faz o efeito repetir a leitura/gravação em OPFS sem necessidade. O chamador atual
-  (`BibliotecaRouteComponent`, `app/routing/router.tsx`) já usa uma constante de módulo
-  (`BIBLIOTECA_STORE_FIXTURE`); um chamador futuro com `dir` real deve `useMemo`/definir
-  `store` fora do corpo do componente pela mesma razão.
 - Montada em `/biblioteca` via `BibliotecaRouteComponent` (`app/routing/router.tsx`), rota
   normal de produto -- não vai atrás do gate `VITE_ENABLE_E2E_TEST_ROUTES`.
 
@@ -122,6 +115,18 @@ página já calculou.
   `ResultadoBusca` obrigaria `BibliotecaNotas` (e todo teste que já cobre os três estados
   hoje) a saber renderizar erro também, ampliando um contrato já acordado no portão de
   forma sem necessidade.
+- **O `useEffect` que restaura/constrói/persiste o índice depende só de `chaveIndice` e
+  `accountId` (ticket S08-13).** São esses os dois valores que identificam *qual* índice
+  carregar -- `notas`, `store` e `t` não mudam essa identidade, só o conteúdo que o efeito lê
+  quando dispara. `notas`/`store`/`t` passam a ser lidos via `useEffectEvent` (`lerAtuais`,
+  React 19.2), que devolve os valores do último render sem os tornar reativos, em vez de
+  entrarem na dependency array; o corpo do efeito continua igual, só a fonte dos três valores
+  muda. Consequência direta: uma
+  mudança em `notas` já não reindexa sozinha -- o efeito só volta a correr quando
+  `chaveIndice`/`accountId` mudam. Hoje isso não custa nada porque o único chamador
+  (`BibliotecaRouteComponent`) passa `notas={[]}` fixture; quem ligar notas reais tem de
+  disparar a reindexação por outra via (mudar `chaveIndice`/`accountId`, ou um ticket futuro
+  que trate a reindexação em condições).
 
 ## Fora de âmbito
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useEffectEvent, useState } from 'react'
 import { useLingui } from '@lingui/react/macro'
 import type MiniSearch from 'minisearch'
 import type { Nota } from '../../entities/nota/nota'
@@ -32,11 +32,14 @@ export function BibliotecaPage({ notas, accountId, chaveIndice, store }: Bibliot
   const [termo, setTermo] = useState('')
   const [erro, setErro] = useState<string | null>(null)
 
+  const lerAtuais = useEffectEvent(() => ({ notas, store, t }))
+
   useEffect(() => {
     if (chaveIndice === null) {
       return
     }
     let cancelado = false
+    const { notas, store, t } = lerAtuais()
 
     async function preparar(chaveAtual: ChaveIndiceBusca) {
       const impressao = impressaoDigital(notas)
@@ -64,7 +67,7 @@ export function BibliotecaPage({ notas, accountId, chaveIndice, store }: Bibliot
     return () => {
       cancelado = true
     }
-  }, [chaveIndice, accountId, store, notas, t])
+  }, [chaveIndice, accountId])
 
   if (erro !== null) {
     return (
