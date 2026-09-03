@@ -6,8 +6,8 @@ Assinatura de nota: uma trava por `(tenant_id, note_id)`, imposta pela chave pri
 `note_signatures` (migração `0005_create_note_signatures.sql`), RLS por tenant como
 `Api.Patients` e `Api.Scheduling`. Diferente das duas, esta tabela existe justamente para o
 servidor **ver** algo -- a existência da nota, a sua revisão, e o instante da assinatura --
-em troca de a trava "uma assinatura por nota, para sempre" ser garantida pelo Postgres, não
-apenas lembrada pelo browser (ver
+em troca de a trava "uma assinatura por nota, para sempre" -- contra `app_role`, não contra
+quem administra a base -- ser garantida pelo Postgres, não apenas lembrada pelo browser (ver
 `docs/adr/ADR-S08-01-assinatura-visivel-ao-servidor.md`). O blob de assinatura em si
 (`iv(12) || AES-GCM(digest SHA-256 da nota)(32) || tag(16)`, 60 bytes) continua opaco ao
 servidor.
@@ -51,7 +51,9 @@ servidor.
 - `ponytail:` sem trigger `BEFORE UPDATE OR DELETE` de imobilidade -- o par `GRANT SELECT,
   INSERT` / `REVOKE UPDATE, DELETE` já fecha todos os caminhos de escrita que `app_role` tem, e
   `app_role` é o único papel com que a API alguma vez liga. Ver o comentário `ponytail:` na
-  migração para as três alternativas de imposição avaliadas e rejeitadas.
+  migração para as três alternativas de imposição avaliadas e rejeitadas. A credencial que
+  corre as migrações fica fora dessa garantia -- ver "Consequências" em
+  `docs/adr/ADR-S08-01-assinatura-visivel-ao-servidor.md`.
 - `NoteEndpoints.MapFailureToProblem` (ronda 1 de correção): `AccountNotFound`/
   `NotAuthorizedToCreateRecords` deixaram de estar provados só a nível de `NoteService`
   (`NoteServiceTests`) e passaram a ter teste HTTP dedicado --

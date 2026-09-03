@@ -10,8 +10,9 @@ CREATE TABLE IF NOT EXISTS note_signatures (
     revisao    integer NOT NULL,     -- entra na AAD do blob selado -- impede replicar a assinatura para outra revisão
     signature  bytea NOT NULL,       -- iv(12) || AES-GCM(digest SHA-256 da nota)(32) || tag(16), opaco ao servidor
     signed_at  timestamptz NOT NULL DEFAULT now(),
-    -- The PRIMARY KEY is what guarantees "uma assinatura por nota, para sempre" -- there is no
-    -- second, softer enforcement layer for this rule, see the ponytail note below.
+    -- The PRIMARY KEY is what guarantees "uma assinatura por nota, para sempre" for any writer
+    -- that has not dropped the constraint -- there is no second, softer enforcement layer; see
+    -- the ponytail note below for what it does not cover.
     PRIMARY KEY (tenant_id, note_id),
     -- Belt-and-suspenders under the endpoint's own `revisao >= 0` validation -- same spirit as
     -- patient_record_entries' sequence_positive check.
@@ -51,8 +52,12 @@ REVOKE UPDATE, DELETE ON note_signatures FROM app_role;
 --     to carry (see the "sem patient_id" note below) -- and a foreign key does not even
 --     deduplicate, so it would not address the "one signature" rule anyway.
 -- The GRANT/REVOKE pair above already closes every write path app_role has, and app_role is
--- the only role the running API ever connects as -- a trigger would be a second enforcement
--- layer for a threat model (a second, non-app_role writer role) that does not exist yet.
+-- the only role the running API ever connects as. A trigger would not add real coverage here:
+-- the second, non-app_role writer a trigger would guard against already exists -- it is the
+-- credential that runs migrations, which owns this table, and it can `DROP TRIGGER` as easily
+-- as it could write around one, so a trigger buys no coverage against it. See
+-- docs/adr/ADR-S08-01-assinatura-visivel-ao-servidor.md, "Consequências", for exactly what
+-- this credential can still do.
 
 -- ponytail: sem `patient_id`. Não tem leitor neste ticket -- nenhuma rota deste ticket devolve
 -- ou filtra assinaturas por paciente -- e a aresta nota->paciente já é visível ao servidor por
