@@ -65,7 +65,7 @@ ticket S08-06, `Nota` também é dona do seu `estado` (`EstadoNota`, `ESTADO_PEN
 - `selarAssinatura(dek: CryptoKey, noteId: string, nota: Nota): Promise<Uint8Array<ArrayBuffer>>`
   (`nota-crypto.ts`, fatia 5).
 - `notaParaEntrada(nota: Nota): Uint8Array<ArrayBuffer>` (`nota-crypto.ts`, fatia 5).
-- `assinarNota(baseUrl, accountId, accessToken, noteId, { revisao, signature }): Promise<AssinarNotaResult>`
+- `assinarNota(baseUrl, accountId, accessToken, noteId, { revision, signature }): Promise<AssinarNotaResult>`
   (`api.ts`, fatia 5) -- `POST /accounts/{accountId}/notes/{noteId}/signature`, 201.
 - `obterAssinatura(baseUrl: string, accountId: string, accessToken: string, noteId: string): Promise<ObterAssinaturaResult>`
   (`api.ts`, S08-11) -- `GET /accounts/{accountId}/notes/{noteId}/signature`. Ver "Removido
@@ -163,7 +163,7 @@ ticket S08-06, `Nota` também é dona do seu `estado` (`EstadoNota`, `ESTADO_PEN
   /accounts/{accountId}/notes/{noteId}/signature` -- 404 `notes.signature_not_found` é o caso
   normal (nota por assinar).
   - `obterAssinatura(baseUrl: string, accountId: string, accessToken: string, noteId: string): Promise<ObterAssinaturaResult>`
-    -- `ObterAssinaturaResult = { ok: true; noteId: string; revisao: number; signedAt: string } | ProblemResult`.
+    -- `ObterAssinaturaResult = { ok: true; noteId: string; revision: number; signedAt: string } | ProblemResult`.
     O blob `signature` do body é lido e descartado de propósito: decodificá-lo só serviria a
     uma verificação client-side que nenhum critério pede e nenhum chamador faz. Molde literal
     de `assinarNota`, logo acima no mesmo ficheiro.

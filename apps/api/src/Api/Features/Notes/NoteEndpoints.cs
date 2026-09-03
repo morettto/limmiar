@@ -52,12 +52,12 @@ public static class NoteEndpoints
             return signatureProblem;
         }
 
-        if (request.Revisao < 0)
+        if (request.Revision < 0)
         {
-            return ValidationProblem("revisao");
+            return ValidationProblem("revision");
         }
 
-        var result = await noteService.SignAsync(accountId, noteId, request.Revisao, request.Signature, cancellationToken);
+        var result = await noteService.SignAsync(accountId, noteId, request.Revision, request.Signature, cancellationToken);
         if (!result.TryGetValue(out var signature, out var failureReason))
         {
             return MapFailureToProblem(failureReason);
@@ -65,7 +65,7 @@ public static class NoteEndpoints
 
         return TypedResults.Created(
             $"/accounts/{accountId}/notes/{noteId}/signature",
-            new SignNoteResponse(noteId, signature.Revisao, signature.SignedAt));
+            new SignNoteResponse(noteId, signature.Revision, signature.SignedAt));
     }
 
     private static async Task<Results<Ok<NoteSignatureResponse>, JsonHttpResult<LimmiarProblemDetails>>> HandleGetAsync(
@@ -87,7 +87,7 @@ public static class NoteEndpoints
             return ProblemJson(StatusCodes.Status404NotFound, "Note signature not found", NotesProblemCodes.NotesSignatureNotFound);
         }
 
-        return TypedResults.Ok(new NoteSignatureResponse(noteId, signature.Revisao, signature.Signature, signature.SignedAt));
+        return TypedResults.Ok(new NoteSignatureResponse(noteId, signature.Revision, signature.Signature, signature.SignedAt));
     }
 
     // [ExcludeFromCodeCoverage] justification (ronda 1 de correção): every named
@@ -118,8 +118,8 @@ public static class NoteEndpoints
         };
 }
 
-public sealed record SignNoteRequest(int Revisao, byte[] Signature);
+public sealed record SignNoteRequest(int Revision, byte[] Signature);
 
-public sealed record SignNoteResponse(Guid NoteId, int Revisao, DateTimeOffset SignedAt);
+public sealed record SignNoteResponse(Guid NoteId, int Revision, DateTimeOffset SignedAt);
 
-public sealed record NoteSignatureResponse(Guid NoteId, int Revisao, byte[] Signature, DateTimeOffset SignedAt);
+public sealed record NoteSignatureResponse(Guid NoteId, int Revision, byte[] Signature, DateTimeOffset SignedAt);

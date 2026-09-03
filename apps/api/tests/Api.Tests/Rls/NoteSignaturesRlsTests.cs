@@ -83,7 +83,7 @@ public sealed class NoteSignaturesRlsTests : IAsyncLifetime
         await using var insertCommand = connection.CreateCommand();
         insertCommand.Transaction = transaction;
         insertCommand.CommandText = """
-            INSERT INTO note_signatures (tenant_id, note_id, revisao, signature)
+            INSERT INTO note_signatures (tenant_id, note_id, revision, signature)
             VALUES (@tenantId, @noteId, 0, @signature)
             """;
         insertCommand.Parameters.AddWithValue("tenantId", ProfessionalB);

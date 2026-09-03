@@ -18,7 +18,7 @@ recusar reeditar.
 
 `note_signatures` (migração `0005_create_note_signatures.sql`) guarda, por nota, um blob
 selado (`iv(12) || AES-GCM(digest SHA-256 da nota)(32) || tag(16)`, 60 bytes, opaco ao
-servidor), a `revisao` assinada (entra na AAD do blob -- impede replicar a assinatura de uma
+servidor), a `revision` assinada (entra na AAD do blob -- impede replicar a assinatura de uma
 revisão para outra) e o instante da assinatura (`signed_at`, decidido pelo servidor via
 `DEFAULT now()`, nunca aceite do corpo do pedido). A chave primária composta
 `(tenant_id, note_id)` é o único mecanismo de imposição: não existe segunda camada (trigger,

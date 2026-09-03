@@ -109,7 +109,7 @@ export function NotaPage({ kek }: NotaPageProps) {
 
       const signature = await selarAssinatura(dek, nota.id, nota)
       const resultado = await assinarNota(BASE_URL_FIXTURE, ACCOUNT_ID_FIXTURE, ACCESS_TOKEN_FIXTURE, nota.id, {
-        revisao: nota.revisao,
+        revision: nota.revisao,
         signature,
       })
 

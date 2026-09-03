@@ -1,4 +1,4 @@
--- Server-visible signature for one note: the server sees the note's existence, its revisão,
+-- Server-visible signature for one note: the server sees the note's existence, its revision,
 -- and the instant it was signed, plus a 60-byte sealed blob it cannot open. In exchange, the
 -- one-signature-per-note lock is enforced by Postgres, not merely remembered client-side.
 -- See docs/adr/ADR-S08-01-assinatura-visivel-ao-servidor.md for what this trades away
@@ -7,16 +7,16 @@
 CREATE TABLE IF NOT EXISTS note_signatures (
     tenant_id  uuid NOT NULL,        -- = owning professional's account id, same convention as patient_record_entries
     note_id    uuid NOT NULL,        -- = the sessionId, client-generated (scheduled_sessions.id)
-    revisao    integer NOT NULL,     -- entra na AAD do blob selado -- impede replicar a assinatura para outra revisão
+    revision   integer NOT NULL,     -- entra na AAD do blob selado -- impede replicar a assinatura para outra revisão
     signature  bytea NOT NULL,       -- iv(12) || AES-GCM(digest SHA-256 da nota)(32) || tag(16), opaco ao servidor
     signed_at  timestamptz NOT NULL DEFAULT now(),
     -- The PRIMARY KEY is what guarantees "uma assinatura por nota, para sempre" for any writer
     -- that has not dropped the constraint -- there is no second, softer enforcement layer; see
     -- the ponytail note below for what it does not cover.
     PRIMARY KEY (tenant_id, note_id),
-    -- Belt-and-suspenders under the endpoint's own `revisao >= 0` validation -- same spirit as
+    -- Belt-and-suspenders under the endpoint's own `revision >= 0` validation -- same spirit as
     -- patient_record_entries' sequence_positive check.
-    CONSTRAINT revisao_not_negative CHECK (revisao >= 0)
+    CONSTRAINT revision_not_negative CHECK (revision >= 0)
 );
 
 ALTER TABLE note_signatures ENABLE ROW LEVEL SECURITY;

@@ -13,25 +13,25 @@ describe('assinarNota', () => {
     vi.unstubAllGlobals()
   })
 
-  it('POSTs { revisao, signature(base64) } with a bearer token and returns revisao + signedAt on 201', async () => {
+  it('POSTs { revision, signature(base64) } with a bearer token and returns revision + signedAt on 201', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
-        JSON.stringify({ revisao: 2, signedAt: '2026-08-27T10:00:00Z' }),
+        JSON.stringify({ revision: 2, signedAt: '2026-08-27T10:00:00Z' }),
         { status: 201, headers: { 'Content-Type': 'application/json' } },
       ),
     )
     vi.stubGlobal('fetch', fetchMock)
 
     const result = await assinarNota('http://api.test', ACCOUNT_ID, ACCESS_TOKEN, NOTE_ID, {
-      revisao: 2,
+      revision: 2,
       signature: SIGNATURE,
     })
 
-    expect(result).toEqual({ ok: true, noteId: NOTE_ID, revisao: 2, signedAt: '2026-08-27T10:00:00Z' })
+    expect(result).toEqual({ ok: true, noteId: NOTE_ID, revision: 2, signedAt: '2026-08-27T10:00:00Z' })
     expect(fetchMock).toHaveBeenCalledWith(`http://api.test/accounts/${ACCOUNT_ID}/notes/${NOTE_ID}/signature`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ACCESS_TOKEN}` },
-      body: JSON.stringify({ revisao: 2, signature: SIGNATURE_BASE64 }),
+      body: JSON.stringify({ revision: 2, signature: SIGNATURE_BASE64 }),
     })
   })
 
@@ -49,7 +49,7 @@ describe('assinarNota', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     const result = await assinarNota('http://api.test', ACCOUNT_ID, ACCESS_TOKEN, NOTE_ID, {
-      revisao: 2,
+      revision: 2,
       signature: SIGNATURE,
     })
 
@@ -62,10 +62,10 @@ describe('obterAssinatura', () => {
     vi.unstubAllGlobals()
   })
 
-  it('GETs the signature endpoint with a bearer token and no body, returning revisao + signedAt on 200', async () => {
+  it('GETs the signature endpoint with a bearer token and no body, returning revision + signedAt on 200', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
-        JSON.stringify({ revisao: 2, signature: SIGNATURE_BASE64, signedAt: '2026-08-27T10:00:00Z' }),
+        JSON.stringify({ revision: 2, signature: SIGNATURE_BASE64, signedAt: '2026-08-27T10:00:00Z' }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
     )
@@ -73,7 +73,7 @@ describe('obterAssinatura', () => {
 
     const result = await obterAssinatura('http://api.test', ACCOUNT_ID, ACCESS_TOKEN, NOTE_ID)
 
-    expect(result).toEqual({ ok: true, noteId: NOTE_ID, revisao: 2, signedAt: '2026-08-27T10:00:00Z' })
+    expect(result).toEqual({ ok: true, noteId: NOTE_ID, revision: 2, signedAt: '2026-08-27T10:00:00Z' })
     expect(fetchMock).toHaveBeenCalledWith(`http://api.test/accounts/${ACCOUNT_ID}/notes/${NOTE_ID}/signature`, {
       headers: { Authorization: `Bearer ${ACCESS_TOKEN}` },
     })

@@ -13,7 +13,7 @@ public enum SignNoteFailureReason
 public sealed class NoteService(IAccountStore accounts, NoteSignatureStore store)
 {
     public async Task<Result<NoteSignature, SignNoteFailureReason>> SignAsync(
-        Guid professionalId, Guid noteId, int revisao, byte[] signature, CancellationToken cancellationToken)
+        Guid professionalId, Guid noteId, int revision, byte[] signature, CancellationToken cancellationToken)
     {
         var account = await accounts.FindByIdAsync(professionalId, cancellationToken);
         if (account is null)
@@ -28,7 +28,7 @@ public sealed class NoteService(IAccountStore accounts, NoteSignatureStore store
             return Result<NoteSignature, SignNoteFailureReason>.Failure(SignNoteFailureReason.NotAuthorizedToCreateRecords);
         }
 
-        var entry = new NoteSignature(professionalId, noteId, revisao, signature, DateTimeOffset.UtcNow);
+        var entry = new NoteSignature(professionalId, noteId, revision, signature, DateTimeOffset.UtcNow);
         var inserted = await store.InsertAsync(entry, cancellationToken);
         if (inserted is null)
         {

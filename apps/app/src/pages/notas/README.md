@@ -201,7 +201,7 @@ decisão.
 - Mostrar quando/por quem a nota foi assinada continua fluxo futuro, ainda sem nenhuma tela
   -- o S08-11 usa `obterAssinatura` (`entities/nota/api.ts`, reposto neste ticket com
   chamador, ver `entities/nota/README.md`) só para decidir `estado`, sem exibir
-  `signedAt`/`revisao` em lado nenhum da UI.
+  `signedAt`/`revision` em lado nenhum da UI.
 - Fila real com efeito por nota selecionada -- o efeito de arranque hoje pergunta só pela
   nota fixture (`ponytail:` no topo do efeito em `NotaPage.tsx`); levantar
   `selecionadoId` de `FilaEEditor`, ou trazer o `estado` já resolvido pelo fetch da fila

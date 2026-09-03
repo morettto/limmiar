@@ -95,7 +95,7 @@ describe('NotaPage', () => {
       vi.mocked(obterAssinatura).mockResolvedValueOnce({
         ok: true,
         noteId: 'nota-fixture-1',
-        revisao: 0,
+        revision: 0,
         signedAt: SIGNED_AT,
       })
 
@@ -139,7 +139,7 @@ describe('NotaPage', () => {
       vi.mocked(obterAssinatura).mockResolvedValueOnce({
         ok: true,
         noteId: 'nota-fixture-1',
-        revisao: 0,
+        revision: 0,
         signedAt: SIGNED_AT,
       })
       const segundoMount = await renderEObterProps()
@@ -155,7 +155,7 @@ describe('NotaPage', () => {
       vi.mocked(obterAssinatura).mockResolvedValueOnce({
         ok: true,
         noteId: 'nota-fixture-1',
-        revisao: 0,
+        revision: 0,
         signedAt: SIGNED_AT,
       })
       const { appendPatientEntry } = await import('../../entities/patient/api')
@@ -201,7 +201,7 @@ describe('NotaPage', () => {
         sequence: 1,
         createdAt: '2026-08-27T09:00:00Z',
       })
-      vi.mocked(assinarNota).mockResolvedValue({ ok: true, noteId: 'nota-fixture-1', revisao: 0, signedAt: SIGNED_AT })
+      vi.mocked(assinarNota).mockResolvedValue({ ok: true, noteId: 'nota-fixture-1', revision: 0, signedAt: SIGNED_AT })
     })
 
     it('chama appendPatientEntry antes de assinarNota, com sequence = entries.length + 1', async () => {

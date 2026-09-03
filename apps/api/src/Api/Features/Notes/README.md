@@ -35,7 +35,7 @@ servidor.
   `GET /accounts/{accountId}/notes/{noteId}/signature` (`200`/`404`). Reusa
   `TryValidateSealedBlobShape` (piso de 28 bytes) de `Api.Problems.SealedBlobShape`, a mesma
   cópia que `PatientEndpoints` e `VoiceEnrollmentEndpoints` usam, mais uma validação própria
-  de `revisao >= 0`. O `GET` existe porque, sem ele, a trava só vive na memória do browser e
+  de `revision >= 0`. O `GET` existe porque, sem ele, a trava só vive na memória do browser e
   desaparece num reload.
 
 ## Decisões relevantes
