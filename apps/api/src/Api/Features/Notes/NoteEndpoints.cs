@@ -58,12 +58,11 @@ public static class NoteEndpoints
         }
 
         var result = await noteService.SignAsync(accountId, noteId, request.Revisao, request.Signature, cancellationToken);
-        if (!result.Succeeded)
+        if (!result.TryGetValue(out var signature, out var failureReason))
         {
-            return MapFailureToProblem(result.FailureReason!.Value);
+            return MapFailureToProblem(failureReason);
         }
 
-        var signature = result.Signature!;
         return TypedResults.Created(
             $"/accounts/{accountId}/notes/{noteId}/signature",
             new SignNoteResponse(noteId, signature.Revisao, signature.SignedAt));

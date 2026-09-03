@@ -6,7 +6,7 @@ Em S04-02, a ronda 1 de review apanhou guardas duplicadas entre `ScheduledSessio
 
 ## Decisão
 
-Métodos de store deste repositório que cruzam para a camada de service devolvem sempre o tipo de resultado do domínio (ex.: `SchedulingResult`, o padrão já usado por `PatientService`/`CreatePatientResult`) diretamente -- nunca um tuplo anónimo `(T?, Reason?)`, e nunca com `!` a apagar uma nulidade real na fronteira. Se o store precisa de comunicar mais de uma condição de falha, os campos entram nomeados no próprio tipo de resultado, não num tuplo posicional que o chamador tem de desempacotar e forçar.
+Métodos de store deste repositório que cruzam para a camada de service devolvem sempre o tipo de resultado do domínio (ex.: `SchedulingResult`, o padrão já usado por `PatientService`/`Api.Platform.Result<TValue, TFailure>`) diretamente -- nunca um tuplo anónimo `(T?, Reason?)`, e nunca com `!` a apagar uma nulidade real na fronteira. Se o store precisa de comunicar mais de uma condição de falha, os campos entram nomeados no próprio tipo de resultado, não num tuplo posicional que o chamador tem de desempacotar e forçar.
 
 ## Consequências
 

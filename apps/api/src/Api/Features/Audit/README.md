@@ -34,9 +34,12 @@ critério 4) que o desenho já fechou.
     que confronta cada âncora: se a entrada em `AnchoredSequence` não carrega o `AnchoredHash`
     gravado -- ou já nem existe, que é o caso da cadeia truncada -- devolve
     `Broken(AnchoredSequence, AnchorMismatch)`.
-- `AuditVerification.cs` -- resultado (molde de `Api.Notes.SignNoteResult`):
+- `AuditVerification.cs` -- resultado (molde de `Api.Platform.Result<TValue, TFailure>`):
   `Intact`/`FirstBrokenSequence`/`BreakKind` (`HashMismatch`, `BrokenLink`, `AnchorMismatch`),
-  mais os construtores `Ok()`/`Broken(sequence, kind)`.
+  mais os construtores `Ok()`/`Broken(sequence, kind)`. Este módulo ainda mantém a sua
+  própria cópia do molde antigo em vez do tipo partilhado -- migrar para
+  `Api.Platform.Result<TValue, TFailure>` é trabalho por fazer (S08-14 migrou só
+  `Api.Notes`/`Api.Patients`).
 - Migração `0006_create_audit_trail.sql` -- cria as duas tabelas, `audit_entries` e
   `audit_anchors`, com o mesmo tratamento: RLS `tenant_isolation` com `FORCE` (mesmo padrão de
   `note_signatures`, migração `0005`) e `GRANT SELECT, INSERT` / `REVOKE UPDATE, DELETE` para
