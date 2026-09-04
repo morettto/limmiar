@@ -1,4 +1,4 @@
-# ADR: Store→Service não devolve tuplo nullable nem usa `!` na fronteira
+# ADR-0011 · Store→Service não devolve tuplo nullable nem usa `!` na fronteira
 
 ## Contexto
 
