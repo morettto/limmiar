@@ -10,6 +10,7 @@ import { CopilotKeyPage } from '../../pages/settings/CopilotKeyPage'
 import { NotaPage } from '../../pages/notas/NotaPage'
 import { BibliotecaPage } from '../../pages/biblioteca/BibliotecaPage'
 import { parseEstadoConsentimento, type EstadoConsentimento } from '../../entities/consentimento/api'
+import { useSession } from '../providers/SessionProvider'
 import { E2eMicrofoneScaffold } from './E2eMicrofoneScaffold'
 
 function readSearchString(search: Record<string, unknown>, key: string): string {
@@ -56,7 +57,8 @@ const magicLinkCallbackRoute = createRoute({
 
 function MagicLinkCallbackRouteComponent() {
   const { baseUrl, token } = magicLinkCallbackRoute.useSearch()
-  return <MagicLinkCallbackPage baseUrl={baseUrl} token={token} />
+  const { iniciarSessao } = useSession()
+  return <MagicLinkCallbackPage baseUrl={baseUrl} token={token} onAuthenticated={iniciarSessao} />
 }
 
 // S02-04 fatia 7 / S02-05 — E2E scaffolding, not production UI: these screens have no navigation
@@ -81,7 +83,8 @@ const authScreenE2ERoute = createRoute({
 
 function AuthScreenE2ERouteComponent() {
   const { baseUrl, role } = authScreenE2ERoute.useSearch()
-  return <AuthPage baseUrl={baseUrl} role={role} />
+  const { iniciarSessao } = useSession()
+  return <AuthPage baseUrl={baseUrl} role={role} onAuthenticated={iniciarSessao} />
 }
 
 interface RecoveryScreenE2ESearch {
@@ -99,7 +102,8 @@ const recoveryScreenE2ERoute = createRoute({
 
 function RecoveryScreenE2ERouteComponent() {
   const { baseUrl } = recoveryScreenE2ERoute.useSearch()
-  return <RecoveryPage baseUrl={baseUrl} />
+  const { iniciarSessao } = useSession()
+  return <RecoveryPage baseUrl={baseUrl} onRecovered={iniciarSessao} />
 }
 
 // Judgment call (S02-06): same "no navigation entry point yet" situation as the pairing routes
@@ -201,10 +205,18 @@ function E2eMicrofoneRouteComponent() {
 // playwright.config.ts exercises a real `vite build`, not `vite dev`.
 
 
+// useSession() only works under app/routing (fsd-pages-no-app forbids pages from importing app),
+// so this thin wrapper is the one place that can read `sessao` and hand CopilotKeyPage a real
+// accountId -- reintroduced after S07-04 follow-up B3 removed it, for that reason.
+function CopilotKeyRouteComponent() {
+  const { sessao } = useSession()
+  return <CopilotKeyPage accountId={sessao?.id ?? ''} />
+}
+
 const copilotSettingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/settings/copilot',
-  component: CopilotKeyPage,
+  component: CopilotKeyRouteComponent,
 })
 
 // ponytail: mesma situação, mesmo motivo do `dek={null}` de BibliotecaRouteComponent --
@@ -223,12 +235,13 @@ const notaRoute = createRoute({
 })
 
 // ponytail: mesma situação do `kek={null}` de CopilotKeyPage/NotaPage -- sem KeychainProvider
-// ainda. `chaveIndice={null}` deixa BibliotecaPage em `a-preparar` sem abrir OPFS. Quem ligar
-// a sessão substitui os quatro valores por props reais, sem mexer na lógica de BibliotecaPage.
+// ainda. `chaveIndice={null}` deixa BibliotecaPage em `a-preparar` sem abrir OPFS. `accountId` já
+// vem da sessão real (S18-01); só falta o chaveiro, fora de âmbito desta spec.
 const BIBLIOTECA_STORE_FIXTURE = { ler: async () => null, gravar: async () => {}, apagar: async () => {} }
 
 function BibliotecaRouteComponent() {
-  return <BibliotecaPage notas={[]} accountId="" chaveIndice={null} store={BIBLIOTECA_STORE_FIXTURE} />
+  const { sessao } = useSession()
+  return <BibliotecaPage notas={[]} accountId={sessao?.id ?? ''} chaveIndice={null} store={BIBLIOTECA_STORE_FIXTURE} />
 }
 
 // Ticket S08-02, fatias 4-5: biblioteca de notas com busca cifrada no cliente. Rota normal

@@ -65,7 +65,7 @@ describe('MagicLinkCallback', () => {
     window.sessionStorage.clear()
   })
 
-  it('a Register ceremony success calls createCredential, completes it, and persists the session', async () => {
+  it('a Register ceremony success calls createCredential, completes it, and calls onAuthenticated with the account', async () => {
     verifyMagicLinkMock.mockResolvedValue({
       ok: true,
       magicLinkTicket: MAGIC_LINK_TICKET,
@@ -114,18 +114,13 @@ describe('MagicLinkCallback', () => {
       twoFactorRequirement: 'NotApplicable',
       twoFactorTicket: null,
     })
-    expect(window.sessionStorage.getItem('limmiar:account')).toBe(
-      JSON.stringify({
-        id: COMPLETED_ACCOUNT.id,
-        email: COMPLETED_ACCOUNT.email,
-        role: COMPLETED_ACCOUNT.role,
-        twoFactorRequirement: 'NotApplicable',
-        twoFactorTicket: null,
-      }),
-    )
+    // The component no longer writes to storage itself -- that is the caller's job now
+    // (SessionProvider.iniciarSessao, wired in app/routing/router.tsx). Proof is onAuthenticated
+    // being called with the right account, asserted above.
+    expect(window.sessionStorage.getItem('limmiar:account')).toBeNull()
   })
 
-  it('an Assert ceremony success calls getCredential with allowCredentials and persists the session', async () => {
+  it('an Assert ceremony success calls getCredential with allowCredentials and calls onAuthenticated', async () => {
     verifyMagicLinkMock.mockResolvedValue({
       ok: true,
       magicLinkTicket: MAGIC_LINK_TICKET,

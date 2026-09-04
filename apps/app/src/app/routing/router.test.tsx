@@ -6,6 +6,19 @@ import { i18n, dynamicActivate } from '../../shared/i18n'
 import { encodeBase64 } from '../../shared/lib/base64'
 import type { MicrofoneAutorizado } from '../../features/live-session/microfone'
 import { ESTADO_PENDENTE } from '../../entities/nota/nota'
+import type { Account } from '../../entities/account'
+
+const ACCOUNT: Account = {
+  id: '99999999-9999-9999-9999-999999999999',
+  email: 'sessao@example.com',
+  role: 'Professional',
+  twoFactorRequirement: 'NotApplicable',
+  twoFactorTicket: null,
+}
+
+function seedStoredAccount(account: Account) {
+  window.sessionStorage.setItem('limmiar:account', JSON.stringify(account))
+}
 
 vi.mock('../../widgets/auth-screen/AuthScreen', () => ({ AuthScreen: vi.fn(() => <div data-testid="auth-screen" />) }))
 vi.mock('../../features/magic-link-auth/MagicLinkCallback', () => ({
@@ -49,6 +62,14 @@ async function loadRouterAt(url: string, enableE2ERoutes = false) {
   return router
 }
 
+// `vi.resetModules()` in `loadRouterAt` gives router.tsx a fresh `SessionContext`; a statically
+// imported `<SessionProvider>` would be a different Context instance and `useSession()` inside the
+// freshly-loaded router would still see the no-provider default. Import it fresh here too.
+async function loadFreshSessionProvider() {
+  const { SessionProvider } = await import('../providers/SessionProvider')
+  return SessionProvider
+}
+
 describe('router', () => {
   beforeAll(async () => {
     // indexRoute's <Link> label goes through @lingui/react/macro's <Trans>, which throws
@@ -61,6 +82,7 @@ describe('router', () => {
     vi.clearAllMocks()
     vi.unstubAllEnvs()
     window.history.pushState({}, '', '/')
+    window.sessionStorage.clear()
     delete (window as unknown as Record<string, unknown>).__e2eDecodeQr
     delete (window as unknown as Record<string, unknown>).__e2eKekAdopted
   })
@@ -111,6 +133,23 @@ describe('router', () => {
     })
 
     expect(router.state.location.pathname).toBe('/')
+  })
+
+  it('resolves /settings/copilot with the real accountId from a live session', async () => {
+    seedStoredAccount(ACCOUNT)
+    const router = await loadRouterAt('/settings/copilot')
+    const SessionProvider = await loadFreshSessionProvider()
+
+    render(
+      <SessionProvider>
+        <RouterProvider router={router} />
+      </SessionProvider>,
+    )
+    await screen.findByTestId('copilot-key-setup')
+
+    const { CopilotKeySetup } = await import('../../features/copilot-byok/CopilotKeySetup')
+    const props = vi.mocked(CopilotKeySetup).mock.calls[0]![0]
+    expect(props.accountId).toBe(ACCOUNT.id)
   })
 
   it('the index route offers a link to /settings/copilot', async () => {
@@ -231,6 +270,23 @@ describe('router', () => {
     await expect(props.store.apagar()).resolves.toBeUndefined()
   })
 
+  it('resolves /biblioteca with the real accountId from a live session', async () => {
+    seedStoredAccount(ACCOUNT)
+    const router = await loadRouterAt('/biblioteca')
+    const SessionProvider = await loadFreshSessionProvider()
+
+    render(
+      <SessionProvider>
+        <RouterProvider router={router} />
+      </SessionProvider>,
+    )
+    await screen.findByTestId('biblioteca-page')
+
+    const { BibliotecaPage } = await import('../../pages/biblioteca/BibliotecaPage')
+    const props = vi.mocked(BibliotecaPage).mock.calls[0]![0]
+    expect(props.accountId).toBe(ACCOUNT.id)
+  })
+
   it('resolves /auth/magic-link and passes baseUrl/token through to MagicLinkCallback', async () => {
     const router = await loadRouterAt('/auth/magic-link?baseUrl=http%3A%2F%2Fapi.test&token=tok-123')
 
@@ -241,6 +297,28 @@ describe('router', () => {
     const props = vi.mocked(MagicLinkCallback).mock.calls[0]![0]
     expect(props.baseUrl).toBe('http://api.test')
     expect(props.token).toBe('tok-123')
+  })
+
+  it('/auth/magic-link wires onAuthenticated to iniciarSessao -- calling it records the session', async () => {
+    const router = await loadRouterAt('/auth/magic-link?baseUrl=http%3A%2F%2Fapi.test&token=tok-123')
+    const SessionProvider = await loadFreshSessionProvider()
+
+    render(
+      <SessionProvider>
+        <RouterProvider router={router} />
+      </SessionProvider>,
+    )
+    await screen.findByTestId('magic-link-callback')
+
+    const { MagicLinkCallback } = await import('../../features/magic-link-auth/MagicLinkCallback')
+    const props = vi.mocked(MagicLinkCallback).mock.calls[0]![0]
+    expect(window.sessionStorage.getItem('limmiar:account')).toBeNull()
+
+    act(() => {
+      props.onAuthenticated?.(ACCOUNT)
+    })
+
+    expect(window.sessionStorage.getItem('limmiar:account')).toBe(JSON.stringify(ACCOUNT))
   })
 
   it('/auth/magic-link falls back to empty strings when baseUrl/token are absent from the query string', async () => {
@@ -268,6 +346,28 @@ describe('router', () => {
     await expect(props.getGoogleIdToken()).rejects.toThrow(
       '/auth/screen is E2E-only scaffolding for magic-link-login.spec.ts, which never clicks the Google button.',
     )
+  })
+
+  it('/auth/screen (E2E-only) wires onAuthenticated to iniciarSessao -- calling it records the session', async () => {
+    const router = await loadRouterAt('/auth/screen?baseUrl=http%3A%2F%2Fapi.test&role=Professional', true)
+    const SessionProvider = await loadFreshSessionProvider()
+
+    render(
+      <SessionProvider>
+        <RouterProvider router={router} />
+      </SessionProvider>,
+    )
+    await screen.findByTestId('auth-screen')
+
+    const { AuthScreen } = await import('../../widgets/auth-screen/AuthScreen')
+    const props = vi.mocked(AuthScreen).mock.calls[0]![0]
+    expect(window.sessionStorage.getItem('limmiar:account')).toBeNull()
+
+    act(() => {
+      props.onAuthenticated?.(ACCOUNT)
+    })
+
+    expect(window.sessionStorage.getItem('limmiar:account')).toBe(JSON.stringify(ACCOUNT))
   })
 
   it('/auth/screen (E2E-only) derives a Patient initialRole', async () => {
@@ -300,6 +400,28 @@ describe('router', () => {
 
     const { RecoveryScreen } = await import('../../features/recovery/RecoveryScreen')
     expect(vi.mocked(RecoveryScreen).mock.calls[0]![0].baseUrl).toBe('http://api.test')
+  })
+
+  it('/auth/recover (E2E-only) wires onRecovered to iniciarSessao -- calling it records the session', async () => {
+    const router = await loadRouterAt('/auth/recover?baseUrl=http%3A%2F%2Fapi.test', true)
+    const SessionProvider = await loadFreshSessionProvider()
+
+    render(
+      <SessionProvider>
+        <RouterProvider router={router} />
+      </SessionProvider>,
+    )
+    await screen.findByTestId('recovery-screen')
+
+    const { RecoveryScreen } = await import('../../features/recovery/RecoveryScreen')
+    const props = vi.mocked(RecoveryScreen).mock.calls[0]![0]
+    expect(window.sessionStorage.getItem('limmiar:account')).toBeNull()
+
+    act(() => {
+      props.onRecovered?.(ACCOUNT)
+    })
+
+    expect(window.sessionStorage.getItem('limmiar:account')).toBe(JSON.stringify(ACCOUNT))
   })
 
   it('resolves /auth/recovery-phrase-setup (E2E-only), passes every search param through, and onDone is a no-op', async () => {
