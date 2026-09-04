@@ -16,6 +16,12 @@ página real, incluindo o único sítio autorizado a chamar `useSession()` fora 
    params, sem sessão. Todos os nove, sem exceção desde S18-04, só ligam `useSession()`/search
    params a props e repassam para uma página/componente em `pages/`/`features/` -- nenhum monta
    JSX de produto próprio (`IndexRouteComponent` fazia isso até S18-04; ver `pages/home/HomePage.tsx`).
+   `MagicLinkCallbackRouteComponent`/`RecoveryScreenE2ERouteComponent` montam
+   `MagicLinkCallback`/`RecoveryScreen` (de `features/`) diretamente desde S18-06 -- os wrappers
+   `pages/magic-link-callback/MagicLinkCallbackPage.tsx` e `pages/recovery/RecoveryPage.tsx` foram
+   apagados por reencaminharem todas as props sem tocar em nenhuma (nada como o `role: string` ->
+   `AccountRole` de `AuthPage.tsx`); não há regra `.dependency-cruiser.cjs` a proibir `app -> features`
+   (só `pages -> app`), e `SessionProvider` já importava direto de `features/copilot-byok`.
 2. `routeTree` regista as rotas E2E-only (`/auth/screen`, `/devices/pair-*`, `/auth/recover`,
    `/auth/recovery-phrase-setup`, `/e2e/microfone`) só quando `VITE_ENABLE_E2E_TEST_ROUTES ===
    'true'` -- gate de build-time, não `import.meta.env.DEV`, porque `playwright.config.ts` corre

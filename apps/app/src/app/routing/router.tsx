@@ -1,8 +1,8 @@
 import { createRootRoute, createRoute, createRouter } from '@tanstack/react-router'
 import { AuthPage } from '../../pages/auth/AuthPage'
 import { HomePage } from '../../pages/home/HomePage'
-import { MagicLinkCallbackPage } from '../../pages/magic-link-callback/MagicLinkCallbackPage'
-import { RecoveryPage } from '../../pages/recovery/RecoveryPage'
+import { MagicLinkCallback } from '../../features/magic-link-auth/MagicLinkCallback'
+import { RecoveryScreen } from '../../features/recovery/RecoveryScreen'
 import { RecoveryPhraseSetupPage } from '../../pages/recovery/RecoveryPhraseSetupPage'
 import { PairPrimaryPage } from '../../pages/device-pairing/PairPrimaryPage'
 import { PairNewPage } from '../../pages/device-pairing/PairNewPage'
@@ -54,7 +54,7 @@ const magicLinkCallbackRoute = createRoute({
 function MagicLinkCallbackRouteComponent() {
   const { baseUrl, token } = magicLinkCallbackRoute.useSearch()
   const { iniciarSessao } = useSession()
-  return <MagicLinkCallbackPage baseUrl={baseUrl} token={token} onAuthenticated={iniciarSessao} />
+  return <MagicLinkCallback baseUrl={baseUrl} token={token} onAuthenticated={iniciarSessao} />
 }
 
 // S02-04 fatia 7 / S02-05 — E2E scaffolding, not production UI: these screens have no navigation
@@ -99,7 +99,7 @@ const recoveryScreenE2ERoute = createRoute({
 function RecoveryScreenE2ERouteComponent() {
   const { baseUrl } = recoveryScreenE2ERoute.useSearch()
   const { iniciarSessao } = useSession()
-  return <RecoveryPage baseUrl={baseUrl} onRecovered={iniciarSessao} />
+  return <RecoveryScreen baseUrl={baseUrl} onRecovered={iniciarSessao} />
 }
 
 // Judgment call (S02-06): same "no navigation entry point yet" situation as the pairing routes
