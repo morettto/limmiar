@@ -53,10 +53,14 @@ export function criarSessaoDeConta(storage: KeyValueStorage): SessaoDeConta {
         return null
       }
 
-      return ehConta(parsed) ? parsed : null
+      // twoFactorTicket nunca sobrevive ao round-trip (S18-07): mesmo que `registar` já não o
+      // grave, uma sessão gravada antes deste fix ainda pode ter um ticket no sessionStorage --
+      // `ler()` força null para não devolver um segredo de 2FA a quem restaura a sessão.
+      return ehConta(parsed) ? { ...parsed, twoFactorTicket: null } : null
     },
     registar(account) {
-      storage.setItem(SESSION_STORAGE_KEY, JSON.stringify(account))
+      const { twoFactorTicket: _twoFactorTicket, ...semTicket } = account
+      storage.setItem(SESSION_STORAGE_KEY, JSON.stringify(semTicket))
     },
     terminar() {
       storage.removeItem(SESSION_STORAGE_KEY)

@@ -6,7 +6,7 @@ const ACCOUNT = {
   email: 'user@example.com',
   role: 'Professional' as const,
   twoFactorRequirement: 'NotApplicable' as const,
-  twoFactorTicket: null,
+  twoFactorTicket: 'a-real-2fa-ticket',
 }
 
 function createFakeStorage(): KeyValueStorage {
@@ -102,12 +102,31 @@ describe('criarSessaoDeConta', () => {
     expect(sessao.ler()).toBeNull()
   })
 
-  it('registar() then ler() round-trips the account', () => {
+  it('registar() then ler() round-trips the account, minus twoFactorTicket', () => {
     const sessao = criarSessaoDeConta(createFakeStorage())
 
     sessao.registar(ACCOUNT)
 
-    expect(sessao.ler()).toEqual(ACCOUNT)
+    expect(sessao.ler()).toEqual({ ...ACCOUNT, twoFactorTicket: null })
+  })
+
+  it('registar() never writes twoFactorTicket to storage -- the raw JSON has no trace of it', () => {
+    const storage = createFakeStorage()
+    const sessao = criarSessaoDeConta(storage)
+
+    sessao.registar(ACCOUNT)
+
+    const raw = storage.getItem('limmiar:account')
+    expect(raw).not.toBeNull()
+    expect(JSON.parse(raw!)).not.toHaveProperty('twoFactorTicket')
+  })
+
+  it('ler() returns twoFactorTicket: null even if a leftover ticket is still in storage (pre-fix session)', () => {
+    const storage = createFakeStorage()
+    storage.setItem('limmiar:account', JSON.stringify(ACCOUNT))
+    const sessao = criarSessaoDeConta(storage)
+
+    expect(sessao.ler()).toEqual({ ...ACCOUNT, twoFactorTicket: null })
   })
 
   it('terminar() then ler() returns null', () => {

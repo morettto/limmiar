@@ -20,6 +20,13 @@ function seedStoredAccount(account: Account) {
   window.sessionStorage.setItem('limmiar:account', JSON.stringify(account))
 }
 
+// S18-07: `registar()` nunca persiste `twoFactorTicket` -- as asserções contra o sessionStorage
+// bruto comparam com esta forma, não com `JSON.stringify(ACCOUNT)`.
+function contaPersistidaJson(account: Account): string {
+  const { twoFactorTicket: _twoFactorTicket, ...semTicket } = account
+  return JSON.stringify(semTicket)
+}
+
 vi.mock('../../widgets/auth-screen/AuthScreen', () => ({ AuthScreen: vi.fn(() => <div data-testid="auth-screen" />) }))
 vi.mock('../../features/magic-link-auth/MagicLinkCallback', () => ({
   MagicLinkCallback: vi.fn(() => <div data-testid="magic-link-callback" />),
@@ -127,6 +134,8 @@ describe('router', () => {
     await screen.findByText('Limmiar')
 
     expect(screen.getByTestId('conta-sessao').textContent).toBe(ACCOUNT.email)
+    // Semeado diretamente via seedStoredAccount (não passou por registar()) -- storage bruto
+    // continua igual ao que foi semeado.
     expect(window.sessionStorage.getItem('limmiar:account')).toBe(JSON.stringify(ACCOUNT))
 
     await act(async () => {
@@ -300,7 +309,7 @@ describe('router', () => {
       props.onAuthenticated?.(ACCOUNT)
     })
 
-    expect(window.sessionStorage.getItem('limmiar:account')).toBe(JSON.stringify(ACCOUNT))
+    expect(window.sessionStorage.getItem('limmiar:account')).toBe(contaPersistidaJson(ACCOUNT))
   })
 
   it('/auth/magic-link falls back to empty strings when baseUrl/token are absent from the query string', async () => {
@@ -343,7 +352,7 @@ describe('router', () => {
       props.onAuthenticated?.(ACCOUNT)
     })
 
-    expect(window.sessionStorage.getItem('limmiar:account')).toBe(JSON.stringify(ACCOUNT))
+    expect(window.sessionStorage.getItem('limmiar:account')).toBe(contaPersistidaJson(ACCOUNT))
   })
 
   it('/auth/screen (E2E-only) derives a Patient initialRole', async () => {
@@ -391,7 +400,7 @@ describe('router', () => {
       props.onRecovered?.(ACCOUNT)
     })
 
-    expect(window.sessionStorage.getItem('limmiar:account')).toBe(JSON.stringify(ACCOUNT))
+    expect(window.sessionStorage.getItem('limmiar:account')).toBe(contaPersistidaJson(ACCOUNT))
   })
 
   it('resolves /auth/recovery-phrase-setup (E2E-only), passes every search param through, and onDone is a no-op', async () => {

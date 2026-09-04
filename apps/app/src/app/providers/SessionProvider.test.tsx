@@ -25,6 +25,13 @@ function seedStoredAccount(account: Account) {
   window.sessionStorage.setItem('limmiar:account', JSON.stringify(account))
 }
 
+// S18-07: `registar()` nunca persiste `twoFactorTicket` -- as asserções contra o sessionStorage
+// bruto comparam com esta forma, não com `JSON.stringify(ACCOUNT)`.
+function contaPersistidaJson(account: Account): string {
+  const { twoFactorTicket: _twoFactorTicket, ...semTicket } = account
+  return JSON.stringify(semTicket)
+}
+
 function copilotKeyStorageKeyFor(accountId: string): string {
   return `${COPILOT_KEY_STORAGE_KEY}:${accountId}`
 }
@@ -100,7 +107,7 @@ describe('SessionProvider', () => {
     fireEvent.click(screen.getByRole('button', { name: 'iniciar' }))
 
     expect(screen.getByTestId('sessao').textContent).toBe(ACCOUNT.id)
-    expect(window.sessionStorage.getItem('limmiar:account')).toBe(JSON.stringify(ACCOUNT))
+    expect(window.sessionStorage.getItem('limmiar:account')).toBe(contaPersistidaJson(ACCOUNT))
   })
 
   it('terminarSessao clears storage and state, and purges the departing account (clearApiKey removes its copilot key)', async () => {
@@ -148,7 +155,7 @@ describe('SessionProvider', () => {
     fireEvent.click(screen.getByRole('button', { name: 'iniciar' }))
 
     expect(screen.getByTestId('sessao').textContent).toBe(ACCOUNT.id)
-    expect(window.sessionStorage.getItem('limmiar:account')).toBe(JSON.stringify(ACCOUNT))
+    expect(window.sessionStorage.getItem('limmiar:account')).toBe(contaPersistidaJson(ACCOUNT))
     // Dá tempo a uma purga indevida correr, se o código a disparasse por engano.
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(window.localStorage.getItem(copilotKeyStorageKeyFor(ACCOUNT.id))).not.toBeNull()
@@ -167,7 +174,7 @@ describe('SessionProvider', () => {
     fireEvent.click(screen.getByRole('button', { name: 'iniciar-outra' }))
 
     expect(screen.getByTestId('sessao').textContent).toBe(OUTRA_CONTA.id)
-    expect(window.sessionStorage.getItem('limmiar:account')).toBe(JSON.stringify(OUTRA_CONTA))
+    expect(window.sessionStorage.getItem('limmiar:account')).toBe(contaPersistidaJson(OUTRA_CONTA))
     await waitFor(() => {
       expect(window.localStorage.getItem(copilotKeyStorageKeyFor(ACCOUNT.id))).toBeNull()
     })

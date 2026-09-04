@@ -52,6 +52,15 @@ em OPFS...) é orquestração de fora, não responsabilidade de `entities` -- a 
   `twoFactorRequirement` que o predicado `valor is Account` depois trata como garantido para
   quem ler `sessao` do contexto -- mesmo que hoje nenhum consumidor leia esses dois campos.
   `twoFactorTicket` continua sem validação própria (`string | null` aceita qualquer coisa).
+- **`twoFactorTicket` nunca persiste em `sessionStorage` (S18-07).** É um segredo do fluxo 2FA
+  que o servidor já invalida ao consumir (~10 min, `TwoFactorEndpoints.cs`) -- não há razão para
+  o gravar. `registar()` grava a conta sem esse campo; `ler()` força-o sempre a `null` (defesa em
+  profundidade, cobre também sessões gravadas antes deste fix). O tipo `Account` continua com os
+  cinco campos -- mudar `ler()`/`sessao` para um tipo mais estreito propagaria por doze
+  assinaturas fora deste módulo (`SessionProvider`, `TotpChallenge`, `MagicLinkCallback`,
+  `RecoveryScreen`, páginas de rota...) sem ganho: quem lê `state.account.twoFactorTicket` fá-lo
+  sempre a partir da resposta fresca da API (`AuthScreen.tsx`, `RecoveryScreen.tsx`), nunca de
+  `useSession().sessao`.
 - **`recordSession`/`createSessionRecorder` foram apagados, não mantidos como alias.** Zero
   chamadores depois do S18-01: os três ecrãs de entrada pararam de gravar a sessão sozinhos, e
   `criarSessaoDeConta`/`sessaoDaConta` (com `ler`/`terminar` novos) tomaram o lugar por inteiro.
