@@ -195,8 +195,7 @@ describe('SessionProvider', () => {
       }),
     }))
     vi.resetModules()
-    // Fresh `useSession` too, não só `SessionProvider`: resetModules() cria um `SessionContext`
-    // novo; um Consumer estático veria o contexto errado (mesma pegadinha de router.test.tsx).
+    // Mesma pegadinha de `renderRouter` em router.test.tsx: `useSession` também tem de vir fresco.
     const { SessionProvider: SessionProviderComMockDePurga, useSession: useSessionFresco } = await import(
       './SessionProvider'
     )
@@ -228,13 +227,13 @@ describe('SessionProvider', () => {
     vi.resetModules()
   })
 
-  it('useSession outside a SessionProvider does not throw and returns the no-op default', () => {
-    expect(() => render(<Consumer />)).not.toThrow()
-    expect(screen.getByTestId('sessao').textContent).toBe('sem-sessao')
+  it('useSession outside a SessionProvider throws instead of returning a silent default', () => {
+    // Suprime o console.error do React sobre o erro não apanhado durante o render.
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
 
-    // Calling the default no-ops must not throw either.
-    expect(() => fireEvent.click(screen.getByRole('button', { name: 'iniciar' }))).not.toThrow()
-    expect(() => fireEvent.click(screen.getByRole('button', { name: 'terminar' }))).not.toThrow()
+    expect(() => render(<Consumer />)).toThrow('useSession: nenhum <SessionProvider> ancestral')
+
+    consoleError.mockRestore()
   })
 
   it('the context value keeps the same reference across a re-render that does not change `sessao`', () => {

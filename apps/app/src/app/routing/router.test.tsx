@@ -62,18 +62,22 @@ async function loadRouterAt(url: string, enableE2ERoutes = false) {
   return router
 }
 
-// `vi.resetModules()` in `loadRouterAt` gives router.tsx a fresh `SessionContext`; a statically
-// imported `<SessionProvider>` would be a different Context instance and `useSession()` inside the
-// freshly-loaded router would still see the no-provider default. Import it fresh here too.
-async function loadFreshSessionProvider() {
+// `vi.resetModules()` gives router.tsx a fresh `SessionContext`; a static `<SessionProvider>`
+// import would be a different instance, so `useSession()` in the fresh router would still throw.
+// Wraps every route in both providers unconditionally -- a no-op for routes needing neither.
+async function renderRouter(router: Awaited<ReturnType<typeof loadRouterAt>>) {
   const { SessionProvider } = await import('../providers/SessionProvider')
-  return SessionProvider
+  return render(
+    <I18nProvider i18n={i18n}>
+      <SessionProvider>
+        <RouterProvider router={router} />
+      </SessionProvider>
+    </I18nProvider>,
+  )
 }
 
 describe('router', () => {
   beforeAll(async () => {
-    // indexRoute's <Link> label goes through @lingui/react/macro's <Trans>, which throws
-    // without an I18nProvider ancestor -- only the two tests that render "/" need it wrapped.
     await dynamicActivate('pt-BR')
   })
 
@@ -90,7 +94,7 @@ describe('router', () => {
   it('does not register the E2E-only routes when VITE_ENABLE_E2E_TEST_ROUTES is unset', async () => {
     const router = await loadRouterAt('/auth/screen?baseUrl=http%3A%2F%2Fapi.test&role=Professional')
 
-    render(<RouterProvider router={router} />)
+    await renderRouter(router)
 
     expect(screen.queryByTestId('auth-screen')).toBeNull()
     expect(router.state.matches.some((match) => match.routeId === '/auth/screen')).toBe(false)
@@ -99,11 +103,7 @@ describe('router', () => {
   it('resolves the index route ("/") and renders the app shell, with no "Sair" button when there is no session', async () => {
     const router = await loadRouterAt('/')
 
-    render(
-      <I18nProvider i18n={i18n}>
-        <RouterProvider router={router} />
-      </I18nProvider>,
-    )
+    await renderRouter(router)
 
     const shell = await screen.findByText('Limmiar')
 
@@ -122,15 +122,8 @@ describe('router', () => {
   it('the index route shows the account email and a "Sair" button with a session; clicking it calls terminarSessao', async () => {
     seedStoredAccount(ACCOUNT)
     const router = await loadRouterAt('/')
-    const SessionProvider = await loadFreshSessionProvider()
 
-    render(
-      <I18nProvider i18n={i18n}>
-        <SessionProvider>
-          <RouterProvider router={router} />
-        </SessionProvider>
-      </I18nProvider>,
-    )
+    await renderRouter(router)
     await screen.findByText('Limmiar')
 
     expect(screen.getByTestId('conta-sessao').textContent).toBe(ACCOUNT.email)
@@ -147,7 +140,7 @@ describe('router', () => {
   it('resolves /settings/copilot with a locked keychain and an empty accountId, and its onDone navigates back to "/"', async () => {
     const router = await loadRouterAt('/settings/copilot')
 
-    render(<RouterProvider router={router} />)
+    await renderRouter(router)
     await screen.findByTestId('copilot-key-setup')
 
     const { CopilotKeySetup } = await import('../../features/copilot-byok/CopilotKeySetup')
@@ -165,13 +158,7 @@ describe('router', () => {
   it('resolves /settings/copilot with the real accountId from a live session', async () => {
     seedStoredAccount(ACCOUNT)
     const router = await loadRouterAt('/settings/copilot')
-    const SessionProvider = await loadFreshSessionProvider()
-
-    render(
-      <SessionProvider>
-        <RouterProvider router={router} />
-      </SessionProvider>,
-    )
+    await renderRouter(router)
     await screen.findByTestId('copilot-key-setup')
 
     const { CopilotKeySetup } = await import('../../features/copilot-byok/CopilotKeySetup')
@@ -182,11 +169,7 @@ describe('router', () => {
   it('the index route offers a link to /settings/copilot', async () => {
     const router = await loadRouterAt('/')
 
-    render(
-      <I18nProvider i18n={i18n}>
-        <RouterProvider router={router} />
-      </I18nProvider>,
-    )
+    await renderRouter(router)
     await screen.findByText('Limmiar')
 
     await act(async () => {
@@ -199,11 +182,7 @@ describe('router', () => {
   it('resolves /notas and mounts FilaEEditor with a single in-memory nota fixture (pendente, S/O/A/P)', async () => {
     const router = await loadRouterAt('/notas')
 
-    render(
-      <I18nProvider i18n={i18n}>
-        <RouterProvider router={router} />
-      </I18nProvider>,
-    )
+    await renderRouter(router)
     await screen.findByTestId('fila-e-editor')
 
     const { FilaEEditor } = await import('../../widgets/soap-editor/FilaEEditor')
@@ -216,11 +195,7 @@ describe('router', () => {
   it('/notas: aoTocar toca a âncora no reprodutor real (fatia 3)', async () => {
     const play = vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(() => Promise.resolve())
     const router = await loadRouterAt('/notas')
-    render(
-      <I18nProvider i18n={i18n}>
-        <RouterProvider router={router} />
-      </I18nProvider>,
-    )
+    await renderRouter(router)
     await screen.findByTestId('fila-e-editor')
 
     const { FilaEEditor } = await import('../../widgets/soap-editor/FilaEEditor')
@@ -234,11 +209,7 @@ describe('router', () => {
 
   it('/notas: onChangeNota atualiza a nota em memória, refletida na renderização seguinte', async () => {
     const router = await loadRouterAt('/notas')
-    render(
-      <I18nProvider i18n={i18n}>
-        <RouterProvider router={router} />
-      </I18nProvider>,
-    )
+    await renderRouter(router)
     await screen.findByTestId('fila-e-editor')
 
     const { FilaEEditor } = await import('../../widgets/soap-editor/FilaEEditor')
@@ -259,11 +230,7 @@ describe('router', () => {
   // O caminho de sucesso é coberto por NotaPage.test.tsx com os módulos duplados.
   it('/notas: aoAssinar sem sessão real cai no caminho de falha de rede -- item continua pendente', async () => {
     const router = await loadRouterAt('/notas')
-    render(
-      <I18nProvider i18n={i18n}>
-        <RouterProvider router={router} />
-      </I18nProvider>,
-    )
+    await renderRouter(router)
     await screen.findByTestId('fila-e-editor')
 
     const { FilaEEditor } = await import('../../widgets/soap-editor/FilaEEditor')
@@ -284,7 +251,7 @@ describe('router', () => {
   it('resolves /biblioteca com fixtures vazias e chaveIndice=null; o store fixture nunca acha nada persistido', async () => {
     const router = await loadRouterAt('/biblioteca')
 
-    render(<RouterProvider router={router} />)
+    await renderRouter(router)
     await screen.findByTestId('biblioteca-page')
 
     const { BibliotecaPage } = await import('../../pages/biblioteca/BibliotecaPage')
@@ -300,13 +267,7 @@ describe('router', () => {
   it('resolves /biblioteca with the real accountId from a live session', async () => {
     seedStoredAccount(ACCOUNT)
     const router = await loadRouterAt('/biblioteca')
-    const SessionProvider = await loadFreshSessionProvider()
-
-    render(
-      <SessionProvider>
-        <RouterProvider router={router} />
-      </SessionProvider>,
-    )
+    await renderRouter(router)
     await screen.findByTestId('biblioteca-page')
 
     const { BibliotecaPage } = await import('../../pages/biblioteca/BibliotecaPage')
@@ -317,7 +278,7 @@ describe('router', () => {
   it('resolves /auth/magic-link and passes baseUrl/token through to MagicLinkCallback', async () => {
     const router = await loadRouterAt('/auth/magic-link?baseUrl=http%3A%2F%2Fapi.test&token=tok-123')
 
-    render(<RouterProvider router={router} />)
+    await renderRouter(router)
     await screen.findByTestId('magic-link-callback')
 
     const { MagicLinkCallback } = await import('../../features/magic-link-auth/MagicLinkCallback')
@@ -328,13 +289,7 @@ describe('router', () => {
 
   it('/auth/magic-link wires onAuthenticated to iniciarSessao -- calling it records the session', async () => {
     const router = await loadRouterAt('/auth/magic-link?baseUrl=http%3A%2F%2Fapi.test&token=tok-123')
-    const SessionProvider = await loadFreshSessionProvider()
-
-    render(
-      <SessionProvider>
-        <RouterProvider router={router} />
-      </SessionProvider>,
-    )
+    await renderRouter(router)
     await screen.findByTestId('magic-link-callback')
 
     const { MagicLinkCallback } = await import('../../features/magic-link-auth/MagicLinkCallback')
@@ -351,7 +306,7 @@ describe('router', () => {
   it('/auth/magic-link falls back to empty strings when baseUrl/token are absent from the query string', async () => {
     const router = await loadRouterAt('/auth/magic-link')
 
-    render(<RouterProvider router={router} />)
+    await renderRouter(router)
     await screen.findByTestId('magic-link-callback')
 
     const { MagicLinkCallback } = await import('../../features/magic-link-auth/MagicLinkCallback')
@@ -363,7 +318,7 @@ describe('router', () => {
   it('/auth/screen (E2E-only) forwards baseUrl, derives a Professional initialRole, and its getGoogleIdToken always rejects', async () => {
     const router = await loadRouterAt('/auth/screen?baseUrl=http%3A%2F%2Fapi.test&role=Professional', true)
 
-    render(<RouterProvider router={router} />)
+    await renderRouter(router)
     await screen.findByTestId('auth-screen')
 
     const { AuthScreen } = await import('../../widgets/auth-screen/AuthScreen')
@@ -377,13 +332,7 @@ describe('router', () => {
 
   it('/auth/screen (E2E-only) wires onAuthenticated to iniciarSessao -- calling it records the session', async () => {
     const router = await loadRouterAt('/auth/screen?baseUrl=http%3A%2F%2Fapi.test&role=Professional', true)
-    const SessionProvider = await loadFreshSessionProvider()
-
-    render(
-      <SessionProvider>
-        <RouterProvider router={router} />
-      </SessionProvider>,
-    )
+    await renderRouter(router)
     await screen.findByTestId('auth-screen')
 
     const { AuthScreen } = await import('../../widgets/auth-screen/AuthScreen')
@@ -400,7 +349,7 @@ describe('router', () => {
   it('/auth/screen (E2E-only) derives a Patient initialRole', async () => {
     const router = await loadRouterAt('/auth/screen?baseUrl=http%3A%2F%2Fapi.test&role=Patient', true)
 
-    render(<RouterProvider router={router} />)
+    await renderRouter(router)
     await screen.findByTestId('auth-screen')
 
     const { AuthScreen } = await import('../../widgets/auth-screen/AuthScreen')
@@ -411,7 +360,7 @@ describe('router', () => {
   it('/auth/screen (E2E-only) falls back to an undefined initialRole for any other role value', async () => {
     const router = await loadRouterAt('/auth/screen?baseUrl=http%3A%2F%2Fapi.test&role=bogus', true)
 
-    render(<RouterProvider router={router} />)
+    await renderRouter(router)
     await screen.findByTestId('auth-screen')
 
     const { AuthScreen } = await import('../../widgets/auth-screen/AuthScreen')
@@ -422,7 +371,7 @@ describe('router', () => {
   it('resolves /auth/recover (E2E-only) and passes baseUrl through to RecoveryScreen', async () => {
     const router = await loadRouterAt('/auth/recover?baseUrl=http%3A%2F%2Fapi.test', true)
 
-    render(<RouterProvider router={router} />)
+    await renderRouter(router)
     await screen.findByTestId('recovery-screen')
 
     const { RecoveryScreen } = await import('../../features/recovery/RecoveryScreen')
@@ -431,13 +380,7 @@ describe('router', () => {
 
   it('/auth/recover (E2E-only) wires onRecovered to iniciarSessao -- calling it records the session', async () => {
     const router = await loadRouterAt('/auth/recover?baseUrl=http%3A%2F%2Fapi.test', true)
-    const SessionProvider = await loadFreshSessionProvider()
-
-    render(
-      <SessionProvider>
-        <RouterProvider router={router} />
-      </SessionProvider>,
-    )
+    await renderRouter(router)
     await screen.findByTestId('recovery-screen')
 
     const { RecoveryScreen } = await import('../../features/recovery/RecoveryScreen')
@@ -457,7 +400,7 @@ describe('router', () => {
       true,
     )
 
-    render(<RouterProvider router={router} />)
+    await renderRouter(router)
     await screen.findByTestId('recovery-phrase-setup')
 
     const { RecoveryPhraseSetup } = await import('../../features/recovery/RecoveryPhraseSetup')
@@ -476,7 +419,7 @@ describe('router', () => {
       true,
     )
 
-    render(<RouterProvider router={router} />)
+    await renderRouter(router)
     await screen.findByTestId('pair-primary-device')
 
     const { PairPrimaryDevice } = await import('../../features/device-pairing-primary/PairPrimaryDevice')
@@ -490,7 +433,7 @@ describe('router', () => {
   it('resolves /devices/pair-new (E2E-only); decode rejects and onKekAdopted no-ops when the E2E window hooks are not installed', async () => {
     const router = await loadRouterAt('/devices/pair-new?baseUrl=http%3A%2F%2Fapi.test', true)
 
-    render(<RouterProvider router={router} />)
+    await renderRouter(router)
     await screen.findByTestId('pair-new-device')
 
     const { PairNewDevice } = await import('../../features/device-pairing-new/PairNewDevice')
@@ -506,7 +449,7 @@ describe('router', () => {
     const e2eKekAdopted = vi.fn()
     Object.assign(window, { __e2eDecodeQr: e2eDecodeQr, __e2eKekAdopted: e2eKekAdopted })
 
-    render(<RouterProvider router={router} />)
+    await renderRouter(router)
     await screen.findByTestId('pair-new-device')
 
     const { PairNewDevice } = await import('../../features/device-pairing-new/PairNewDevice')
@@ -525,7 +468,7 @@ describe('router', () => {
     vi.mocked(abrirMicrofone).mockResolvedValue({ ok: false, motivo: 'consentimento-ausente' })
 
     const router = await loadRouterAt('/e2e/microfone?consentimento=revogado', true)
-    render(<RouterProvider router={router} />)
+    await renderRouter(router)
 
     fireEvent.click(await screen.findByRole('button', { name: 'Gravar' }))
 
@@ -539,7 +482,7 @@ describe('router', () => {
     vi.mocked(abrirMicrofone).mockResolvedValue({ ok: false, motivo: 'consentimento-ausente' })
 
     const router = await loadRouterAt('/e2e/microfone', true)
-    render(<RouterProvider router={router} />)
+    await renderRouter(router)
 
     fireEvent.click(await screen.findByRole('button', { name: 'Gravar' }))
 
@@ -552,7 +495,7 @@ describe('router', () => {
     vi.mocked(abrirMicrofone).mockResolvedValue({ ok: false, motivo: 'consentimento-ausente' })
 
     const router = await loadRouterAt('/e2e/microfone?consentimento=bogus', true)
-    render(<RouterProvider router={router} />)
+    await renderRouter(router)
 
     fireEvent.click(await screen.findByRole('button', { name: 'Gravar' }))
 
@@ -570,7 +513,7 @@ describe('router', () => {
     })
 
     const router = await loadRouterAt('/e2e/microfone?consentimento=concedido', true)
-    render(<RouterProvider router={router} />)
+    await renderRouter(router)
 
     fireEvent.click(await screen.findByRole('button', { name: 'Gravar' }))
 

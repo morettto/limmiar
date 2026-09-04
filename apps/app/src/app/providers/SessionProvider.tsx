@@ -22,12 +22,7 @@ export interface ContextoSessao {
   terminarSessao(): void
 }
 
-// Default when `useSession()` has no ancestor `<SessionProvider>`. `router.test.tsx` renders
-// `<RouterProvider>` without `AppProviders` in ~25 places; throwing here would force wrapping all
-// of them. Production always mounts via `App.tsx` -> `AppProviders`, which always includes this.
-const SEM_PROVIDER: ContextoSessao = { sessao: null, iniciarSessao: () => {}, terminarSessao: () => {} }
-
-const SessionContext = createContext<ContextoSessao>(SEM_PROVIDER)
+const SessionContext = createContext<ContextoSessao | null>(null)
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [sessao, setSessao] = useState<Account | null>(() => sessaoDaConta.ler())
@@ -57,5 +52,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 }
 
 export function useSession(): ContextoSessao {
-  return useContext(SessionContext)
+  const value = useContext(SessionContext)
+  if (value === null) {
+    throw new Error('useSession: nenhum <SessionProvider> ancestral')
+  }
+  return value
 }
