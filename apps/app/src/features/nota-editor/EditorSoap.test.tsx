@@ -2,7 +2,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { I18nProvider } from '@lingui/react'
 import { i18n, dynamicActivate } from '../../shared/i18n'
-import type { Nota } from '../../entities/nota/nota'
+import { ESTADO_ASSINADA, ESTADO_PENDENTE, type Nota } from '../../entities/nota/nota'
 import { EditorSoap } from './EditorSoap'
 
 const NOTA: Nota = {
@@ -15,7 +15,7 @@ const NOTA: Nota = {
     { id: 'A-0', secao: 'A', texto: 'hipótese', ancoras: [{ inicioMs: 2000, fimMs: 3000 }] },
     // P fica sem frases de propósito -- cobre a secção vazia.
   ],
-  estado: 'pendente',
+  estado: ESTADO_PENDENTE,
 }
 
 function renderEditor(props?: Partial<{ nota: Nota; onChange: (nota: Nota) => void; aoTocar: (ancora: unknown) => void; aoAssinar: (nota: Nota) => void }>) {
@@ -107,7 +107,7 @@ describe('EditorSoap', () => {
   })
 
   it('nota assinada renderiza os textarea em leitura apenas', () => {
-    renderEditor({ nota: { ...NOTA, estado: 'assinada' } })
+    renderEditor({ nota: { ...NOTA, estado: ESTADO_ASSINADA } })
 
     expect((screen.getByLabelText('Subjetivo 1') as HTMLTextAreaElement).readOnly).toBe(true)
   })

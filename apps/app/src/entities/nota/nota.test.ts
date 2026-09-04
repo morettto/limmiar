@@ -1,6 +1,14 @@
 import type { Afirmacao } from '@limmiar/copilot'
 import { describe, expect, it } from 'vitest'
-import { digestNota, editarFrase, rascunhoParaNota, textoCanonico, type SecaoSoap } from './nota'
+import {
+  ESTADO_ASSINADA,
+  ESTADO_PENDENTE,
+  digestNota,
+  editarFrase,
+  rascunhoParaNota,
+  textoCanonico,
+  type SecaoSoap,
+} from './nota'
 
 function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes)
@@ -133,5 +141,23 @@ describe('digestNota', () => {
     const resultado = await digestNota(nota)
 
     expect(bytesToHex(resultado)).toBe('b75bb3a41f6a7252028f851ea60f9d0b28c999991a15aa06717ba5cec477a12a')
+  })
+})
+
+describe('ESTADO_PENDENTE', () => {
+  it('estreita para o literal "pendente", não para EstadoNota inteiro (prova de tipo, não de runtime)', () => {
+    // Se ESTADO_PENDENTE estiver anotado como EstadoNota (o defeito original), esta linha
+    // não compila: TS2322, 'EstadoNota' não é atribuível a '"pendente"'. tsc -b --noEmit é o
+    // sinal vermelho/verde desta fatia, o runtime do vitest não distingue os dois tipos.
+    const literal: 'pendente' = ESTADO_PENDENTE
+    expect(literal).toBe('pendente')
+  })
+})
+
+describe('ESTADO_ASSINADA', () => {
+  it('estreita para o literal "assinada", não para EstadoNota inteiro (prova de tipo, não de runtime) -- canário irmão do de ESTADO_PENDENTE acima', () => {
+    // Mesmo mecanismo do canário acima: quem falha aqui é o tsc, não o expect.
+    const literal: 'assinada' = ESTADO_ASSINADA
+    expect(literal).toBe('assinada')
   })
 })

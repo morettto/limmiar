@@ -5,6 +5,7 @@ import { I18nProvider } from '@lingui/react'
 import { i18n, dynamicActivate } from '../../shared/i18n'
 import { encodeBase64 } from '../../shared/lib/base64'
 import type { MicrofoneAutorizado } from '../../features/live-session/microfone'
+import { ESTADO_PENDENTE } from '../../entities/nota/nota'
 
 vi.mock('../../widgets/auth-screen/AuthScreen', () => ({ AuthScreen: vi.fn(() => <div data-testid="auth-screen" />) }))
 vi.mock('../../features/magic-link-auth/MagicLinkCallback', () => ({
@@ -142,7 +143,7 @@ describe('router', () => {
     const { FilaEEditor } = await import('../../widgets/soap-editor/FilaEEditor')
     const props = vi.mocked(FilaEEditor).mock.calls[0]![0]
     expect(props.notas).toHaveLength(1)
-    expect(props.notas[0]!.estado).toBe('pendente')
+    expect(props.notas[0]!.estado).toBe(ESTADO_PENDENTE)
     expect(props.notas[0]!.frases.map((frase) => frase.secao)).toEqual(['S', 'O', 'A', 'P'])
   })
 
@@ -207,7 +208,7 @@ describe('router', () => {
     })
 
     const propsDepois = vi.mocked(FilaEEditor).mock.calls.at(-1)![0]
-    expect(propsDepois.notas[0]!.estado).toBe('pendente')
+    expect(propsDepois.notas[0]!.estado).toBe(ESTADO_PENDENTE)
     expect(screen.getByRole('alert')).toBeTruthy()
   })
 

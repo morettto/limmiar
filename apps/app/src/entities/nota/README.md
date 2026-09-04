@@ -51,15 +51,15 @@ ticket S08-06, `Nota` também é dona do seu `estado` (`EstadoNota`, `ESTADO_PEN
   `.tsx` a repeti-lo dispararia `lingui/no-unlocalized-strings`, que varre todo `.tsx` à
   procura de texto visível não traduzido; este ficheiro, puro `.ts`, está fora do seu
   alcance). Sem mudança de comportamento nem de cobertura -- só a keyword `export`.
-  **Este ficheiro é a referência única para esta justificação** -- `ORDEM_SECOES` reexportada
-  de um `.ts` puro, e o mesmo raciocínio aplicado via convenção `SCREAMING_SNAKE_CASE` (em
-  vez de reexportação, já que essas constantes nascem dentro de um `.tsx`) às constantes
-  `ESTADO_PENDENTE`/`ESTADO_ASSINADA` de `features/nota-fila/FilaAssinatura.tsx`. Os
-  READMEs de `features/nota-editor` e `features/nota-fila` linkam para aqui em vez de
-  repetirem o parágrafo.
-- Tipos: `SecaoSoap`, `FraseNota`, `Nota` (`src/nota.ts`), `EstadoNota` (`'pendente' |
-  'assinada'`); constantes `ESTADO_PENDENTE`, `ESTADO_ASSINADA` -- ver "Decisões da fatia
-  S08-06". `Afirmacao`/`Ancora` são importados de `@limmiar/copilot`, não redeclarados.
+  **Este ficheiro é a referência única para esta justificação** -- `ORDEM_SECOES` e
+  `ESTADO_PENDENTE`/`ESTADO_ASSINADA` (abaixo) nascem as duas neste `.ts` puro, fora do
+  alcance de `lingui/no-unlocalized-strings`. Os READMEs de `features/nota-editor` e
+  `features/nota-fila` linkam para aqui em vez de repetirem o parágrafo.
+- Tipos: `SecaoSoap`, `FraseNota`, `Nota` (`src/nota.ts`), `EstadoNota`
+  (`(typeof ESTADOS_NOTA)[number]`); constantes `ESTADO_PENDENTE`, `ESTADO_ASSINADA` e o
+  array `ESTADOS_NOTA` (`[ESTADO_PENDENTE, ESTADO_ASSINADA] as const`) -- as constantes vêm do S08-06,
+  o array e o tipo derivado do S08-16, ver "Decisões da fatia S08-16". `Afirmacao`/`Ancora` são
+  importados de `@limmiar/copilot`, não redeclarados.
 - `notaAssinaturaAad(noteId: string, revisao: number): Uint8Array<ArrayBuffer>`
   (`nota-crypto.ts`, fatia 5) -- `"limmiar/note-signature/v1|{noteId}|{revisao}"` em UTF-8.
 - `selarAssinatura(dek: CryptoKey, noteId: string, nota: Nota): Promise<Uint8Array<ArrayBuffer>>`
@@ -144,6 +144,12 @@ ticket S08-06, `Nota` também é dona do seu `estado` (`EstadoNota`, `ESTADO_PEN
   nasce sempre pendente -- a única mudança de comportamento desta fatia neste ficheiro
   (`digestNota`/`textoCanonico` continuam a ignorar `estado`, não faz parte da superfície
   assinada).
+
+## Decisões da fatia S08-16 (`EstadoNota` deriva das constantes)
+
+- **`ESTADOS_NOTA = [ESTADO_PENDENTE, ESTADO_ASSINADA] as const`, `EstadoNota = (typeof
+  ESTADOS_NOTA)[number]`.** Tipo derivado das constantes, para não haver duas listas de estados
+  a divergir; `FilaAssinatura.tsx` reusa o array como `ABAS`. Idioma de `ESTADOS_CONSENTIMENTO`.
 
 ## Fora de âmbito
 

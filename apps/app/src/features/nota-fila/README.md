@@ -37,9 +37,10 @@ prop -- buscá-los de um servidor é a fatia 4. Sem áudio, sem edição de nota
 
 - `FilaAssinatura` (`FilaAssinatura.tsx`) -- componente React, props `itens: readonly
   Nota[]`, `selecionadoId`, `onSelecionar`.
-- `EstadoNota`, `ESTADO_PENDENTE`, `ESTADO_ASSINADA` vivem em `entities/nota/nota.ts` desde
-  o ticket S08-06 (fundir `ItemFila` em `Nota`) -- este módulo importa-os de lá, não os
-  redeclara. Ver `entities/nota/README.md`, "Decisões da fatia S08-06".
+- `EstadoNota`, `ESTADO_PENDENTE` e `ESTADO_ASSINADA` vivem em `entities/nota/nota.ts`
+  desde o ticket S08-06 (fundir `ItemFila` em `Nota`); `ESTADOS_NOTA` (o array que dá as
+  `ABAS`) nasceu no S08-16 -- este módulo importa-os de lá, não os redeclara. Ver
+  `entities/nota/README.md`, "Decisões da fatia S08-06" e "Decisões da fatia S08-16".
 - `proximoIndice(indice, total, tecla)` (`navegacao-teclado.ts`) -- seam puro, sem React,
   sem browser, 100% interno a esta feature (desde S08-08; `ehAtalhoAssinar` viveu aqui até
   essa fatia, ver `features/nota-editor/README.md` para onde foi e porquê).
@@ -66,9 +67,9 @@ prop -- buscá-los de um servidor é a fatia 4. Sem áudio, sem edição de nota
   silenciosa. Upgrade, se um dia a spec pedir *wrap*: trocar só o corpo de `proximoIndice`,
   a assinatura do seam não muda.
 - **`ESTADO_PENDENTE`/`ESTADO_ASSINADA` são `const` exportadas, não literais inline.**
-  Mesma justificação (`lingui/no-unlocalized-strings`, convenção `SCREAMING_SNAKE_CASE`
-  isenta) de `ORDEM_SECOES` -- ver README de `entities/nota` (dono do padrão e, desde
-  S08-06, dono também destas duas constantes).
+  Mesma justificação de `ORDEM_SECOES`: reusadas aqui em `.tsx`, onde repetir o literal
+  dispararia `lingui/no-unlocalized-strings` -- ver README de `entities/nota` (dono do
+  padrão e, desde S08-06, dono também destas duas constantes).
 
 ## Fora de âmbito (fatias seguintes da spec S08)
 

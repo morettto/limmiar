@@ -3,7 +3,7 @@ import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import { I18nProvider } from '@lingui/react'
 import { webcrypto as limmiarWebcrypto } from '@limmiar/crypto'
 import { dynamicActivate, i18n } from '../../shared/i18n'
-import type { Nota } from '../../entities/nota/nota'
+import { ESTADO_PENDENTE, type Nota } from '../../entities/nota/nota'
 import { construirIndice, impressaoDigital, notaParaDoc, serializarIndice } from '../../features/nota-biblioteca/indice'
 import { chaveIndiceDaConta, selarIndice, type ChaveIndiceBusca } from '../../features/nota-biblioteca/indice-crypto'
 import { BibliotecaPage, type BibliotecaPageProps } from './BibliotecaPage'
@@ -35,7 +35,7 @@ function nota(): Nota {
     patientId: 'paciente-1',
     revisao: 0,
     frases: [{ id: 'S-0', secao: 'S', texto: 'termo-supersecreto-xyz', ancoras: [] }],
-    estado: 'pendente',
+    estado: ESTADO_PENDENTE,
   }
 }
 

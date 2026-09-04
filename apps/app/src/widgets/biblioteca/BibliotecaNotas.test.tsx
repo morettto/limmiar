@@ -4,14 +4,15 @@ import { I18nProvider } from '@lingui/react'
 import { i18n, dynamicActivate } from '../../shared/i18n'
 import type { GrupoPaciente } from '../../features/nota-biblioteca/biblioteca'
 import type { ResultadoBusca } from '../../features/nota-biblioteca/indice'
+import { ESTADO_ASSINADA, ESTADO_PENDENTE } from '../../entities/nota/nota'
 import { BibliotecaNotas } from './BibliotecaNotas'
 
 const GRUPOS: readonly GrupoPaciente[] = [
   {
     patientId: 'paciente-1',
     itens: [
-      { id: 'nota-1', patientId: 'paciente-1', estado: 'pendente', revisao: 0, frases: [] },
-      { id: 'nota-2', patientId: 'paciente-1', estado: 'assinada', revisao: 0, frases: [] },
+      { id: 'nota-1', patientId: 'paciente-1', estado: ESTADO_PENDENTE, revisao: 0, frases: [] },
+      { id: 'nota-2', patientId: 'paciente-1', estado: ESTADO_ASSINADA, revisao: 0, frases: [] },
     ],
   },
 ]
@@ -80,15 +81,15 @@ describe('BibliotecaNotas', () => {
       {
         patientId: 'paciente-2',
         itens: [
-          { id: 'nota-3', patientId: 'paciente-2', estado: 'pendente', revisao: 0, frases: [] },
-          { id: 'nota-4', patientId: 'paciente-2', estado: 'assinada', revisao: 0, frases: [] },
+          { id: 'nota-3', patientId: 'paciente-2', estado: ESTADO_PENDENTE, revisao: 0, frases: [] },
+          { id: 'nota-4', patientId: 'paciente-2', estado: ESTADO_ASSINADA, revisao: 0, frases: [] },
         ],
       },
       {
         patientId: 'paciente-1',
         itens: [
-          { id: 'nota-1', patientId: 'paciente-1', estado: 'pendente', revisao: 0, frases: [] },
-          { id: 'nota-2', patientId: 'paciente-1', estado: 'assinada', revisao: 0, frases: [] },
+          { id: 'nota-1', patientId: 'paciente-1', estado: ESTADO_PENDENTE, revisao: 0, frases: [] },
+          { id: 'nota-2', patientId: 'paciente-1', estado: ESTADO_ASSINADA, revisao: 0, frases: [] },
         ],
       },
     ]
@@ -113,11 +114,11 @@ describe('BibliotecaNotas', () => {
     const grupos: readonly GrupoPaciente[] = [
       {
         patientId: 'paciente-1',
-        itens: [{ id: 'nota-1', patientId: 'paciente-1', estado: 'pendente', revisao: 0, frases: [] }],
+        itens: [{ id: 'nota-1', patientId: 'paciente-1', estado: ESTADO_PENDENTE, revisao: 0, frases: [] }],
       },
       {
         patientId: 'paciente-2',
-        itens: [{ id: 'nota-3', patientId: 'paciente-2', estado: 'pendente', revisao: 0, frases: [] }],
+        itens: [{ id: 'nota-3', patientId: 'paciente-2', estado: ESTADO_PENDENTE, revisao: 0, frases: [] }],
       },
     ]
     renderWidget({ grupos, resultado: { estado: 'pronto', ids: ['nota-1'] } })

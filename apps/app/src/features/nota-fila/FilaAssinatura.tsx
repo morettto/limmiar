@@ -1,7 +1,7 @@
 import { useState, type KeyboardEvent } from 'react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { proximoIndice } from './navegacao-teclado'
-import { ESTADO_ASSINADA, ESTADO_PENDENTE, type EstadoNota, type Nota } from '../../entities/nota/nota'
+import { ESTADO_PENDENTE, ESTADOS_NOTA, type EstadoNota, type Nota } from '../../entities/nota/nota'
 
 export interface FilaAssinaturaProps {
   itens: readonly Nota[]
@@ -10,7 +10,7 @@ export interface FilaAssinaturaProps {
   onSelecionar: (id: string) => void
 }
 
-const ABAS: readonly EstadoNota[] = [ESTADO_PENDENTE, ESTADO_ASSINADA]
+const ABAS = ESTADOS_NOTA
 
 function indiceInicial(total: number): number {
   return total > 0 ? 0 : -1
