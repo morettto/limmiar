@@ -13,7 +13,9 @@ página real, incluindo o único sítio autorizado a chamar `useSession()` fora 
    `MagicLinkCallbackRouteComponent`, `AuthScreenE2ERouteComponent`,
    `RecoveryScreenE2ERouteComponent`, `CopilotKeyRouteComponent`, `BibliotecaRouteComponent`);
    as restantes (`PairPrimaryRouteComponent`, `PairNewRouteComponent`, ...) só repassam search
-   params, sem sessão.
+   params, sem sessão. Todos os nove, sem exceção desde S18-04, só ligam `useSession()`/search
+   params a props e repassam para uma página/componente em `pages/`/`features/` -- nenhum monta
+   JSX de produto próprio (`IndexRouteComponent` fazia isso até S18-04; ver `pages/home/HomePage.tsx`).
 2. `routeTree` regista as rotas E2E-only (`/auth/screen`, `/devices/pair-*`, `/auth/recover`,
    `/auth/recovery-phrase-setup`, `/e2e/microfone`) só quando `VITE_ENABLE_E2E_TEST_ROUTES ===
    'true'` -- gate de build-time, não `import.meta.env.DEV`, porque `playwright.config.ts` corre
@@ -29,6 +31,11 @@ página real, incluindo o único sítio autorizado a chamar `useSession()` fora 
 
 ## Decisões relevantes
 
+- **`CopilotKeyRouteComponent`/`BibliotecaRouteComponent` passam `sessao?.id ?? null`, nunca
+  `?? ''` (S18-04).** A sentinela `''` era a mesma armadilha que `assertAccountId`
+  (`features/copilot-byok/key-store.ts`) rejeita -- `CopilotKeyPageProps.accountId` e
+  `BibliotecaPageProps.accountId` são `string | null`, e cada página trata `null` no mesmo
+  ramo que tratava `''` antes (ver os dois READMEs/comentários dessas páginas).
 - **`router.test.tsx` monta toda rota por um único helper, `renderRouter(router)` (S18-03).**
   Antes, ~25 sítios repetiam manualmente `<I18nProvider>`/`<SessionProvider>` (ou nenhum dos
   dois), e `loadFreshSessionProvider()` duplicava, quase ao carácter, o comentário sobre

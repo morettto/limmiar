@@ -46,6 +46,9 @@ vi.mock('../../features/device-pairing-new/PairNewDevice', () => ({
 vi.mock('../../features/copilot-byok/CopilotKeySetup', () => ({
   CopilotKeySetup: vi.fn(() => <div data-testid="copilot-key-setup" />),
 }))
+vi.mock('../../pages/home/HomePage', () => ({
+  HomePage: vi.fn(() => <div data-testid="home-page" />),
+}))
 vi.mock('../../widgets/soap-editor/FilaEEditor', () => ({
   FilaEEditor: vi.fn(() => <div data-testid="fila-e-editor" />),
 }))
@@ -107,17 +110,17 @@ describe('router', () => {
     expect(router.state.matches.some((match) => match.routeId === '/auth/screen')).toBe(false)
   })
 
-  it('resolves the index route ("/") and renders the app shell, with no "Sair" button when there is no session', async () => {
+  // S18-04: IndexRouteComponent só liga useSession() a HomePage (mockada aqui) -- o conteúdo
+  // visual (span/botão condicionais a email) é provado por HomePage.test.tsx, sem router.
+  it('resolves the index route ("/") and wires useSession() to HomePage: email=null with no session', async () => {
     const router = await loadRouterAt('/')
 
     await renderRouter(router)
+    await screen.findByTestId('home-page')
 
-    const shell = await screen.findByText('Limmiar')
-
-    expect(shell.id).toBe('app-shell')
-    expect(shell.textContent).toContain('Limmiar')
-    expect(screen.queryByRole('button', { name: 'Sair' })).toBeNull()
-    expect(screen.queryByTestId('conta-sessao')).toBeNull()
+    const { HomePage } = await import('../../pages/home/HomePage')
+    const props = vi.mocked(HomePage).mock.calls[0]![0]
+    expect(props.email).toBeNull()
 
     const matches = router.state.matches
     expect(matches).toHaveLength(2)
@@ -126,24 +129,25 @@ describe('router', () => {
     expect(matches[1]?.fullPath).toBe('/')
   })
 
-  it('the index route shows the account email and a "Sair" button with a session; clicking it calls terminarSessao', async () => {
+  it('wires useSession() to HomePage: email set with a live session; onSair calls terminarSessao', async () => {
     seedStoredAccount(ACCOUNT)
     const router = await loadRouterAt('/')
 
     await renderRouter(router)
-    await screen.findByText('Limmiar')
+    await screen.findByTestId('home-page')
 
-    expect(screen.getByTestId('conta-sessao').textContent).toBe(ACCOUNT.email)
+    const { HomePage } = await import('../../pages/home/HomePage')
+    const props = vi.mocked(HomePage).mock.calls[0]![0]
+    expect(props.email).toBe(ACCOUNT.email)
     // Semeado diretamente via seedStoredAccount (não passou por registar()) -- storage bruto
     // continua igual ao que foi semeado.
     expect(window.sessionStorage.getItem('limmiar:account')).toBe(JSON.stringify(ACCOUNT))
 
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Sair' }))
+      props.onSair()
     })
 
     expect(window.sessionStorage.getItem('limmiar:account')).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Sair' })).toBeNull()
   })
 
   it('resolves /settings/copilot with a locked keychain and an empty accountId, and its onDone navigates back to "/"', async () => {
@@ -173,19 +177,6 @@ describe('router', () => {
     const { CopilotKeySetup } = await import('../../features/copilot-byok/CopilotKeySetup')
     const props = vi.mocked(CopilotKeySetup).mock.calls[0]![0]
     expect(props.accountId).toBe(ACCOUNT.id)
-  })
-
-  it('the index route offers a link to /settings/copilot', async () => {
-    const router = await loadRouterAt('/')
-
-    await renderRouter(router)
-    await screen.findByText('Limmiar')
-
-    await act(async () => {
-      fireEvent.click(screen.getByRole('link', { name: 'Configurar copiloto de IA' }))
-    })
-
-    expect(router.state.location.pathname).toBe('/settings/copilot')
   })
 
   it('resolves /notas and mounts FilaEEditor with a single in-memory nota fixture (pendente, S/O/A/P)', async () => {
@@ -266,7 +257,7 @@ describe('router', () => {
     const { BibliotecaPage } = await import('../../pages/biblioteca/BibliotecaPage')
     const props = vi.mocked(BibliotecaPage).mock.calls[0]![0]
     expect(props.notas).toEqual([])
-    expect(props.accountId).toBe('')
+    expect(props.accountId).toBeNull()
     expect(props.chaveIndice).toBeNull()
     await expect(props.store.ler()).resolves.toBeNull()
     await expect(props.store.gravar(new Uint8Array())).resolves.toBeUndefined()

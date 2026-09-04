@@ -16,7 +16,7 @@ import { BibliotecaNotas } from '../../widgets/biblioteca/BibliotecaNotas'
 
 export interface BibliotecaPageProps {
   notas: readonly Nota[]
-  accountId: string
+  accountId: string | null
   chaveIndice: ChaveIndiceBusca | null
   store: { ler: LerSelado; gravar: GravarSelado; apagar: ApagarSelado }
 }
@@ -39,22 +39,24 @@ export function BibliotecaPage({ notas, accountId, chaveIndice, store }: Bibliot
   const lerAtuais = useEffectEvent(() => ({ notas, store, mensagemErroBusca }))
 
   useEffect(() => {
-    if (chaveIndice === null) {
+    // accountId===null cai no mesmo ramo que chaveIndice===null já cobria: sem conta real, não
+    // há índice para restaurar/construir -- ver README, "accountId===null tratado no mesmo lugar".
+    if (chaveIndice === null || accountId === null) {
       return
     }
     let cancelado = false
     const { notas, store, mensagemErroBusca } = lerAtuais()
 
-    async function preparar(chaveAtual: ChaveIndiceBusca) {
+    async function preparar(chaveAtual: ChaveIndiceBusca, accountIdAtual: string) {
       const impressao = impressaoDigital(notas)
-      const restaurado = await restaurarIndice(store, chaveAtual, accountId, impressao)
+      const restaurado = await restaurarIndice(store, chaveAtual, accountIdAtual, impressao)
       if (cancelado) return
       if (restaurado) {
         setIndice(restaurado)
         return
       }
       const construido = construirIndice(notas.map(notaParaDoc))
-      await persistirIndice(store.gravar, chaveAtual, accountId, construido, impressao)
+      await persistirIndice(store.gravar, chaveAtual, accountIdAtual, construido, impressao)
       if (cancelado) return
       setIndice(construido)
     }
@@ -63,7 +65,7 @@ export function BibliotecaPage({ notas, accountId, chaveIndice, store }: Bibliot
     // Sem `.catch`, uma OPFS negada ou uma chave/AAD errada vira rejeição não tratada e a
     // página encalha em "Preparando a busca..." sem sinal nenhum -- mesmo padrão de
     // `PatientWallet.tsx` (`load(kek).catch(...)`), mesmo `role="alert"`.
-    preparar(chaveIndice).catch(() => {
+    preparar(chaveIndice, accountId).catch(() => {
       if (!cancelado) {
         setErro(mensagemErroBusca)
       }

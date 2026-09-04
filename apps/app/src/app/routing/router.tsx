@@ -1,6 +1,6 @@
-import { createRootRoute, createRoute, createRouter, Link } from '@tanstack/react-router'
-import { Trans } from '@lingui/react/macro'
+import { createRootRoute, createRoute, createRouter } from '@tanstack/react-router'
 import { AuthPage } from '../../pages/auth/AuthPage'
+import { HomePage } from '../../pages/home/HomePage'
 import { MagicLinkCallbackPage } from '../../pages/magic-link-callback/MagicLinkCallbackPage'
 import { RecoveryPage } from '../../pages/recovery/RecoveryPage'
 import { RecoveryPhraseSetupPage } from '../../pages/recovery/RecoveryPhraseSetupPage'
@@ -25,26 +25,9 @@ function readSearchString(search: Record<string, unknown>, key: string): string 
 
 const rootRoute = createRootRoute()
 
-// ponytail: this <div id="app-shell"> is a navigation stub, not a real landing page --
-// replace it together with the real landing page, not as a standalone cleanup.
 function IndexRouteComponent() {
   const { sessao, terminarSessao } = useSession()
-  return (
-    <div id="app-shell">
-      Limmiar
-      <Link to="/settings/copilot">
-        <Trans>Configurar copiloto de IA</Trans>
-      </Link>
-      {sessao !== null ? (
-        <>
-          <span data-testid="conta-sessao">{sessao.email}</span>
-          <button type="button" onClick={terminarSessao}>
-            <Trans>Sair</Trans>
-          </button>
-        </>
-      ) : null}
-    </div>
-  )
+  return <HomePage email={sessao?.email ?? null} onSair={terminarSessao} />
 }
 
 const indexRoute = createRoute({
@@ -223,7 +206,7 @@ function E2eMicrofoneRouteComponent() {
 // accountId -- reintroduced after S07-04 follow-up B3 removed it, for that reason.
 function CopilotKeyRouteComponent() {
   const { sessao } = useSession()
-  return <CopilotKeyPage accountId={sessao?.id ?? ''} />
+  return <CopilotKeyPage accountId={sessao?.id ?? null} />
 }
 
 const copilotSettingsRoute = createRoute({
@@ -254,7 +237,7 @@ const BIBLIOTECA_STORE_FIXTURE = { ler: async () => null, gravar: async () => {}
 
 function BibliotecaRouteComponent() {
   const { sessao } = useSession()
-  return <BibliotecaPage notas={[]} accountId={sessao?.id ?? ''} chaveIndice={null} store={BIBLIOTECA_STORE_FIXTURE} />
+  return <BibliotecaPage notas={[]} accountId={sessao?.id ?? null} chaveIndice={null} store={BIBLIOTECA_STORE_FIXTURE} />
 }
 
 // Ticket S08-02, fatias 4-5: biblioteca de notas com busca cifrada no cliente. Rota normal
