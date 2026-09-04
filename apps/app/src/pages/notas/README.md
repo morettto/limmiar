@@ -126,18 +126,20 @@ decisão.
   chamada a `openRecord`/`sealAssinatura` -- mesma forma estrutural do `dek === null` em
   `pages/biblioteca/BibliotecaPage.tsx`.
 - **`kek` virou prop de `NotaPage` (na altura, opcional com default `= null`), não ficou
-  só o valor do fixture trocado por dentro.** O ticket S08-07 pedia a solução mais estreita
-  (só o tipo/valor do fixture + a guarda, sem prop) -- mas um `const` de módulo fixo em
-  `null`, sem seam nenhum para o substituir, faz a guarda interceptar **toda** chamada a
-  `aoAssinar`, incluindo dentro dos testes (`vi.mock` dos módulos de cripto/api não alcança
-  um `const` interno do próprio ficheiro sob teste). Isso tornava o resto de `aoAssinar`
+  só o valor do fixture trocado por dentro.** A primeira tentativa, mais estreita (só o
+  tipo/valor do fixture + a guarda, sem prop), foi uma preferência de execução -- do
+  orquestrador ao despachar o ticket (decisão de âmbito), não uma cláusula do ticket
+  S08-07: nenhum dos seus três critérios de aceite menciona prop vs. constante. Essa
+  tentativa esbarrou num problema técnico: um `const` de módulo fixo em `null`, sem seam
+  nenhum para o substituir, faz a guarda interceptar **toda** chamada a `aoAssinar`,
+  incluindo dentro dos testes (`vi.mock` dos módulos de cripto/api não alcança um `const`
+  interno do próprio ficheiro sob teste). Isso tornava o resto de `aoAssinar`
   (`openRecord` → `sealEntry` → `appendPatientEntry` → `assinarNota`, os três desfechos)
   permanentemente morto e sem cobertura -- quebrando 5 dos 7 testes da fatia 5 e violando o
   piso de 100% de branch do portão de cobertura. Essa necessidade técnica (seam de teste
-  inexistente + piso de cobertura) justificou a prop opcional na altura -- não foi uma
-  cláusula do ticket a autorizá-la, o ticket só descrevia a solução preferida, mais
-  estreita. A ronda 1 de correção abaixo tornou `kek` **obrigatória**, alinhando com o
-  critério de aceite 2 do ticket.
+  inexistente + piso de cobertura) justificou a prop opcional na altura. A ronda 1 de
+  correção abaixo tornou `kek` **obrigatória**, alinhando com o critério de aceite 2 do
+  ticket (`kek: CryptoKey | null`).
 - **`record`/`baseUrl`/`accountId`/`accessToken` continuam fixtures locais, não props.**
   Não existe ainda nenhum `KeychainProvider`/sessão real montada em lado nenhum da app
   (mesma situação, mesmo motivo, do `kek={null}, accountId=""` de
@@ -208,11 +210,11 @@ decisão.
 - **Correção de atribuição:** a frase "o ticket previa a válvula de escape" que descrevia
   a decisão acima em `.harness/diff/S08-07.md` não vinha do ticket -- era uma instrução do
   orquestrador no prompt de despacho do implementador dessa fatia, não texto do ficheiro do
-  ticket. O ticket S08-07 só tinha os três critérios de aceite; a bullet acima ("O ticket
-  S08-07 pedia a solução mais estreita...") já descrevia a razão técnica real (seam de
-  teste inexistente + piso de cobertura de branch) sem citar o ticket como fonte de
-  permissão -- mantida como estava, só reforçada aqui para não repetir o engano no
-  artefacto de diff.
+  ticket. O ticket S08-07 só tinha os três critérios de aceite. A bullet acima manteve, na
+  altura, uma variante do mesmo engano ("o ticket S08-07 pedia a solução mais estreita...")
+  -- só corrigida na ronda 2 ([[S08-19 README de pages-notas atribui ao ticket S08-07 uma
+  preferência que ele não formula]]): a preferência pela solução mais estreita era do
+  orquestrador, ao despachar o ticket (decisão de âmbito), não do ticket em si.
 
 ## Fora de âmbito
 
