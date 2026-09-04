@@ -12,6 +12,7 @@
 - Keep components modular and concerns clearly separated.
 - Prefer established, well-maintained libraries when they reduce overall complexity or improve reliability. Do not reimplement common functionality without a clear reason.
 - Lean on the dependencies already in the project before writing your own implementation or adding packages. Do not assume a library lacks a capability without checking its documentation and types.
+- A dependency that **parses or deserializes** already-decrypted user data — turns bytes or text read back from storage into a structure of its own (an index, a tree, an object graph) — never travels in a grouped batch of the dependency pass (`/build:deps`): it is upgraded as its own item, with its changelog read, even for a patch. Rendering or transforming values the app has already parsed is not this class (that is `react`); today the class holds only `minisearch` (`apps/app/src/features/nota-biblioteca`), and the reasoning is in `docs/adr/0010-minisearch-fica-em-intervalo-o-lockfile-e-o-pin.md`.
 - Make architectural decisions for the long term. Do not accept a stopgap that only works for now and is meant to be replaced later.
 
 - Write comments only for what the code cannot say: a *why*, a constraint, a decision that looks wrong without context. Never restate what the line below already shows.

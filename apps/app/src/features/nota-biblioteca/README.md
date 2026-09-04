@@ -118,6 +118,11 @@ ver os READMEs dos dois para o fluxo de composição.
   instalada (`minisearch@^7.2.0`, dependência de produção já presente em `package.json`)
   resolve. Subir a escada: não há utilitário do repo nem da stdlib que cubra isto, e a
   lib já estava instalada -- não foi adicionada para esta fatia.
+- **O intervalo `^7.2.0` fica (ticket S08-17), não se fixa a versão exata.** `pnpm-lock.yaml`
+  está versionado e já fixa `minisearch@7.2.0` com integridade; todo o `pnpm install` de CI
+  corre `--frozen-lockfile`, portanto o `^` só se move num `pnpm update` deliberado. Motivo
+  completo, data de revisão e regra de lote: ADR-0010, em
+  `docs/adr/0010-minisearch-fica-em-intervalo-o-lockfile-e-o-pin.md`.
 - **`OPCOES_INDICE` é uma única constante exportada, reusada literalmente por
   `construirIndice` e `carregarIndice`.** `minisearch` serializa a estrutura do índice
   (`fieldIds`, `storedFields`) mas continua a precisar de `fields`/`storeFields` no
