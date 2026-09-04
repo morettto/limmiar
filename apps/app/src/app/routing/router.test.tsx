@@ -96,7 +96,7 @@ describe('router', () => {
     expect(router.state.matches.some((match) => match.routeId === '/auth/screen')).toBe(false)
   })
 
-  it('resolves the index route ("/") and renders the app shell', async () => {
+  it('resolves the index route ("/") and renders the app shell, with no "Sair" button when there is no session', async () => {
     const router = await loadRouterAt('/')
 
     render(
@@ -109,12 +109,39 @@ describe('router', () => {
 
     expect(shell.id).toBe('app-shell')
     expect(shell.textContent).toContain('Limmiar')
+    expect(screen.queryByRole('button', { name: 'Sair' })).toBeNull()
+    expect(screen.queryByTestId('conta-sessao')).toBeNull()
 
     const matches = router.state.matches
     expect(matches).toHaveLength(2)
     expect(matches[0]?.routeId).toBe('__root__')
     expect(matches[1]?.routeId).toBe('/')
     expect(matches[1]?.fullPath).toBe('/')
+  })
+
+  it('the index route shows the account email and a "Sair" button with a session; clicking it calls terminarSessao', async () => {
+    seedStoredAccount(ACCOUNT)
+    const router = await loadRouterAt('/')
+    const SessionProvider = await loadFreshSessionProvider()
+
+    render(
+      <I18nProvider i18n={i18n}>
+        <SessionProvider>
+          <RouterProvider router={router} />
+        </SessionProvider>
+      </I18nProvider>,
+    )
+    await screen.findByText('Limmiar')
+
+    expect(screen.getByTestId('conta-sessao').textContent).toBe(ACCOUNT.email)
+    expect(window.sessionStorage.getItem('limmiar:account')).toBe(JSON.stringify(ACCOUNT))
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Sair' }))
+    })
+
+    expect(window.sessionStorage.getItem('limmiar:account')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Sair' })).toBeNull()
   })
 
   it('resolves /settings/copilot with a locked keychain and an empty accountId, and its onDone navigates back to "/"', async () => {

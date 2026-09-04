@@ -24,7 +24,9 @@ em OPFS...) é orquestração de fora, não responsabilidade de `entities` -- a 
    tenta restaurar a sessão gravada. Quatro ramos degradam para `null`, nunca lançam: nada
    gravado; JSON corrompido; valor parseado que não é um objeto não-nulo (array e o literal
    `"null"` incluídos); objeto sem `id` string não-vazio.
-4. `terminar()` (S18-02, fora desta fatia) remove a entrada de `sessionStorage`.
+4. `terminar()` remove a entrada de `sessionStorage`. Desde S18-02, `SessionProvider.terminarSessao()`
+   chama-o e depois dispara a purga de outros dados da conta (ver `app/providers/SessionProvider.tsx`
+   e `features/copilot-byok/README.md`, ponto 5) -- esta slice continua sem saber nada dessa purga.
 
 ## Pontos de entrada
 
@@ -58,8 +60,9 @@ em OPFS...) é orquestração de fora, não responsabilidade de `entities` -- a 
 
 ## Fora de âmbito
 
-- **Purga da sessão e de tudo o que depende dela no logout/troca de conta** -- `terminar()`
-  existe nesta fatia, mas nenhum botão "Sair" o chama ainda; é o
-  [[S18-02 Sair da conta por um ponto único de purga|S18-02]].
 - **Chaveiro (KEK) real** -- `entities/account` não sabe nada de criptografia de repouso; quem
   monta o chaveiro é a spec S01, ainda não ligada a `SessionProvider`.
+
+[[S18-02 Sair da conta por um ponto único de purga|S18-02]] fechou o botão "Sair" e a purga por
+conta (`app/providers/SessionProvider.tsx`, `PURGAS`/`purgarConta`) -- fora desta slice, ver
+`features/copilot-byok/README.md` ponto 5 para o desenho completo.

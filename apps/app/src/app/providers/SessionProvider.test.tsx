@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { afterEach, describe, expect, it } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { Account } from '../../entities/account'
+import { COPILOT_KEY_STORAGE_KEY } from '../../features/copilot-byok/key-store'
 import { SessionProvider, useSession } from './SessionProvider'
 
 const ACCOUNT: Account = {
@@ -12,8 +13,29 @@ const ACCOUNT: Account = {
   twoFactorTicket: null,
 }
 
+const OUTRA_CONTA: Account = {
+  id: '22222222-2222-2222-2222-222222222222',
+  email: 'outra@example.com',
+  role: 'Professional',
+  twoFactorRequirement: 'NotApplicable',
+  twoFactorTicket: null,
+}
+
 function seedStoredAccount(account: Account) {
   window.sessionStorage.setItem('limmiar:account', JSON.stringify(account))
+}
+
+function copilotKeyStorageKeyFor(accountId: string): string {
+  return `${COPILOT_KEY_STORAGE_KEY}:${accountId}`
+}
+
+// Semeia uma entrada real de localStorage (não um mock) no formato que key-store.ts grava --
+// prova o efeito real de clearApiKey, não uma chamada espiada.
+function seedCopilotKeyEnvelope(accountId: string) {
+  window.localStorage.setItem(
+    copilotKeyStorageKeyFor(accountId),
+    JSON.stringify({ providerId: 'openai', wrappedDek: 'x', ciphertext: 'y' }),
+  )
 }
 
 function Consumer() {
@@ -22,6 +44,7 @@ function Consumer() {
     <div>
       <p data-testid="sessao">{sessao === null ? 'sem-sessao' : sessao.id}</p>
       <button onClick={() => iniciarSessao(ACCOUNT)}>iniciar</button>
+      <button onClick={() => iniciarSessao(OUTRA_CONTA)}>iniciar-outra</button>
       <button onClick={() => terminarSessao()}>terminar</button>
     </div>
   )
@@ -50,6 +73,8 @@ describe('SessionProvider', () => {
   afterEach(() => {
     cleanup()
     window.sessionStorage.clear()
+    window.localStorage.clear()
+    vi.restoreAllMocks()
   })
 
   it('mounts with `sessao` pre-filled when the storage already has an account', () => {
@@ -78,8 +103,9 @@ describe('SessionProvider', () => {
     expect(window.sessionStorage.getItem('limmiar:account')).toBe(JSON.stringify(ACCOUNT))
   })
 
-  it('terminarSessao clears storage and state', () => {
+  it('terminarSessao clears storage and state, and purges the departing account (clearApiKey removes its copilot key)', async () => {
     seedStoredAccount(ACCOUNT)
+    seedCopilotKeyEnvelope(ACCOUNT.id)
     render(
       <SessionProvider>
         <Consumer />
@@ -91,6 +117,115 @@ describe('SessionProvider', () => {
 
     expect(screen.getByTestId('sessao').textContent).toBe('sem-sessao')
     expect(window.sessionStorage.getItem('limmiar:account')).toBeNull()
+    await waitFor(() => {
+      expect(window.localStorage.getItem(copilotKeyStorageKeyFor(ACCOUNT.id))).toBeNull()
+    })
+  })
+
+  it('terminarSessao with no session is a no-op: no purge, nothing to clear', () => {
+    render(
+      <SessionProvider>
+        <Consumer />
+      </SessionProvider>,
+    )
+    expect(screen.getByTestId('sessao').textContent).toBe('sem-sessao')
+
+    expect(() => fireEvent.click(screen.getByRole('button', { name: 'terminar' }))).not.toThrow()
+
+    expect(screen.getByTestId('sessao').textContent).toBe('sem-sessao')
+  })
+
+  it('iniciarSessao with the same account already registered re-registers it without purging (A -> A)', async () => {
+    seedStoredAccount(ACCOUNT)
+    seedCopilotKeyEnvelope(ACCOUNT.id)
+    render(
+      <SessionProvider>
+        <Consumer />
+      </SessionProvider>,
+    )
+    expect(screen.getByTestId('sessao').textContent).toBe(ACCOUNT.id)
+
+    fireEvent.click(screen.getByRole('button', { name: 'iniciar' }))
+
+    expect(screen.getByTestId('sessao').textContent).toBe(ACCOUNT.id)
+    expect(window.sessionStorage.getItem('limmiar:account')).toBe(JSON.stringify(ACCOUNT))
+    // Dá tempo a uma purga indevida correr, se o código a disparasse por engano.
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(window.localStorage.getItem(copilotKeyStorageKeyFor(ACCOUNT.id))).not.toBeNull()
+  })
+
+  it('iniciarSessao with a different account purges the previous one before mounting the new one (A -> B)', async () => {
+    seedStoredAccount(ACCOUNT)
+    seedCopilotKeyEnvelope(ACCOUNT.id)
+    render(
+      <SessionProvider>
+        <Consumer />
+      </SessionProvider>,
+    )
+    expect(screen.getByTestId('sessao').textContent).toBe(ACCOUNT.id)
+
+    fireEvent.click(screen.getByRole('button', { name: 'iniciar-outra' }))
+
+    expect(screen.getByTestId('sessao').textContent).toBe(OUTRA_CONTA.id)
+    expect(window.sessionStorage.getItem('limmiar:account')).toBe(JSON.stringify(OUTRA_CONTA))
+    await waitFor(() => {
+      expect(window.localStorage.getItem(copilotKeyStorageKeyFor(ACCOUNT.id))).toBeNull()
+    })
+  })
+
+  it('iniciarSessao with no prior session registers the account without purging anything (sem sessão)', () => {
+    render(
+      <SessionProvider>
+        <Consumer />
+      </SessionProvider>,
+    )
+    expect(screen.getByTestId('sessao').textContent).toBe('sem-sessao')
+
+    expect(() => fireEvent.click(screen.getByRole('button', { name: 'iniciar' }))).not.toThrow()
+
+    expect(screen.getByTestId('sessao').textContent).toBe(ACCOUNT.id)
+  })
+
+  it('a purge that throws synchronously does not stop terminarSessao from clearing the session', async () => {
+    // Prova que o `async (purga) => purga(accountId)` dentro do .map() é necessário: se alguém o
+    // remover, clearApiKey (síncrona e lançando) escaparia do Promise.allSettled e este teste rebenta.
+    vi.doMock('../../features/copilot-byok/key-store', () => ({
+      clearApiKey: vi.fn(() => {
+        throw new Error('purge boom')
+      }),
+    }))
+    vi.resetModules()
+    // Fresh `useSession` too, não só `SessionProvider`: resetModules() cria um `SessionContext`
+    // novo; um Consumer estático veria o contexto errado (mesma pegadinha de router.test.tsx).
+    const { SessionProvider: SessionProviderComMockDePurga, useSession: useSessionFresco } = await import(
+      './SessionProvider'
+    )
+
+    function ConsumerFresco() {
+      const { sessao, terminarSessao } = useSessionFresco()
+      return (
+        <div>
+          <p data-testid="sessao">{sessao === null ? 'sem-sessao' : sessao.id}</p>
+          <button onClick={() => terminarSessao()}>terminar</button>
+        </div>
+      )
+    }
+
+    seedStoredAccount(ACCOUNT)
+    render(
+      <SessionProviderComMockDePurga>
+        <ConsumerFresco />
+      </SessionProviderComMockDePurga>,
+    )
+    expect(screen.getByTestId('sessao').textContent).toBe(ACCOUNT.id)
+
+    expect(() => fireEvent.click(screen.getByRole('button', { name: 'terminar' }))).not.toThrow()
+
+    expect(screen.getByTestId('sessao').textContent).toBe('sem-sessao')
+    expect(window.sessionStorage.getItem('limmiar:account')).toBeNull()
+
+    vi.doUnmock('../../features/copilot-byok/key-store')
+    vi.resetModules()
   })
 
   it('useSession outside a SessionProvider does not throw and returns the no-op default', () => {
