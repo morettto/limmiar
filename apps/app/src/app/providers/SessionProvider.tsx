@@ -32,23 +32,24 @@ const SessionContext = createContext<ContextoSessao>(SEM_PROVIDER)
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [sessao, setSessao] = useState<Account | null>(() => sessaoDaConta.ler())
 
+  // Alvo da purga é `sessao` (estado), não `sessaoDaConta.ler()`: `ler()` degrada para `null` em
+  // storage corrompido -- certo para autenticação (falha fechada), mas saltaria a purga em
+  // silêncio. `sessao` foi lido válido no mount, é a identidade que o botão "Sair" mostra.
   const iniciarSessao = useCallback((account: Account) => {
-    const anterior = sessaoDaConta.ler()
-    if (anterior !== null && anterior.id !== account.id) {
-      void purgarConta(anterior.id)
+    if (sessao !== null && sessao.id !== account.id) {
+      void purgarConta(sessao.id)
     }
     sessaoDaConta.registar(account)
     setSessao(account)
-  }, [])
+  }, [sessao])
 
   const terminarSessao = useCallback(() => {
-    const anterior = sessaoDaConta.ler()
     sessaoDaConta.terminar()
     setSessao(null)
-    if (anterior !== null) {
-      void purgarConta(anterior.id)
+    if (sessao !== null) {
+      void purgarConta(sessao.id)
     }
-  }, [])
+  }, [sessao])
 
   const value = useMemo(() => ({ sessao, iniciarSessao, terminarSessao }), [sessao, iniciarSessao, terminarSessao])
 

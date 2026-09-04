@@ -28,18 +28,22 @@ export interface BibliotecaPageProps {
  */
 export function BibliotecaPage({ notas, accountId, chaveIndice, store }: BibliotecaPageProps) {
   const { t } = useLingui()
+  // `t` só é rastreável pelo extrator do Lingui numa chamada direta aqui -- redeclará-lo dentro do
+  // efeito via `lerAtuais()` quebrava a extração sem quebrar a tradução em runtime. Recalculada a
+  // cada render, o efeito ainda vê o locale atual mesmo se o `catch` disparar após uma troca.
+  const mensagemErroBusca = t`Não foi possível preparar a busca. Tente novamente.`
   const [indice, setIndice] = useState<MiniSearch<DocNota> | null>(null)
   const [termo, setTermo] = useState('')
   const [erro, setErro] = useState<string | null>(null)
 
-  const lerAtuais = useEffectEvent(() => ({ notas, store, t }))
+  const lerAtuais = useEffectEvent(() => ({ notas, store, mensagemErroBusca }))
 
   useEffect(() => {
     if (chaveIndice === null) {
       return
     }
     let cancelado = false
-    const { notas, store, t } = lerAtuais()
+    const { notas, store, mensagemErroBusca } = lerAtuais()
 
     async function preparar(chaveAtual: ChaveIndiceBusca) {
       const impressao = impressaoDigital(notas)
@@ -61,7 +65,7 @@ export function BibliotecaPage({ notas, accountId, chaveIndice, store }: Bibliot
     // `PatientWallet.tsx` (`load(kek).catch(...)`), mesmo `role="alert"`.
     preparar(chaveIndice).catch(() => {
       if (!cancelado) {
-        setErro(t`Não foi possível preparar a busca. Tente novamente.`)
+        setErro(mensagemErroBusca)
       }
     })
     return () => {

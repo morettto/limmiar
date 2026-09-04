@@ -1,4 +1,4 @@
-import type { Account } from './account'
+import type { Account, AccountRole, TwoFactorRequirement } from './account'
 
 const SESSION_STORAGE_KEY = 'limmiar:account'
 
@@ -14,15 +14,26 @@ export interface SessaoDeConta {
   terminar(): void
 }
 
-// ponytail: only `id` is validated because it is the only field this module reads back from a
-// restored session (accountId); `role`/`twoFactorRequirement` always arrive fresh from `registar`
-// in the login/recovery flow, never round-tripped through JSON.
+const PAPEIS: readonly AccountRole[] = ['Professional', 'Patient']
+const REQUISITOS_2FA: readonly TwoFactorRequirement[] = ['NotApplicable', 'SetupRequired', 'ChallengeRequired']
+
+// Valida os quatro campos que o predicado promete (valor is Account), não só `id` -- um
+// sessionStorage editável no DevTools não deve conseguir forjar um `role`/`twoFactorRequirement`
+// que o compilador depois trata como garantido em quem ler `sessao` do contexto.
 function ehConta(valor: unknown): valor is Account {
   if (typeof valor !== 'object' || valor === null) {
     return false
   }
-  const { id } = valor as { id?: unknown }
-  return typeof id === 'string' && id !== ''
+  const { id, email, role, twoFactorRequirement } = valor as Partial<Account>
+  return (
+    typeof id === 'string' &&
+    id !== '' &&
+    typeof email === 'string' &&
+    role !== undefined &&
+    PAPEIS.includes(role) &&
+    twoFactorRequirement !== undefined &&
+    REQUISITOS_2FA.includes(twoFactorRequirement)
+  )
 }
 
 // Accepts the storage as a dependency instead of reaching for `window.sessionStorage` itself, so

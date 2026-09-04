@@ -386,9 +386,9 @@ msgstr "Impossibile decifrare la chiave ricevuta. Prova ad abbinare di nuovo."
 msgid "Não foi possível ler"
 msgstr "Impossibile leggere"
 
-#: src/pages/biblioteca/BibliotecaPage.tsx:61
-#~ msgid "Não foi possível preparar a busca. Tente novamente."
-#~ msgstr "Impossibile preparare la ricerca. Riprova."
+#: src/pages/biblioteca/BibliotecaPage.tsx:34
+msgid "Não foi possível preparar a busca. Tente novamente."
+msgstr "Impossibile preparare la ricerca. Riprova."
 
 #: src/features/copilot-byok/CopilotKeySetup.tsx:61
 msgid "Não foi possível salvar a chave. Tente novamente."

@@ -77,6 +77,31 @@ describe('criarSessaoDeConta', () => {
     expect(sessao.ler()).toBeNull()
   })
 
+  it('ler() returns null when email is missing', () => {
+    const storage = createFakeStorage()
+    const { email: _email, ...semEmail } = ACCOUNT
+    storage.setItem('limmiar:account', JSON.stringify(semEmail))
+    const sessao = criarSessaoDeConta(storage)
+
+    expect(sessao.ler()).toBeNull()
+  })
+
+  it('ler() returns null when role is not one of the known roles (a forged sessionStorage value)', () => {
+    const storage = createFakeStorage()
+    storage.setItem('limmiar:account', JSON.stringify({ ...ACCOUNT, role: 'Admin' }))
+    const sessao = criarSessaoDeConta(storage)
+
+    expect(sessao.ler()).toBeNull()
+  })
+
+  it('ler() returns null when twoFactorRequirement is not one of the known values', () => {
+    const storage = createFakeStorage()
+    storage.setItem('limmiar:account', JSON.stringify({ ...ACCOUNT, twoFactorRequirement: 'Bypassed' }))
+    const sessao = criarSessaoDeConta(storage)
+
+    expect(sessao.ler()).toBeNull()
+  })
+
   it('registar() then ler() round-trips the account', () => {
     const sessao = criarSessaoDeConta(createFakeStorage())
 

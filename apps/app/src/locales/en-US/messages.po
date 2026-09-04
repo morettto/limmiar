@@ -386,9 +386,9 @@ msgstr "Could not decrypt the received key. Try pairing again."
 msgid "Não foi possível ler"
 msgstr "Could not read"
 
-#: src/pages/biblioteca/BibliotecaPage.tsx:61
-#~ msgid "Não foi possível preparar a busca. Tente novamente."
-#~ msgstr "Could not prepare the search. Try again."
+#: src/pages/biblioteca/BibliotecaPage.tsx:34
+msgid "Não foi possível preparar a busca. Tente novamente."
+msgstr "Could not prepare the search. Try again."
 
 #: src/features/copilot-byok/CopilotKeySetup.tsx:61
 msgid "Não foi possível salvar a chave. Tente novamente."
