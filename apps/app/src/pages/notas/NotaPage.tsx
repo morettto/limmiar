@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLingui } from '@lingui/react/macro'
 import type { Ancora } from '@limmiar/copilot'
 import type { CryptoKey } from '@limmiar/crypto'
@@ -53,6 +53,10 @@ export function NotaPage({ kek }: NotaPageProps) {
   // `appendPatientEntry` já ter sido gravado (ver comentário em `aoAssinar`).
   const ultimaRevisaoGravadaRef = useRef<Record<string, number>>({})
   const proximaSequenciaRef = useRef(RECORD_FIXTURE.entries.length + 1)
+  // `Object.values` sobre o `Record` devolvia array nova em toda renderização, mesmo sem
+  // mudar conteúdo; o `useMemo` faz a identidade da prop seguir o conteúdo -- garantia
+  // preventiva, sem consumidor hoje que dependa dela (ver README).
+  const listaNotas = useMemo(() => Object.values(notas), [notas])
 
   function marcarAssinada(notaId: string) {
     setNotas((atuais) =>
@@ -151,7 +155,7 @@ export function NotaPage({ kek }: NotaPageProps) {
       <audio ref={audioRef} hidden />
       {mensagem?.status === 'sucesso' && <p role="status">{mensagem.texto}</p>}
       {mensagem?.status === 'erro' && <p role="alert">{mensagem.texto}</p>}
-      <FilaEEditor notas={Object.values(notas)} onChangeNota={onChangeNota} aoTocar={aoTocar} aoAssinar={aoAssinar} />
+      <FilaEEditor notas={listaNotas} onChangeNota={onChangeNota} aoTocar={aoTocar} aoAssinar={aoAssinar} />
     </>
   )
 }

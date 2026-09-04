@@ -174,6 +174,20 @@ describe('NotaPage', () => {
     })
   })
 
+  describe('identidade da prop notas entre renders', () => {
+    it('render que só muda mensagem (kek === null) não troca a referência de notas', async () => {
+      const { FilaEEditor } = await import('../../widgets/soap-editor/FilaEEditor')
+      const { props, notaId } = await renderEObterProps(null)
+      const notasAntes = props().notas
+      const chamadasAntes = vi.mocked(FilaEEditor).mock.calls.length
+
+      await assinar(props, notaId)
+
+      expect(vi.mocked(FilaEEditor).mock.calls.length).toBeGreaterThan(chamadasAntes)
+      expect(props().notas).toBe(notasAntes)
+    })
+  })
+
   describe('aoAssinar sem sessão (kek === null)', () => {
     it('mostra mensagem explícita de sessão ausente e nunca chama openRecord', async () => {
       const { openRecord } = await import('../../entities/patient/patient-crypto')
