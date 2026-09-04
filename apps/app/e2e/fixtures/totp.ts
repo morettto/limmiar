@@ -7,7 +7,7 @@ import { expect } from '@playwright/test'
 
 const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
 
-export function base32Decode(secret: string): Buffer {
+function base32Decode(secret: string): Buffer {
   const clean = secret.replace(/=+$/, '').toUpperCase()
   let bits = ''
   for (const char of clean) {

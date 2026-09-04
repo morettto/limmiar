@@ -47,10 +47,11 @@ em OPFS...) é orquestração de fora, não responsabilidade de `entities` -- a 
 
 ## Decisões desta fatia
 
-- **Só `id` é validado em `ler()`.** É o único campo que este módulo lê de volta de uma sessão
-  restaurada (o `accountId` que outras telas precisam). `role`/`twoFactorRequirement` chegam
-  sempre frescos de `registar`, vindo direto do fluxo de login/recuperação -- nunca fazem o
-  round-trip por `JSON.stringify`/`JSON.parse` sem um `registar` novo por trás.
+- **`ler()` valida `id`, `email`, `role` e `twoFactorRequirement` (S18-02, review de segurança).**
+  Um `sessionStorage` editável no DevTools não deve conseguir forjar um `role` ou um
+  `twoFactorRequirement` que o predicado `valor is Account` depois trata como garantido para
+  quem ler `sessao` do contexto -- mesmo que hoje nenhum consumidor leia esses dois campos.
+  `twoFactorTicket` continua sem validação própria (`string | null` aceita qualquer coisa).
 - **`recordSession`/`createSessionRecorder` foram apagados, não mantidos como alias.** Zero
   chamadores depois do S18-01: os três ecrãs de entrada pararam de gravar a sessão sozinhos, e
   `criarSessaoDeConta`/`sessaoDaConta` (com `ler`/`terminar` novos) tomaram o lugar por inteiro.
