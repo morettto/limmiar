@@ -13,9 +13,11 @@ React (`useSession()`), sobre `entities/account/session.ts` -- ver
    fora, `SessionProvider` por dentro -- único ponto de montagem em produção
    (`App.tsx` -> `AppProviders`).
 2. `SessionProvider` lê `sessaoDaConta.ler()` no mount para pré-preencher `sessao`. `iniciarSessao`
-   e `terminarSessao` gravam/apagam via `sessaoDaConta` e dão trigger a `purgarConta` (lista
-   `PURGAS` módulo-scoped, hoje só `clearApiKey`) sob `Promise.allSettled`, nunca bloqueando a
-   troca/saída de sessão por uma purga que falhe.
+   e `terminarSessao` gravam/apagam via `sessaoDaConta` e dão trigger a `purgarConta` (interna ao
+   módulo; lista `PURGAS` módulo-scoped, hoje só `clearApiKey`), que desde S18-05 corre as purgas
+   num `for-of` sequencial com `try/catch` por purga -- uma que falhe não trava o logout/troca de
+   sessão. Com uma só entrada em `PURGAS`, "não trava as outras" fica esperado, não provado; a
+   prova completa espera o S08-20 acrescentar a sua.
 3. `useSession()` lê o `SessionContext` React. Fora de um `<SessionProvider>` ancestral, lança
    (`useSession: nenhum <SessionProvider> ancestral`) em vez de devolver um default silencioso
    (S18-03) -- um erro de montagem em produção deixa de correr código sensível a sessão sem
@@ -27,7 +29,6 @@ React (`useSession()`), sobre `entities/account/session.ts` -- ver
 - `SessionProvider({ children })`, `useSession(): ContextoSessao` (`SessionProvider.tsx`).
   `useSession` só pode ser chamado a partir de `app/routing/router.tsx` (`fsd-pages-no-app`
   proíbe `pages` de importar `app` diretamente).
-
 ## Decisões relevantes
 
 - **`SessionContext` é `createContext<ContextoSessao | null>(null)`, não um default no-op

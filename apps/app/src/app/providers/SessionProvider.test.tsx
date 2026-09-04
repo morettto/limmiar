@@ -187,8 +187,8 @@ describe('SessionProvider', () => {
   })
 
   it('a purge that throws synchronously does not stop terminarSessao from clearing the session', async () => {
-    // Prova que o `async (purga) => purga(accountId)` dentro do .map() é necessário: se alguém o
-    // remover, clearApiKey (síncrona e lançando) escaparia do Promise.allSettled e este teste rebenta.
+    // Prova que purgarConta não deixa um throw síncrono de clearApiKey escapar para terminarSessao
+    // (que chama purgarConta em fire-and-forget, sem esperar por ela).
     vi.doMock('../../features/copilot-byok/key-store', () => ({
       clearApiKey: vi.fn(() => {
         throw new Error('purge boom')

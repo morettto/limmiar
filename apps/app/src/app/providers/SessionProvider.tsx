@@ -10,10 +10,13 @@ type PurgaDeConta = (accountId: string) => void | Promise<void>
 const PURGAS: readonly PurgaDeConta[] = [clearApiKey]
 
 async function purgarConta(accountId: string): Promise<void> {
-  // O `async (purga) => purga(accountId)` é obrigatório: clearApiKey é síncrona e LANÇA
-  // (assertAccountId rejeita accountId vazio) -- sem o `async`, esse throw escapa do .map() antes
-  // de chegar a Promise.allSettled. Ver SessionProvider.test.tsx para o teste que prova isto.
-  await Promise.allSettled(PURGAS.map(async (purga) => purga(accountId)))
+  for (const purga of PURGAS) {
+    try {
+      await purga(accountId)
+    } catch {
+      // uma purga falhada não trava as outras nem o logout
+    }
+  }
 }
 
 export interface ContextoSessao {
