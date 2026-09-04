@@ -1,4 +1,5 @@
 using Api.Data;
+using Api.Platform;
 using Npgsql;
 
 namespace Api.Scheduling;
@@ -58,14 +59,14 @@ public sealed class ScheduledSessionStore(NpgsqlDataSource dataSource)
     /// guards in <see cref="LockAndGuardAsync"/> observe a state that cannot change out from
     /// under this transaction before the UPDATE commits.
     /// </summary>
-    public async Task<SchedulingResult> MoveAsync(
+    public async Task<Result<ScheduledSession, SchedulingFailureReason>> MoveAsync(
         Guid tenantId, Guid sessionId, DateTimeOffset newStartsAt, int newDurationMinutes, CancellationToken cancellationToken)
     {
         await using var scope = await dataSource.OpenTenantScopedTransactionAsync(tenantId, cancellationToken);
 
         if (await LockAndGuardAsync(scope, sessionId, cancellationToken) is { } rejection)
         {
-            return SchedulingResult.Failure(rejection);
+            return Result<ScheduledSession, SchedulingFailureReason>.Failure(rejection);
         }
 
         await using var updateCommand = scope.Connection.CreateCommand();
@@ -93,18 +94,18 @@ public sealed class ScheduledSessionStore(NpgsqlDataSource dataSource)
         }
 
         await scope.Transaction.CommitAsync(cancellationToken);
-        return SchedulingResult.Success(moved);
+        return Result<ScheduledSession, SchedulingFailureReason>.Success(moved);
     }
 
     /// <summary>Same lock and same guards as <see cref="MoveAsync"/>; only writes <c>cancelled_at</c>.</summary>
-    public async Task<SchedulingResult> CancelAsync(
+    public async Task<Result<ScheduledSession, SchedulingFailureReason>> CancelAsync(
         Guid tenantId, Guid sessionId, DateTimeOffset cancelledAt, CancellationToken cancellationToken)
     {
         await using var scope = await dataSource.OpenTenantScopedTransactionAsync(tenantId, cancellationToken);
 
         if (await LockAndGuardAsync(scope, sessionId, cancellationToken) is { } rejection)
         {
-            return SchedulingResult.Failure(rejection);
+            return Result<ScheduledSession, SchedulingFailureReason>.Failure(rejection);
         }
 
         await using var updateCommand = scope.Connection.CreateCommand();
@@ -126,7 +127,7 @@ public sealed class ScheduledSessionStore(NpgsqlDataSource dataSource)
         }
 
         await scope.Transaction.CommitAsync(cancellationToken);
-        return SchedulingResult.Success(cancelled);
+        return Result<ScheduledSession, SchedulingFailureReason>.Success(cancelled);
     }
 
     /// <summary>

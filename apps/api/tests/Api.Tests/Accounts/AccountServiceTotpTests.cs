@@ -1,4 +1,5 @@
 using Api.Accounts;
+using Api.Platform;
 
 namespace Api.Tests.Accounts;
 
@@ -315,8 +316,8 @@ public sealed class AccountServiceTotpTests
 
         var result = await service.LoginAsync(account.Email, SomeVerifier, CancellationToken.None);
 
-        Assert.True(result.Succeeded);
-        Assert.Equal(TwoFactorRequirement.ChallengeRequired, result.TwoFactorRequirement);
+        Assert.True(result.TryGetValue(out var success, out _));
+        Assert.Equal(TwoFactorRequirement.ChallengeRequired, success.TwoFactorRequirement);
     }
 
     [Fact]
@@ -329,8 +330,9 @@ public sealed class AccountServiceTotpTests
 
         var result = await service.LoginAsync(account.Email, SomeVerifier, CancellationToken.None);
 
-        Assert.NotNull(result.TwoFactorTicket);
-        Assert.True(ticketIssuer.Validate(result.TwoFactorTicket!, account.Id));
+        Assert.True(result.TryGetValue(out var success, out _));
+        Assert.NotNull(success.TwoFactorTicket);
+        Assert.True(ticketIssuer.Validate(success.TwoFactorTicket!, account.Id));
     }
 
     [Fact]
@@ -342,8 +344,8 @@ public sealed class AccountServiceTotpTests
 
         var result = await service.LoginAsync(account.Email, SomeVerifier, CancellationToken.None);
 
-        Assert.True(result.Succeeded);
-        Assert.Equal(TwoFactorRequirement.NotApplicable, result.TwoFactorRequirement);
+        Assert.True(result.TryGetValue(out var success, out _));
+        Assert.Equal(TwoFactorRequirement.NotApplicable, success.TwoFactorRequirement);
     }
 
     [Fact]
@@ -355,7 +357,8 @@ public sealed class AccountServiceTotpTests
 
         var result = await service.LoginAsync(account.Email, SomeVerifier, CancellationToken.None);
 
-        Assert.Null(result.TwoFactorTicket);
+        Assert.True(result.TryGetValue(out var success, out _));
+        Assert.Null(success.TwoFactorTicket);
     }
 
     [Fact]
@@ -367,7 +370,8 @@ public sealed class AccountServiceTotpTests
 
         var result = await service.GoogleAuthAsync("valid-id-token", AccountRole.Professional, CancellationToken.None);
 
-        Assert.Equal(TwoFactorRequirement.SetupRequired, result.TwoFactorRequirement);
+        Assert.True(result.TryGetValue(out var success, out _));
+        Assert.Equal(TwoFactorRequirement.SetupRequired, success.TwoFactorRequirement);
     }
 
     [Fact]
@@ -380,8 +384,9 @@ public sealed class AccountServiceTotpTests
 
         var result = await service.GoogleAuthAsync("valid-id-token", AccountRole.Professional, CancellationToken.None);
 
-        Assert.NotNull(result.TwoFactorTicket);
-        Assert.True(ticketIssuer.Validate(result.TwoFactorTicket!, result.Account!.Id));
+        Assert.True(result.TryGetValue(out var success, out _));
+        Assert.NotNull(success.TwoFactorTicket);
+        Assert.True(ticketIssuer.Validate(success.TwoFactorTicket!, success.Account.Id));
     }
 
     [Fact]
@@ -393,7 +398,8 @@ public sealed class AccountServiceTotpTests
 
         var result = await service.GoogleAuthAsync("valid-id-token", AccountRole.Patient, CancellationToken.None);
 
-        Assert.Equal(TwoFactorRequirement.NotApplicable, result.TwoFactorRequirement);
+        Assert.True(result.TryGetValue(out var success, out _));
+        Assert.Equal(TwoFactorRequirement.NotApplicable, success.TwoFactorRequirement);
     }
 
     [Fact]
@@ -405,7 +411,8 @@ public sealed class AccountServiceTotpTests
 
         var result = await service.GoogleAuthAsync("valid-id-token", AccountRole.Patient, CancellationToken.None);
 
-        Assert.Null(result.TwoFactorTicket);
+        Assert.True(result.TryGetValue(out var success, out _));
+        Assert.Null(success.TwoFactorTicket);
     }
 
     [Fact]
@@ -419,8 +426,9 @@ public sealed class AccountServiceTotpTests
 
         var result = await service.GoogleAuthAsync("valid-id-token", AccountRole.Patient, CancellationToken.None);
 
-        Assert.NotNull(result.TwoFactorTicket);
-        Assert.True(ticketIssuer.Validate(result.TwoFactorTicket!, existingAccount.Id));
+        Assert.True(result.TryGetValue(out var success, out _));
+        Assert.NotNull(success.TwoFactorTicket);
+        Assert.True(ticketIssuer.Validate(success.TwoFactorTicket!, existingAccount.Id));
     }
 
     [Fact]
@@ -456,7 +464,8 @@ public sealed class AccountServiceTotpTests
 
         var result = await service.LoginAsync(account.Email, SomeVerifier, CancellationToken.None);
 
-        Assert.NotNull(result.Session);
+        Assert.True(result.TryGetValue(out var success, out _));
+        Assert.NotNull(success.Session);
     }
 
     [Fact]
@@ -468,7 +477,8 @@ public sealed class AccountServiceTotpTests
 
         var result = await service.LoginAsync(account.Email, SomeVerifier, CancellationToken.None);
 
-        Assert.Null(result.Session);
+        Assert.True(result.TryGetValue(out var success, out _));
+        Assert.Null(success.Session);
     }
 
     [Fact]
@@ -480,7 +490,8 @@ public sealed class AccountServiceTotpTests
 
         var result = await service.GoogleAuthAsync("valid-id-token", AccountRole.Patient, CancellationToken.None);
 
-        Assert.NotNull(result.Session);
+        Assert.True(result.TryGetValue(out var success, out _));
+        Assert.NotNull(success.Session);
     }
 
     [Fact]
@@ -492,7 +503,8 @@ public sealed class AccountServiceTotpTests
 
         var result = await service.GoogleAuthAsync("valid-id-token", AccountRole.Professional, CancellationToken.None);
 
-        Assert.Null(result.Session);
+        Assert.True(result.TryGetValue(out var success, out _));
+        Assert.Null(success.Session);
     }
 
     [Fact]
@@ -599,10 +611,10 @@ public sealed class AccountServiceTotpTests
         public Task<AccountRegistrationResult> RegisterAsync(string email, byte[] verifier, AccountRole role, CancellationToken cancellationToken) =>
             registerHandler.Handle(new RegisterCommand(email, verifier, role), cancellationToken).AsTask();
 
-        public Task<AccountLoginResult> LoginAsync(string email, byte[] verifier, CancellationToken cancellationToken) =>
+        public Task<Result<AccountLoginSuccess, AccountLoginFailureReason>> LoginAsync(string email, byte[] verifier, CancellationToken cancellationToken) =>
             loginHandler.Handle(new LoginCommand(email, verifier), cancellationToken).AsTask();
 
-        public Task<AccountGoogleAuthResult> GoogleAuthAsync(string idToken, AccountRole role, CancellationToken cancellationToken) =>
+        public Task<Result<AccountGoogleAuthSuccess, AccountGoogleAuthFailureReason>> GoogleAuthAsync(string idToken, AccountRole role, CancellationToken cancellationToken) =>
             googleHandler.Handle(new ContinueWithGoogleCommand(idToken, role), cancellationToken).AsTask();
 
         public Task<BeginTotpEnrollmentResult> BeginTotpEnrollmentAsync(Guid accountId, CancellationToken cancellationToken) =>

@@ -18,15 +18,19 @@ concorrência real (ver `docs/adr/ADR-S04-02-horario-em-claro-servidor-zero-know
   `MoveAsync`/`CancelAsync` correm sob `SELECT ... FOR UPDATE` (lock de linha) via o método
   privado partilhado `LockAndGuardAsync`, que lê a linha e corre as três guardas (sessão não
   encontrada, já cancelada, gravação ativa) uma única vez -- cada chamador só faz depois o seu
-  próprio `UPDATE`. `MoveAsync`/`CancelAsync` devolvem `(ScheduledSession? Session,
-  SchedulingFailureReason? FailureReason)`: o store já fala o vocabulário final de falha, não
-  há tipo intermédio a traduzir a jusante.
+  próprio `UPDATE`. `MoveAsync`/`CancelAsync` devolvem `Api.Platform.Result<ScheduledSession,
+  SchedulingFailureReason>` (S08-21, molde `Api.Notes`/`Api.Patients`, ADR
+  `docs/adr/0011-store-service-nao-devolve-tuplo-nullable.md`): o store já fala o vocabulário
+  final de falha, não há tipo intermédio a traduzir a jusante, e a exclusividade
+  valor-ou-falha é estrutural (`TryGetValue`/`TryGetFailure`), não um `required bool
+  Succeeded` com dois nullables.
 - `SchedulingService` -- `AuthorizeAsync` (privado) verifica a conta uma única vez para
   `ScheduleAsync`/`MoveAsync`/`CancelAsync` (existe, é Profissional Ativo, reusando
   `AccountAuthorizationGuard.CanCreatePatientRecords`, o mesmo guard que `PatientService`
   usa); cada método público só adapta `ScheduledSessionSlotConflictException` para
-  `SchedulingFailureReason.SlotTaken` e devolve `SchedulingResult` -- nenhuma
-  `PostgresException` nem exceção de domínio escapa deste serviço.
+  `SchedulingFailureReason.SlotTaken` e devolve `Result<ScheduledSession,
+  SchedulingFailureReason>` -- nenhuma `PostgresException` nem exceção de domínio escapa
+  deste serviço.
 - `Api.Endpoints.SchedulingEndpoints` -- `POST/PATCH/DELETE
   /accounts/{accountId}/agenda/sessions[/{sessionId}]`. Sem `GET` (não pedido por nenhum
   critério de aceite deste ticket). Usa os helpers partilhados de
@@ -46,8 +50,12 @@ concorrência real (ver `docs/adr/ADR-S04-02-horario-em-claro-servidor-zero-know
   endpoint de gravação tem de acrescentar o `GRANT UPDATE (recording_active)` nessa altura --
   esse `UPDATE` depois fica na fila do mesmo lock, não é preciso inventar uma segunda tabela
   nem um segundo lock quando esse endpoint existir.
-- `SchedulingFailureReason`/`SchedulingResult` são um único tipo partilhado por
-  Schedule/Move/Cancel (não `ScheduleSessionResult` + `MutateSessionResult` em paralelo,
-  quase idênticos): `SlotTaken` só é produzido por Schedule e Move (Cancel nunca muda
-  `starts_at`, logo nunca pode colidir com outra linha viva) -- não há um enum próprio por
-  operação para essa única assimetria.
+- `SchedulingFailureReason` é um único enum partilhado por Schedule/Move/Cancel (não
+  `ScheduleSessionFailureReason` + `MutateSessionFailureReason` em paralelo, quase
+  idênticos): `SlotTaken` só é produzido por Schedule e Move (Cancel nunca muda `starts_at`,
+  logo nunca pode colidir com outra linha viva) -- não há um enum próprio por operação para
+  essa única assimetria. Vive em `SchedulingService.cs`, não num ficheiro `SchedulingResult.cs`
+  à parte -- desde o S08-21, o antigo tipo `SchedulingResult` (`required bool Succeeded` + dois
+  nullables) foi apagado; o limite store/service devolve
+  `Api.Platform.Result<ScheduledSession, SchedulingFailureReason>` diretamente (molde
+  `Api.Notes`/`Api.Patients`, S08-14).

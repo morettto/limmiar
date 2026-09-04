@@ -34,12 +34,20 @@ critério 4) que o desenho já fechou.
     que confronta cada âncora: se a entrada em `AnchoredSequence` não carrega o `AnchoredHash`
     gravado -- ou já nem existe, que é o caso da cadeia truncada -- devolve
     `Broken(AnchoredSequence, AnchorMismatch)`.
-- `AuditVerification.cs` -- resultado (molde de `Api.Platform.Result<TValue, TFailure>`):
-  `Intact`/`FirstBrokenSequence`/`BreakKind` (`HashMismatch`, `BrokenLink`, `AnchorMismatch`),
-  mais os construtores `Ok()`/`Broken(sequence, kind)`. Este módulo ainda mantém a sua
-  própria cópia do molde antigo em vez do tipo partilhado -- migrar para
-  `Api.Platform.Result<TValue, TFailure>` é trabalho por fazer (S08-14 migrou só
-  `Api.Notes`/`Api.Patients`).
+- `AuditVerification.cs` -- resultado de `AuditChain.Verify`: `Intact`/`FirstBrokenSequence`/
+  `BreakKind` (`HashMismatch`, `BrokenLink`, `AnchorMismatch`), mais os construtores
+  `Ok()`/`Broken(sequence, kind)`. **Decisão (S08-21): deliberadamente não migrado** para
+  `Api.Platform.Result<TValue, TFailure>` (ADR
+  `docs/adr/0011-store-service-nao-devolve-tuplo-nullable.md`), ao contrário de
+  `Api.Notes`/`Api.Patients` (S08-14) e, desde este ticket, `Api.Accounts`
+  (`LoginHandler`/`ContinueWithGoogleHandler`), `Api.Consent` e `Api.Scheduling`. Razão: não é
+  um par valor-ou-falha. `Result<TValue, TFailure>` exige exatamente um valor de sucesso
+  (`TValue`, restrito a `class`) xor uma razão de falha; `AuditVerification.Ok()` não carrega
+  nenhum valor de sucesso -- o caso "cadeia íntegra" não tem payload nenhum, só o booleano
+  implícito em `Intact`. Forçar isto no molde partilhado exigiria um `TValue` artificial (ex.
+  `object`) só para satisfazer a assinatura, ou inverter `Broken` para "falha" e `Ok` para um
+  `TValue` vazio inventado -- ambos torcem o tipo partilhado para um formato que não é o dele
+  em vez de o tipo servir o domínio. `AuditVerification` fica como está.
 - Migração `0006_create_audit_trail.sql` -- cria as duas tabelas, `audit_entries` e
   `audit_anchors`, com o mesmo tratamento: RLS `tenant_isolation` com `FORCE` (mesmo padrão de
   `note_signatures`, migração `0005`) e `GRANT SELECT, INSERT` / `REVOKE UPDATE, DELETE` para

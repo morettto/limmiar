@@ -71,10 +71,12 @@ public sealed class SchedulingEndpointsTests : IAsyncLifetime
         var second = Task.Run(() => schedulingService.ScheduleAsync(accountId, Guid.NewGuid(), SomeStart, 50, CancellationToken.None));
         var results = await Task.WhenAll(first, second);
 
-        var winner = Assert.Single(results, r => r.Succeeded);
-        Assert.Equal(accountId, winner.Session!.TenantId);
-        var loser = Assert.Single(results, r => !r.Succeeded);
-        Assert.Equal(SchedulingFailureReason.SlotTaken, loser.FailureReason);
+        var winner = Assert.Single(results, r => r.TryGetValue(out _, out _));
+        Assert.True(winner.TryGetValue(out var winnerSession, out _));
+        Assert.Equal(accountId, winnerSession.TenantId);
+        var loser = Assert.Single(results, r => !r.TryGetValue(out _, out _));
+        Assert.True(loser.TryGetFailure(out var loserFailureReason));
+        Assert.Equal(SchedulingFailureReason.SlotTaken, loserFailureReason);
 
         await using var connection = new NpgsqlConnection(_fixture.AdminConnectionString);
         await connection.OpenAsync();

@@ -94,8 +94,12 @@ tentar arrancar o container, não passam silenciosamente. Os testes puramente un
   README do módulo (`src/Api/Features/Consent/README.md`).
 - `src/Api/Platform` -- (S08-14) `Result<TValue, TFailure>`, o molde partilhado de resultado
   store/service do repositório: um valor de sucesso ou uma razão de falha (`enum`), nunca os
-  dois nem nenhum. Usado por `NoteService.SignAsync` e por `PatientService.CreatePatientAsync`/
-  `AppendEntryAsync`. `Api.Accounts` e os módulos `Consent`/`Audit` ainda por migrar.
+  dois nem nenhum. Usado por `NoteService.SignAsync`, `PatientService.CreatePatientAsync`/
+  `AppendEntryAsync`, e desde o S08-21 também por `LoginHandler`/`ContinueWithGoogleHandler`
+  (`Api.Accounts`), `ConsentService.RecordAsync` e `SchedulingService`/`ScheduledSessionStore`
+  (`Move`/`CancelAsync`). `Api.Audit.AuditVerification` deliberadamente não migrou -- não é um
+  par valor-ou-falha (`Ok()` não carrega valor nenhum), ver o README do módulo
+  (`src/Api/Features/Audit/README.md`).
 - `src/Api/Platform/Problems` -- `LimmiarProblemDetails` (RFC 7807 + `code` + `params`
   estruturado, nunca a mensagem de exceção crua) e o catálogo central `ProblemCodes` (ex.:
   `voice.enrollment_not_found` para o `GET`/`DELETE` de cadastro de voz sem cadastro

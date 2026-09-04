@@ -75,15 +75,15 @@ public static class AuthEndpoints
         }
 
         var result = await sender.Send(new LoginCommand(request.Email, request.PasswordVerifier), cancellationToken);
-        if (!result.Succeeded)
+        if (!result.TryGetValue(out var success, out _))
         {
             return ProblemJson(StatusCodes.Status401Unauthorized, "Invalid credentials", AccountsProblemCodes.AuthInvalidCredentials);
         }
 
-        var account = result.Account!;
+        var account = success.Account;
         return TypedResults.Ok(new LoginResponse(
-            account.Id, account.Email, account.Role, result.TwoFactorRequirement, result.TwoFactorTicket,
-            result.Session?.AccessToken, result.Session?.RefreshToken, result.Session?.AccessTokenExpiresAt));
+            account.Id, account.Email, account.Role, success.TwoFactorRequirement, success.TwoFactorTicket,
+            success.Session?.AccessToken, success.Session?.RefreshToken, success.Session?.AccessTokenExpiresAt));
     }
 
     private static async Task<Results<Ok<GoogleAuthResponse>, JsonHttpResult<LimmiarProblemDetails>>> HandleGoogleAsync(
@@ -95,15 +95,15 @@ public static class AuthEndpoints
         }
 
         var result = await sender.Send(new ContinueWithGoogleCommand(request.IdToken, request.RequestedRole), cancellationToken);
-        if (!result.Succeeded)
+        if (!result.TryGetValue(out var success, out _))
         {
             return ProblemJson(StatusCodes.Status401Unauthorized, "Invalid Google token", AccountsProblemCodes.AuthGoogleTokenInvalid);
         }
 
-        var account = result.Account!;
+        var account = success.Account;
         return TypedResults.Ok(new GoogleAuthResponse(
-            account.Id, account.Email, account.Role, result.IsNewAccount, result.TwoFactorRequirement, result.TwoFactorTicket,
-            result.Session?.AccessToken, result.Session?.RefreshToken, result.Session?.AccessTokenExpiresAt));
+            account.Id, account.Email, account.Role, success.IsNewAccount, success.TwoFactorRequirement, success.TwoFactorTicket,
+            success.Session?.AccessToken, success.Session?.RefreshToken, success.Session?.AccessTokenExpiresAt));
     }
 
     private static Results<Ok<RefreshTokenResponse>, JsonHttpResult<LimmiarProblemDetails>> HandleRefreshAsync(

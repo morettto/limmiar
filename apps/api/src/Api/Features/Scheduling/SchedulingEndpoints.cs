@@ -68,12 +68,11 @@ public static class SchedulingEndpoints
 
         var result = await schedulingService.ScheduleAsync(
             accountId, request.PatientId, request.StartsAt, request.DurationMinutes, cancellationToken);
-        if (!result.Succeeded)
+        if (!result.TryGetValue(out var session, out var failureReason))
         {
-            return MapFailureToProblem(result.FailureReason!.Value);
+            return MapFailureToProblem(failureReason);
         }
 
-        var session = result.Session!;
         return TypedResults.Created(
             $"/accounts/{accountId}/agenda/sessions/{session.Id}",
             ToResponse(session));
@@ -100,12 +99,12 @@ public static class SchedulingEndpoints
 
         var result = await schedulingService.MoveAsync(
             accountId, sessionId, request.StartsAt, request.DurationMinutes, cancellationToken);
-        if (!result.Succeeded)
+        if (!result.TryGetValue(out var session, out var failureReason))
         {
-            return MapFailureToProblem(result.FailureReason!.Value);
+            return MapFailureToProblem(failureReason);
         }
 
-        return TypedResults.Ok(ToResponse(result.Session!));
+        return TypedResults.Ok(ToResponse(session));
     }
 
     private static async Task<Results<NoContent, JsonHttpResult<LimmiarProblemDetails>>> HandleCancelAsync(
@@ -122,9 +121,9 @@ public static class SchedulingEndpoints
         }
 
         var result = await schedulingService.CancelAsync(accountId, sessionId, cancellationToken);
-        if (!result.Succeeded)
+        if (!result.TryGetValue(out _, out var failureReason))
         {
-            return MapFailureToProblem(result.FailureReason!.Value);
+            return MapFailureToProblem(failureReason);
         }
 
         return TypedResults.NoContent();
@@ -148,7 +147,7 @@ public static class SchedulingEndpoints
     // [ExcludeFromCodeCoverage] justification: every named SchedulingFailureReason arm reachable
     // from Schedule, Move or Cancel is exercised by a dedicated test in
     // SchedulingEndpointsTests -- SlotTaken is only reachable from Schedule and Move (Cancel
-    // never changes starts_at, see SchedulingResult's docs); the remaining gap is the
+    // never changes starts_at, see SchedulingFailureReason's docs); the remaining gap is the
     // compiler-generated unreachable fallback for a 6-value switch expression.
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage(Justification =
         "Every named case reachable from Schedule, Move or Cancel is covered by a dedicated " +
