@@ -38,9 +38,10 @@ prop -- buscá-los de um servidor é a fatia 4. Sem áudio, sem edição de nota
 - `FilaAssinatura` (`FilaAssinatura.tsx`) -- componente React, props `itens: readonly
   Nota[]`, `selecionadoId`, `onSelecionar`.
 - `EstadoNota`, `ESTADO_PENDENTE` e `ESTADO_ASSINADA` vivem em `entities/nota/nota.ts`
-  desde o ticket S08-06 (fundir `ItemFila` em `Nota`); `ESTADOS_NOTA` (o array que dá as
-  `ABAS`) nasceu no S08-16 -- este módulo importa-os de lá, não os redeclara. Ver
-  `entities/nota/README.md`, "Decisões da fatia S08-06" e "Decisões da fatia S08-16".
+  desde o ticket S08-06 (fundir `ItemFila` em `Nota`); `ESTADOS_NOTA` nasceu no S08-16 e é
+  o que este módulo itera direto para renderizar as abas (`ESTADOS_NOTA.map(...)`, sem
+  alias local -- o `const ABAS = ESTADOS_NOTA` que existiu era 1:1 com um só uso, eliminado
+  no S08-22). Ver `entities/nota/README.md`, "Decisões da fatia S08-06".
 - `proximoIndice(indice, total, tecla)` (`navegacao-teclado.ts`) -- seam puro, sem React,
   sem browser, 100% interno a esta feature (desde S08-08; `ehAtalhoAssinar` viveu aqui até
   essa fatia, ver `features/nota-editor/README.md` para onde foi e porquê).

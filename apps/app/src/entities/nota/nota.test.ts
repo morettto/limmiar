@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   ESTADO_ASSINADA,
   ESTADO_PENDENTE,
+  ESTADOS_NOTA,
   digestNota,
   editarFrase,
   rascunhoParaNota,
@@ -144,20 +145,12 @@ describe('digestNota', () => {
   })
 })
 
-describe('ESTADO_PENDENTE', () => {
-  it('estreita para o literal "pendente", não para EstadoNota inteiro (prova de tipo, não de runtime)', () => {
-    // Se ESTADO_PENDENTE estiver anotado como EstadoNota (o defeito original), esta linha
-    // não compila: TS2322, 'EstadoNota' não é atribuível a '"pendente"'. tsc -b --noEmit é o
-    // sinal vermelho/verde desta fatia, o runtime do vitest não distingue os dois tipos.
-    const literal: 'pendente' = ESTADO_PENDENTE
-    expect(literal).toBe('pendente')
-  })
-})
-
-describe('ESTADO_ASSINADA', () => {
-  it('estreita para o literal "assinada", não para EstadoNota inteiro (prova de tipo, não de runtime) -- canário irmão do de ESTADO_PENDENTE acima', () => {
-    // Mesmo mecanismo do canário acima: quem falha aqui é o tsc, não o expect.
-    const literal: 'assinada' = ESTADO_ASSINADA
-    expect(literal).toBe('assinada')
+describe('estado da nota', () => {
+  it('ESTADO_PENDENTE/ESTADO_ASSINADA estreitam para o literal, não para EstadoNota inteiro, e ESTADOS_NOTA contém as duas nesta ordem (prova de tipo + conteúdo/ordem, não só de runtime)', () => {
+    // Anotar as duas como EstadoNota não compilaria aqui (TS2322) -- tsc -b é o
+    // vermelho/verde de tipo. O expect cobre o que o compilador não cobre: conteúdo/ordem.
+    const p: 'pendente' = ESTADO_PENDENTE
+    const a: 'assinada' = ESTADO_ASSINADA
+    expect([p, a]).toEqual(ESTADOS_NOTA)
   })
 })

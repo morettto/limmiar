@@ -10,8 +10,6 @@ export interface FilaAssinaturaProps {
   onSelecionar: (id: string) => void
 }
 
-const ABAS = ESTADOS_NOTA
-
 function indiceInicial(total: number): number {
   return total > 0 ? 0 : -1
 }
@@ -65,7 +63,7 @@ export function FilaAssinatura({ itens, selecionadoId, onSelecionar }: FilaAssin
   return (
     <div>
       <div role="tablist" aria-label={t`Estado da nota`} className="mb-2 flex gap-1">
-        {ABAS.map((estadoAba) => (
+        {ESTADOS_NOTA.map((estadoAba) => (
           <button
             key={estadoAba}
             type="button"

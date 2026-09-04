@@ -43,6 +43,13 @@ describe('FilaAssinatura', () => {
     expect(screen.queryByText('paciente-3')).toBeNull()
   })
 
+  it('as abas renderizam na ordem de ESTADOS_NOTA -- Pendentes antes de Assinadas', () => {
+    renderFila()
+
+    const abas = screen.getAllByRole('tab')
+    expect(abas.map((aba) => aba.textContent)).toEqual(['Pendentes', 'Assinadas'])
+  })
+
   it('a listbox aponta aria-activedescendant para a primeira opção por omissão', () => {
     renderFila()
 

@@ -10,8 +10,8 @@ export interface FraseNota {
   readonly ancoras: readonly Ancora[]
 }
 
-// EstadoNota deriva das constantes, não o inverso -- anotá-las como EstadoNota é o que as
-// alargava. Idioma de entities/consentimento/api.ts: lingui/no-unlocalized-strings só varre `.tsx`.
+// as const + tipo derivado, idioma de entities/consentimento/api.ts: nota.ts é `.ts` puro,
+// fora do alcance de lingui/no-unlocalized-strings (que só varre `.tsx`).
 export const ESTADO_PENDENTE = 'pendente'
 export const ESTADO_ASSINADA = 'assinada'
 export const ESTADOS_NOTA = [ESTADO_PENDENTE, ESTADO_ASSINADA] as const
