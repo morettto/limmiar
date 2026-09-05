@@ -14,11 +14,14 @@ React (`useSession()`), sobre `entities/account/session.ts` -- ver
    (`App.tsx` -> `AppProviders`).
 2. `SessionProvider` lê `sessaoDaConta.ler()` no mount para pré-preencher `sessao`. `iniciarSessao`
    e `terminarSessao` gravam/apagam via `sessaoDaConta` e dão trigger a `purgarConta` (interna ao
-   módulo; lista `PURGAS` módulo-scoped: `clearApiKey`, `purgarIndiceBusca` desde S08-20), que
-   desde S18-05 corre as purgas num `for-of` sequencial com `try/catch` por purga -- uma que
-   falhe não trava as outras nem o logout/troca de sessão, provado pelo teste que faz
-   `clearApiKey` rebentar e confirma que `purgarIndiceBusca` (a purga seguinte na lista) ainda
-   apaga o índice OPFS da conta que sai.
+   módulo; lista `PURGAS` módulo-scoped: entradas `[nome, purga]` -- `['clearApiKey', clearApiKey]`,
+   `['purgarIndiceBusca', purgarIndiceBusca]`, desde S08-20/S18-08), que desde S18-05 corre as
+   purgas num `for-of` sequencial com `try/catch` por purga -- uma que falhe não trava as outras
+   nem o logout/troca de sessão, provado pelo teste que faz `clearApiKey` rebentar e confirma que
+   `purgarIndiceBusca` (a purga seguinte na lista) ainda apaga o índice OPFS da conta que sai.
+   Desde S18-08, o `catch` também deixa rasto: `console.error` com o `nome` literal da purga (não
+   `purga.name` -- minificação em produção apagaria o nome) e o `accountId`, provado pelo teste
+   que força `clearApiKey` a rejeitar e verifica a mensagem.
 3. `useSession()` lê o `SessionContext` React. Fora de um `<SessionProvider>` ancestral, lança
    (`useSession: nenhum <SessionProvider> ancestral`) em vez de devolver um default silencioso
    (S18-03) -- um erro de montagem em produção deixa de correr código sensível a sessão sem
@@ -52,3 +55,14 @@ React (`useSession()`), sobre `entities/account/session.ts` -- ver
   `MagicLinkCallback`, `AuthPage` e `RecoveryScreen`, e punha o login à espera de I/O de disco,
   com um OPFS bloqueado a pendurar o login. O que o teste prova, e o que interessa, é o efeito: o
   blob de A é apagado e o de B fica intacto.
+- **O que fazer a um blob que sobreviveu a uma purga falhada (S18-08): nada, nesta fatia.** Não há
+  retentativa nem fila de purgas pendentes -- o rasto no `console.error` do `catch` de
+  `purgarConta` é tudo o que existe hoje. Porquê: o produto é zero-knowledge (o blob que sobra é
+  cifrado, não texto em claro utilizável sem a chave da sessão que acabou de terminar), a purga
+  corre num cliente que já perdeu a sessão (não há onde agendar retentativa nem para onde voltar
+  a autenticar sozinho), e telemetria remota está fora de âmbito -- este produto não manda nada
+  para fora do cliente. Se compensar corrigir isto (ex.: uma varredura no arranque da sessão
+  seguinte para reconciliar diretórios OPFS órfãos), é ticket próprio, não uma extensão desta
+  fatia. Por isso o `catch` só regista: sem essa reconciliação, um "vamos tentar outra vez" seria
+  promessa vazia. Porque é que o objeto de erro pode ir para o console em segurança: ver o
+  comentário no `catch` de `purgarConta` (`SessionProvider.tsx`).

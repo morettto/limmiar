@@ -306,6 +306,51 @@ describe('SessionProvider', () => {
     vi.resetModules()
   })
 
+  it('uma purga que rejeita deixa rasto no console com o nome da purga e o accountId, sem conteudo do blob nem chave', async () => {
+    vi.doMock('../../features/copilot-byok/key-store', () => ({
+      clearApiKey: vi.fn(() => Promise.reject(new Error('purge boom'))),
+    }))
+    vi.resetModules()
+    const raiz = new FakeDirectoryHandle()
+    restoreOpfsRoot = stubOpfsRoot(raiz)
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    // Mesma pegadinha de `renderRouter`: `useSession` também tem de vir fresco.
+    const { SessionProvider: SessionProviderComMockDePurga, useSession: useSessionFresco } = await import(
+      './SessionProvider'
+    )
+
+    function ConsumerFresco() {
+      const { sessao, terminarSessao } = useSessionFresco()
+      return (
+        <div>
+          <p data-testid="sessao">{sessao === null ? 'sem-sessao' : sessao.id}</p>
+          <button onClick={() => terminarSessao()}>terminar</button>
+        </div>
+      )
+    }
+
+    seedStoredAccount(ACCOUNT)
+    render(
+      <SessionProviderComMockDePurga>
+        <ConsumerFresco />
+      </SessionProviderComMockDePurga>,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'terminar' }))
+
+    await waitFor(() => {
+      expect(consoleError).toHaveBeenCalledWith(
+        expect.stringContaining('clearApiKey'),
+        expect.any(Error),
+      )
+    })
+    expect(consoleError).toHaveBeenCalledWith(expect.stringContaining(ACCOUNT.id), expect.any(Error))
+
+    consoleError.mockRestore()
+    vi.doUnmock('../../features/copilot-byok/key-store')
+    vi.resetModules()
+  })
+
   it('useSession outside a SessionProvider throws instead of returning a silent default', () => {
     // Suprime o console.error do React sobre o erro não apanhado durante o render.
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
