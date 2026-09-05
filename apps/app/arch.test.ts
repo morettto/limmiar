@@ -1,7 +1,32 @@
+import { readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { cruise } from 'dependency-cruiser'
 import extractDepcruiseConfig from 'dependency-cruiser/config-utl/extract-depcruise-config'
 import { describe, expect, it } from 'vitest'
+
+const FSD_LAYERS = ['pages', 'widgets', 'features', 'entities'] as const
+
+const sliceDirs = (root: string, layer: string) => {
+  const layerDir = resolve(root, layer)
+  try {
+    return readdirSync(layerDir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+  } catch {
+    return []
+  }
+}
+
+const looseLayerRootFiles = (root: string, layer: string) => {
+  const layerDir = resolve(root, layer)
+  try {
+    return readdirSync(layerDir, { withFileTypes: true })
+      .filter((entry) => entry.isFile() && /\.(ts|tsx)$/.test(entry.name))
+      .map((entry) => entry.name)
+  } catch {
+    return []
+  }
+}
 
 describe('fsd-no-cross-slice', () => {
   it('flags exactly the sibling-slice imports, spares intra-slice/lower-layer/accepted-pair', async () => {
@@ -22,8 +47,8 @@ describe('fsd-no-cross-slice', () => {
       .sort((a, b) => a.from.localeCompare(b.from))
 
     // Exact list, each entry naming its rule: proves the two narrow rules fire on their own,
-    // not just the general one, and that intra-slice/lower-layer/both accepted pairs never
-    // sneak into this array.
+    // not just the general one, that intra-slice/lower-layer/both accepted pairs never sneak
+    // into this array, and that a file loose at a layer root (no slice folder) also violates.
     expect(sorted).toEqual([
       {
         rule: { name: 'fsd-no-cross-slice-device-pairing-new' },
@@ -50,6 +75,36 @@ describe('fsd-no-cross-slice', () => {
         from: 'src/features/recovery/RecoveryScreen.ts',
         to: 'src/features/nota-fila/navegacao-teclado.ts',
       },
+      {
+        rule: { name: 'fsd-no-loose-layer-files' },
+        from: 'src/features/solto.ts',
+        to: 'src/entities/nota/nota.ts',
+      },
     ])
+  })
+})
+
+describe('fsd layer roots have no loose files', () => {
+  it('src/<layer> root has no .ts/.tsx file outside a slice folder', () => {
+    // Filesystem-level net, independent of depcruise's edge model: fsd-no-loose-layer-files
+    // only fires when the loose file has an outgoing import, so a zero-import loose file or
+    // one only ever imported by others would slip past it. This test just lists files.
+    for (const layer of FSD_LAYERS) {
+      expect(looseLayerRootFiles(resolve(import.meta.dirname, 'src'), layer), `src/${layer}`).toEqual([])
+    }
+  })
+})
+
+describe('arch-fixture slice names track src', () => {
+  it('every slice folder the fixture reuses from a real slice name still exists in src', () => {
+    // Not regenerated from src: that would couple this regex test to whatever slices happen
+    // to exist for reasons unrelated to the rule logic. Cross-checking names is enough.
+    for (const layer of FSD_LAYERS) {
+      const fixtureSlices = sliceDirs(resolve(import.meta.dirname, 'arch-fixture/src'), layer)
+      const realSlices = sliceDirs(resolve(import.meta.dirname, 'src'), layer)
+      for (const slice of fixtureSlices) {
+        expect(realSlices, `arch-fixture/src/${layer}/${slice} não existe em src/${layer}`).toContain(slice)
+      }
+    }
   })
 })
