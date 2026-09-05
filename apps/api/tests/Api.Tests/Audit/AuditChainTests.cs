@@ -133,6 +133,27 @@ public sealed class AuditChainTests
         Assert.Equal(AuditBreakKind.HashMismatch, result.BreakKind);
     }
 
+    /// <summary>Every other anchor test above anchors a *violated* claim, so the loop always
+    /// returns early from inside its body -- the loop's own natural exit (falling through to
+    /// `Ok()` after the last iteration) was never exercised. This is the gap AC1 of S10-04
+    /// names: a chain intact end to end, plural anchors, and every one of them correct.</summary>
+    [Fact]
+    public void Verify_WhenChainIsIntactAndEveryAnchorMatches_ReportsOk()
+    {
+        var entries = BuildIntactChain(3);
+        var anchors = new[]
+        {
+            new AuditAnchor(TenantId, 1, entries[0].EntryHash, RecordedAt),
+            new AuditAnchor(TenantId, 3, entries[2].EntryHash, RecordedAt),
+        };
+
+        var result = AuditChain.Verify(entries, anchors);
+
+        Assert.True(result.Intact);
+        Assert.Null(result.FirstBrokenSequence);
+        Assert.Null(result.BreakKind);
+    }
+
     private static List<AuditEntry> BuildIntactChain(int count)
     {
         var entries = new List<AuditEntry>();

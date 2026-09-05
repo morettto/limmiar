@@ -122,6 +122,14 @@ critério 4) que o desenho já fechou.
   `Verify` (elo, `entry_hash` e `AnchorMismatch`) usam todas
   `CryptographicOperations.FixedTimeEquals` -- o argumento completo está no comentário
   imediatamente acima do `foreach` em `AuditChain.cs`.
+- **A suíte de âncoras era escrita só a partir dos modos de falha (S10-04).** Toda a suíte de
+  `AuditChainTests` para âncoras testava cadeias com âncora violada, anchor ausente, ou ambos
+  violados de propósito -- nunca uma cadeia íntegra com todas as âncoras corretas. Isso deixava
+  o `foreach` de `Verify` sem cobertura no caminho em que percorre todas as âncoras sem quebrar
+  nenhuma e cai no `return AuditVerification.Ok()` -- a única classe abaixo de 100% de linhas e
+  ramos no gate global de cobertura (`Api.Tests.csproj`, `<Threshold>100</Threshold>`).
+  `Verify_WhenChainIsIntactAndEveryAnchorMatches_ReportsOk` fecha o caminho feliz plural (duas
+  âncoras, ambas corretas) que faltava.
 - **Critério de aceite 4 provado contra a base, não por regex na migração.**
   `AuditTrailSchemaTests.AuditEntries_HasExactlyTheSevenMetadataColumns` e
   `AuditAnchors_HasExactlyTheFourColumns` comparam o conjunto exato de
