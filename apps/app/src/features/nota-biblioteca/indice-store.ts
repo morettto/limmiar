@@ -45,6 +45,23 @@ export function opfsIndice(
   }
 }
 
+/** Apaga o blob do índice da conta, se existir. Convenção: diretório `<raiz OPFS>/<accountId>`,
+ *  ficheiro `ARQUIVO_INDICE` -- o mesmo que `opfsIndice` já usa. */
+export async function purgarIndiceBusca(accountId: string): Promise<void> {
+  const raiz = await navigator.storage.getDirectory()
+  try {
+    const dir = await raiz.getDirectoryHandle(accountId)
+    await opfsIndice(dir).apagar()
+  } catch (erro) {
+    // Sem diretório/ficheiro: no-op silencioso. Qualquer outro erro propaga -- quem
+    // engole é o `catch {}` de `purgarConta`.
+    if (erro instanceof DOMException && erro.name === 'NotFoundError') {
+      return
+    }
+    throw erro
+  }
+}
+
 /** Serializa + sela + grava -- `gravar` só recebe ciphertext, nunca o JSON do índice. */
 export async function persistirIndice(
   gravar: GravarSelado,

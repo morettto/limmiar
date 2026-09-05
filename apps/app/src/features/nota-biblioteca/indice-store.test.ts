@@ -1,9 +1,9 @@
 import { webcrypto as limmiarWebcrypto } from '@limmiar/crypto'
-import { describe, expect, it, vi } from 'vitest'
-import { FakeDirectoryHandle } from '../../test-support/fake-opfs'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { FakeDirectoryHandle, stubOpfsRoot } from '../../test-support/fake-opfs'
 import { chaveIndiceDaConta, type ChaveIndiceBusca } from './indice-crypto'
 import { construirIndice } from './indice'
-import { opfsIndice, persistirIndice, restaurarIndice } from './indice-store'
+import { opfsIndice, persistirIndice, purgarIndiceBusca, restaurarIndice } from './indice-store'
 
 const ACCOUNT_ID = '11111111-1111-1111-1111-111111111111'
 const IMPRESSAO = '1:0|2:0'
@@ -18,6 +18,79 @@ function toHex(bytes: Uint8Array): string {
     .map((byte) => byte.toString(16).padStart(2, '0'))
     .join('')
 }
+
+describe('purgarIndiceBusca', () => {
+  let restoreOpfsRoot: (() => void) | null = null
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    restoreOpfsRoot?.()
+    restoreOpfsRoot = null
+  })
+
+  it('apaga o blob do indice da conta', async () => {
+    const chave = await makeChave()
+    const raiz = new FakeDirectoryHandle()
+    const dirConta = await raiz.getDirectoryHandle(ACCOUNT_ID, { create: true })
+    const { gravar, ler } = opfsIndice(dirConta as unknown as FileSystemDirectoryHandle)
+    const indice = construirIndice([{ id: '1', patientId: 'p1', texto: 'febre' }])
+    await persistirIndice(gravar, chave, ACCOUNT_ID, indice, IMPRESSAO)
+    restoreOpfsRoot = stubOpfsRoot(raiz)
+
+    await purgarIndiceBusca(ACCOUNT_ID)
+
+    expect(await ler()).toBeNull()
+  })
+
+  it('conta sem diretorio OPFS e no-op', async () => {
+    const raiz = new FakeDirectoryHandle()
+    restoreOpfsRoot = stubOpfsRoot(raiz)
+
+    await expect(purgarIndiceBusca(ACCOUNT_ID)).resolves.toBeUndefined()
+  })
+
+  it('propaga um Error simples em vez de o engolir', async () => {
+    const raizComErro = {
+      getDirectoryHandle: async () => {
+        throw new Error('disco corrompido')
+      },
+    } as unknown as FakeDirectoryHandle
+    restoreOpfsRoot = stubOpfsRoot(raizComErro)
+
+    await expect(purgarIndiceBusca(ACCOUNT_ID)).rejects.toThrow('disco corrompido')
+  })
+
+  it('propaga uma DOMException que nao seja NotFoundError', async () => {
+    const raizComErro = {
+      getDirectoryHandle: async () => {
+        throw new DOMException('sem permissao', 'NotAllowedError')
+      },
+    } as unknown as FakeDirectoryHandle
+    restoreOpfsRoot = stubOpfsRoot(raizComErro)
+
+    await expect(purgarIndiceBusca(ACCOUNT_ID)).rejects.toThrow('sem permissao')
+  })
+
+  // Critério de aceite 4: depois da purga, restaurar devolve null por ausência de blob, não
+  // por impressão que não bate -- só o `not.toHaveBeenCalled()` distingue os dois casos, já
+  // que ambos devolvem null (ver o teste "devolve null e apaga o blob..." em restaurarIndice).
+  it('depois de purgar, restaurarIndice devolve null sem chamar apagar de novo', async () => {
+    const chave = await makeChave()
+    const raiz = new FakeDirectoryHandle()
+    const dirConta = await raiz.getDirectoryHandle(ACCOUNT_ID, { create: true })
+    const { gravar, ler, apagar } = opfsIndice(dirConta as unknown as FileSystemDirectoryHandle)
+    const indice = construirIndice([{ id: '1', patientId: 'p1', texto: 'febre' }])
+    await persistirIndice(gravar, chave, ACCOUNT_ID, indice, IMPRESSAO)
+    restoreOpfsRoot = stubOpfsRoot(raiz)
+
+    await purgarIndiceBusca(ACCOUNT_ID)
+    const apagarEspiado = vi.fn(apagar)
+    const restaurado = await restaurarIndice({ ler, apagar: apagarEspiado }, chave, ACCOUNT_ID, IMPRESSAO)
+
+    expect(restaurado).toBeNull()
+    expect(apagarEspiado).not.toHaveBeenCalled()
+  })
+})
 
 describe('opfsIndice', () => {
   it('apagar remove o ficheiro selado do diretório', async () => {

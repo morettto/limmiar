@@ -1,8 +1,13 @@
 import { useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { webcrypto as limmiarWebcrypto } from '@limmiar/crypto'
 import type { Account } from '../../entities/account'
 import { COPILOT_KEY_STORAGE_KEY } from '../../features/copilot-byok/key-store'
+import { chaveIndiceDaConta, type ChaveIndiceBusca } from '../../features/nota-biblioteca/indice-crypto'
+import { construirIndice } from '../../features/nota-biblioteca/indice'
+import { opfsIndice, persistirIndice } from '../../features/nota-biblioteca/indice-store'
+import { FakeDirectoryHandle, stubOpfsRoot } from '../../test-support/fake-opfs'
 import { SessionProvider, useSession } from './SessionProvider'
 
 const ACCOUNT: Account = {
@@ -45,6 +50,22 @@ function seedCopilotKeyEnvelope(accountId: string) {
   )
 }
 
+async function makeChave(): Promise<ChaveIndiceBusca> {
+  const kek = await limmiarWebcrypto.importKek(crypto.getRandomValues(new Uint8Array(32)))
+  return chaveIndiceDaConta(kek)
+}
+
+// Semeia `raiz/<accountId>/indice-busca` via opfsIndice (mesmo trio de produção), devolvendo
+// o diretório da conta para inspecionar `.files` depois da purga.
+async function seedIndiceBusca(raiz: FakeDirectoryHandle, accountId: string): Promise<FakeDirectoryHandle> {
+  const chave = await makeChave()
+  const dir = await raiz.getDirectoryHandle(accountId, { create: true })
+  const { gravar } = opfsIndice(dir as unknown as FileSystemDirectoryHandle)
+  const indice = construirIndice([{ id: '1', patientId: 'p1', texto: 'febre' }])
+  await persistirIndice(gravar, chave, accountId, indice, '1:0')
+  return dir
+}
+
 function Consumer() {
   const { sessao, iniciarSessao, terminarSessao } = useSession()
   return (
@@ -76,12 +97,16 @@ function ValueCapturer({ onValue }: { onValue: (value: ReturnType<typeof useSess
   return null
 }
 
+let restoreOpfsRoot: (() => void) | null = null
+
 describe('SessionProvider', () => {
   afterEach(() => {
     cleanup()
     window.sessionStorage.clear()
     window.localStorage.clear()
     vi.restoreAllMocks()
+    restoreOpfsRoot?.()
+    restoreOpfsRoot = null
   })
 
   it('mounts with `sessao` pre-filled when the storage already has an account', () => {
@@ -126,6 +151,25 @@ describe('SessionProvider', () => {
     expect(window.sessionStorage.getItem('limmiar:account')).toBeNull()
     await waitFor(() => {
       expect(window.localStorage.getItem(copilotKeyStorageKeyFor(ACCOUNT.id))).toBeNull()
+    })
+  })
+
+  it('terminarSessao purga o indice da conta que sai', async () => {
+    const raiz = new FakeDirectoryHandle()
+    const dirA = await seedIndiceBusca(raiz, ACCOUNT.id)
+    restoreOpfsRoot = stubOpfsRoot(raiz)
+    seedStoredAccount(ACCOUNT)
+    render(
+      <SessionProvider>
+        <Consumer />
+      </SessionProvider>,
+    )
+    expect(screen.getByTestId('sessao').textContent).toBe(ACCOUNT.id)
+
+    fireEvent.click(screen.getByRole('button', { name: 'terminar' }))
+
+    await waitFor(() => {
+      expect(dirA.files.has('indice-busca')).toBe(false)
     })
   })
 
@@ -180,6 +224,27 @@ describe('SessionProvider', () => {
     })
   })
 
+  it('trocar de conta (A -> B) apaga o indice de A e deixa o de B intacto', async () => {
+    const raiz = new FakeDirectoryHandle()
+    const dirA = await seedIndiceBusca(raiz, ACCOUNT.id)
+    const dirB = await seedIndiceBusca(raiz, OUTRA_CONTA.id)
+    restoreOpfsRoot = stubOpfsRoot(raiz)
+    seedStoredAccount(ACCOUNT)
+    render(
+      <SessionProvider>
+        <Consumer />
+      </SessionProvider>,
+    )
+    expect(screen.getByTestId('sessao').textContent).toBe(ACCOUNT.id)
+
+    fireEvent.click(screen.getByRole('button', { name: 'iniciar-outra' }))
+
+    await waitFor(() => {
+      expect(dirA.files.has('indice-busca')).toBe(false)
+    })
+    expect(dirB.files.has('indice-busca')).toBe(true)
+  })
+
   it('iniciarSessao with no prior session registers the account without purging anything (sem sessão)', () => {
     render(
       <SessionProvider>
@@ -193,15 +258,19 @@ describe('SessionProvider', () => {
     expect(screen.getByTestId('sessao').textContent).toBe(ACCOUNT.id)
   })
 
-  it('a purge that throws synchronously does not stop terminarSessao from clearing the session', async () => {
+  it('a purge that throws synchronously does not stop terminarSessao from clearing the session, nor the next purge in the list (o indice ainda e apagado)', async () => {
     // Prova que purgarConta não deixa um throw síncrono de clearApiKey escapar para terminarSessao
-    // (que chama purgarConta em fire-and-forget, sem esperar por ela).
+    // (que chama purgarConta em fire-and-forget, sem esperar por ela), e que a purga seguinte
+    // na lista (purgarIndiceBusca) ainda corre -- README `app/providers`, linhas 19-20.
     vi.doMock('../../features/copilot-byok/key-store', () => ({
       clearApiKey: vi.fn(() => {
         throw new Error('purge boom')
       }),
     }))
     vi.resetModules()
+    const raiz = new FakeDirectoryHandle()
+    const dirA = await seedIndiceBusca(raiz, ACCOUNT.id)
+    restoreOpfsRoot = stubOpfsRoot(raiz)
     // Mesma pegadinha de `renderRouter` em router.test.tsx: `useSession` também tem de vir fresco.
     const { SessionProvider: SessionProviderComMockDePurga, useSession: useSessionFresco } = await import(
       './SessionProvider'
@@ -229,6 +298,9 @@ describe('SessionProvider', () => {
 
     expect(screen.getByTestId('sessao').textContent).toBe('sem-sessao')
     expect(window.sessionStorage.getItem('limmiar:account')).toBeNull()
+    await waitFor(() => {
+      expect(dirA.files.has('indice-busca')).toBe(false)
+    })
 
     vi.doUnmock('../../features/copilot-byok/key-store')
     vi.resetModules()

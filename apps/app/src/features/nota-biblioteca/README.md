@@ -57,7 +57,14 @@ ver os READMEs dos dois para o fluxo de composição.
    por diretório já escopado à conta pelo chamador). `ler` devolve `null` quando o ficheiro
    ainda não existe (apanha só `NotFoundError`; qualquer outro erro propaga). `apagar`
    (ticket S08-09) faz `dir.removeEntry(ARQUIVO_INDICE)`.
-9. `persistirIndice(gravar, chave, accountId, indice, impressao)` (parâmetro solto, `gravar`
+9. `purgarIndiceBusca(accountId)` (`indice-store.ts`, ticket S08-20) é o chamador de produção
+   de `opfsIndice(dir).apagar()`: lê a raiz OPFS (`navigator.storage.getDirectory()`, fora do
+   try -- essa rejeição propaga sempre), entra em `raiz.getDirectoryHandle(accountId)` (sem
+   `{ create: true }`) e chama `apagar()` num único try; qualquer `NotFoundError` (sem
+   diretório da conta, ou diretório sem `indice-busca`) vira `return` silencioso, tudo o
+   resto propaga. Único chamador: `PURGAS` em `app/providers/SessionProvider.tsx`, disparada
+   em fire-and-forget no logout e na troca de conta.
+10. `persistirIndice(gravar, chave, accountId, indice, impressao)` (parâmetro solto, `gravar`
    sozinho -- só usa esse campo) e `restaurarIndice(store, chave, accountId, impressao)`
    (`store: { ler, apagar }` inteiro -- os dois precisam de andar juntos) compõem os passos
    5+7+8: serializar (com a impressão) → selar → gravar, e ler → abrir → carregar (com a
@@ -90,12 +97,14 @@ ver os READMEs dos dois para o fluxo de composição.
   (`indice-crypto.ts`).
 - `LerSelado`, `GravarSelado`, `ApagarSelado`, `opfsIndice(dir): { ler, gravar, apagar }`,
   `persistirIndice(gravar: GravarSelado, chave: ChaveIndiceBusca, accountId, indice, impressao): Promise<void>`,
-  `restaurarIndice(store: { ler, apagar }, chave: ChaveIndiceBusca, accountId, impressao): Promise<MiniSearch<DocNota> | null>`
-  (`indice-store.ts`).
+  `restaurarIndice(store: { ler, apagar }, chave: ChaveIndiceBusca, accountId, impressao): Promise<MiniSearch<DocNota> | null>`,
+  `purgarIndiceBusca(accountId: string): Promise<void>` (ticket S08-20) (`indice-store.ts`).
 - Chamador (fatias 4-5): `widgets/biblioteca/BibliotecaNotas.tsx` renderiza `GrupoPaciente[]`
   e `ResultadoBusca`; `pages/biblioteca/BibliotecaPage.tsx` é quem chama
   `agruparPorPaciente`/`buscar`/`persistirIndice`/`restaurarIndice` de facto, na rota
   `/biblioteca`.
+- Chamador de `purgarIndiceBusca` (ticket S08-20): `app/providers/SessionProvider.tsx`, via
+  `PURGAS` (logout e troca de conta) -- ver `app/providers/README.md`.
 
 ## Decisões desta fatia
 
@@ -174,6 +183,18 @@ ver os READMEs dos dois para o fluxo de composição.
   `gravar` (via `createWritable()`) trunca e sobrescreve o mesmo ficheiro de qualquer forma.
   Só a rejeição de `apagar` é engolida -- `ler` e `abrirIndice` continuam a propagar como
   antes; um erro nesses dois passos não tem um passo seguinte que o corrija sozinho.
+
+- **`purgarIndiceBusca` fixa a convenção `<raiz OPFS>/<accountId>/indice-busca` sem
+  exportar um `dirIndiceDaConta` (ticket S08-20).** O diretório da conta é
+  `raiz.getDirectoryHandle(accountId)` (sem `{ create: true }` -- criar um diretório vazio a
+  cada logout seria semear lixo no OPFS sem nenhum gravador a segui-lo) e o ficheiro é o
+  `ARQUIVO_INDICE` que `opfsIndice` já usa. Não há chamador de produção que precise de um
+  helper de caminho exportado; se um escritor de produção do índice um dia discordar deste
+  diretório, é o teste de aceite 4 (`indice-store.test.ts`) que fica vermelho primeiro. Por
+  igual motivo, a purga usa `opfsIndice(dir).apagar()` (um `removeEntry(ARQUIVO_INDICE)`), não
+  `raiz.removeEntry(accountId, { recursive: true })` -- o diretório da conta pode vir a
+  guardar dados de outros módulos, e apagar a árvore inteira apagaria isso também. Um
+  diretório vazio que sobra não é texto em claro e não é problema.
 
 ## Fora de âmbito
 

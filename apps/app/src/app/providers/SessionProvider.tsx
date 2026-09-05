@@ -2,12 +2,13 @@ import { createContext, useCallback, useContext, useMemo, useState, type ReactNo
 import type { Account } from '../../entities/account'
 import { sessaoDaConta } from '../../entities/account/session'
 import { clearApiKey } from '../../features/copilot-byok/key-store'
+import { purgarIndiceBusca } from '../../features/nota-biblioteca/indice-store'
 
 type PurgaDeConta = (accountId: string) => void | Promise<void>
 
-// Módulo-level, NÃO exportada. S08-20 acrescenta purgarIndiceBusca como mais uma linha aqui.
-// Exportar a lista, ou um registarPurga(), seria registo dinâmico -- a spec recusa isso.
-const PURGAS: readonly PurgaDeConta[] = [clearApiKey]
+// Módulo-level, NÃO exportada. Exportar a lista, ou um registarPurga(), seria registo
+// dinâmico -- a spec recusa isso.
+const PURGAS: readonly PurgaDeConta[] = [clearApiKey, purgarIndiceBusca]
 
 async function purgarConta(accountId: string): Promise<void> {
   for (const purga of PURGAS) {
