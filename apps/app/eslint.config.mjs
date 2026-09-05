@@ -34,6 +34,10 @@ export default tseslint.config(
     },
     rules: {
       'local/no-implicit-locale-formatting': 'error',
+      // ignoreRestSiblings (off by default): the `{ chave: _chave, ...resto }` shape omits a field
+      // from a copy on purpose (e.g. session.ts:62's twoFactorTicket, S18-07) -- the renamed
+      // sibling is never read again by design, not a forgotten variable.
+      '@typescript-eslint/no-unused-vars': ['error', { ignoreRestSiblings: true }],
     },
   },
   {

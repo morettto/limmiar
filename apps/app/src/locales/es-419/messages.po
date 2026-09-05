@@ -141,7 +141,7 @@ msgstr "¿Cómo vas a usar Limmiar?"
 msgid "Concluindo o pareamento..."
 msgstr "Completando la vinculación..."
 
-#: src/app/routing/router.tsx:36
+#: src/pages/home/HomePage.tsx:16
 msgid "Configurar copiloto de IA"
 msgstr "Configurar copiloto de IA"
 
@@ -494,7 +494,7 @@ msgstr "Recuperar acceso a la cuenta"
 msgid "Risco"
 msgstr "Riesgo"
 
-#: src/app/routing/router.tsx:42
+#: src/pages/home/HomePage.tsx:22
 msgid "Sair"
 msgstr "Cerrar sesión"
 

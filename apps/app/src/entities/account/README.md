@@ -74,5 +74,5 @@ em OPFS...) é orquestração de fora, não responsabilidade de `entities` -- a 
   monta o chaveiro é a spec S01, ainda não ligada a `SessionProvider`.
 
 [[S18-02 Sair da conta por um ponto único de purga|S18-02]] fechou o botão "Sair" e a purga por
-conta (`app/providers/SessionProvider.tsx`, `PURGAS`/`purgarConta`) -- fora desta slice, ver
+conta (`app/providers/purgar-conta.ts`, `PURGAS`/`purgarConta`) -- fora desta slice, ver
 `features/copilot-byok/README.md` ponto 5 para o desenho completo.

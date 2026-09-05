@@ -62,7 +62,7 @@ ver os READMEs dos dois para o fluxo de composição.
    try -- essa rejeição propaga sempre), entra em `raiz.getDirectoryHandle(accountId)` (sem
    `{ create: true }`) e chama `apagar()` num único try; qualquer `NotFoundError` (sem
    diretório da conta, ou diretório sem `indice-busca`) vira `return` silencioso, tudo o
-   resto propaga. Único chamador: `PURGAS` em `app/providers/SessionProvider.tsx`, disparada
+   resto propaga. Único chamador: `PURGAS` em `app/providers/purgar-conta.ts`, disparada
    em fire-and-forget no logout e na troca de conta.
 10. `persistirIndice(gravar, chave, accountId, indice, impressao)` (parâmetro solto, `gravar`
    sozinho -- só usa esse campo) e `restaurarIndice(store, chave, accountId, impressao)`
@@ -103,7 +103,7 @@ ver os READMEs dos dois para o fluxo de composição.
   e `ResultadoBusca`; `pages/biblioteca/BibliotecaPage.tsx` é quem chama
   `agruparPorPaciente`/`buscar`/`persistirIndice`/`restaurarIndice` de facto, na rota
   `/biblioteca`.
-- Chamador de `purgarIndiceBusca` (ticket S08-20): `app/providers/SessionProvider.tsx`, via
+- Chamador de `purgarIndiceBusca` (ticket S08-20): `app/providers/purgar-conta.ts`, via
   `PURGAS` (logout e troca de conta) -- ver `app/providers/README.md`.
 
 ## Decisões desta fatia
