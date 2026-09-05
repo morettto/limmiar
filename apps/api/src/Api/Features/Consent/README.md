@@ -66,7 +66,7 @@ para o porquê do consentimento viver em claro no servidor.
   `AccountNotFound`/`NotAuthorizedToCreateRecords`, vive junto do serviço em
   `ConsentService.cs`, não num ficheiro `RecordConsentResult.cs` à parte -- esse tipo
   (`required bool Succeeded` + dois nullables) foi apagado, e `ConsentEndpoints` lê o
-  resultado por `TryGetValue`/`TryGetFailure`, nunca por `!`.
+  resultado por `Match`, nunca por `!`.
 - `ConsentEndpoints.cs` (fatia 3) --
   `POST /accounts/{accountId:guid}/patients/{patientId:guid}/consents` (`201`/`400`/`401`/
   `403`/`404`) e `GET` na mesma rota (`200`/`401`). Sem `DELETE` nem `PUT`: revogar é o

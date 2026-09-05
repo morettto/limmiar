@@ -36,13 +36,13 @@ public sealed class LoginHandler(IAccountStore store, IPasswordVerifierComparer 
 
         if (account is null || !hasRealVerifier || !matches)
         {
-            return Result<AccountLoginSuccess, AccountLoginFailureReason>.Failure(AccountLoginFailureReason.InvalidCredentials);
+            return AccountLoginFailureReason.InvalidCredentials;
         }
 
-        return Result<AccountLoginSuccess, AccountLoginFailureReason>.Success(new AccountLoginSuccess(
+        return new AccountLoginSuccess(
             account,
             TwoFactorPolicy.Determine(account),
             IssueTwoFactorTicketIfRequired(account, twoFactorTicketIssuer),
-            IssueSessionIfNoTwoFactorPending(account, sessionTokenIssuer)));
+            IssueSessionIfNoTwoFactorPending(account, sessionTokenIssuer));
     }
 }

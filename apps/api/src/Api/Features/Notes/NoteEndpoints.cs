@@ -58,14 +58,11 @@ public static class NoteEndpoints
         }
 
         var result = await noteService.SignAsync(accountId, noteId, request.Revision, request.Signature, cancellationToken);
-        if (!result.TryGetValue(out var signature, out var failureReason))
-        {
-            return MapFailureToProblem(failureReason);
-        }
-
-        return TypedResults.Created(
-            $"/accounts/{accountId}/notes/{noteId}/signature",
-            new SignNoteResponse(noteId, signature.Revision, signature.SignedAt));
+        return result.Match<Results<Created<SignNoteResponse>, JsonHttpResult<LimmiarProblemDetails>>>(
+            signature => TypedResults.Created(
+                $"/accounts/{accountId}/notes/{noteId}/signature",
+                new SignNoteResponse(noteId, signature.Revision, signature.SignedAt)),
+            reason => MapFailureToProblem(reason));
     }
 
     private static async Task<Results<Ok<NoteSignatureResponse>, JsonHttpResult<LimmiarProblemDetails>>> HandleGetAsync(

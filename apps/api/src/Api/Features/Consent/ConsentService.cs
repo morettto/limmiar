@@ -32,17 +32,17 @@ public sealed class ConsentService(IAccountStore accounts, ConsentEventStore sto
         var account = await accounts.FindByIdAsync(professionalId, cancellationToken);
         if (account is null)
         {
-            return Result<ConsentEvent, RecordConsentFailureReason>.Failure(RecordConsentFailureReason.AccountNotFound);
+            return RecordConsentFailureReason.AccountNotFound;
         }
 
         if (!AccountAuthorizationGuard.CanCreatePatientRecords(account))
         {
-            return Result<ConsentEvent, RecordConsentFailureReason>.Failure(RecordConsentFailureReason.NotAuthorizedToCreateRecords);
+            return RecordConsentFailureReason.NotAuthorizedToCreateRecords;
         }
 
         var evt = new ConsentEvent(professionalId, patientId, purpose, decision, default);
         var inserted = await store.InsertAsync(evt, cancellationToken);
-        return Result<ConsentEvent, RecordConsentFailureReason>.Success(inserted);
+        return inserted;
     }
 
     /// <summary>

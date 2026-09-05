@@ -55,14 +55,11 @@ public static class ConsentEndpoints
         }
 
         var result = await consentService.RecordAsync(accountId, patientId, purpose, decision, cancellationToken);
-        if (!result.TryGetValue(out var evt, out var failureReason))
-        {
-            return MapFailureToProblem(failureReason);
-        }
-
-        return TypedResults.Created(
-            $"/accounts/{accountId}/patients/{patientId}/consents",
-            new RecordConsentResponse(patientId, LowerFirst(purpose.ToString()), LowerFirst(decision.ToString()), evt.RecordedAt));
+        return result.Match<Results<Created<RecordConsentResponse>, JsonHttpResult<LimmiarProblemDetails>>>(
+            evt => TypedResults.Created(
+                $"/accounts/{accountId}/patients/{patientId}/consents",
+                new RecordConsentResponse(patientId, LowerFirst(purpose.ToString()), LowerFirst(decision.ToString()), evt.RecordedAt)),
+            reason => MapFailureToProblem(reason));
     }
 
     private static async Task<Results<Ok<ConsentSnapshot>, JsonHttpResult<LimmiarProblemDetails>>> HandleGetAsync(

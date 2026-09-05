@@ -18,24 +18,24 @@ public sealed class NoteService(IAccountStore accounts, NoteSignatureStore store
         var account = await accounts.FindByIdAsync(professionalId, cancellationToken);
         if (account is null)
         {
-            return Result<NoteSignature, SignNoteFailureReason>.Failure(SignNoteFailureReason.AccountNotFound);
+            return SignNoteFailureReason.AccountNotFound;
         }
 
         // Same guard as PatientService.CreatePatientAsync/AppendEntryAsync -- signing a note
         // carries the same authorization risk as creating or appending clinical content.
         if (!AccountAuthorizationGuard.CanCreatePatientRecords(account))
         {
-            return Result<NoteSignature, SignNoteFailureReason>.Failure(SignNoteFailureReason.NotAuthorizedToCreateRecords);
+            return SignNoteFailureReason.NotAuthorizedToCreateRecords;
         }
 
         var entry = new NoteSignature(professionalId, noteId, revision, signature, DateTimeOffset.UtcNow);
         var inserted = await store.InsertAsync(entry, cancellationToken);
         if (inserted is null)
         {
-            return Result<NoteSignature, SignNoteFailureReason>.Failure(SignNoteFailureReason.AlreadySigned);
+            return SignNoteFailureReason.AlreadySigned;
         }
 
-        return Result<NoteSignature, SignNoteFailureReason>.Success(inserted);
+        return inserted;
     }
 
     public Task<NoteSignature?> GetSignatureAsync(Guid professionalId, Guid noteId, CancellationToken cancellationToken) =>

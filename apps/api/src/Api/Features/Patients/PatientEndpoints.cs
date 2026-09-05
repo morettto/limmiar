@@ -76,14 +76,11 @@ public static class PatientEndpoints
 
         var result = await patientService.CreatePatientAsync(
             accountId, request.PatientId, request.WrappedDek, request.Ciphertext, cancellationToken);
-        if (!result.TryGetValue(out var entry, out var failureReason))
-        {
-            return MapCreateFailureToProblem(failureReason);
-        }
-
-        return TypedResults.Created(
-            $"/accounts/{accountId}/patients/{entry.PatientId}",
-            new CreatePatientResponse(entry.PatientId, entry.CreatedAt));
+        return result.Match<Results<Created<CreatePatientResponse>, JsonHttpResult<LimmiarProblemDetails>>>(
+            entry => TypedResults.Created(
+                $"/accounts/{accountId}/patients/{entry.PatientId}",
+                new CreatePatientResponse(entry.PatientId, entry.CreatedAt)),
+            reason => MapCreateFailureToProblem(reason));
     }
 
     private static async Task<Results<Created<AppendPatientEntryResponse>, JsonHttpResult<LimmiarProblemDetails>>> HandleAppendPatientEntryAsync(
@@ -107,14 +104,11 @@ public static class PatientEndpoints
 
         var result = await patientService.AppendEntryAsync(
             accountId, patientId, request.Sequence, request.Ciphertext, cancellationToken);
-        if (!result.TryGetValue(out var entry, out var failureReason))
-        {
-            return MapAppendFailureToProblem(failureReason);
-        }
-
-        return TypedResults.Created(
-            $"/accounts/{accountId}/patients/{patientId}/entries/{entry.Id}",
-            new AppendPatientEntryResponse(entry.Id, entry.Sequence, entry.CreatedAt));
+        return result.Match<Results<Created<AppendPatientEntryResponse>, JsonHttpResult<LimmiarProblemDetails>>>(
+            entry => TypedResults.Created(
+                $"/accounts/{accountId}/patients/{patientId}/entries/{entry.Id}",
+                new AppendPatientEntryResponse(entry.Id, entry.Sequence, entry.CreatedAt)),
+            reason => MapAppendFailureToProblem(reason));
     }
 
     private static async Task<Results<Ok<PatientRecordResponse>, JsonHttpResult<LimmiarProblemDetails>>> HandleGetPatientAsync(

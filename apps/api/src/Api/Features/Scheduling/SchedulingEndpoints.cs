@@ -68,14 +68,11 @@ public static class SchedulingEndpoints
 
         var result = await schedulingService.ScheduleAsync(
             accountId, request.PatientId, request.StartsAt, request.DurationMinutes, cancellationToken);
-        if (!result.TryGetValue(out var session, out var failureReason))
-        {
-            return MapFailureToProblem(failureReason);
-        }
-
-        return TypedResults.Created(
-            $"/accounts/{accountId}/agenda/sessions/{session.Id}",
-            ToResponse(session));
+        return result.Match<Results<Created<ScheduledSessionResponse>, JsonHttpResult<LimmiarProblemDetails>>>(
+            session => TypedResults.Created(
+                $"/accounts/{accountId}/agenda/sessions/{session.Id}",
+                ToResponse(session)),
+            reason => MapFailureToProblem(reason));
     }
 
     private static async Task<Results<Ok<ScheduledSessionResponse>, JsonHttpResult<LimmiarProblemDetails>>> HandleMoveAsync(
@@ -99,12 +96,9 @@ public static class SchedulingEndpoints
 
         var result = await schedulingService.MoveAsync(
             accountId, sessionId, request.StartsAt, request.DurationMinutes, cancellationToken);
-        if (!result.TryGetValue(out var session, out var failureReason))
-        {
-            return MapFailureToProblem(failureReason);
-        }
-
-        return TypedResults.Ok(ToResponse(session));
+        return result.Match<Results<Ok<ScheduledSessionResponse>, JsonHttpResult<LimmiarProblemDetails>>>(
+            session => TypedResults.Ok(ToResponse(session)),
+            reason => MapFailureToProblem(reason));
     }
 
     private static async Task<Results<NoContent, JsonHttpResult<LimmiarProblemDetails>>> HandleCancelAsync(
@@ -121,12 +115,9 @@ public static class SchedulingEndpoints
         }
 
         var result = await schedulingService.CancelAsync(accountId, sessionId, cancellationToken);
-        if (!result.TryGetValue(out _, out var failureReason))
-        {
-            return MapFailureToProblem(failureReason);
-        }
-
-        return TypedResults.NoContent();
+        return result.Match<Results<NoContent, JsonHttpResult<LimmiarProblemDetails>>>(
+            _ => TypedResults.NoContent(),
+            reason => MapFailureToProblem(reason));
     }
 
     private static bool IsValidDuration(int durationMinutes, out JsonHttpResult<LimmiarProblemDetails> problem)
