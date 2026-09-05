@@ -2,6 +2,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { act, cleanup, render, screen } from '@testing-library/react'
 import { I18nProvider } from '@lingui/react'
 import { i18n, dynamicActivate } from '../../shared/i18n'
+import { ESTADO_ASSINADA, ESTADO_PENDENTE } from '../../entities/nota/nota'
 import { NotaPage } from './NotaPage'
 
 vi.mock('../../widgets/soap-editor/FilaEEditor', () => ({
@@ -16,7 +17,10 @@ vi.mock('../../entities/nota/nota-crypto', () => ({
   notaParaEntrada: vi.fn(() => new Uint8Array([9, 9])),
 }))
 vi.mock('../../entities/patient/api', () => ({ appendPatientEntry: vi.fn() }))
-vi.mock('../../entities/nota/api', () => ({ assinarNota: vi.fn() }))
+vi.mock('../../entities/nota/api', () => ({
+  assinarNota: vi.fn(),
+  obterAssinatura: vi.fn().mockResolvedValue({ ok: false, code: 'notes.signature_not_found', params: {} }),
+}))
 
 const DEK = {} as CryptoKey
 const CIPHERTEXT = new Uint8Array([1, 2, 3])
@@ -86,6 +90,104 @@ describe('NotaPage', () => {
     play.mockRestore()
   })
 
+  describe('mount pergunta ao servidor se a nota já está assinada', () => {
+    it('obterAssinatura ok=true marca a nota assinada, sem role=alert', async () => {
+      const { obterAssinatura } = await import('../../entities/nota/api')
+      vi.mocked(obterAssinatura).mockResolvedValueOnce({
+        ok: true,
+        noteId: 'nota-fixture-1',
+        revision: 0,
+        signedAt: SIGNED_AT,
+      })
+
+      const { props, notaId } = await renderEObterProps()
+      await act(async () => {})
+
+      expect(vi.mocked(obterAssinatura)).toHaveBeenCalledWith('', '', '', notaId)
+      expect(props().notas.find((nota) => nota.id === notaId)?.estado).toBe(ESTADO_ASSINADA)
+      expect(screen.queryByRole('alert')).toBeNull()
+    })
+
+    it('obterAssinatura ok=false (404, nota por assinar) mantém a nota pendente', async () => {
+      const { props, notaId } = await renderEObterProps()
+      await act(async () => {})
+
+      expect(props().notas.find((nota) => nota.id === notaId)?.estado).toBe(ESTADO_PENDENTE)
+    })
+
+    it('obterAssinatura rejeitada (rede em baixo) mantém a nota pendente, sem rejeição não tratada', async () => {
+      const { obterAssinatura } = await import('../../entities/nota/api')
+      vi.mocked(obterAssinatura).mockRejectedValueOnce(new Error('network down'))
+
+      const { props, notaId } = await renderEObterProps()
+      await act(async () => {})
+
+      expect(props().notas.find((nota) => nota.id === notaId)?.estado).toBe(ESTADO_PENDENTE)
+    })
+
+    // Prova executada (não inferência) do critério 3: cleanup() desmonta -- é o reload, apaga
+    // toda memória do cliente. O 2º mount só chega a 'assinada' pela resposta do servidor.
+    it('reload (unmount + mount novo) repõe a trava vinda do servidor, sem interação do utilizador', async () => {
+      const { obterAssinatura } = await import('../../entities/nota/api')
+      vi.mocked(obterAssinatura).mockResolvedValueOnce({ ok: false, code: 'notes.signature_not_found', params: {} })
+
+      const primeiroMount = await renderEObterProps()
+      await act(async () => {})
+      expect(primeiroMount.props().notas.find((nota) => nota.id === primeiroMount.notaId)?.estado).toBe(ESTADO_PENDENTE)
+
+      cleanup() // desmonta -- simula o reload: nenhum estado do cliente sobrevive a isto
+
+      vi.mocked(obterAssinatura).mockResolvedValueOnce({
+        ok: true,
+        noteId: 'nota-fixture-1',
+        revision: 0,
+        signedAt: SIGNED_AT,
+      })
+      const segundoMount = await renderEObterProps()
+      await act(async () => {})
+
+      expect(segundoMount.props().notas.find((nota) => nota.id === segundoMount.notaId)?.estado).toBe(ESTADO_ASSINADA)
+    })
+  })
+
+  describe('aoAssinar numa nota já assinada (trava vinda do servidor)', () => {
+    it('não chama appendPatientEntry nem assinarNota, e mostra role=alert', async () => {
+      const { obterAssinatura } = await import('../../entities/nota/api')
+      vi.mocked(obterAssinatura).mockResolvedValueOnce({
+        ok: true,
+        noteId: 'nota-fixture-1',
+        revision: 0,
+        signedAt: SIGNED_AT,
+      })
+      const { appendPatientEntry } = await import('../../entities/patient/api')
+      const { assinarNota } = await import('../../entities/nota/api')
+
+      const { props, notaId } = await renderEObterProps()
+      await act(async () => {})
+      expect(props().notas.find((nota) => nota.id === notaId)?.estado).toBe(ESTADO_ASSINADA)
+
+      await assinar(props, notaId)
+
+      expect(vi.mocked(appendPatientEntry)).not.toHaveBeenCalled()
+      expect(vi.mocked(assinarNota)).not.toHaveBeenCalled()
+      expect(screen.getByRole('alert').textContent).toBe('Esta nota já está assinada.')
+    })
+  })
+
+  describe('identidade da prop notas entre renders', () => {
+    it('render que só muda mensagem (kek === null) não troca a referência de notas', async () => {
+      const { FilaEEditor } = await import('../../widgets/soap-editor/FilaEEditor')
+      const { props, notaId } = await renderEObterProps(null)
+      const notasAntes = props().notas
+      const chamadasAntes = vi.mocked(FilaEEditor).mock.calls.length
+
+      await assinar(props, notaId)
+
+      expect(vi.mocked(FilaEEditor).mock.calls.length).toBeGreaterThan(chamadasAntes)
+      expect(props().notas).toBe(notasAntes)
+    })
+  })
+
   describe('aoAssinar sem sessão (kek === null)', () => {
     it('mostra mensagem explícita de sessão ausente e nunca chama openRecord', async () => {
       const { openRecord } = await import('../../entities/patient/patient-crypto')
@@ -95,7 +197,7 @@ describe('NotaPage', () => {
 
       expect(vi.mocked(openRecord)).not.toHaveBeenCalled()
       expect(screen.getByRole('alert').textContent).toBe('Sem sessão ativa. Não é possível assinar.')
-      expect(props().notas.find((nota) => nota.id === notaId)?.estado).toBe('pendente')
+      expect(props().notas.find((nota) => nota.id === notaId)?.estado).toBe(ESTADO_PENDENTE)
     })
   })
 
@@ -114,7 +216,7 @@ describe('NotaPage', () => {
         sequence: 1,
         createdAt: '2026-08-27T09:00:00Z',
       })
-      vi.mocked(assinarNota).mockResolvedValue({ ok: true, noteId: 'nota-fixture-1', revisao: 0, signedAt: SIGNED_AT })
+      vi.mocked(assinarNota).mockResolvedValue({ ok: true, noteId: 'nota-fixture-1', revision: 0, signedAt: SIGNED_AT })
     })
 
     it('chama appendPatientEntry antes de assinarNota, com sequence = entries.length + 1', async () => {
@@ -139,7 +241,7 @@ describe('NotaPage', () => {
       await assinar(props, notaId)
 
       const propsDepois = props()
-      expect(propsDepois.notas.find((nota) => nota.id === notaId)?.estado).toBe('assinada')
+      expect(propsDepois.notas.find((nota) => nota.id === notaId)?.estado).toBe(ESTADO_ASSINADA)
       const status = screen.getByRole('status')
       // Mesma locale que NotaPage.tsx usa para formatar (`toLocaleString(i18n.locale)`). Sem ela,
       // o teste formatava na locale por omissão do host e passava só em máquinas pt-BR: no runner
@@ -154,13 +256,13 @@ describe('NotaPage', () => {
       await act(async () => {
         await (props().aoAssinar(notaDeOutraId) as unknown as Promise<void>)
       })
-      expect(props().notas.find((nota) => nota.id === notaId)?.estado).toBe('pendente')
+      expect(props().notas.find((nota) => nota.id === notaId)?.estado).toBe(ESTADO_PENDENTE)
 
       // Sem este segundo assinar, a asserção acima passa mesmo com aoAssinar em no-op --
       // não prova o filtro por nota.id, só que nada aconteceu. Assinar a nota real a
       // seguir é que constrange: só marca 'assinada' quem tem o id certo.
       await assinar(props, notaId)
-      expect(props().notas.find((nota) => nota.id === notaId)?.estado).toBe('assinada')
+      expect(props().notas.find((nota) => nota.id === notaId)?.estado).toBe(ESTADO_ASSINADA)
     })
 
     it('409 notes.already_signed marca o item assinado e mostra role=alert', async () => {
@@ -171,7 +273,7 @@ describe('NotaPage', () => {
       await assinar(props, notaId)
 
       const propsDepois = props()
-      expect(propsDepois.notas.find((nota) => nota.id === notaId)?.estado).toBe('assinada')
+      expect(propsDepois.notas.find((nota) => nota.id === notaId)?.estado).toBe(ESTADO_ASSINADA)
       expect(screen.getByRole('alert')).toBeTruthy()
     })
 
@@ -183,7 +285,7 @@ describe('NotaPage', () => {
       await assinar(props, notaId)
 
       const propsDepois = props()
-      expect(propsDepois.notas.find((nota) => nota.id === notaId)?.estado).toBe('pendente')
+      expect(propsDepois.notas.find((nota) => nota.id === notaId)?.estado).toBe(ESTADO_PENDENTE)
       const alert = screen.getByRole('alert')
       expect(alert.textContent).toBe('Sua sessão expirou. Entre novamente.')
     })
@@ -196,7 +298,7 @@ describe('NotaPage', () => {
       await assinar(props, notaId)
 
       const propsDepois = props()
-      expect(propsDepois.notas.find((nota) => nota.id === notaId)?.estado).toBe('pendente')
+      expect(propsDepois.notas.find((nota) => nota.id === notaId)?.estado).toBe(ESTADO_PENDENTE)
       expect(screen.getByRole('alert')).toBeTruthy()
     })
 
@@ -214,7 +316,7 @@ describe('NotaPage', () => {
 
       expect(vi.mocked(assinarNota)).not.toHaveBeenCalled()
       const propsDepois = props()
-      expect(propsDepois.notas.find((nota) => nota.id === notaId)?.estado).toBe('pendente')
+      expect(propsDepois.notas.find((nota) => nota.id === notaId)?.estado).toBe(ESTADO_PENDENTE)
       expect(screen.getByRole('alert')).toBeTruthy()
     })
 

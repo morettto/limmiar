@@ -33,11 +33,11 @@ msgstr "A verificação em duas etapas já está ativada para esta conta."
 msgid "staff.unauthorized"
 msgstr "Acesso não autorizado."
 
-#: src/features/recovery/RecoveryScreen.tsx:102
+#: src/features/recovery/RecoveryScreen.tsx:100
 msgid "Acesso recuperado com sucesso."
 msgstr "Acesso recuperado com sucesso."
 
-#: src/widgets/auth-screen/AuthScreen.tsx:183
+#: src/widgets/auth-screen/AuthScreen.tsx:181
 msgid "Acompanhe suas consultas e informações de saúde com segurança."
 msgstr "Acompanhe suas consultas e informações de saúde com segurança."
 
@@ -58,11 +58,11 @@ msgstr "Aguarde o outro dispositivo ler o código antes de liberar o acesso."
 msgid "Aponte a câmera para o código QR exibido no outro dispositivo."
 msgstr "Aponte a câmera para o código QR exibido no outro dispositivo."
 
-#: src/features/nota-fila/FilaAssinatura.tsx:39
+#: src/features/nota-fila/FilaAssinatura.tsx:37
 msgid "Assinadas"
 msgstr "Assinadas"
 
-#: src/features/nota-editor/EditorSoap.tsx:29
+#: src/features/nota-editor/EditorSoap.tsx:30
 msgid "Avaliação"
 msgstr "Avaliação"
 
@@ -133,7 +133,7 @@ msgstr "Código QR para parear novo dispositivo"
 msgid "Código secreto"
 msgstr "Código secreto"
 
-#: src/widgets/auth-screen/AuthScreen.tsx:155
+#: src/widgets/auth-screen/AuthScreen.tsx:153
 msgid "Como você vai usar o Limmiar?"
 msgstr "Como você vai usar o Limmiar?"
 
@@ -141,7 +141,7 @@ msgstr "Como você vai usar o Limmiar?"
 msgid "Concluindo o pareamento..."
 msgstr "Concluindo o pareamento..."
 
-#: src/app/routing/router.tsx:36
+#: src/pages/home/HomePage.tsx:16
 msgid "Configurar copiloto de IA"
 msgstr "Configurar copiloto de IA"
 
@@ -149,7 +149,7 @@ msgstr "Configurar copiloto de IA"
 msgid "Configure a verificação em duas etapas"
 msgstr "Configure a verificação em duas etapas"
 
-#: src/features/magic-link-auth/MagicLinkCallback.tsx:155
+#: src/features/magic-link-auth/MagicLinkCallback.tsx:153
 msgid "Confirmando seu acesso..."
 msgstr "Confirmando seu acesso..."
 
@@ -157,11 +157,11 @@ msgstr "Confirmando seu acesso..."
 msgid "Confirmar"
 msgstr "Confirmar"
 
-#: src/widgets/auth-screen/AuthScreen.tsx:148
+#: src/widgets/auth-screen/AuthScreen.tsx:146
 msgid "Conta criada. Você está cadastrado como paciente."
 msgstr "Conta criada. Você está cadastrado como paciente."
 
-#: src/widgets/auth-screen/AuthScreen.tsx:146
+#: src/widgets/auth-screen/AuthScreen.tsx:144
 msgid "Conta criada. Você está cadastrado como profissional."
 msgstr "Conta criada. Você está cadastrado como profissional."
 
@@ -170,11 +170,11 @@ msgstr "Conta criada. Você está cadastrado como profissional."
 msgid "auth.account_not_found"
 msgstr "Conta não encontrada."
 
-#: src/widgets/auth-screen/AuthScreen.tsx:235
+#: src/widgets/auth-screen/AuthScreen.tsx:233
 msgid "Continuar com o Google"
 msgstr "Continuar com o Google"
 
-#: src/widgets/auth-screen/AuthScreen.tsx:227
+#: src/widgets/auth-screen/AuthScreen.tsx:225
 msgid "Criar conta"
 msgstr "Criar conta"
 
@@ -182,7 +182,7 @@ msgstr "Criar conta"
 msgid "Digite o código de 6 dígitos do seu aplicativo autenticador ou um dos seus códigos de backup."
 msgstr "Digite o código de 6 dígitos do seu aplicativo autenticador ou um dos seus códigos de backup."
 
-#: src/features/recovery/RecoveryScreen.tsx:116
+#: src/features/recovery/RecoveryScreen.tsx:114
 msgid "Digite seu e-mail e sua frase de recuperação para recuperar o acesso à sua conta."
 msgstr "Digite seu e-mail e sua frase de recuperação para recuperar o acesso à sua conta."
 
@@ -193,8 +193,8 @@ msgstr "Digite seu e-mail e sua frase de recuperação para recuperar o acesso �
 msgid "Dispositivo pareado com sucesso."
 msgstr "Dispositivo pareado com sucesso."
 
-#: src/features/recovery/RecoveryScreen.tsx:122
-#: src/widgets/auth-screen/AuthScreen.tsx:191
+#: src/features/recovery/RecoveryScreen.tsx:120
+#: src/widgets/auth-screen/AuthScreen.tsx:189
 msgid "E-mail"
 msgstr "E-mail"
 
@@ -212,7 +212,7 @@ msgstr "E-mail ou senha inválidos."
 msgid "Enviando a chave para o novo dispositivo..."
 msgstr "Enviando a chave para o novo dispositivo..."
 
-#: src/widgets/auth-screen/AuthScreen.tsx:227
+#: src/widgets/auth-screen/AuthScreen.tsx:225
 msgid "Enviar link mágico"
 msgstr "Enviar link mágico"
 
@@ -239,12 +239,16 @@ msgstr "Esta frase não será exibida novamente. Guarde-a em um local seguro: el
 msgid "notes.signature_not_found"
 msgstr "Esta nota ainda não foi assinada."
 
+#: src/pages/notas/NotaPage.tsx:89
+msgid "Esta nota já está assinada."
+msgstr "Esta nota já está assinada."
+
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:158
 msgid "notes.already_signed"
 msgstr "Esta nota já foi assinada."
 
-#: src/pages/notas/NotaPage.tsx:112
+#: src/pages/notas/NotaPage.tsx:130
 msgid "Esta nota já tinha sido assinada. As alterações feitas depois não estão cobertas por essa assinatura."
 msgstr "Esta nota já tinha sido assinada. As alterações feitas depois não estão cobertas por essa assinatura."
 
@@ -253,7 +257,7 @@ msgstr "Esta nota já tinha sido assinada. As alterações feitas depois não es
 msgid "agenda.session_cancelled"
 msgstr "Esta sessão foi cancelada."
 
-#: src/features/nota-fila/FilaAssinatura.tsx:67
+#: src/features/nota-fila/FilaAssinatura.tsx:65
 msgid "Estado da nota"
 msgstr "Estado da nota"
 
@@ -285,11 +289,11 @@ msgstr "Este prontuário mudou em outro dispositivo. Recarregue e tente de novo.
 msgid "Estes códigos não serão exibidos novamente. Guarde-os em um local seguro: eles são a única forma de recuperar o acesso à sua conta caso você perca o aplicativo autenticador."
 msgstr "Estes códigos não serão exibidos novamente. Guarde-os em um local seguro: eles são a única forma de recuperar o acesso à sua conta caso você perca o aplicativo autenticador."
 
-#: src/pages/notas/NotaPage.tsx:119
+#: src/pages/notas/NotaPage.tsx:137
 msgid "Falha ao assinar a nota. Tente novamente."
 msgstr "Falha ao assinar a nota. Tente novamente."
 
-#: src/features/nota-fila/FilaAssinatura.tsx:83
+#: src/features/nota-fila/FilaAssinatura.tsx:81
 #: src/widgets/soap-editor/FilaEEditor.tsx:31
 msgid "Fila de assinatura"
 msgstr "Fila de assinatura"
@@ -298,11 +302,11 @@ msgstr "Fila de assinatura"
 msgid "Fornecedor"
 msgstr "Fornecedor"
 
-#: src/features/recovery/RecoveryScreen.tsx:134
+#: src/features/recovery/RecoveryScreen.tsx:132
 msgid "Frase de recuperação"
 msgstr "Frase de recuperação"
 
-#: src/features/recovery/RecoveryScreen.tsx:58
+#: src/features/recovery/RecoveryScreen.tsx:56
 msgid "Frase de recuperação inválida. Verifique se você digitou todas as palavras corretamente."
 msgstr "Frase de recuperação inválida. Verifique se você digitou todas as palavras corretamente."
 
@@ -310,7 +314,7 @@ msgstr "Frase de recuperação inválida. Verifique se você digitou todas as pa
 msgid "Gerando sua frase de recuperação..."
 msgstr "Gerando sua frase de recuperação..."
 
-#: src/widgets/auth-screen/AuthScreen.tsx:181
+#: src/widgets/auth-screen/AuthScreen.tsx:179
 msgid "Gerencie pacientes, prontuários e agenda em um só lugar."
 msgstr "Gerencie pacientes, prontuários e agenda em um só lugar."
 
@@ -343,7 +347,7 @@ msgstr "Lembrar neste dispositivo"
 msgid "Link de provisionamento"
 msgstr "Link de provisionamento"
 
-#: src/features/magic-link-auth/MagicLinkCallback.tsx:146
+#: src/features/magic-link-auth/MagicLinkCallback.tsx:144
 msgid "Login realizado com sucesso."
 msgstr "Login realizado com sucesso."
 
@@ -382,7 +386,7 @@ msgstr "Não foi possível decifrar a chave recebida. Tente parear novamente."
 msgid "Não foi possível ler"
 msgstr "Não foi possível ler"
 
-#: src/pages/biblioteca/BibliotecaPage.tsx:61
+#: src/pages/biblioteca/BibliotecaPage.tsx:34
 msgid "Não foi possível preparar a busca. Tente novamente."
 msgstr "Não foi possível preparar a busca. Tente novamente."
 
@@ -404,11 +408,11 @@ msgstr "Nenhum cadastro de voz encontrado para esta conta."
 msgid "Nenhuma nota encontrada."
 msgstr "Nenhuma nota encontrada."
 
-#: src/features/nota-fila/FilaAssinatura.tsx:91
+#: src/features/nota-fila/FilaAssinatura.tsx:89
 msgid "Nenhuma nota nesta aba."
 msgstr "Nenhuma nota nesta aba."
 
-#: src/pages/notas/NotaPage.tsx:105
+#: src/pages/notas/NotaPage.tsx:123
 msgid "Nota assinada em {dataAssinatura}."
 msgstr "Nota assinada em {dataAssinatura}."
 
@@ -417,7 +421,7 @@ msgstr "Nota assinada em {dataAssinatura}."
 msgid "auth.device_pairing_payload_not_delivered"
 msgstr "O dispositivo principal ainda não liberou o acesso. Aguarde."
 
-#: src/features/nota-editor/EditorSoap.tsx:28
+#: src/features/nota-editor/EditorSoap.tsx:29
 msgid "Objetivo"
 msgstr "Objetivo"
 
@@ -431,7 +435,7 @@ msgstr "Ocorreu um erro inesperado no servidor."
 msgid "errors.generic"
 msgstr "Ocorreu um erro inesperado. Tente novamente."
 
-#: src/widgets/auth-screen/AuthScreen.tsx:176
+#: src/widgets/auth-screen/AuthScreen.tsx:174
 #: src/widgets/patient-wallet/PatientWallet.tsx:120
 msgid "Paciente"
 msgstr "Paciente"
@@ -444,11 +448,11 @@ msgstr "Pacientes"
 msgid "Parear novo dispositivo"
 msgstr "Parear novo dispositivo"
 
-#: src/features/nota-fila/FilaAssinatura.tsx:38
+#: src/features/nota-fila/FilaAssinatura.tsx:36
 msgid "Pendentes"
 msgstr "Pendentes"
 
-#: src/features/nota-editor/EditorSoap.tsx:30
+#: src/features/nota-editor/EditorSoap.tsx:31
 msgid "Plano"
 msgstr "Plano"
 
@@ -464,7 +468,7 @@ msgstr "Preparando a verificação em duas etapas..."
 msgid "Preparando o código para parear o novo dispositivo..."
 msgstr "Preparando o código para parear o novo dispositivo..."
 
-#: src/widgets/auth-screen/AuthScreen.tsx:166
+#: src/widgets/auth-screen/AuthScreen.tsx:164
 msgid "Profissional"
 msgstr "Profissional"
 
@@ -478,17 +482,21 @@ msgstr "Prontuário não encontrado."
 msgid "Pular"
 msgstr "Pular"
 
-#: src/features/recovery/RecoveryScreen.tsx:154
+#: src/features/recovery/RecoveryScreen.tsx:152
 msgid "Recuperar acesso"
 msgstr "Recuperar acesso"
 
-#: src/features/recovery/RecoveryScreen.tsx:113
+#: src/features/recovery/RecoveryScreen.tsx:111
 msgid "Recuperar acesso à conta"
 msgstr "Recuperar acesso à conta"
 
 #: src/widgets/patient-wallet/PatientWallet.tsx:121
 msgid "Risco"
 msgstr "Risco"
+
+#: src/pages/home/HomePage.tsx:22
+msgid "Sair"
+msgstr "Sair"
 
 #: src/features/copilot-byok/CopilotKeySetup.tsx:112
 msgid "Salvar"
@@ -498,11 +506,11 @@ msgstr "Salvar"
 msgid "Selecione uma nota na fila."
 msgstr "Selecione uma nota na fila."
 
-#: src/pages/notas/NotaPage.tsx:75
+#: src/pages/notas/NotaPage.tsx:93
 msgid "Sem sessão ativa. Não é possível assinar."
 msgstr "Sem sessão ativa. Não é possível assinar."
 
-#: src/widgets/auth-screen/AuthScreen.tsx:204
+#: src/widgets/auth-screen/AuthScreen.tsx:202
 msgid "Senha"
 msgstr "Senha"
 
@@ -546,11 +554,11 @@ msgstr "Sua sessão expirou. Entre novamente."
 msgid "auth.totp_ticket_invalid"
 msgstr "Sua verificação em duas etapas expirou. Entre novamente."
 
-#: src/features/nota-editor/EditorSoap.tsx:27
+#: src/features/nota-editor/EditorSoap.tsx:28
 msgid "Subjetivo"
 msgstr "Subjetivo"
 
-#: src/widgets/auth-screen/AuthScreen.tsx:157
+#: src/widgets/auth-screen/AuthScreen.tsx:155
 msgid "Tipo de conta"
 msgstr "Tipo de conta"
 
@@ -566,6 +574,6 @@ msgstr "Verificação em duas etapas"
 msgid "Verificar"
 msgstr "Verificar"
 
-#: src/widgets/auth-screen/AuthScreen.tsx:133
+#: src/widgets/auth-screen/AuthScreen.tsx:131
 msgid "Verifique seu e-mail para continuar. Enviamos um link de acesso, se este e-mail existir."
 msgstr "Verifique seu e-mail para continuar. Enviamos um link de acesso, se este e-mail existir."

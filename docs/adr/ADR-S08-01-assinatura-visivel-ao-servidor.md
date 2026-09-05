@@ -9,14 +9,16 @@ sobreviva a um reload ou a um novo dispositivo, não apenas viva em memória do 
 produto: campos clínicos são blobs cifrados opacos ao servidor, com uma exceção pontual e
 justificada quando o próprio Postgres precisa de comparar um valor para impor uma garantia
 (`ADR-S04-02-horario-em-claro-servidor-zero-knowledge.md`). Impor "uma assinatura por nota,
-para sempre" tem a mesma forma: exige que o servidor veja o suficiente para uma chave primária
-recusar a segunda escrita, não apenas para o cliente lembrar-se de recusar reeditar.
+para sempre" -- contra `app_role`, o único papel com que a API liga, não contra a credencial
+que corre as migrações -- tem a mesma forma: exige que o servidor veja o suficiente para uma
+chave primária recusar a segunda escrita desse papel, não apenas para o cliente lembrar-se de
+recusar reeditar.
 
 ## Decisão
 
 `note_signatures` (migração `0005_create_note_signatures.sql`) guarda, por nota, um blob
 selado (`iv(12) || AES-GCM(digest SHA-256 da nota)(32) || tag(16)`, 60 bytes, opaco ao
-servidor), a `revisao` assinada (entra na AAD do blob -- impede replicar a assinatura de uma
+servidor), a `revision` assinada (entra na AAD do blob -- impede replicar a assinatura de uma
 revisão para outra) e o instante da assinatura (`signed_at`, decidido pelo servidor via
 `DEFAULT now()`, nunca aceite do corpo do pedido). A chave primária composta
 `(tenant_id, note_id)` é o único mecanismo de imposição: não existe segunda camada (trigger,
@@ -54,3 +56,17 @@ Três construções alternativas para a primitiva de assinatura foram avaliadas 
   contra o próprio profissional diante de um auditor externo ou de um tribunal -- essa
   propriedade só chega com identidade assimétrica publicada (Ed25519 + infraestrutura de
   chave pública), que é o escopo rejeitado acima e fica para S10.
+- **A trava vale contra `app_role`, não contra quem administra a base.** `app_role` é o único
+  papel com que a API alguma vez liga, e o `REVOKE UPDATE, DELETE` fecha os caminhos de escrita
+  que esse papel tem. A credencial que corre as migrações -- dona da tabela -- fica de fora
+  dessa garantia: mantém `DELETE` (nunca lhe foi revogado), pode
+  `ALTER TABLE note_signatures NO FORCE ROW LEVEL SECURITY` e pode `DROP POLICY
+  tenant_isolation`, revertendo a trava por inteiro. `NoteSigned` está reservada em
+  `AuditAction`, e S10-01 entregou a estrutura da trilha sem produtor
+  (`apps/api/src/Api/Features/Audit/README.md`). Mesmo com produtor, a trilha regista o que a
+  aplicação faz como `app_role` -- não SQL emitido diretamente pela credencial das migrações --
+  e este abuso não produz entrada nenhuma. O que a trilha daria, havendo produtor, é divergência
+  detetável, não registo do abuso: uma assinatura apagada por SQL direto deixaria a entrada
+  `NoteSigned` órfã face a `note_signatures` -- e mesmo isso assume que a mesma credencial não
+  reescreve entradas e âncoras na mesma transação, que é precisamente o que a âncora, por
+  desenho, não prova.

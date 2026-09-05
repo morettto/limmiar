@@ -59,10 +59,14 @@ para o porquê do consentimento viver em claro no servidor.
   `ConsentState.Fold` duas vezes, uma por finalidade -- sem verificar a conta, porque quem
   chama (`ConsentEndpoints`) já provou pelo bearer token que `professionalId` é a própria
   conta do chamador.
-- `RecordConsentResult.cs` (fatia 3) -- molde `Api.Notes.SignNoteResult` (ADR
-  `docs/adr/ADR-api-store-service-boundary-result-contract.md`): `RecordConsentFailureReason`
-  fechado em `AccountNotFound`/`NotAuthorizedToCreateRecords`, nunca um tuplo nulável nem `!`
-  a cruzar a fronteira store/service.
+- `ConsentService.RecordAsync` (fatia 3) devolve `Api.Platform.Result<ConsentEvent,
+  RecordConsentFailureReason>` diretamente (S08-21, ADR
+  `docs/adr/0011-store-service-nao-devolve-tuplo-nullable.md`, molde `Api.Notes`/
+  `Api.Patients` do S08-14): `RecordConsentFailureReason` fechado em
+  `AccountNotFound`/`NotAuthorizedToCreateRecords`, vive junto do serviço em
+  `ConsentService.cs`, não num ficheiro `RecordConsentResult.cs` à parte -- esse tipo
+  (`required bool Succeeded` + dois nullables) foi apagado, e `ConsentEndpoints` lê o
+  resultado por `TryGetValue`/`TryGetFailure`, nunca por `!`.
 - `ConsentEndpoints.cs` (fatia 3) --
   `POST /accounts/{accountId:guid}/patients/{patientId:guid}/consents` (`201`/`400`/`401`/
   `403`/`404`) e `GET` na mesma rota (`200`/`401`). Sem `DELETE` nem `PUT`: revogar é o

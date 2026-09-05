@@ -20,11 +20,11 @@ elemento `<audio>` e decide quando chamar `tocar`/`parar` é o chamador
    este seam existe só para o componente de UI nunca tocar no elemento direto, e para
    ser testável em jsdom com um duplo (jsdom não implementa `play()`/`pause()`).
 2. `abrirSessaoComoBlob(dir, dek, sessionId): Promise<Blob>` lista os ficheiros de `dir`
-   (reusa `listarOrfaos` de `features/live-session/chunk-store.ts` -- mesma operação de
-   listar nomes, sem reimplementar), ordena por `seq` (numérico, não lexicográfico -- "10"
+   (reusa `listarOrfaos` de `shared/lib/opfs.ts` -- desde S08-08, mesma operação de listar
+   nomes, sem reimplementar), ordena por `seq` (numérico, não lexicográfico -- "10"
    antes de "2" quebraria a ordem), abre cada chunk sob `dek`/`sessionId` via `abrirChunk`
-   (`features/live-session/audio-crypto.ts`) e concatena o plaintext resultante num único
-   `Blob`.
+   (`entities/gravacao/audio-crypto.ts`, desde S08-08) e concatena o plaintext resultante
+   num único `Blob`.
 3. Sessão sem chunks e chunk que falha a abrir **rejeitam** -- nenhum dos dois é
    silenciado. Ver Decisões.
 
@@ -57,10 +57,13 @@ elemento `<audio>` e decide quando chamar `tocar`/`parar` é o chamador
   com outro codec produz um `Blob` cujo tipo não bate com os bytes reais. Upgrade: a
   fatia 4 grava `recorder.mimeType` junto da sessão e este ficheiro lê-lo em vez de
   assumir.
-- **`abrirSessaoComoBlob` reusa `listarOrfaos` de `chunk-store.ts` para listar os nomes de
-  ficheiro**, em vez de reimplementar `dir.keys()` aqui -- é literalmente a mesma
+- **`abrirSessaoComoBlob` reusa `listarOrfaos` de `shared/lib/opfs.ts` para listar os nomes
+  de ficheiro**, em vez de reimplementar `dir.keys()` aqui -- é literalmente a mesma
   operação (listar o que está num diretório OPFS), só o chamador difere (recuperação de
-  sessão órfã vs. leitura de sessão para tocar).
+  sessão órfã, em `live-session`, vs. leitura de sessão para tocar, aqui). Vivia em
+  `features/live-session/chunk-store.ts` até S08-08: mudou de casa (nome inalterado) porque
+  a regra de isolamento de slices (`fsd-no-cross-slice`) deixou de permitir a uma feature
+  importar de outra do mesmo nível.
 - **Sem mock de OPFS de repositório para reusar** (mesma decisão de `chunk-store.test.ts`):
   o mock (`FakeDirectoryHandle`/`FakeFileHandle`) começou local a
   `reprodutor.test.ts`, só com os métodos que `abrirSessaoComoBlob` de facto usa

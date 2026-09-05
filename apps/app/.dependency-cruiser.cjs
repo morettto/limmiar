@@ -41,6 +41,42 @@ module.exports = {
       from: { path: '^src/shared' },
       to: { path: '^src/(app|pages|widgets|features|entities)' },
     },
+    {
+      name: 'fsd-no-cross-slice',
+      comment:
+        'FSD slice isolation: a slice depends on lower layers, never on a sibling slice of its own layer. Invariant: every file lives inside a named slice folder (no loose files at a layer root) -- not checked by this regex, verified by hand across all four layers instead. The two composition exceptions (recovery, device-pairing-new) get their own rules below, scoped to the exact accepted pair, and are carved out of this general rule via from.pathNot so their broader traffic still routes through those dedicated rules. The exception list is debt with its own ticket (promote recovery and device-pairing-new to widgets).',
+      severity: 'error',
+      from: {
+        path: '^src/(pages|widgets|features|entities)/([^/]+)/',
+        pathNot: '^src/features/(recovery|device-pairing-new)/',
+      },
+      to: {
+        path: '^src/$1/',
+        pathNot: '^src/$1/$2/',
+      },
+    },
+    {
+      name: 'fsd-no-cross-slice-recovery',
+      comment:
+        'Composition exception (accepted by S08-08): recovery may mount totp-challenge and totp-enrollment components, nothing else outside its own slice. Promoting recovery to a widget is a separate ticket.',
+      severity: 'error',
+      from: { path: '^src/features/recovery/' },
+      to: {
+        path: '^src/features/',
+        pathNot: '^src/features/(recovery|totp-challenge|totp-enrollment)/',
+      },
+    },
+    {
+      name: 'fsd-no-cross-slice-device-pairing-new',
+      comment:
+        'Composition exception (accepted by S08-08): device-pairing-new may mount qr-scan components, nothing else outside its own slice. Promoting device-pairing-new to a widget is a separate ticket.',
+      severity: 'error',
+      from: { path: '^src/features/device-pairing-new/' },
+      to: {
+        path: '^src/features/',
+        pathNot: '^src/features/(device-pairing-new|qr-scan)/',
+      },
+    },
   ],
   options: {
     doNotFollow: {

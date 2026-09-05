@@ -1,7 +1,6 @@
 import { useId, useState } from 'react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { translateProblemCode } from '../../shared/api'
-import { recordSession } from '../../entities/session'
 import {
   continueWithGoogle,
   deriveEmailPasswordVerifier,
@@ -41,7 +40,6 @@ export function AuthScreen({ baseUrl, getGoogleIdToken, onAuthenticated, initial
   const [state, setState] = useState<SubmitState>({ status: 'idle' })
 
   function handleAuthenticated(account: Account) {
-    recordSession(account)
     onAuthenticated?.(account)
     setState({ status: 'success', account })
   }

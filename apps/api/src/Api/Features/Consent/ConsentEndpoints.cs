@@ -55,12 +55,11 @@ public static class ConsentEndpoints
         }
 
         var result = await consentService.RecordAsync(accountId, patientId, purpose, decision, cancellationToken);
-        if (!result.Succeeded)
+        if (!result.TryGetValue(out var evt, out var failureReason))
         {
-            return MapFailureToProblem(result.FailureReason!.Value);
+            return MapFailureToProblem(failureReason);
         }
 
-        var evt = result.Event!;
         return TypedResults.Created(
             $"/accounts/{accountId}/patients/{patientId}/consents",
             new RecordConsentResponse(patientId, LowerFirst(purpose.ToString()), LowerFirst(decision.ToString()), evt.RecordedAt));

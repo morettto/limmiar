@@ -1,21 +1,38 @@
 using Api.Accounts;
+using Api.Platform;
 
 namespace Api.Patients;
 
+public enum CreatePatientFailureReason
+{
+    AccountNotFound,
+    NotAuthorizedToCreateRecords,
+    PatientAlreadyExists,
+}
+
+public enum AppendPatientEntryFailureReason
+{
+    AccountNotFound,
+    NotAuthorizedToCreateRecords,
+    PatientNotFound,
+    InvalidSequence,
+    SequenceConflict,
+}
+
 public sealed class PatientService(IAccountStore accounts, PatientRecordStore store)
 {
-    public async Task<CreatePatientResult> CreatePatientAsync(
+    public async Task<Result<PatientRecordEntry, CreatePatientFailureReason>> CreatePatientAsync(
         Guid professionalId, Guid patientId, byte[] wrappedDek, byte[] ciphertext, CancellationToken cancellationToken)
     {
         var account = await accounts.FindByIdAsync(professionalId, cancellationToken);
         if (account is null)
         {
-            return CreatePatientResult.Failure(CreatePatientFailureReason.AccountNotFound);
+            return Result<PatientRecordEntry, CreatePatientFailureReason>.Failure(CreatePatientFailureReason.AccountNotFound);
         }
 
         if (!AccountAuthorizationGuard.CanCreatePatientRecords(account))
         {
-            return CreatePatientResult.Failure(CreatePatientFailureReason.NotAuthorizedToCreateRecords);
+            return Result<PatientRecordEntry, CreatePatientFailureReason>.Failure(CreatePatientFailureReason.NotAuthorizedToCreateRecords);
         }
 
         // Sequence 1 is always the creation entry -- it alone carries the wrapped DEK (migration's wrapped_dek_only_on_sequence_1 check).
@@ -26,21 +43,21 @@ public sealed class PatientService(IAccountStore accounts, PatientRecordStore st
         try
         {
             var inserted = await store.AppendAsync(entry, cancellationToken);
-            return CreatePatientResult.Success(inserted);
+            return Result<PatientRecordEntry, CreatePatientFailureReason>.Success(inserted);
         }
         catch (PatientRecordSequenceConflictException)
         {
-            return CreatePatientResult.Failure(CreatePatientFailureReason.PatientAlreadyExists);
+            return Result<PatientRecordEntry, CreatePatientFailureReason>.Failure(CreatePatientFailureReason.PatientAlreadyExists);
         }
     }
 
-    public async Task<AppendPatientEntryResult> AppendEntryAsync(
+    public async Task<Result<PatientRecordEntry, AppendPatientEntryFailureReason>> AppendEntryAsync(
         Guid professionalId, Guid patientId, int sequence, byte[] ciphertext, CancellationToken cancellationToken)
     {
         var account = await accounts.FindByIdAsync(professionalId, cancellationToken);
         if (account is null)
         {
-            return AppendPatientEntryResult.Failure(AppendPatientEntryFailureReason.AccountNotFound);
+            return Result<PatientRecordEntry, AppendPatientEntryFailureReason>.Failure(AppendPatientEntryFailureReason.AccountNotFound);
         }
 
         // Same guard as CreatePatientAsync -- appending new clinical content carries the same
@@ -48,13 +65,13 @@ public sealed class PatientService(IAccountStore accounts, PatientRecordStore st
         // whose professional verification has since been revoked (see AccountAuthorizationGuard).
         if (!AccountAuthorizationGuard.CanCreatePatientRecords(account))
         {
-            return AppendPatientEntryResult.Failure(AppendPatientEntryFailureReason.NotAuthorizedToCreateRecords);
+            return Result<PatientRecordEntry, AppendPatientEntryFailureReason>.Failure(AppendPatientEntryFailureReason.NotAuthorizedToCreateRecords);
         }
 
         var lastSequence = await store.GetLastSequenceAsync(professionalId, patientId, cancellationToken);
         if (lastSequence is null)
         {
-            return AppendPatientEntryResult.Failure(AppendPatientEntryFailureReason.PatientNotFound);
+            return Result<PatientRecordEntry, AppendPatientEntryFailureReason>.Failure(AppendPatientEntryFailureReason.PatientNotFound);
         }
 
         // Re-using an already-taken (or earlier) sequence is a conflict -- the ticket's own
@@ -64,12 +81,12 @@ public sealed class PatientService(IAccountStore accounts, PatientRecordStore st
         // invalid rather than silently accepted or miscategorized as a conflict.
         if (sequence <= lastSequence.Value)
         {
-            return AppendPatientEntryResult.Failure(AppendPatientEntryFailureReason.SequenceConflict);
+            return Result<PatientRecordEntry, AppendPatientEntryFailureReason>.Failure(AppendPatientEntryFailureReason.SequenceConflict);
         }
 
         if (sequence != lastSequence.Value + 1)
         {
-            return AppendPatientEntryResult.Failure(AppendPatientEntryFailureReason.InvalidSequence);
+            return Result<PatientRecordEntry, AppendPatientEntryFailureReason>.Failure(AppendPatientEntryFailureReason.InvalidSequence);
         }
 
         var entry = new PatientRecordEntry(
@@ -86,7 +103,7 @@ public sealed class PatientService(IAccountStore accounts, PatientRecordStore st
         // concurrent double-submits on the exact same next sequence turn out to be common
         // enough in practice to be worth the extra path.
         var inserted = await store.AppendAsync(entry, cancellationToken);
-        return AppendPatientEntryResult.Success(inserted);
+        return Result<PatientRecordEntry, AppendPatientEntryFailureReason>.Success(inserted);
     }
 
     public async Task<PatientRecord?> GetPatientAsync(Guid professionalId, Guid patientId, CancellationToken cancellationToken)

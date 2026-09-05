@@ -10,13 +10,12 @@ export interface FraseNota {
   readonly ancoras: readonly Ancora[]
 }
 
-export type EstadoNota = 'pendente' | 'assinada'
-
-// Constantes, não literais inline: lingui/no-unlocalized-strings varre `.tsx` à procura de
-// texto visível, e um `const` SCREAMING_SNAKE_CASE já está isento por convenção do repo
-// (ver eslint.config.mjs).
-export const ESTADO_PENDENTE: EstadoNota = 'pendente'
-export const ESTADO_ASSINADA: EstadoNota = 'assinada'
+// as const + tipo derivado, idioma de entities/consentimento/api.ts: nota.ts é `.ts` puro,
+// fora do alcance de lingui/no-unlocalized-strings (que só varre `.tsx`).
+export const ESTADO_PENDENTE = 'pendente'
+export const ESTADO_ASSINADA = 'assinada'
+export const ESTADOS_NOTA = [ESTADO_PENDENTE, ESTADO_ASSINADA] as const
+export type EstadoNota = (typeof ESTADOS_NOTA)[number]
 
 export interface Nota {
   readonly id: string

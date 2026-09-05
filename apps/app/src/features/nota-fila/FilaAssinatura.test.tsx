@@ -2,7 +2,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { I18nProvider } from '@lingui/react'
 import { i18n, dynamicActivate } from '../../shared/i18n'
-import type { Nota } from '../../entities/nota/nota'
+import { ESTADO_ASSINADA, ESTADO_PENDENTE, type Nota } from '../../entities/nota/nota'
 import { FilaAssinatura } from './FilaAssinatura'
 
 function nota(id: string, patientId: string, estado: Nota['estado']): Nota {
@@ -10,9 +10,9 @@ function nota(id: string, patientId: string, estado: Nota['estado']): Nota {
 }
 
 const ITENS: readonly Nota[] = [
-  nota('nota-1', 'paciente-1', 'pendente'),
-  nota('nota-2', 'paciente-2', 'pendente'),
-  nota('nota-3', 'paciente-3', 'assinada'),
+  nota('nota-1', 'paciente-1', ESTADO_PENDENTE),
+  nota('nota-2', 'paciente-2', ESTADO_PENDENTE),
+  nota('nota-3', 'paciente-3', ESTADO_ASSINADA),
 ]
 
 function renderFila(props?: Partial<{ itens: readonly Nota[]; selecionadoId: string | null; onSelecionar: (id: string) => void }>) {
@@ -41,6 +41,13 @@ describe('FilaAssinatura', () => {
     expect(screen.getByRole('tab', { name: 'Assinadas' }).getAttribute('aria-selected')).toBe('false')
     expect(screen.getAllByRole('option')).toHaveLength(2)
     expect(screen.queryByText('paciente-3')).toBeNull()
+  })
+
+  it('as abas renderizam na ordem de ESTADOS_NOTA -- Pendentes antes de Assinadas', () => {
+    renderFila()
+
+    const abas = screen.getAllByRole('tab')
+    expect(abas.map((aba) => aba.textContent)).toEqual(['Pendentes', 'Assinadas'])
   })
 
   it('a listbox aponta aria-activedescendant para a primeira opção por omissão', () => {
@@ -157,9 +164,9 @@ describe('FilaAssinatura', () => {
       <I18nProvider i18n={i18n}>
         <FilaAssinatura
           itens={[
-            nota('nota-1', 'paciente-1', 'pendente'),
-            nota('nota-2', 'paciente-2', 'assinada'),
-            nota('nota-3', 'paciente-3', 'assinada'),
+            nota('nota-1', 'paciente-1', ESTADO_PENDENTE),
+            nota('nota-2', 'paciente-2', ESTADO_ASSINADA),
+            nota('nota-3', 'paciente-3', ESTADO_ASSINADA),
           ]}
           selecionadoId={null}
           onSelecionar={onSelecionar}
@@ -187,7 +194,7 @@ describe('FilaAssinatura', () => {
     rerender(
       <I18nProvider i18n={i18n}>
         <FilaAssinatura
-          itens={[nota('nota-1', 'paciente-1', 'assinada'), nota('nota-2', 'paciente-2', 'assinada')]}
+          itens={[nota('nota-1', 'paciente-1', ESTADO_ASSINADA), nota('nota-2', 'paciente-2', ESTADO_ASSINADA)]}
           selecionadoId={null}
           onSelecionar={onSelecionar}
         />

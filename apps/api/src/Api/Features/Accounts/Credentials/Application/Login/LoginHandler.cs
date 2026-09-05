@@ -1,12 +1,29 @@
+using Api.Platform;
 using Mediator;
 using static Api.Accounts.AccountAuthenticationOrchestration;
 
 namespace Api.Accounts;
 
-public sealed class LoginHandler(IAccountStore store, IPasswordVerifierComparer comparer, ITwoFactorTicketIssuer twoFactorTicketIssuer, ISessionTokenIssuer sessionTokenIssuer)
-    : IRequestHandler<LoginCommand, AccountLoginResult>
+public enum AccountLoginFailureReason
 {
-    public async ValueTask<AccountLoginResult> Handle(LoginCommand request, CancellationToken cancellationToken)
+    InvalidCredentials,
+}
+
+/// <summary>
+/// Success payload of <see cref="LoginHandler"/> -- the <c>TValue</c> of
+/// <see cref="Result{TValue,TFailure}"/> (molde Api.Platform, ADR
+/// docs/adr/0011-store-service-nao-devolve-tuplo-nullable.md).
+/// </summary>
+public sealed record AccountLoginSuccess(
+    Account Account,
+    TwoFactorRequirement TwoFactorRequirement,
+    string? TwoFactorTicket,
+    SessionTokenPair? Session);
+
+public sealed class LoginHandler(IAccountStore store, IPasswordVerifierComparer comparer, ITwoFactorTicketIssuer twoFactorTicketIssuer, ISessionTokenIssuer sessionTokenIssuer)
+    : IRequestHandler<LoginCommand, Result<AccountLoginSuccess, AccountLoginFailureReason>>
+{
+    public async ValueTask<Result<AccountLoginSuccess, AccountLoginFailureReason>> Handle(LoginCommand request, CancellationToken cancellationToken)
     {
         var normalizedEmail = AccountEmail.Normalize(request.Email);
         var account = await store.FindByEmailAsync(normalizedEmail, cancellationToken);
@@ -19,10 +36,13 @@ public sealed class LoginHandler(IAccountStore store, IPasswordVerifierComparer 
 
         if (account is null || !hasRealVerifier || !matches)
         {
-            return AccountLoginResult.Failure(AccountLoginFailureReason.InvalidCredentials);
+            return Result<AccountLoginSuccess, AccountLoginFailureReason>.Failure(AccountLoginFailureReason.InvalidCredentials);
         }
 
-        return AccountLoginResult.Success(
-            account, IssueTwoFactorTicketIfRequired(account, twoFactorTicketIssuer), IssueSessionIfNoTwoFactorPending(account, sessionTokenIssuer));
+        return Result<AccountLoginSuccess, AccountLoginFailureReason>.Success(new AccountLoginSuccess(
+            account,
+            TwoFactorPolicy.Determine(account),
+            IssueTwoFactorTicketIfRequired(account, twoFactorTicketIssuer),
+            IssueSessionIfNoTwoFactorPending(account, sessionTokenIssuer)));
     }
 }

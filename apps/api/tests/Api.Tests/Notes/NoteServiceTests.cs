@@ -52,8 +52,8 @@ public sealed class NoteServiceTests : IAsyncLifetime
 
         var result = await service.SignAsync(Guid.NewGuid(), Guid.NewGuid(), 0, new byte[60], CancellationToken.None);
 
-        Assert.False(result.Succeeded);
-        Assert.Equal(SignNoteFailureReason.AccountNotFound, result.FailureReason);
+        Assert.True(result.TryGetFailure(out var failureReason));
+        Assert.Equal(SignNoteFailureReason.AccountNotFound, failureReason);
     }
 
     [Fact]
@@ -66,8 +66,8 @@ public sealed class NoteServiceTests : IAsyncLifetime
 
         var result = await service.SignAsync(account.Id, Guid.NewGuid(), 0, new byte[60], CancellationToken.None);
 
-        Assert.False(result.Succeeded);
-        Assert.Equal(SignNoteFailureReason.NotAuthorizedToCreateRecords, result.FailureReason);
+        Assert.True(result.TryGetFailure(out var failureReason));
+        Assert.Equal(SignNoteFailureReason.NotAuthorizedToCreateRecords, failureReason);
     }
 
     [Fact]
@@ -82,8 +82,8 @@ public sealed class NoteServiceTests : IAsyncLifetime
 
         var result = await service.SignAsync(account.Id, noteId, 0, new byte[60], CancellationToken.None);
 
-        Assert.False(result.Succeeded);
-        Assert.Equal(SignNoteFailureReason.AlreadySigned, result.FailureReason);
+        Assert.True(result.TryGetFailure(out var failureReason));
+        Assert.Equal(SignNoteFailureReason.AlreadySigned, failureReason);
     }
 
     private NoteService CreateService(IAccountStore accounts)

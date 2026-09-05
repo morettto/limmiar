@@ -76,12 +76,11 @@ public static class PatientEndpoints
 
         var result = await patientService.CreatePatientAsync(
             accountId, request.PatientId, request.WrappedDek, request.Ciphertext, cancellationToken);
-        if (!result.Succeeded)
+        if (!result.TryGetValue(out var entry, out var failureReason))
         {
-            return MapCreateFailureToProblem(result.FailureReason!.Value);
+            return MapCreateFailureToProblem(failureReason);
         }
 
-        var entry = result.Entry!;
         return TypedResults.Created(
             $"/accounts/{accountId}/patients/{entry.PatientId}",
             new CreatePatientResponse(entry.PatientId, entry.CreatedAt));
@@ -108,12 +107,11 @@ public static class PatientEndpoints
 
         var result = await patientService.AppendEntryAsync(
             accountId, patientId, request.Sequence, request.Ciphertext, cancellationToken);
-        if (!result.Succeeded)
+        if (!result.TryGetValue(out var entry, out var failureReason))
         {
-            return MapAppendFailureToProblem(result.FailureReason!.Value);
+            return MapAppendFailureToProblem(failureReason);
         }
 
-        var entry = result.Entry!;
         return TypedResults.Created(
             $"/accounts/{accountId}/patients/{patientId}/entries/{entry.Id}",
             new AppendPatientEntryResponse(entry.Id, entry.Sequence, entry.CreatedAt));

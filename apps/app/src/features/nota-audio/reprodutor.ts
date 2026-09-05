@@ -1,6 +1,6 @@
 import type { CryptoKey } from '@limmiar/crypto'
-import { abrirChunk } from '../live-session/audio-crypto'
-import { listarOrfaos } from '../live-session/chunk-store'
+import { abrirChunk } from '../../entities/gravacao/audio-crypto'
+import { listarOrfaos } from '../../shared/lib/opfs'
 
 /** Wrapper fino sobre um `HTMLAudioElement` já existente (com `src` posto pelo chamador): o seam
  *  existe para o componente de UI nunca tocar no elemento direto, e é testável em jsdom com um

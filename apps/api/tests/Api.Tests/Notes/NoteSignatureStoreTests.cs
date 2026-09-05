@@ -59,7 +59,7 @@ public sealed class NoteSignatureStoreTests : IAsyncLifetime
         Assert.NotNull(inserted);
         Assert.Equal(TenantA, inserted!.TenantId);
         Assert.Equal(noteId, inserted.NoteId);
-        Assert.Equal(3, inserted.Revisao);
+        Assert.Equal(3, inserted.Revision);
         // The store's INSERT does not bind the caller's SignedAt -- the column default `now()`
         // decides it, so a request that (accidentally or maliciously) supplied a fixed instant
         // never controls the persisted audit timestamp.

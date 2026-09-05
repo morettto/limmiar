@@ -1,8 +1,8 @@
-import { useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLingui } from '@lingui/react/macro'
 import type { Ancora } from '@limmiar/copilot'
 import type { CryptoKey } from '@limmiar/crypto'
-import { assinarNota } from '../../entities/nota/api'
+import { assinarNota, obterAssinatura } from '../../entities/nota/api'
 import { notaParaEntrada, selarAssinatura } from '../../entities/nota/nota-crypto'
 import { ESTADO_ASSINADA, ESTADO_PENDENTE, ORDEM_SECOES, type Nota } from '../../entities/nota/nota'
 import { appendPatientEntry } from '../../entities/patient/api'
@@ -53,12 +53,26 @@ export function NotaPage({ kek }: NotaPageProps) {
   // `appendPatientEntry` já ter sido gravado (ver comentário em `aoAssinar`).
   const ultimaRevisaoGravadaRef = useRef<Record<string, number>>({})
   const proximaSequenciaRef = useRef(RECORD_FIXTURE.entries.length + 1)
+  // `Object.values` sobre o `Record` devolvia array nova em toda renderização, mesmo sem
+  // mudar conteúdo; o `useMemo` faz a identidade da prop seguir o conteúdo -- garantia
+  // preventiva, sem consumidor hoje que dependa dela (ver README).
+  const listaNotas = useMemo(() => Object.values(notas), [notas])
 
   function marcarAssinada(notaId: string) {
     setNotas((atuais) =>
       atuais[notaId] ? { ...atuais, [notaId]: { ...atuais[notaId], estado: ESTADO_ASSINADA } } : atuais,
     )
   }
+
+  useEffect(() => {
+    // ponytail: pergunta pela nota fixture no mount (fila real -> efeito por nota selecionada).
+    // Fail-open na falha (ver README): a chave primária do Postgres é a trava a sério.
+    obterAssinatura(BASE_URL_FIXTURE, ACCOUNT_ID_FIXTURE, ACCESS_TOKEN_FIXTURE, NOTA_FIXTURE_ID)
+      .then((r) => {
+        if (r.ok) marcarAssinada(NOTA_FIXTURE_ID)
+      })
+      .catch(() => {}) // rede em baixo: `request` não apanha a rejeição do fetch
+  }, [])
 
   // Foca a listbox da fila (sem forwardRef através de FilaEEditor/FilaAssinatura -- é a
   // única instância de `role="listbox"` na página) para o `j`/`k` seguinte continuar de
@@ -71,6 +85,10 @@ export function NotaPage({ kek }: NotaPageProps) {
   // depois de gravar é recuperável (novo ⌘↵ assina a mesma revisão); o inverso deixaria uma
   // assinatura a apontar para uma revisão que não existe no prontuário, e isso não se apaga.
   async function aoAssinar(nota: Nota) {
+    if (nota.estado === ESTADO_ASSINADA) {
+      setMensagem({ status: 'erro', texto: t`Esta nota já está assinada.` })
+      return
+    }
     if (kek === null) {
       setMensagem({ status: 'erro', texto: t`Sem sessão ativa. Não é possível assinar.` })
       return
@@ -95,7 +113,7 @@ export function NotaPage({ kek }: NotaPageProps) {
 
       const signature = await selarAssinatura(dek, nota.id, nota)
       const resultado = await assinarNota(BASE_URL_FIXTURE, ACCOUNT_ID_FIXTURE, ACCESS_TOKEN_FIXTURE, nota.id, {
-        revisao: nota.revisao,
+        revision: nota.revisao,
         signature,
       })
 
@@ -137,7 +155,7 @@ export function NotaPage({ kek }: NotaPageProps) {
       <audio ref={audioRef} hidden />
       {mensagem?.status === 'sucesso' && <p role="status">{mensagem.texto}</p>}
       {mensagem?.status === 'erro' && <p role="alert">{mensagem.texto}</p>}
-      <FilaEEditor notas={Object.values(notas)} onChangeNota={onChangeNota} aoTocar={aoTocar} aoAssinar={aoAssinar} />
+      <FilaEEditor notas={listaNotas} onChangeNota={onChangeNota} aoTocar={aoTocar} aoAssinar={aoAssinar} />
     </>
   )
 }

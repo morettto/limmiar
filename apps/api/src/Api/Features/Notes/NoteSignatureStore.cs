@@ -26,13 +26,13 @@ public sealed class NoteSignatureStore(NpgsqlDataSource dataSource)
         await using var insertCommand = scope.Connection.CreateCommand();
         insertCommand.Transaction = scope.Transaction;
         insertCommand.CommandText = """
-            INSERT INTO note_signatures (tenant_id, note_id, revisao, signature)
-            VALUES (@tenantId, @noteId, @revisao, @signature)
+            INSERT INTO note_signatures (tenant_id, note_id, revision, signature)
+            VALUES (@tenantId, @noteId, @revision, @signature)
             RETURNING signed_at
             """;
         insertCommand.Parameters.AddWithValue("tenantId", signature.TenantId);
         insertCommand.Parameters.AddWithValue("noteId", signature.NoteId);
-        insertCommand.Parameters.AddWithValue("revisao", signature.Revisao);
+        insertCommand.Parameters.AddWithValue("revision", signature.Revision);
         insertCommand.Parameters.AddWithValue("signature", signature.Signature);
 
         DateTimeOffset insertedSignedAt;
@@ -65,7 +65,7 @@ public sealed class NoteSignatureStore(NpgsqlDataSource dataSource)
         await using var selectCommand = scope.Connection.CreateCommand();
         selectCommand.Transaction = scope.Transaction;
         selectCommand.CommandText = """
-            SELECT tenant_id, note_id, revisao, signature, signed_at
+            SELECT tenant_id, note_id, revision, signature, signed_at
             FROM note_signatures
             WHERE note_id = @noteId
             """;

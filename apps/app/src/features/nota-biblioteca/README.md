@@ -39,18 +39,33 @@ ver os READMEs dos dois para o fluxo de composição.
    (`indice === null`, ainda não construído/restaurado), `ocioso` (termo vazio -- mostra a
    biblioteca toda) ou `pronto` com `ids` (pode ser `[]`, sem resultados). Ver Decisões,
    "os três estados não colapsam em dois".
-7. `indiceBuscaAad(accountId)`/`selarIndice`/`abrirIndice` (`indice-crypto.ts`) cifram o
-   JSON do índice (já o envelope com impressão) sob a DEK da conta
-   (`webcrypto.encrypt`/`decrypt` de `@limmiar/crypto`), AAD
-   `limmiar/note-index/v1|{accountId}` -- rejeita se `accountId` não bater com o usado
-   para selar.
+7. `chaveIndiceDaConta(kek)` (`indice-crypto.ts`, ticket S08-10) é a única porta de
+   `ChaveIndiceBusca` -- um tipo marcado (`unique symbol`) que só ela produz, depois de
+   confirmar em runtime que `kek` tem usages de KEK (`wrapKey`/`unwrapKey`); uma DEK de
+   paciente (usages `encrypt`/`decrypt`) lança, e não compila onde `ChaveIndiceBusca` é
+   esperado. `selarIndice(chave, accountId, json)` gera uma DEK fresca por gravação
+   (`webcrypto.generateWrappedDek`), embrulhada por `chave` sob a AAD de
+   `indiceBuscaDekAad(accountId)` (`limmiar/note-index-dek/v1|{accountId}`, distinta da AAD
+   do conteúdo), cifra `json` sob essa DEK com `indiceBuscaAad(accountId)`
+   (`limmiar/note-index/v1|{accountId}`) e devolve `wrappedDek(60 bytes) || ciphertext`.
+   `abrirIndice(chave, accountId, selado)` é o inverso: corta os 60 bytes, desembrulha a
+   DEK, decifra o resto -- rejeita se `chave` não for a KEK que embrulhou, ou se
+   `accountId` não bater em qualquer uma das duas AAD. Ver Decisões, "DEK de conta, não DEK
+   de paciente, para o índice cross-paciente".
 8. `opfsIndice(dir)` (`indice-store.ts`) devolve `{ ler, gravar, apagar }`, o único trio
    autorizado a tocar a API OPFS para o índice de busca (um ficheiro fixo, `indice-busca`,
    por diretório já escopado à conta pelo chamador). `ler` devolve `null` quando o ficheiro
    ainda não existe (apanha só `NotFoundError`; qualquer outro erro propaga). `apagar`
    (ticket S08-09) faz `dir.removeEntry(ARQUIVO_INDICE)`.
-9. `persistirIndice(gravar, dek, accountId, indice, impressao)` (parâmetro solto, `gravar`
-   sozinho -- só usa esse campo) e `restaurarIndice(store, dek, accountId, impressao)`
+9. `purgarIndiceBusca(accountId)` (`indice-store.ts`, ticket S08-20) é o chamador de produção
+   de `opfsIndice(dir).apagar()`: lê a raiz OPFS (`navigator.storage.getDirectory()`, fora do
+   try -- essa rejeição propaga sempre), entra em `raiz.getDirectoryHandle(accountId)` (sem
+   `{ create: true }`) e chama `apagar()` num único try; qualquer `NotFoundError` (sem
+   diretório da conta, ou diretório sem `indice-busca`) vira `return` silencioso, tudo o
+   resto propaga. Único chamador: `PURGAS` em `app/providers/purgar-conta.ts`, disparada
+   em fire-and-forget no logout e na troca de conta.
+10. `persistirIndice(gravar, chave, accountId, indice, impressao)` (parâmetro solto, `gravar`
+   sozinho -- só usa esse campo) e `restaurarIndice(store, chave, accountId, impressao)`
    (`store: { ler, apagar }` inteiro -- os dois precisam de andar juntos) compõem os passos
    5+7+8: serializar (com a impressão) → selar → gravar, e ler → abrir → carregar (com a
    impressão). `gravar` nunca recebe o JSON em claro, só o blob selado. `restaurarIndice`:
@@ -73,20 +88,30 @@ ver os READMEs dos dois para o fluxo de composição.
   `carregarIndice(json, impressao: string): MiniSearch<DocNota> | null`,
   `ResultadoBusca`, `buscar(indice: MiniSearch<DocNota> | null, termo: string): ResultadoBusca`
   (`indice.ts`).
-- `indiceBuscaAad(accountId): Uint8Array<ArrayBuffer>`,
-  `selarIndice(dek, accountId, json): Promise<Uint8Array<ArrayBuffer>>`,
-  `abrirIndice(dek, accountId, selado): Promise<Uint8Array<ArrayBuffer>>` (`indice-crypto.ts`).
+- `ChaveIndiceBusca` (tipo marcado, `CryptoKey` de branding própria),
+  `chaveIndiceDaConta(kek: CryptoKey): ChaveIndiceBusca` (única porta de produção; lança se
+  `kek` não tiver usages `wrapKey`+`unwrapKey`), `indiceBuscaAad(accountId): Uint8Array<ArrayBuffer>`,
+  `indiceBuscaDekAad(accountId): Uint8Array<ArrayBuffer>`,
+  `selarIndice(chave: ChaveIndiceBusca, accountId, json): Promise<Uint8Array<ArrayBuffer>>`,
+  `abrirIndice(chave: ChaveIndiceBusca, accountId, selado): Promise<Uint8Array<ArrayBuffer>>`
+  (`indice-crypto.ts`).
 - `LerSelado`, `GravarSelado`, `ApagarSelado`, `opfsIndice(dir): { ler, gravar, apagar }`,
-  `persistirIndice(gravar: GravarSelado, dek, accountId, indice, impressao): Promise<void>`,
-  `restaurarIndice(store: { ler, apagar }, dek, accountId, impressao): Promise<MiniSearch<DocNota> | null>`
-  (`indice-store.ts`).
+  `persistirIndice(gravar: GravarSelado, chave: ChaveIndiceBusca, accountId, indice, impressao): Promise<void>`,
+  `restaurarIndice(store: { ler, apagar }, chave: ChaveIndiceBusca, accountId, impressao): Promise<MiniSearch<DocNota> | null>`,
+  `purgarIndiceBusca(accountId: string): Promise<void>` (ticket S08-20) (`indice-store.ts`).
 - Chamador (fatias 4-5): `widgets/biblioteca/BibliotecaNotas.tsx` renderiza `GrupoPaciente[]`
   e `ResultadoBusca`; `pages/biblioteca/BibliotecaPage.tsx` é quem chama
   `agruparPorPaciente`/`buscar`/`persistirIndice`/`restaurarIndice` de facto, na rota
   `/biblioteca`.
+- Chamador de `purgarIndiceBusca` (ticket S08-20): `app/providers/purgar-conta.ts`, via
+  `PURGAS` (logout e troca de conta) -- ver `app/providers/README.md`.
 
 ## Decisões desta fatia
 
+- **DEK de conta, não DEK de paciente, para o índice cross-paciente (ticket S08-10).** Chave
+  de conta (`ChaveIndiceBusca`, via `chaveIndiceDaConta(kek)`), DEK fresca por gravação
+  embrulhada e prefixada ao próprio blob selado. Wire format, alternativa rejeitada e
+  consequências: `docs/adr/ADR-S08-10-chave-de-conta-para-o-indice-de-busca.md`.
 - **OPFS, não Dexie, para persistir o índice.** A spec original apontava Dexie, mas o
   índice de busca não é um dado relacional/consultável por campo -- é um blob opaco
   (`MiniSearch.toJSON()` serializado) que só precisa de ser lido e escrito inteiro, de novo
@@ -102,6 +127,11 @@ ver os READMEs dos dois para o fluxo de composição.
   instalada (`minisearch@^7.2.0`, dependência de produção já presente em `package.json`)
   resolve. Subir a escada: não há utilitário do repo nem da stdlib que cubra isto, e a
   lib já estava instalada -- não foi adicionada para esta fatia.
+- **O intervalo `^7.2.0` fica (ticket S08-17), não se fixa a versão exata.** `pnpm-lock.yaml`
+  está versionado e já fixa `minisearch@7.2.0` com integridade; todo o `pnpm install` de CI
+  corre `--frozen-lockfile`, portanto o `^` só se move num `pnpm update` deliberado. Motivo
+  completo, data de revisão e regra de lote: ADR-0010, em
+  `docs/adr/0010-minisearch-fica-em-intervalo-o-lockfile-e-o-pin.md`.
 - **`OPCOES_INDICE` é uma única constante exportada, reusada literalmente por
   `construirIndice` e `carregarIndice`.** `minisearch` serializa a estrutura do índice
   (`fieldIds`, `storedFields`) mas continua a precisar de `fields`/`storeFields` no
@@ -153,6 +183,18 @@ ver os READMEs dos dois para o fluxo de composição.
   `gravar` (via `createWritable()`) trunca e sobrescreve o mesmo ficheiro de qualquer forma.
   Só a rejeição de `apagar` é engolida -- `ler` e `abrirIndice` continuam a propagar como
   antes; um erro nesses dois passos não tem um passo seguinte que o corrija sozinho.
+
+- **`purgarIndiceBusca` fixa a convenção `<raiz OPFS>/<accountId>/indice-busca` sem
+  exportar um `dirIndiceDaConta` (ticket S08-20).** O diretório da conta é
+  `raiz.getDirectoryHandle(accountId)` (sem `{ create: true }` -- criar um diretório vazio a
+  cada logout seria semear lixo no OPFS sem nenhum gravador a segui-lo) e o ficheiro é o
+  `ARQUIVO_INDICE` que `opfsIndice` já usa. Não há chamador de produção que precise de um
+  helper de caminho exportado; se um escritor de produção do índice um dia discordar deste
+  diretório, é o teste de aceite 4 (`indice-store.test.ts`) que fica vermelho primeiro. Por
+  igual motivo, a purga usa `opfsIndice(dir).apagar()` (um `removeEntry(ARQUIVO_INDICE)`), não
+  `raiz.removeEntry(accountId, { recursive: true })` -- o diretório da conta pode vir a
+  guardar dados de outros módulos, e apagar a árvore inteira apagaria isso também. Um
+  diretório vazio que sobra não é texto em claro e não é problema.
 
 ## Fora de âmbito
 

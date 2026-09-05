@@ -51,22 +51,26 @@ ticket S08-06, `Nota` também é dona do seu `estado` (`EstadoNota`, `ESTADO_PEN
   `.tsx` a repeti-lo dispararia `lingui/no-unlocalized-strings`, que varre todo `.tsx` à
   procura de texto visível não traduzido; este ficheiro, puro `.ts`, está fora do seu
   alcance). Sem mudança de comportamento nem de cobertura -- só a keyword `export`.
-  **Este ficheiro é a referência única para esta justificação** -- `ORDEM_SECOES` reexportada
-  de um `.ts` puro, e o mesmo raciocínio aplicado via convenção `SCREAMING_SNAKE_CASE` (em
-  vez de reexportação, já que essas constantes nascem dentro de um `.tsx`) às constantes
-  `ESTADO_PENDENTE`/`ESTADO_ASSINADA` de `features/nota-fila/FilaAssinatura.tsx`. Os
-  READMEs de `features/nota-editor` e `features/nota-fila` linkam para aqui em vez de
-  repetirem o parágrafo.
-- Tipos: `SecaoSoap`, `FraseNota`, `Nota` (`src/nota.ts`), `EstadoNota` (`'pendente' |
-  'assinada'`); constantes `ESTADO_PENDENTE`, `ESTADO_ASSINADA` -- ver "Decisões da fatia
-  S08-06". `Afirmacao`/`Ancora` são importados de `@limmiar/copilot`, não redeclarados.
+  **Este ficheiro é a referência única para esta justificação** -- `ORDEM_SECOES` e
+  `ESTADO_PENDENTE`/`ESTADO_ASSINADA` (abaixo) nascem as duas neste `.ts` puro, fora do
+  alcance de `lingui/no-unlocalized-strings`. Os READMEs de `features/nota-editor` e
+  `features/nota-fila` linkam para aqui em vez de repetirem o parágrafo.
+- Tipos: `SecaoSoap`, `FraseNota`, `Nota` (`src/nota.ts`), `EstadoNota`
+  (`(typeof ESTADOS_NOTA)[number]`); constantes `ESTADO_PENDENTE`, `ESTADO_ASSINADA` e o
+  array `ESTADOS_NOTA` (`[ESTADO_PENDENTE, ESTADO_ASSINADA] as const`) -- as constantes vêm do S08-06,
+  `ESTADOS_NOTA`/`EstadoNota` derivado dele do S08-16 (justificação do idioma no comentário
+  acima de `ESTADOS_NOTA` em `nota.ts`).
+  `Afirmacao`/`Ancora` são importados de `@limmiar/copilot`, não redeclarados.
 - `notaAssinaturaAad(noteId: string, revisao: number): Uint8Array<ArrayBuffer>`
   (`nota-crypto.ts`, fatia 5) -- `"limmiar/note-signature/v1|{noteId}|{revisao}"` em UTF-8.
 - `selarAssinatura(dek: CryptoKey, noteId: string, nota: Nota): Promise<Uint8Array<ArrayBuffer>>`
   (`nota-crypto.ts`, fatia 5).
 - `notaParaEntrada(nota: Nota): Uint8Array<ArrayBuffer>` (`nota-crypto.ts`, fatia 5).
-- `assinarNota(baseUrl, accountId, accessToken, noteId, { revisao, signature }): Promise<AssinarNotaResult>`
+- `assinarNota(baseUrl, accountId, accessToken, noteId, { revision, signature }): Promise<AssinarNotaResult>`
   (`api.ts`, fatia 5) -- `POST /accounts/{accountId}/notes/{noteId}/signature`, 201.
+- `obterAssinatura(baseUrl: string, accountId: string, accessToken: string, noteId: string): Promise<ObterAssinaturaResult>`
+  (`api.ts`, S08-11) -- `GET /accounts/{accountId}/notes/{noteId}/signature`. Ver "Removido
+  (S08-02), reposto no S08-11" abaixo.
 
 ## Decisões desta fatia
 
@@ -149,11 +153,18 @@ ticket S08-06, `Nota` também é dona do seu `estado` (`EstadoNota`, `ESTADO_PEN
   reagir a 409/falha de rede, marcar a nota como assinada na fila) -- isso é
   `pages/notas/NotaPage.tsx` (fatia 5), ver o README desse módulo.
 
-## Removido (S08-02)
+## Removido (S08-02), reposto no S08-11
 
-- **`obterAssinatura`/`ObterAssinaturaResult`** (`api.ts`) foram apagados: nasceram na
-  fatia 5 do S08-01 sem chamador ("fica pronto para..."), e continuaram sem nenhum até o
-  ticket S08-02 -- reabrir uma nota já assinada é fluxo que ainda não existe em lado
-  nenhum da app. Veredicto herdado do S08-01 (já registado nesse README antes da remoção),
-  não reaberto aqui. `assinarNota` continua -- é o único lado do endpoint com chamador
-  real (`pages/notas/NotaPage.tsx`).
+- **`obterAssinatura`/`ObterAssinaturaResult`** (`api.ts`) foram apagados no S08-02: nasceram
+  na fatia 5 do S08-01 sem chamador ("fica pronto para..."), e continuaram sem nenhum até
+  esse ticket -- reabrir uma nota já assinada era fluxo que ainda não existia em lado nenhum
+  da app. O S08-11 repôs a função **com chamador**: `pages/notas/NotaPage.tsx` pergunta ao
+  servidor no mount se a nota já está assinada, para o editor abrir em leitura apenas sem
+  depender só do estado local (ver README de `pages/notas`). `GET
+  /accounts/{accountId}/notes/{noteId}/signature` -- 404 `notes.signature_not_found` é o caso
+  normal (nota por assinar).
+  - `obterAssinatura(baseUrl: string, accountId: string, accessToken: string, noteId: string): Promise<ObterAssinaturaResult>`
+    -- `ObterAssinaturaResult = { ok: true; noteId: string; revision: number; signedAt: string } | ProblemResult`.
+    O blob `signature` do body é lido e descartado de propósito: decodificá-lo só serviria a
+    uma verificação client-side que nenhum critério pede e nenhum chamador faz. Molde literal
+    de `assinarNota`, logo acima no mesmo ficheiro.

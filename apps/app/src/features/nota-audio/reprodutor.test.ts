@@ -1,7 +1,7 @@
 import { webcrypto as limmiarWebcrypto } from '@limmiar/crypto'
 import { describe, expect, it, vi } from 'vitest'
 import { FakeDirectoryHandle, FakeFileHandle, fakeDir } from '../../test-support/fake-opfs'
-import { sealChunk } from '../live-session/audio-crypto'
+import { sealChunk } from '../../entities/gravacao/audio-crypto'
 import { abrirSessaoComoBlob, criarReprodutor } from './reprodutor'
 
 const SESSION_ID = '11111111-1111-1111-1111-111111111111'

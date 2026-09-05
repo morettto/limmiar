@@ -25,3 +25,7 @@ TestResults/
 # por apps/app/src/session/nemotron-loader.ts; produção serve de object
 # store externo (VITE_ASR_MODEL_BASE_URL) -- ver S05-02 fatia 6.
 apps/app/public/models/
+
+# Relatório JSON do vitest (`--reporter=json --outputFile`), escrito por quem
+# corre a suíte à mão; nunca é entrada de nenhum portão.
+apps/app/coverage.json

@@ -37,14 +37,14 @@ prop -- buscá-los de um servidor é a fatia 4. Sem áudio, sem edição de nota
 
 - `FilaAssinatura` (`FilaAssinatura.tsx`) -- componente React, props `itens: readonly
   Nota[]`, `selecionadoId`, `onSelecionar`.
-- `EstadoNota`, `ESTADO_PENDENTE`, `ESTADO_ASSINADA` vivem em `entities/nota/nota.ts` desde
-  o ticket S08-06 (fundir `ItemFila` em `Nota`) -- este módulo importa-os de lá, não os
-  redeclara. Ver `entities/nota/README.md`, "Decisões da fatia S08-06".
-- `proximoIndice(indice, total, tecla)`, `ehAtalhoAssinar(e)` (`navegacao-teclado.ts`) --
-  seam puro, sem React, sem browser. `ehAtalhoAssinar` também é consumido por
-  `features/nota-editor/EditorSoap.tsx` (import lateral entre features do mesmo nível,
-  permitido pela regra do FSD deste repo -- só `app`/`pages`/`widgets` upstream são
-  proibidos a `features`, ver `.dependency-cruiser.cjs`).
+- `EstadoNota`, `ESTADO_PENDENTE` e `ESTADO_ASSINADA` vivem em `entities/nota/nota.ts`
+  desde o ticket S08-06 (fundir `ItemFila` em `Nota`); `ESTADOS_NOTA` nasceu no S08-16 e é
+  o que este módulo itera direto para renderizar as abas (`ESTADOS_NOTA.map(...)`, sem
+  alias local -- o `const ABAS = ESTADOS_NOTA` que existiu era 1:1 com um só uso, eliminado
+  no S08-22). Ver `entities/nota/README.md`, "Decisões da fatia S08-06".
+- `proximoIndice(indice, total, tecla)` (`navegacao-teclado.ts`) -- seam puro, sem React,
+  sem browser, 100% interno a esta feature (desde S08-08; `ehAtalhoAssinar` viveu aqui até
+  essa fatia, ver `features/nota-editor/README.md` para onde foi e porquê).
 - Consumido por `widgets/soap-editor/FilaEEditor.tsx`, que monta esta fila lado a lado com
   `EditorSoap`.
 
@@ -67,20 +67,10 @@ prop -- buscá-los de um servidor é a fatia 4. Sem áudio, sem edição de nota
   último item mantém o foco nele, em vez de saltar de volta ao primeiro de forma
   silenciosa. Upgrade, se um dia a spec pedir *wrap*: trocar só o corpo de `proximoIndice`,
   a assinatura do seam não muda.
-- **`ehAtalhoAssinar` aceita `metaKey` OU `ctrlKey`, sem detetar o sistema operativo.** A
-  spec S08 escreve o atalho como `⌘↵` (Mac), mas a assinatura do seam
-  (`Pick<KeyboardEvent, 'key' | 'metaKey' | 'ctrlKey'>`) não carrega nenhuma informação de
-  plataforma de propósito: detetar o SO exigiria ler `navigator.platform`/`userAgent`
-  (não fiável, e o próprio seam deixaria de ser uma função pura testável só com um objeto
-  literal). Em vez disso, `Enter` com **qualquer um** dos dois modificadores conta --
-  `⌘↵` funciona no Mac, `Ctrl+↵` funciona fora dele, e nenhum profissional fica sem atalho
-  de teclado por causa do sistema operativo que usa. Efeito colateral aceite: `Ctrl+Enter`
-  também funciona num Mac (inofensivo) e `Cmd+Enter` "funcionaria" num Windows/Linux se
-  esse teclado tivesse uma tecla Meta (na prática, nunca acontece por acidente).
 - **`ESTADO_PENDENTE`/`ESTADO_ASSINADA` são `const` exportadas, não literais inline.**
-  Mesma justificação (`lingui/no-unlocalized-strings`, convenção `SCREAMING_SNAKE_CASE`
-  isenta) de `ORDEM_SECOES` -- ver README de `entities/nota` (dono do padrão e, desde
-  S08-06, dono também destas duas constantes).
+  Mesma justificação de `ORDEM_SECOES`: reusadas aqui em `.tsx`, onde repetir o literal
+  dispararia `lingui/no-unlocalized-strings` -- ver README de `entities/nota` (dono do
+  padrão e, desde S08-06, dono também destas duas constantes).
 
 ## Fora de âmbito (fatias seguintes da spec S08)
 

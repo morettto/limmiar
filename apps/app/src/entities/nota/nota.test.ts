@@ -1,6 +1,15 @@
 import type { Afirmacao } from '@limmiar/copilot'
 import { describe, expect, it } from 'vitest'
-import { digestNota, editarFrase, rascunhoParaNota, textoCanonico, type SecaoSoap } from './nota'
+import {
+  ESTADO_ASSINADA,
+  ESTADO_PENDENTE,
+  ESTADOS_NOTA,
+  digestNota,
+  editarFrase,
+  rascunhoParaNota,
+  textoCanonico,
+  type SecaoSoap,
+} from './nota'
 
 function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes)
@@ -133,5 +142,15 @@ describe('digestNota', () => {
     const resultado = await digestNota(nota)
 
     expect(bytesToHex(resultado)).toBe('b75bb3a41f6a7252028f851ea60f9d0b28c999991a15aa06717ba5cec477a12a')
+  })
+})
+
+describe('estado da nota', () => {
+  it('ESTADO_PENDENTE/ESTADO_ASSINADA estreitam para o literal, não para EstadoNota inteiro, e ESTADOS_NOTA contém as duas nesta ordem (prova de tipo + conteúdo/ordem, não só de runtime)', () => {
+    // Anotar as duas como EstadoNota não compilaria aqui (TS2322) -- tsc -b é o
+    // vermelho/verde de tipo. O expect cobre o que o compilador não cobre: conteúdo/ordem.
+    const p: 'pendente' = ESTADO_PENDENTE
+    const a: 'assinada' = ESTADO_ASSINADA
+    expect([p, a]).toEqual(ESTADOS_NOTA)
   })
 })

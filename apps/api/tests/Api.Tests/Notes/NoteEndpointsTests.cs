@@ -19,7 +19,7 @@ namespace Api.Tests.Notes;
 /// HTTP-layer round-trip against a real Postgres (Testcontainers) -- proves the sign/read
 /// contract: 201 + Location on first signature, 409 notes.already_signed on a second attempt
 /// for the same note, 401 for a missing/wrong-owner token, 400 for a too-short signature blob
-/// or a negative revisao, and the GET half of the lock (200 when signed, 404 when not).
+/// or a negative revision, and the GET half of the lock (200 when signed, 404 when not).
 /// </summary>
 [Collection("Database")]
 public sealed class NoteEndpointsTests : IAsyncLifetime
@@ -80,7 +80,7 @@ public sealed class NoteEndpointsTests : IAsyncLifetime
         var signed = await response.Content.ReadFromJsonAsync(NotesJsonContext.Default.SignNoteResponse);
         Assert.NotNull(signed);
         Assert.Equal(noteId, signed!.NoteId);
-        Assert.Equal(1, signed.Revisao);
+        Assert.Equal(1, signed.Revision);
     }
 
     [Fact]
@@ -142,13 +142,13 @@ public sealed class NoteEndpointsTests : IAsyncLifetime
         Assert.Equal("signature", doc.RootElement.GetProperty("params").GetProperty("field").GetString());
     }
 
-    /// <summary>A negative revisao is rejected before ever reaching NoteService -- there is no such thing as revisao -1.</summary>
+    /// <summary>A negative revision is rejected before ever reaching NoteService -- there is no such thing as revision -1.</summary>
     [Fact]
-    public async Task PostNoteSignature_WithNegativeRevisao_Returns400WithProblemDetails()
+    public async Task PostNoteSignature_WithNegativeRevision_Returns400WithProblemDetails()
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        var accountId = await RegisterActiveProfessionalAsync(client, "note-sign-negative-revisao@example.com");
+        var accountId = await RegisterActiveProfessionalAsync(client, "note-sign-negative-revision@example.com");
 
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/notes/{Guid.NewGuid()}/signature",
@@ -159,7 +159,7 @@ public sealed class NoteEndpointsTests : IAsyncLifetime
         var body = await response.Content.ReadAsStringAsync();
         using var doc = JsonDocument.Parse(body);
         Assert.Equal("validation.invalid_field", doc.RootElement.GetProperty("code").GetString());
-        Assert.Equal("revisao", doc.RootElement.GetProperty("params").GetProperty("field").GetString());
+        Assert.Equal("revision", doc.RootElement.GetProperty("params").GetProperty("field").GetString());
     }
 
     [Fact]
@@ -243,7 +243,7 @@ public sealed class NoteEndpointsTests : IAsyncLifetime
         var signature = await response.Content.ReadFromJsonAsync(NotesJsonContext.Default.NoteSignatureResponse);
         Assert.NotNull(signature);
         Assert.Equal(noteId, signature!.NoteId);
-        Assert.Equal(2, signature.Revisao);
+        Assert.Equal(2, signature.Revision);
         Assert.Equal(signatureBytes, signature.Signature);
     }
 

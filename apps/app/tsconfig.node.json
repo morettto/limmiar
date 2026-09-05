@@ -24,6 +24,7 @@
     "lingui.config.ts",
     "playwright-ct.config.ts",
     "security-headers.ts",
-    "security-headers.test.ts"
+    "security-headers.test.ts",
+    "arch.test.ts"
   ]
 }

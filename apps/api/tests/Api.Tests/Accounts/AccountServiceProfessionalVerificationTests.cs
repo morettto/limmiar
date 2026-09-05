@@ -39,8 +39,8 @@ public sealed class AccountServiceProfessionalVerificationTests
 
         var result = await handler.Handle(new ContinueWithGoogleCommand("valid-id-token", AccountRole.Professional), CancellationToken.None);
 
-        Assert.True(result.Succeeded);
-        Assert.Equal(AccountVerificationStatus.Pending, result.Account!.VerificationStatus);
+        Assert.True(result.TryGetValue(out var success, out _));
+        Assert.Equal(AccountVerificationStatus.Pending, success.Account.VerificationStatus);
     }
 
     [Fact]
@@ -52,8 +52,8 @@ public sealed class AccountServiceProfessionalVerificationTests
 
         var result = await handler.Handle(new ContinueWithGoogleCommand("valid-id-token", AccountRole.Patient), CancellationToken.None);
 
-        Assert.True(result.Succeeded);
-        Assert.Equal(AccountVerificationStatus.Active, result.Account!.VerificationStatus);
+        Assert.True(result.TryGetValue(out var success, out _));
+        Assert.Equal(AccountVerificationStatus.Active, success.Account.VerificationStatus);
     }
 
     [Fact]

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Nota } from '../../entities/nota/nota'
+import { ESTADO_PENDENTE, type Nota } from '../../entities/nota/nota'
 import { buscar, carregarIndice, construirIndice, impressaoDigital, notaParaDoc, serializarIndice } from './indice'
 
 describe('buscar', () => {
@@ -30,7 +30,7 @@ describe('notaParaDoc', () => {
         { id: 'S-0', secao: 'S', texto: 'febre há 3 dias', ancoras: [] },
         { id: 'O-0', secao: 'O', texto: '38.5 graus', ancoras: [] },
       ],
-      estado: 'pendente',
+      estado: ESTADO_PENDENTE,
     }
 
     expect(notaParaDoc(nota)).toEqual({ id: 'nota-1', patientId: 'p1', texto: 'febre há 3 dias 38.5 graus' })
@@ -39,7 +39,7 @@ describe('notaParaDoc', () => {
 
 describe('impressaoDigital', () => {
   function notaComRevisao(id: string, revisao: number): Nota {
-    return { id, patientId: 'p1', revisao, frases: [], estado: 'pendente' }
+    return { id, patientId: 'p1', revisao, frases: [], estado: ESTADO_PENDENTE }
   }
 
   it('é a mesma independentemente da ordem das notas', () => {

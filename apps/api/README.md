@@ -92,11 +92,19 @@ tentar arrancar o container, não passam silenciosamente. Os testes puramente un
   como `"pendente"|"concedido"|"revogado"`. Fatia 3 de seis do ticket S10-02: ainda sem
   consumidor real (o portão do microfone e a máquina de sessão são as fatias 4 e 5). Ver o
   README do módulo (`src/Api/Features/Consent/README.md`).
-- `src/Api/Problems` -- `LimmiarProblemDetails` (RFC 7807 + `code` + `params` estruturado,
-  nunca a mensagem de exceção crua) e o catálogo central `ProblemCodes` (ex.:
+- `src/Api/Platform` -- (S08-14) `Result<TValue, TFailure>`, o molde partilhado de resultado
+  store/service do repositório: um valor de sucesso ou uma razão de falha (`enum`), nunca os
+  dois nem nenhum. Usado por `NoteService.SignAsync`, `PatientService.CreatePatientAsync`/
+  `AppendEntryAsync`, e desde o S08-21 também por `LoginHandler`/`ContinueWithGoogleHandler`
+  (`Api.Accounts`), `ConsentService.RecordAsync` e `SchedulingService`/`ScheduledSessionStore`
+  (`Move`/`CancelAsync`). `Api.Audit.AuditVerification` deliberadamente não migrou -- não é um
+  par valor-ou-falha (`Ok()` não carrega valor nenhum), ver o README do módulo
+  (`src/Api/Features/Audit/README.md`).
+- `src/Api/Platform/Problems` -- `LimmiarProblemDetails` (RFC 7807 + `code` + `params`
+  estruturado, nunca a mensagem de exceção crua) e o catálogo central `ProblemCodes` (ex.:
   `voice.enrollment_not_found` para o `GET`/`DELETE` de cadastro de voz sem cadastro
   prévio, distinto de `auth.account_not_found`).
-- `src/Api/Data` -- `MigrationRunner` (executor de `*.sql` sem framework, AOT-safe),
+- `src/Api/Platform/Data` -- `MigrationRunner` (executor de `*.sql` sem framework, AOT-safe),
   `NpgsqlDataSourceFactory`, e `OpenTenantScopedTransactionAsync` (extensão de
   `NpgsqlDataSource`): abre ligação + transação e já corre o `set_config('app.tenant_id',
   ..., true)` que a política `tenant_isolation` de qualquer tabela com RLS por tenant

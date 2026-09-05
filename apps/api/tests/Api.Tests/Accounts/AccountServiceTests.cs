@@ -48,8 +48,8 @@ public sealed class AccountServiceTests
 
         var result = await handler.Handle(new LoginCommand("known@example.com", SomeVerifier), CancellationToken.None);
 
-        Assert.True(result.Succeeded);
-        Assert.Same(existingAccount, result.Account);
+        Assert.True(result.TryGetValue(out var success, out _));
+        Assert.Same(existingAccount, success.Account);
     }
 
     [Fact]
@@ -61,9 +61,8 @@ public sealed class AccountServiceTests
 
         var result = await handler.Handle(new LoginCommand("known@example.com", CreateVerifier(0xFF)), CancellationToken.None);
 
-        Assert.False(result.Succeeded);
-        Assert.Equal(AccountLoginFailureReason.InvalidCredentials, result.FailureReason);
-        Assert.Null(result.Account);
+        Assert.True(result.TryGetFailure(out var failureReason));
+        Assert.Equal(AccountLoginFailureReason.InvalidCredentials, failureReason);
     }
 
     [Fact]
@@ -74,9 +73,8 @@ public sealed class AccountServiceTests
 
         var result = await handler.Handle(new LoginCommand("ghost@example.com", SomeVerifier), CancellationToken.None);
 
-        Assert.False(result.Succeeded);
-        Assert.Equal(AccountLoginFailureReason.InvalidCredentials, result.FailureReason);
-        Assert.Null(result.Account);
+        Assert.True(result.TryGetFailure(out var failureReason));
+        Assert.Equal(AccountLoginFailureReason.InvalidCredentials, failureReason);
     }
 
     // Guards against a shortcut like `if (account is null) return Failure(...);` before the
@@ -118,8 +116,8 @@ public sealed class AccountServiceTests
 
         var result = await handler.Handle(new LoginCommand("google-only@example.com", SomeVerifier), CancellationToken.None);
 
-        Assert.False(result.Succeeded);
-        Assert.Equal(AccountLoginFailureReason.InvalidCredentials, result.FailureReason);
+        Assert.True(result.TryGetFailure(out var failureReason));
+        Assert.Equal(AccountLoginFailureReason.InvalidCredentials, failureReason);
         Assert.Equal(1, comparer.CallCount);
         Assert.Equal(AccountVerifierLengths.PasswordVerifierLength, comparer.LastStoredLength);
     }
@@ -137,9 +135,8 @@ public sealed class AccountServiceTests
 
         var result = await handler.Handle(new LoginCommand("google-only@example.com", allZeroVerifier), CancellationToken.None);
 
-        Assert.False(result.Succeeded);
-        Assert.Equal(AccountLoginFailureReason.InvalidCredentials, result.FailureReason);
-        Assert.Null(result.Account);
+        Assert.True(result.TryGetFailure(out var failureReason));
+        Assert.Equal(AccountLoginFailureReason.InvalidCredentials, failureReason);
     }
 
     [Fact]
@@ -151,12 +148,12 @@ public sealed class AccountServiceTests
 
         var result = await handler.Handle(new ContinueWithGoogleCommand("valid-id-token", AccountRole.Professional), CancellationToken.None);
 
-        Assert.True(result.Succeeded);
-        Assert.True(result.IsNewAccount);
-        Assert.Equal("new-via-google@example.com", result.Account!.Email);
-        Assert.Equal(AccountRole.Professional, result.Account.Role);
-        Assert.Equal("google-subject-1", result.Account.GoogleSubjectId);
-        Assert.Null(result.Account.PasswordVerifier);
+        Assert.True(result.TryGetValue(out var success, out _));
+        Assert.True(success.IsNewAccount);
+        Assert.Equal("new-via-google@example.com", success.Account.Email);
+        Assert.Equal(AccountRole.Professional, success.Account.Role);
+        Assert.Equal("google-subject-1", success.Account.GoogleSubjectId);
+        Assert.Null(success.Account.PasswordVerifier);
     }
 
     [Fact]
@@ -169,10 +166,10 @@ public sealed class AccountServiceTests
 
         var result = await handler.Handle(new ContinueWithGoogleCommand("valid-id-token", AccountRole.Patient), CancellationToken.None);
 
-        Assert.True(result.Succeeded);
-        Assert.False(result.IsNewAccount);
-        Assert.Same(existingAccount, result.Account);
-        Assert.Equal(AccountRole.Professional, result.Account!.Role);
+        Assert.True(result.TryGetValue(out var success, out _));
+        Assert.False(success.IsNewAccount);
+        Assert.Same(existingAccount, success.Account);
+        Assert.Equal(AccountRole.Professional, success.Account.Role);
     }
 
     [Fact]
@@ -183,9 +180,8 @@ public sealed class AccountServiceTests
 
         var result = await handler.Handle(new ContinueWithGoogleCommand("bad-id-token", AccountRole.Patient), CancellationToken.None);
 
-        Assert.False(result.Succeeded);
-        Assert.Equal(AccountGoogleAuthFailureReason.InvalidGoogleToken, result.FailureReason);
-        Assert.Null(result.Account);
+        Assert.True(result.TryGetFailure(out var failureReason));
+        Assert.Equal(AccountGoogleAuthFailureReason.InvalidGoogleToken, failureReason);
     }
 
     private static byte[] CreateVerifier(byte fill)

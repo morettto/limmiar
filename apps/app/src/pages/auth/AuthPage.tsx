@@ -1,19 +1,21 @@
 import { AuthScreen } from '../../widgets/auth-screen/AuthScreen'
-import type { AccountRole } from '../../entities/account'
+import type { Account, AccountRole } from '../../entities/account'
 
 export interface AuthPageProps {
   baseUrl: string
   // '' means unset -- AuthScreen falls back to its own default.
   role: string
+  onAuthenticated?: (account: Account) => void
 }
 
-export function AuthPage({ baseUrl, role }: AuthPageProps) {
+export function AuthPage({ baseUrl, role, onAuthenticated }: AuthPageProps) {
   const initialRole: AccountRole | undefined = role === 'Professional' || role === 'Patient' ? role : undefined
 
   return (
     <AuthScreen
       baseUrl={baseUrl}
       initialRole={initialRole}
+      onAuthenticated={onAuthenticated}
       getGoogleIdToken={() =>
         Promise.reject(
           new Error(

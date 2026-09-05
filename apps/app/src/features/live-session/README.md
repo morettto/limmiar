@@ -22,21 +22,14 @@ de `fakeEngine`. S10-02 fatia 4 -- `microfone.ts` passa a ser o único
 construtor de `LigarSessaoOpcoes.microfone`, substituindo o antigo campo
 `stream: MediaStream`. `SessaoAoVivo.tsx` fica para uma fatia seguinte.
 
-## Fluxo -- cifra (`audio-crypto.ts`)
+## Fluxo -- cifra (`entities/gravacao/audio-crypto.ts`, desde S08-08)
 
-`audioChunkAad(sessionId, seq)` gera a AAD versionada
-(`limmiar/audio-chunk/v1|${sessionId}|${seq}`), à imagem de
-`patientEntryAad`. `sealChunk(dek, sessionId, seq, chunk)` cifra um chunk
-sob essa AAD via `webcrypto.encrypt` de `@limmiar/crypto` -- wire format
-`iv(12) || ciphertext || tag(16)`, mesma primitiva usada em todo o resto do
-app, não reimplementada.
-
-`abrirChunk(dek, sessionId, seq, selado)` é o inverso exato (fatia 3, S08-01)
--- `webcrypto.decrypt` sob a mesma AAD. Rejeita se `sessionId`/`seq` não
-forem os mesmos usados para selar: é a AAD, não uma checagem extra, que
-impede um chunk de outra sessão ou fora de ordem de abrir por bom. Consumido
-por `features/nota-audio/reprodutor.ts` (`abrirSessaoComoBlob`), que também
-reusa `listarOrfaos` (abaixo) para listar os chunks de uma sessão por `seq`.
+`audioChunkAad`/`sealChunk`/`abrirChunk` -- a cifra dos chunks da sessão --
+mudou de casa para `entities/gravacao` em S08-08 (a regra `fsd-no-cross-slice`
+deixou de permitir esta feature importar de `features/nota-audio`, e a
+cifra em si não depende de nada específico de captura ao vivo). Ver o README
+desse módulo para o fluxo completo; `chunk-store.ts` (abaixo) continua a
+importar `sealChunk` de lá para `persistChunk`.
 
 ## Fluxo -- escrita OPFS (`chunk-store.ts`)
 
@@ -49,7 +42,10 @@ reusa `listarOrfaos` (abaixo) para listar os chunks de uma sessão por `seq`.
    claro.
 3. `listarOrfaos(dir)` lista os nomes de ficheiro presentes num diretório
    (`dir.keys()`), para detetar chunks que sobraram de uma sessão anterior
-   sem fecho limpo.
+   sem fecho limpo. Mudou de casa para `shared/lib/opfs.ts` em S08-08 (nome
+   inalterado) -- `chunk-store.ts` continua o único ficheiro autorizado a
+   escrever OPFS (Invariante abaixo), mas listar é uma operação genérica de
+   diretório, sem nada específico de sessão.
 
 ### Invariante
 
@@ -279,7 +275,7 @@ vive.
 | clique de consentimento | UI | `CONSENTIMENTO_CONCEDIDO` (precede `ligarSessao`) |
 | clique de marcar momento | UI | `MARCAR_MOMENTO { offsetMs }` (sem efeito real) |
 | botão "tentar de novo" | UI | `TENTAR_NOVAMENTE` + novo `ligarSessao` |
-| varrimento de `listarOrfaos` | UI / futuro `recovery.ts` | `RECUPERACAO_CONCLUIDA` / `RECUPERACAO_FALHOU` |
+| varrimento de `listarOrfaos` (`shared/lib/opfs.ts`) | UI / futuro `recovery.ts` | `RECUPERACAO_CONCLUIDA` / `RECUPERACAO_FALHOU` |
 | `montarTranscricaoCanonica` (`@limmiar/diarization`) | UI / futuro `SessaoAoVivo.tsx` | `PASSE_CANONICO_CONCLUIDO` / `PASSE_CANONICO_FALHOU` |
 
 ## Pontos de entrada
@@ -287,10 +283,11 @@ vive.
 - `audioChunkAad(sessionId, seq): Uint8Array<ArrayBuffer>`,
   `sealChunk(dek, sessionId, seq, chunk): Promise<Uint8Array<ArrayBuffer>>`,
   `abrirChunk(dek, sessionId, seq, selado): Promise<Uint8Array<ArrayBuffer>>`
-  (`audio-crypto.ts`).
+  -- `entities/gravacao/audio-crypto.ts`, desde S08-08 (ver o README desse módulo).
 - `WriteSealed` (tipo), `opfsWriter(dir): WriteSealed`,
-  `persistChunk(write, dek, sessionId, seq, blob): Promise<void>`,
-  `listarOrfaos(dir): Promise<string[]>` (`chunk-store.ts`).
+  `persistChunk(write, dek, sessionId, seq, blob): Promise<void>`
+  (`chunk-store.ts`). Listar nomes de ficheiro é `listarOrfaos(dir): Promise<string[]>`
+  de `shared/lib/opfs.ts`, desde S08-08 (ver essa secção acima).
 - `abrirMicrofone(consentimentoGravacao: EstadoConsentimento, midia?: MediaDevices): Promise<AbrirMicrofoneResult>`
   -- porta única para `getUserMedia`; `MicrofoneAutorizado` (tipo, construtor
   único é esta função), `AbrirMicrofoneResult` (`microfone.ts`, S10-02 fatia 4).

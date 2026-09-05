@@ -1,37 +1,57 @@
 using Api.Accounts;
+using Api.Platform;
 
 namespace Api.Scheduling;
 
+/// <summary>
+/// Shared by <see cref="SchedulingService.ScheduleAsync"/>, <see cref="SchedulingService.MoveAsync"/>
+/// and <see cref="SchedulingService.CancelAsync"/> -- one enum, not three near-identical ones,
+/// since every member applies identically across every operation that can reach it.
+/// <see cref="SlotTaken"/> is only ever produced by Schedule and Move: Cancel never changes
+/// <c>starts_at</c>, so it can never collide with another live row. The failure-to-problem
+/// mapping in the endpoints layer already switches over every named member, so this narrow
+/// asymmetry costs nothing extra to represent.
+/// </summary>
+public enum SchedulingFailureReason
+{
+    AccountNotFound,
+    NotAuthorizedToSchedule,
+    SessionNotFound,
+    SessionCancelled,
+    RecordingActive,
+    SlotTaken,
+}
+
 public sealed class SchedulingService(IAccountStore accounts, ScheduledSessionStore store)
 {
-    public async Task<SchedulingResult> ScheduleAsync(
+    public async Task<Result<ScheduledSession, SchedulingFailureReason>> ScheduleAsync(
         Guid professionalId, Guid patientId, DateTimeOffset startsAt, int durationMinutes, CancellationToken cancellationToken)
     {
         var authorizationFailure = await AuthorizeAsync(professionalId, cancellationToken);
         if (authorizationFailure is not null)
         {
-            return SchedulingResult.Failure(authorizationFailure.Value);
+            return Result<ScheduledSession, SchedulingFailureReason>.Failure(authorizationFailure.Value);
         }
 
         try
         {
             // timestamptz requires a zero-offset (UTC) value from Npgsql.
             var session = await store.InsertAsync(professionalId, patientId, startsAt.ToUniversalTime(), durationMinutes, cancellationToken);
-            return SchedulingResult.Success(session);
+            return Result<ScheduledSession, SchedulingFailureReason>.Success(session);
         }
         catch (ScheduledSessionSlotConflictException)
         {
-            return SchedulingResult.Failure(SchedulingFailureReason.SlotTaken);
+            return Result<ScheduledSession, SchedulingFailureReason>.Failure(SchedulingFailureReason.SlotTaken);
         }
     }
 
-    public async Task<SchedulingResult> MoveAsync(
+    public async Task<Result<ScheduledSession, SchedulingFailureReason>> MoveAsync(
         Guid professionalId, Guid sessionId, DateTimeOffset newStartsAt, int newDurationMinutes, CancellationToken cancellationToken)
     {
         var authorizationFailure = await AuthorizeAsync(professionalId, cancellationToken);
         if (authorizationFailure is not null)
         {
-            return SchedulingResult.Failure(authorizationFailure.Value);
+            return Result<ScheduledSession, SchedulingFailureReason>.Failure(authorizationFailure.Value);
         }
 
         try
@@ -40,16 +60,16 @@ public sealed class SchedulingService(IAccountStore accounts, ScheduledSessionSt
         }
         catch (ScheduledSessionSlotConflictException)
         {
-            return SchedulingResult.Failure(SchedulingFailureReason.SlotTaken);
+            return Result<ScheduledSession, SchedulingFailureReason>.Failure(SchedulingFailureReason.SlotTaken);
         }
     }
 
-    public async Task<SchedulingResult> CancelAsync(Guid professionalId, Guid sessionId, CancellationToken cancellationToken)
+    public async Task<Result<ScheduledSession, SchedulingFailureReason>> CancelAsync(Guid professionalId, Guid sessionId, CancellationToken cancellationToken)
     {
         var authorizationFailure = await AuthorizeAsync(professionalId, cancellationToken);
         if (authorizationFailure is not null)
         {
-            return SchedulingResult.Failure(authorizationFailure.Value);
+            return Result<ScheduledSession, SchedulingFailureReason>.Failure(authorizationFailure.Value);
         }
 
         return await store.CancelAsync(professionalId, sessionId, DateTimeOffset.UtcNow, cancellationToken);

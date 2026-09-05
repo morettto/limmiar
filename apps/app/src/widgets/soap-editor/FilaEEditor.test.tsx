@@ -2,7 +2,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { I18nProvider } from '@lingui/react'
 import { i18n, dynamicActivate } from '../../shared/i18n'
-import type { Nota } from '../../entities/nota/nota'
+import { ESTADO_PENDENTE, type Nota } from '../../entities/nota/nota'
 import { FilaEEditor } from './FilaEEditor'
 
 function nota(id: string, patientId: string): Nota {
@@ -11,7 +11,7 @@ function nota(id: string, patientId: string): Nota {
     patientId,
     revisao: 0,
     frases: [{ id: `${id}-S-0`, secao: 'S', texto: `texto de ${id}`, ancoras: [] }],
-    estado: 'pendente',
+    estado: ESTADO_PENDENTE,
   }
 }
 

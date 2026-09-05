@@ -15,25 +15,53 @@ decisão.
 1. Monta com uma fila de um único item e uma nota fixa (`notaFixture()`), ambos com um id
    fixture (`NOTA_FIXTURE_ID`/`PATIENT_FIXTURE_ID`) -- não há ainda uma fila real vinda de
    um backend (fica fora de âmbito, ver `widgets/soap-editor/README.md`).
-2. `⌘↵`/`Ctrl+↵` no editor (via `EditorSoap`/`FilaEEditor`, ver `ehAtalhoAssinar`) chama
+2. **Efeito de arranque (S08-11):** no mount, `useEffect(..., [])` pergunta ao servidor
+   (`obterAssinatura`, `entities/nota/api.ts`) se a nota fixture já está assinada. `ok:true`
+   chama `marcarAssinada`, deixando `EditorSoap` em leitura apenas logo no primeiro render
+   útil -- um reload é, portanto, um mount novo, e a trava não se perde. Critério "reload não
+   perde a trava" tem prova executada, não por inferência: `NotaPage.test.tsx` ("reload
+   (unmount + mount novo) repõe a trava vinda do servidor, sem interação do utilizador") monta,
+   desmonta (`cleanup()` -- simula o reload, apaga toda memória do cliente) e monta de novo com
+   `obterAssinatura` a devolver `ok:true` só na segunda vez; fixa que é a resposta do servidor,
+   não estado do cliente, que repõe `estado === 'assinada'` na instância nova de `EditorSoap`.
+   `ok:false` (404
+   `notes.signature_not_found`, o caso normal de uma nota por assinar) e a promessa rejeitada
+   (rede em baixo, 401 no arranque) colapsam no mesmo `if (r.ok)`: nenhum dos dois produz
+   `role="alert"`/`role="status"` -- 404 não é acionável, e falha de rede/401 no boot também
+   não. Sem flag de cancelamento: as três credenciais e o id são constantes de módulo (deps
+   `[]` são honestas), `marcarAssinada` é idempotente, e `setState` depois do desmonte é
+   no-op no React 19. **Fail-open**: se a pergunta falhar, a nota fica editável -- a trava a
+   sério é a chave primária do Postgres, e um cliente desatualizado apanha o 409
+   `notes.already_signed` que `aoAssinar` já trata (ver 2.e abaixo). Fail-closed trancaria
+   toda nota de uma app local-first sempre que a rede caísse. `ponytail:` teto conhecido:
+   offline, um reload não recupera a trava -- upgrade natural é cachear o último resultado
+   conhecido localmente.
+3. `⌘↵`/`Ctrl+↵` no editor (via `EditorSoap`/`FilaEEditor`, ver `ehAtalhoAssinar`) chama
    `aoAssinar(nota)`, que segue uma ordem fixa e não inversível:
-   a. Guarda cedo: se `kek === null` (o que `NotaRouteComponent` sempre passa hoje, ver
+   a. **Guarda de nota já assinada (S08-11), antes de qualquer outra guarda:** se
+      `nota.estado === ESTADO_ASSINADA`, mostra `role="alert"` ("Esta nota já está
+      assinada.") e retorna sem tocar em `openRecord`/`appendPatientEntry`/`assinarNota`.
+      Existe porque, depois de a trava vir do servidor (item 2), `ultimaRevisaoGravadaRef`
+      está vazio para essa nota -- sem esta guarda, um `⌘↵` gravaria uma entrada nova no
+      prontuário append-only para uma nota já assinada, que é exatamente o defeito do
+      ticket (a chave primária recusa a segunda linha, mas só depois de já ter gravado).
+   b. Guarda de sessão: se `kek === null` (o que `NotaRouteComponent` sempre passa hoje, ver
       "Pontos de entrada"), mostra `role="alert"` com uma mensagem de estado permanente
       ("Sem sessão ativa. Não é possível assinar.") e retorna **sem** chamar `openRecord`
       nem nenhuma outra função de cripto/rede -- mesmo padrão estrutural do `dek === null`
       em `pages/biblioteca/BibliotecaPage.tsx`.
-   b. `openRecord(kek, record, nota.patientId)` -- desembrulha a DEK do prontuário.
-   c. Se a revisão desta nota ainda não foi gravada (`ultimaRevisaoGravadaRef`), sela
+   c. `openRecord(kek, record, nota.patientId)` -- desembrulha a DEK do prontuário.
+   d. Se a revisão desta nota ainda não foi gravada (`ultimaRevisaoGravadaRef`), sela
       (`sealEntry`) e grava (`appendPatientEntry`) uma entrada de prontuário com
       `notaParaEntrada(nota)`, **antes** de assinar.
-   d. Sela a assinatura (`selarAssinatura`) e chama `assinarNota`.
-   e. Marca **só o item com `nota.id`** (não a fila inteira) como assinado, e anuncia o
+   e. Sela a assinatura (`selarAssinatura`) e chama `assinarNota`.
+   f. Marca **só o item com `nota.id`** (não a fila inteira) como assinado, e anuncia o
       desfecho, um de três: sucesso (`role="status"`, data da assinatura, marca assinada);
       409 `notes.already_signed` (`role="alert"`, mas marca assinada também -- o servidor é
       a verdade); ou qualquer outro `ProblemResult`/falha de rede (`role="alert"`, item
       continua pendente -- ver decisão abaixo).
-   f. Foca de volta a listbox da fila, para o `j`/`k` seguinte continuar dali.
-3. `onChangeNota`/`aoTocar` continuam simples repasses para estado local / o reprodutor
+   g. Foca de volta a listbox da fila, para o `j`/`k` seguinte continuar dali.
+4. `onChangeNota`/`aoTocar` continuam simples repasses para estado local / o reprodutor
    real (`features/nota-audio`, fatia 3) -- nenhuma mudança nesta fatia.
 
 ## Pontos de entrada
@@ -58,8 +86,30 @@ decisão.
   completo. `notaFixture()` agora inclui `estado: ESTADO_PENDENTE`; `marcarAssinada(notaId)`
   atualiza só a `estado` da entrada certa dentro do `Record` (guarda: se `notaId` não é uma
   chave existente, não cria uma entrada nova) -- `onChangeNota` já mexia no mesmo `Record`,
-  sem alteração. `<FilaEEditor>` passa a receber `notas={Object.values(notas)}` numa prop
-  só, em vez de `itens`+`notas` separados.
+  sem alteração. `<FilaEEditor>` passa a receber `notas` numa prop só, em vez de
+  `itens`+`notas` separados.
+- **`notas={Object.values(notas)}` virou `notas={listaNotas}`, com `listaNotas =
+  useMemo(() => Object.values(notas), [notas])` (S08-18).** `Object.values` sobre um
+  `Record` cria uma array nova a cada chamada, mesmo sem mudança de conteúdo; sem
+  `useMemo`, `FilaEEditor` recebia uma array de identidade nova em toda renderização de
+  `NotaPage` -- incluindo as que só mudam `mensagem` (ex.: a guarda de sessão em
+  `aoAssinar`) e não tocam em `notas`. Garantia preventiva: hoje não há consumidor que
+  dependa dessa identidade -- `FilaEEditor` não está memoizado, e não tem efeito nenhum que
+  leve `notas` numa dependency array. `pages/biblioteca/BibliotecaPage` recebe `notas`
+  como prop e, até o S08-13, levava-a na dependency array do efeito do índice -- o que
+  tornava esse efeito sensível à estabilidade de identidade de quem lha passasse. O
+  S08-13 tirou `notas` das deps (hoje `[chaveIndice, accountId]`) e passou a ler o valor
+  atual via `useEffectEvent` (`lerAtuais`, ver `pages/biblioteca/README.md`): a exigência
+  de identidade que existia ali deixou de existir -- quem ler este README não deve repô-la.
+  `onChangeNota`, `aoTocar` e `aoAssinar` continuam a ser recriadas a cada render de
+  `NotaPage`: só `notas` tem identidade estável, e quem memoizar `FilaEEditor` no futuro não
+  pode assumir o mesmo das outras props. `NotaPage.test.tsx` prova por referência (`toBe`),
+  não por igualdade estrutural, no teste "render que só muda mensagem (kek === null) não
+  troca a referência de notas".
+- **O `Record<string, Nota>` não virou `useState<Nota[]>`.** O `Record` dá atualização
+  O(1) por id, decisão deliberada do S08-06; trocar a forma do estado só para obter uma
+  identidade estável que o `useMemo` já dá numa linha seria mais diff pela mesma coisa, sem
+  motivo novo para desfazer essa decisão.
 - **A lógica de `aoAssinar` (ordem, guardas, mensagens) não mudou.** Só a forma de
   `marcarAssinada` por dentro mudou (map sobre array → update de chave num `Record`); os
   três ramos de desfecho (sucesso, 409, falha de rede) continuam exatamente como estavam.
@@ -76,18 +126,20 @@ decisão.
   chamada a `openRecord`/`sealAssinatura` -- mesma forma estrutural do `dek === null` em
   `pages/biblioteca/BibliotecaPage.tsx`.
 - **`kek` virou prop de `NotaPage` (na altura, opcional com default `= null`), não ficou
-  só o valor do fixture trocado por dentro.** O ticket S08-07 pedia a solução mais estreita
-  (só o tipo/valor do fixture + a guarda, sem prop) -- mas um `const` de módulo fixo em
-  `null`, sem seam nenhum para o substituir, faz a guarda interceptar **toda** chamada a
-  `aoAssinar`, incluindo dentro dos testes (`vi.mock` dos módulos de cripto/api não alcança
-  um `const` interno do próprio ficheiro sob teste). Isso tornava o resto de `aoAssinar`
+  só o valor do fixture trocado por dentro.** A primeira tentativa, mais estreita (só o
+  tipo/valor do fixture + a guarda, sem prop), foi uma preferência de execução -- do
+  orquestrador ao despachar o ticket (decisão de âmbito), não uma cláusula do ticket
+  S08-07: nenhum dos seus três critérios de aceite menciona prop vs. constante. Essa
+  tentativa esbarrou num problema técnico: um `const` de módulo fixo em `null`, sem seam
+  nenhum para o substituir, faz a guarda interceptar **toda** chamada a `aoAssinar`,
+  incluindo dentro dos testes (`vi.mock` dos módulos de cripto/api não alcança um `const`
+  interno do próprio ficheiro sob teste). Isso tornava o resto de `aoAssinar`
   (`openRecord` → `sealEntry` → `appendPatientEntry` → `assinarNota`, os três desfechos)
   permanentemente morto e sem cobertura -- quebrando 5 dos 7 testes da fatia 5 e violando o
   piso de 100% de branch do portão de cobertura. Essa necessidade técnica (seam de teste
-  inexistente + piso de cobertura) justificou a prop opcional na altura -- não foi uma
-  cláusula do ticket a autorizá-la, o ticket só descrevia a solução preferida, mais
-  estreita. A ronda 1 de correção abaixo tornou `kek` **obrigatória**, alinhando com o
-  critério de aceite 2 do ticket.
+  inexistente + piso de cobertura) justificou a prop opcional na altura. A ronda 1 de
+  correção abaixo tornou `kek` **obrigatória**, alinhando com o critério de aceite 2 do
+  ticket (`kek: CryptoKey | null`).
 - **`record`/`baseUrl`/`accountId`/`accessToken` continuam fixtures locais, não props.**
   Não existe ainda nenhum `KeychainProvider`/sessão real montada em lado nenhum da app
   (mesma situação, mesmo motivo, do `kek={null}, accountId=""` de
@@ -158,11 +210,11 @@ decisão.
 - **Correção de atribuição:** a frase "o ticket previa a válvula de escape" que descrevia
   a decisão acima em `.harness/diff/S08-07.md` não vinha do ticket -- era uma instrução do
   orquestrador no prompt de despacho do implementador dessa fatia, não texto do ficheiro do
-  ticket. O ticket S08-07 só tinha os três critérios de aceite; a bullet acima ("O ticket
-  S08-07 pedia a solução mais estreita...") já descrevia a razão técnica real (seam de
-  teste inexistente + piso de cobertura de branch) sem citar o ticket como fonte de
-  permissão -- mantida como estava, só reforçada aqui para não repetir o engano no
-  artefacto de diff.
+  ticket. O ticket S08-07 só tinha os três critérios de aceite. A bullet acima manteve, na
+  altura, uma variante do mesmo engano ("o ticket S08-07 pedia a solução mais estreita...")
+  -- só corrigida na ronda 2 ([[S08-19 README de pages-notas atribui ao ticket S08-07 uma
+  preferência que ele não formula]]): a preferência pela solução mais estreita era do
+  orquestrador, ao despachar o ticket (decisão de âmbito), não do ticket em si.
 
 ## Fora de âmbito
 
@@ -170,7 +222,11 @@ decisão.
   `widgets/soap-editor/README.md`.
 - Sessão/Keychain real (substituir `record`/`baseUrl`/`accountId`/`accessToken` por props
   reais, e `router.tsx` a passar uma `kek` não-nula) -- ver as decisões acima.
-- Reabrir uma nota já assinada e mostrar quando foi assinada é fluxo futuro, ainda sem
-  nenhuma tela. `obterAssinatura` (`entities/nota/api.ts`) que serviria esse fluxo foi
-  apagado no S08-02 por nunca ter tido chamador -- ver `entities/nota/README.md`,
-  "Removido".
+- Mostrar quando/por quem a nota foi assinada continua fluxo futuro, ainda sem nenhuma tela
+  -- o S08-11 usa `obterAssinatura` (`entities/nota/api.ts`, reposto neste ticket com
+  chamador, ver `entities/nota/README.md`) só para decidir `estado`, sem exibir
+  `signedAt`/`revision` em lado nenhum da UI.
+- Fila real com efeito por nota selecionada -- o efeito de arranque hoje pergunta só pela
+  nota fixture (`ponytail:` no topo do efeito em `NotaPage.tsx`); levantar
+  `selecionadoId` de `FilaEEditor`, ou trazer o `estado` já resolvido pelo fetch da fila
+  real, é o caminho de upgrade quando essa fila existir.

@@ -1,0 +1,1 @@
+export const abrirChunk = () => null
