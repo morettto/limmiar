@@ -89,27 +89,21 @@ decisão.
   sem alteração. `<FilaEEditor>` passa a receber `notas` numa prop só, em vez de
   `itens`+`notas` separados.
 - **`notas={Object.values(notas)}` virou `notas={listaNotas}`, com `listaNotas =
-  useMemo(() => Object.values(notas), [notas])` (S08-18).** `Object.values` sobre um
-  `Record` cria uma array nova a cada chamada, mesmo sem mudança de conteúdo; sem
-  `useMemo`, `FilaEEditor` recebia uma array de identidade nova em toda renderização de
-  `NotaPage` -- incluindo as que só mudam `mensagem` (ex.: a guarda de sessão em
-  `aoAssinar`) e não tocam em `notas`. Garantia preventiva: hoje não há consumidor que
-  dependa dessa identidade -- `FilaEEditor` não está memoizado, e não tem efeito nenhum que
-  leve `notas` numa dependency array. `pages/biblioteca/BibliotecaPage` recebe `notas`
-  como prop e, até o S08-13, levava-a na dependency array do efeito do índice -- o que
-  tornava esse efeito sensível à estabilidade de identidade de quem lha passasse. O
-  S08-13 tirou `notas` das deps (hoje `[chaveIndice, accountId]`) e passou a ler o valor
-  atual via `useEffectEvent` (`lerAtuais`, ver `pages/biblioteca/README.md`): a exigência
-  de identidade que existia ali deixou de existir -- quem ler este README não deve repô-la.
-  `onChangeNota`, `aoTocar` e `aoAssinar` continuam a ser recriadas a cada render de
-  `NotaPage`: só `notas` tem identidade estável, e quem memoizar `FilaEEditor` no futuro não
-  pode assumir o mesmo das outras props. `NotaPage.test.tsx` prova por referência (`toBe`),
-  não por igualdade estrutural, no teste "render que só muda mensagem (kek === null) não
-  troca a referência de notas".
+  useMemo(() => Object.values(notas), [notas])` (S08-18) -- e voltou a
+  `notas={Object.values(notas)}` direto, sem `useMemo` (ticket S08-25).** O `useMemo` do
+  S08-18 era garantia preventiva, por escrito: "hoje não há consumidor que dependa dessa
+  identidade". O consumidor que a teria justificado era o `useEffect` do índice em
+  `pages/biblioteca/BibliotecaPage` -- mas esse efeito é de outra página (`notas` próprias,
+  não as desta), nunca leu esta identidade, e o S08-25 corrigiu justamente esse efeito para
+  depender de `impressao` (`impressaoDigital(notas)`, uma string), não da identidade da
+  array -- ver `pages/biblioteca/README.md`, "O `useEffect` que restaura/constrói/persiste
+  o índice". Sem consumidor real em lado nenhum, o `useMemo` ficou puro custo: apagado, e
+  `Object.values(notas)` volta a correr direto no JSX. `FilaEEditor` continua a receber uma
+  array de identidade nova em toda renderização de `NotaPage` (incluindo as que só mudam
+  `mensagem`) -- sem `FilaEEditor` memoizado nem efeito que leve `notas` numa dependency
+  array, essa identidade nova não move nada.
 - **O `Record<string, Nota>` não virou `useState<Nota[]>`.** O `Record` dá atualização
-  O(1) por id, decisão deliberada do S08-06; trocar a forma do estado só para obter uma
-  identidade estável que o `useMemo` já dá numa linha seria mais diff pela mesma coisa, sem
-  motivo novo para desfazer essa decisão.
+  O(1) por id, decisão deliberada do S08-06 -- sem motivo novo para desfazer essa decisão.
 - **A lógica de `aoAssinar` (ordem, guardas, mensagens) não mudou.** Só a forma de
   `marcarAssinada` por dentro mudou (map sobre array → update de chave num `Record`); os
   três ramos de desfecho (sucesso, 409, falha de rede) continuam exatamente como estavam.

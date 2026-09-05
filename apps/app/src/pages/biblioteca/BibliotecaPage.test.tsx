@@ -216,6 +216,39 @@ describe('BibliotecaPage', () => {
     expect(gravar).toHaveBeenCalledTimes(1)
   })
 
+  // S08-25: a identidade real do índice é `impressaoDigital(notas)` -- uma mudança de
+  // conteúdo em `notas` (sem `chaveIndice`/`accountId` mudar) tem de reindexar sozinha.
+  it('rerender do pai com notas de conteúdo diferente (mesma chaveIndice/accountId): reindexa e grava de novo', async () => {
+    const chaveIndice = await makeChave()
+    const notaAtual = nota()
+    const ler = vi.fn().mockResolvedValue(null)
+    const gravar = vi.fn().mockResolvedValue(undefined)
+    const apagar = vi.fn().mockResolvedValue(undefined)
+    const { rerender, props } = await renderEObterProps({
+      chaveIndice,
+      notas: [notaAtual],
+      store: { ler, gravar, apagar },
+    })
+
+    await waitFor(() => expect(props().resultado.estado).not.toBe('a-preparar'))
+    expect(gravar).toHaveBeenCalledTimes(1)
+
+    const notaEditada = { ...notaAtual, revisao: notaAtual.revisao + 1 }
+    rerender(
+      <I18nProvider i18n={i18n}>
+        <BibliotecaPage
+          notas={[notaEditada]}
+          accountId={ACCOUNT_ID}
+          chaveIndice={chaveIndice}
+          store={{ ler, gravar, apagar }}
+        />
+      </I18nProvider>,
+    )
+
+    await waitFor(() => expect(gravar).toHaveBeenCalledTimes(2))
+    expect(ler).toHaveBeenCalledTimes(2)
+  })
+
   it('chaveIndice === null: o resultado fica em a-preparar, sem tocar em ler/gravar', async () => {
     const ler = vi.fn()
     const gravar = vi.fn()

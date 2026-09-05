@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLingui } from '@lingui/react/macro'
 import type MiniSearch from 'minisearch'
 import type { Nota } from '../../entities/nota/nota'
@@ -28,15 +28,14 @@ export interface BibliotecaPageProps {
  */
 export function BibliotecaPage({ notas, accountId, chaveIndice, store }: BibliotecaPageProps) {
   const { t } = useLingui()
-  // `t` só é rastreável pelo extrator do Lingui numa chamada direta aqui -- redeclará-lo dentro do
-  // efeito via `lerAtuais()` quebrava a extração sem quebrar a tradução em runtime. Recalculada a
-  // cada render, o efeito ainda vê o locale atual mesmo se o `catch` disparar após uma troca.
+  // `t` só é rastreável pelo extrator do Lingui numa chamada direta aqui -- lido do closure do
+  // efeito sem entrar na dependency array. Recalculada a cada render, o efeito ainda vê o
+  // locale atual mesmo se o `catch` disparar após uma troca.
   const mensagemErroBusca = t`Não foi possível preparar a busca. Tente novamente.`
   const [indice, setIndice] = useState<MiniSearch<DocNota> | null>(null)
   const [termo, setTermo] = useState('')
   const [erro, setErro] = useState<string | null>(null)
-
-  const lerAtuais = useEffectEvent(() => ({ notas, store, mensagemErroBusca }))
+  const impressao = impressaoDigital(notas)
 
   useEffect(() => {
     // accountId===null cai no mesmo ramo que chaveIndice===null já cobria: sem conta real, não
@@ -45,10 +44,8 @@ export function BibliotecaPage({ notas, accountId, chaveIndice, store }: Bibliot
       return
     }
     let cancelado = false
-    const { notas, store, mensagemErroBusca } = lerAtuais()
 
     async function preparar(chaveAtual: ChaveIndiceBusca, accountIdAtual: string) {
-      const impressao = impressaoDigital(notas)
       const restaurado = await restaurarIndice(store, chaveAtual, accountIdAtual, impressao)
       if (cancelado) return
       if (restaurado) {
@@ -73,7 +70,7 @@ export function BibliotecaPage({ notas, accountId, chaveIndice, store }: Bibliot
     return () => {
       cancelado = true
     }
-  }, [chaveIndice, accountId])
+  }, [chaveIndice, accountId, impressao])
 
   if (erro !== null) {
     return (
