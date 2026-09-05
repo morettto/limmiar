@@ -12,7 +12,7 @@ página já calculou.
 ## Fluxo principal
 
 1. No mount (e sempre que `chaveIndice`/`accountId` mudarem), se
-   `chaveIndice !== null`:
+   `chaveIndice !== null` e `accountId !== null`:
    a. Calcula `impressao = impressaoDigital(notas)` (ticket S08-09) -- resume que notas (e
       que revisão de cada uma) as `notas` atuais cobrem.
    b. `restaurarIndice(store, chaveIndice, accountId, impressao)` -- tenta abrir um índice já
@@ -34,7 +34,7 @@ página já calculou.
       `BibliotecaNotas` -- renderiza o próprio `role="alert"` no lugar do widget, para não
       ficar presa em "Preparando a busca..." para sempre sem sinal ao utilizador. Mesmo
       padrão de `PatientWallet.tsx` (`load(kek).catch(...)`, `role="alert"`).
-2. Com `chaveIndice === null`, o efeito não faz nada -- `indice` fica `null` para sempre, e
+2. Com `chaveIndice === null` ou `accountId === null`, o efeito não faz nada -- `indice` fica `null` para sempre, e
    `buscar(null, termo)` já devolve `a-preparar` (`indice.ts`) sozinho. Não há um branch de
    render "bloqueado" próprio aqui, ao contrário de `PatientWallet` -- `BibliotecaNotas` já
    sabe renderizar `a-preparar`.
@@ -57,6 +57,8 @@ página já calculou.
 ## Pontos de entrada
 
 - `BibliotecaPage({ notas, accountId, chaveIndice, store })` -- componente React.
+  `accountId: string | null` (S18-04) -- `null` sem sessão, tratado no mesmo ramo cedo do
+  efeito que `chaveIndice === null` já cobria (ver Decisões).
   `chaveIndice: ChaveIndiceBusca | null` (`features/nota-biblioteca/indice-crypto.ts`,
   ticket S08-10) só aceita o tipo marcado que `chaveIndiceDaConta(kek)` produz -- uma
   `CryptoKey` crua (ex.: uma DEK de paciente) não compila aqui, ver
@@ -79,8 +81,13 @@ página já calculou.
   parâmetro -- é o container "fino" que a instrução de página deste harness pede. As
   fixtures (`chaveIndice={null}`, `store` que nunca acha nada, `notas` vazias) vivem em
   `BibliotecaRouteComponent`, no router -- mesmo padrão, mesmo motivo do
-  `kek={null}, accountId=""` de `CopilotKeyPage`, só que um nível acima (na composição da
+  `kek={null}` de `CopilotKeyPage`, só que um nível acima (na composição da
   rota, não dentro da página).
+- **`accountId: string | null`, não `string` com sentinela `''` (S18-04).**
+  `BibliotecaRouteComponent` passa `sessao?.id ?? null`; o efeito que restaura/constrói o
+  índice trata `accountId === null` no mesmo ramo cedo que já tratava `chaveIndice === null`
+  (nenhuma das duas condições tem hoje índice para carregar) -- sem reintroduzir a sentinela
+  que `assertAccountId` (`features/copilot-byok/key-store.ts`) rejeitaria noutra página.
 - **`chaveIndice: ChaveIndiceBusca | null`, não `dek: CryptoKey | null` (ticket S08-10).**
   O nome/tipo antigo (`dek`) não dizia de quem era a chave -- quem ligasse a sessão real
   teria uma DEK de paciente na mão e um prop `CryptoKey` à espera, e o texto de todas as

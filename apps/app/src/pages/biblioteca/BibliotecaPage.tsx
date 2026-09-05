@@ -16,7 +16,7 @@ import { BibliotecaNotas } from '../../widgets/biblioteca/BibliotecaNotas'
 
 export interface BibliotecaPageProps {
   notas: readonly Nota[]
-  accountId: string
+  accountId: string | null
   chaveIndice: ChaveIndiceBusca | null
   store: { ler: LerSelado; gravar: GravarSelado; apagar: ApagarSelado }
 }
@@ -28,29 +28,35 @@ export interface BibliotecaPageProps {
  */
 export function BibliotecaPage({ notas, accountId, chaveIndice, store }: BibliotecaPageProps) {
   const { t } = useLingui()
+  // `t` só é rastreável pelo extrator do Lingui numa chamada direta aqui -- redeclará-lo dentro do
+  // efeito via `lerAtuais()` quebrava a extração sem quebrar a tradução em runtime. Recalculada a
+  // cada render, o efeito ainda vê o locale atual mesmo se o `catch` disparar após uma troca.
+  const mensagemErroBusca = t`Não foi possível preparar a busca. Tente novamente.`
   const [indice, setIndice] = useState<MiniSearch<DocNota> | null>(null)
   const [termo, setTermo] = useState('')
   const [erro, setErro] = useState<string | null>(null)
 
-  const lerAtuais = useEffectEvent(() => ({ notas, store, t }))
+  const lerAtuais = useEffectEvent(() => ({ notas, store, mensagemErroBusca }))
 
   useEffect(() => {
-    if (chaveIndice === null) {
+    // accountId===null cai no mesmo ramo que chaveIndice===null já cobria: sem conta real, não
+    // há índice para restaurar/construir -- ver README, "accountId===null tratado no mesmo lugar".
+    if (chaveIndice === null || accountId === null) {
       return
     }
     let cancelado = false
-    const { notas, store, t } = lerAtuais()
+    const { notas, store, mensagemErroBusca } = lerAtuais()
 
-    async function preparar(chaveAtual: ChaveIndiceBusca) {
+    async function preparar(chaveAtual: ChaveIndiceBusca, accountIdAtual: string) {
       const impressao = impressaoDigital(notas)
-      const restaurado = await restaurarIndice(store, chaveAtual, accountId, impressao)
+      const restaurado = await restaurarIndice(store, chaveAtual, accountIdAtual, impressao)
       if (cancelado) return
       if (restaurado) {
         setIndice(restaurado)
         return
       }
       const construido = construirIndice(notas.map(notaParaDoc))
-      await persistirIndice(store.gravar, chaveAtual, accountId, construido, impressao)
+      await persistirIndice(store.gravar, chaveAtual, accountIdAtual, construido, impressao)
       if (cancelado) return
       setIndice(construido)
     }
@@ -59,9 +65,9 @@ export function BibliotecaPage({ notas, accountId, chaveIndice, store }: Bibliot
     // Sem `.catch`, uma OPFS negada ou uma chave/AAD errada vira rejeição não tratada e a
     // página encalha em "Preparando a busca..." sem sinal nenhum -- mesmo padrão de
     // `PatientWallet.tsx` (`load(kek).catch(...)`), mesmo `role="alert"`.
-    preparar(chaveIndice).catch(() => {
+    preparar(chaveIndice, accountId).catch(() => {
       if (!cancelado) {
-        setErro(t`Não foi possível preparar a busca. Tente novamente.`)
+        setErro(mensagemErroBusca)
       }
     })
     return () => {

@@ -43,6 +43,7 @@ async function renderEObterProps(overrides: Partial<BibliotecaPageProps> = {}) {
   const { BibliotecaNotas } = await import('../../widgets/biblioteca/BibliotecaNotas')
   const chaveIndice =
     'chaveIndice' in overrides ? (overrides.chaveIndice as ChaveIndiceBusca | null) : await makeChave()
+  const accountId = 'accountId' in overrides ? (overrides.accountId as string | null) : ACCOUNT_ID
   const store = overrides.store ?? {
     ler: vi.fn().mockResolvedValue(null),
     gravar: vi.fn().mockResolvedValue(undefined),
@@ -52,7 +53,7 @@ async function renderEObterProps(overrides: Partial<BibliotecaPageProps> = {}) {
     <I18nProvider i18n={i18n}>
       <BibliotecaPage
         notas={overrides.notas ?? [nota()]}
-        accountId={overrides.accountId ?? ACCOUNT_ID}
+        accountId={accountId}
         chaveIndice={chaveIndice}
         store={store}
       />
@@ -220,6 +221,19 @@ describe('BibliotecaPage', () => {
     const gravar = vi.fn()
     const apagar = vi.fn()
     const { props } = await renderEObterProps({ chaveIndice: null, store: { ler, gravar, apagar } })
+
+    expect(props().resultado.estado).toBe('a-preparar')
+    expect(ler).not.toHaveBeenCalled()
+    expect(gravar).not.toHaveBeenCalled()
+  })
+
+  // S18-04: accountId agora é `string | null` -- mesmo ramo que chaveIndice===null já cobria,
+  // sem precisar da sentinela `''` que assertAccountId (key-store.ts) rejeitaria noutra página.
+  it('accountId === null: o resultado fica em a-preparar, sem tocar em ler/gravar', async () => {
+    const ler = vi.fn()
+    const gravar = vi.fn()
+    const apagar = vi.fn()
+    const { props } = await renderEObterProps({ accountId: null, store: { ler, gravar, apagar } })
 
     expect(props().resultado.estado).toBe('a-preparar')
     expect(ler).not.toHaveBeenCalled()

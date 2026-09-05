@@ -10,7 +10,6 @@ import {
   type Account,
   type AccountRole,
 } from '../../entities/account'
-import { recordSession } from '../../entities/account/session'
 import { TotpChallenge } from '../../features/totp-challenge/TotpChallenge'
 import { TotpSetup } from '../../features/totp-enrollment/TotpSetup'
 
@@ -41,7 +40,6 @@ export function AuthScreen({ baseUrl, getGoogleIdToken, onAuthenticated, initial
   const [state, setState] = useState<SubmitState>({ status: 'idle' })
 
   function handleAuthenticated(account: Account) {
-    recordSession(account)
     onAuthenticated?.(account)
     setState({ status: 'success', account })
   }

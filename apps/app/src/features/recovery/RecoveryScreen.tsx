@@ -3,7 +3,6 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { validateMnemonic } from '@limmiar/crypto'
 import { translateProblemCode } from '../../shared/api'
 import { deriveEmailSalt, deriveRecoveryVerifier, recoverAccess, type Account } from '../../entities/account'
-import { recordSession } from '../../entities/account/session'
 import { TotpChallenge } from '../totp-challenge/TotpChallenge'
 import { TotpSetup } from '../totp-enrollment/TotpSetup'
 
@@ -27,7 +26,6 @@ export function RecoveryScreen({ baseUrl, onRecovered }: RecoveryScreenProps) {
   const [state, setState] = useState<SubmitState>({ status: 'idle' })
 
   function handleRecovered(account: Account) {
-    recordSession(account)
     onRecovered?.(account)
     setState({ status: 'success', account })
   }

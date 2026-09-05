@@ -3,7 +3,6 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { translateProblemCode } from '../../shared/api'
 import { decodeBase64, encodeBase64 } from '../../shared/lib/base64'
 import { completeWebAuthnCeremony, verifyMagicLink, type Account } from '../../entities/account'
-import { recordSession } from '../../entities/account/session'
 import {
   createCredentialWithBrowser,
   getCredentialWithBrowser,
@@ -117,7 +116,6 @@ export function MagicLinkCallback({
         twoFactorRequirement: 'NotApplicable',
         twoFactorTicket: null,
       }
-      recordSession(account)
       onAuthenticated?.(account)
       setState({ status: 'success' })
     }
