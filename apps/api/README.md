@@ -110,7 +110,19 @@ tentar arrancar o container, não passam silenciosamente. Os testes puramente un
   `NpgsqlDataSource`): abre ligação + transação e já corre o `set_config('app.tenant_id',
   ..., true)` que a política `tenant_isolation` de qualquer tabela com RLS por tenant
   precisa -- é o único sítio do repositório que emite esse `set_config`, para todo o resto
-  não voltar a reescrevê-lo.
+  não voltar a reescrevê-lo. **Regra de imutabilidade das migrações**: enquanto
+  `MigrationRunner` não tiver tabela de migrações aplicadas, ele corre todo `*.sql` de
+  `migrations/` em todo o arranque -- um ficheiro de migração já publicado é imutável, porque
+  uma base onde ele já correu vê qualquer edição desse ficheiro como um `CREATE TABLE IF NOT
+  EXISTS` no-op e nunca a recebe. Qualquer mudança de schema depois de publicado entra num
+  ficheiro novo, numerado a seguir, idempotente (guardas `IF EXISTS`, sem `IF NOT EXISTS` a
+  mascarar um no-op). Caso concreto que motivou a regra, S08-29:
+  `0005_create_note_signatures.sql` foi editado in-place no S08-15 para renomear `revisao`
+  para `revision`; numa base onde a 0005 antiga já tinha corrido isso nunca aconteceu, e
+  `NoteSignatureStore` (que fala `revision`) rebentava com `42703 undefined_column`. A 0005
+  voltou à forma publicada e `0008_rename_note_signatures_revisao_to_revision.sql` faz o
+  rename, com dois guardas independentes porque Postgres não tem `RENAME COLUMN/CONSTRAINT IF
+  EXISTS`.
 
 ## Decisões relevantes
 
