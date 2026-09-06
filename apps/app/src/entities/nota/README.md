@@ -59,7 +59,11 @@ ticket S08-06, `Nota` também é dona do seu `estado` (`EstadoNota`, `ESTADO_PEN
   (`(typeof ESTADOS_NOTA)[number]`); constantes `ESTADO_PENDENTE`, `ESTADO_ASSINADA` e o
   array `ESTADOS_NOTA` (`[ESTADO_PENDENTE, ESTADO_ASSINADA] as const`) -- as constantes vêm do S08-06,
   `ESTADOS_NOTA`/`EstadoNota` derivado dele do S08-16 (justificação do idioma no comentário
-  acima de `ESTADOS_NOTA` em `nota.ts`).
+  acima de `ESTADOS_NOTA` em `nota.ts`). **`ESTADOS_NOTA` serve só para derivar `EstadoNota`,
+  não é ordem de apresentação** -- desde o S08-31, a ordem em que as abas de
+  `features/nota-fila` renderizam vive em `ORDEM_ABAS`, local a essa feature, não aqui (ver
+  `features/nota-fila/README.md`, "Decisões desta fatia"). Reordenar este array não muda
+  nenhuma UI; é seguro só quanto a isso.
   `Afirmacao`/`Ancora` são importados de `@limmiar/copilot`, não redeclarados.
 - `notaAssinaturaAad(noteId: string, revisao: number): Uint8Array<ArrayBuffer>`
   (`nota-crypto.ts`, fatia 5) -- `"limmiar/note-signature/v1|{noteId}|{revisao}"` em UTF-8.
@@ -145,6 +149,26 @@ ticket S08-06, `Nota` também é dona do seu `estado` (`EstadoNota`, `ESTADO_PEN
   nasce sempre pendente -- a única mudança de comportamento desta fatia neste ficheiro
   (`digestNota`/`textoCanonico` continuam a ignorar `estado`, não faz parte da superfície
   assinada).
+
+## Removido (S08-31) -- teste tautológico de `ESTADO_PENDENTE`/`ESTADO_ASSINADA`/`ESTADOS_NOTA`
+
+- `nota.test.ts` tinha um `describe('estado da nota')` que anotava `ESTADO_PENDENTE`/
+  `ESTADO_ASSINADA` com o literal estreito (prova que `tsc` já faz sozinho, via `TS2322`
+  se a anotação fosse `EstadoNota` em vez do literal) e comparava `[p, a]` com
+  `ESTADOS_NOTA` -- um array com os mesmos dois valores de que ele próprio é construído.
+  A cadeia de review da spec S08 (achado 7.4) apontou que o único facto de runtime real
+  que esse teste apanharia, a ordem, já estava afirmado onde importa
+  (`FilaAssinatura.test.tsx`), e que o teste existia sobretudo para satisfazer o piso de
+  cobertura por ficheiro.
+- Antes de apagar, confirmámos a premissa em vez de a assumir: `ESTADO_PENDENTE`,
+  `ESTADO_ASSINADA` e `ESTADOS_NOTA` são atribuições de nível de topo, sem branch nem
+  função -- executam-se só por este ficheiro ser importado, o que qualquer outro `it` deste
+  mesmo `nota.test.ts` já faz. Correr `vitest run --coverage src/entities/nota/nota.test.ts`
+  sem o `describe('estado da nota')` mantém `nota.ts` a 100% nas quatro métricas pelos seus
+  próprios testes -- não há dependência nova da cobertura vinda de consumidores externos
+  (`features/nota-fila` ou outro). Por isso o teste saiu sem precisar de nenhuma
+  justificação escrita sobre "linhas que passam a depender de cobertura de consumidor";
+  essa situação não se aplicou.
 
 ## Fora de âmbito
 

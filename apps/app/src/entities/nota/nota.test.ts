@@ -1,9 +1,6 @@
 import type { Afirmacao } from '@limmiar/copilot'
 import { describe, expect, it } from 'vitest'
 import {
-  ESTADO_ASSINADA,
-  ESTADO_PENDENTE,
-  ESTADOS_NOTA,
   digestNota,
   editarFrase,
   rascunhoParaNota,
@@ -145,12 +142,3 @@ describe('digestNota', () => {
   })
 })
 
-describe('estado da nota', () => {
-  it('ESTADO_PENDENTE/ESTADO_ASSINADA estreitam para o literal, não para EstadoNota inteiro, e ESTADOS_NOTA contém as duas nesta ordem (prova de tipo + conteúdo/ordem, não só de runtime)', () => {
-    // Anotar as duas como EstadoNota não compilaria aqui (TS2322) -- tsc -b é o
-    // vermelho/verde de tipo. O expect cobre o que o compilador não cobre: conteúdo/ordem.
-    const p: 'pendente' = ESTADO_PENDENTE
-    const a: 'assinada' = ESTADO_ASSINADA
-    expect([p, a]).toEqual(ESTADOS_NOTA)
-  })
-})

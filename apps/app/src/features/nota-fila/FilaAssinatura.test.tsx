@@ -43,11 +43,35 @@ describe('FilaAssinatura', () => {
     expect(screen.queryByText('paciente-3')).toBeNull()
   })
 
-  it('as abas renderizam na ordem de ESTADOS_NOTA -- Pendentes antes de Assinadas', () => {
+  it('as abas renderizam na ordem declarada por esta feature -- Pendentes antes de Assinadas', () => {
     renderFila()
 
     const abas = screen.getAllByRole('tab')
     expect(abas.map((aba) => aba.textContent)).toEqual(['Pendentes', 'Assinadas'])
+  })
+
+  it('a ordem das abas não muda se ESTADOS_NOTA vier reordenado -- a ordem vive nesta feature, não em entities/nota (S08-31)', async () => {
+    vi.resetModules()
+    vi.doMock('../../entities/nota/nota', async (importOriginal) => {
+      const original = await importOriginal<typeof import('../../entities/nota/nota')>()
+      return { ...original, ESTADOS_NOTA: [...original.ESTADOS_NOTA].reverse() }
+    })
+
+    try {
+      const { FilaAssinatura: FilaComEstadosNotaInvertido } = await import('./FilaAssinatura')
+
+      render(
+        <I18nProvider i18n={i18n}>
+          <FilaComEstadosNotaInvertido itens={ITENS} selecionadoId={null} onSelecionar={vi.fn()} />
+        </I18nProvider>,
+      )
+
+      const abas = screen.getAllByRole('tab')
+      expect(abas.map((aba) => aba.textContent)).toEqual(['Pendentes', 'Assinadas'])
+    } finally {
+      vi.doUnmock('../../entities/nota/nota')
+      vi.resetModules()
+    }
   })
 
   it('a listbox aponta aria-activedescendant para a primeira opção por omissão', () => {
