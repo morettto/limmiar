@@ -1,21 +1,17 @@
 {
-  "turno_iniciado": "2026-09-03",
+  "turno_iniciado": "2026-09-06",
   "tickets_planejados": [
-    "S08-09",
-    "S08-10",
-    "S08-11",
-    "S08-08",
-    "S08-12"
+    "S08-27",
+    "S08-28",
+    "S08-31"
   ],
   "tickets_concluidos": [
-    "S08-09",
-    "S08-10",
-    "S08-11",
-    "S08-08",
-    "S08-12"
+    "S08-27",
+    "S08-28",
+    "S08-31"
   ],
   "ticket_atual": "",
   "spec_fechada": "",
   "branch_da_mr": "",
-  "worktree": "C:/wt-S08 (S08 restante, branch feat/S08-12-alcance-trava-assinatura, empilhada sobre S08-08/S08-11/S08-10, local, sem push)"
+  "worktree": "sem worktree separado nesta sessao -- trabalho direto em C:/Users/m0retto/Documents/projects/limmiar, branch feat/S08-S18-colheita-cadeia-de-spec, 0 atras de origin/main"
 }
