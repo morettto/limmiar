@@ -1,5 +1,4 @@
 using Mediator;
-using static Api.Accounts.AccountAuthenticationOrchestration;
 
 namespace Api.Accounts;
 
@@ -20,7 +19,6 @@ public sealed class RecoverAccessHandler(IAccountStore store, IPasswordVerifierC
             return AccountRecoveryResult.Failure(AccountRecoveryFailureReason.InvalidRecoveryPhrase);
         }
 
-        return AccountRecoveryResult.Success(
-            account, IssueTwoFactorTicketIfRequired(account, twoFactorTicketIssuer), IssueSessionIfNoTwoFactorPending(account, sessionTokenIssuer));
+        return AccountRecoveryResult.Success(account, twoFactorTicketIssuer, sessionTokenIssuer);
     }
 }

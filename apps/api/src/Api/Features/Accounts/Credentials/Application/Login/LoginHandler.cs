@@ -14,11 +14,39 @@ public enum AccountLoginFailureReason
 /// <see cref="Result{TValue,TFailure}"/> (molde Api.Platform, ADR
 /// docs/adr/0011-store-service-nao-devolve-tuplo-nullable.md).
 /// </summary>
-public sealed record AccountLoginSuccess(
-    Account Account,
-    TwoFactorRequirement TwoFactorRequirement,
-    string? TwoFactorTicket,
-    SessionTokenPair? Session);
+/// <remarks>
+/// S08-28: construtor privado, <see cref="For"/> é a única fábrica. TwoFactorRequirement é
+/// sempre derivado da <see cref="Account"/> passada a <see cref="For"/> -- é impossível construir
+/// um payload com um requisito incoerente com a conta que vai no mesmo objeto.
+/// </remarks>
+public sealed record AccountLoginSuccess
+{
+    public Account Account { get; }
+
+    public TwoFactorRequirement TwoFactorRequirement { get; }
+
+    public string? TwoFactorTicket { get; }
+
+    public SessionTokenPair? Session { get; }
+
+    private AccountLoginSuccess(Account account, TwoFactorRequirement twoFactorRequirement, string? twoFactorTicket, SessionTokenPair? session)
+    {
+        Account = account;
+        TwoFactorRequirement = twoFactorRequirement;
+        TwoFactorTicket = twoFactorTicket;
+        Session = session;
+    }
+
+    public static AccountLoginSuccess For(Account account, ITwoFactorTicketIssuer twoFactorTicketIssuer, ISessionTokenIssuer sessionTokenIssuer)
+    {
+        var requirement = TwoFactorPolicy.Determine(account);
+        return new(
+            account,
+            requirement,
+            IssueTwoFactorTicketIfRequired(account, requirement, twoFactorTicketIssuer),
+            IssueSessionIfNoTwoFactorPending(account, requirement, sessionTokenIssuer));
+    }
+}
 
 public sealed class LoginHandler(IAccountStore store, IPasswordVerifierComparer comparer, ITwoFactorTicketIssuer twoFactorTicketIssuer, ISessionTokenIssuer sessionTokenIssuer)
     : IRequestHandler<LoginCommand, Result<AccountLoginSuccess, AccountLoginFailureReason>>
@@ -39,10 +67,6 @@ public sealed class LoginHandler(IAccountStore store, IPasswordVerifierComparer 
             return AccountLoginFailureReason.InvalidCredentials;
         }
 
-        return new AccountLoginSuccess(
-            account,
-            TwoFactorPolicy.Determine(account),
-            IssueTwoFactorTicketIfRequired(account, twoFactorTicketIssuer),
-            IssueSessionIfNoTwoFactorPending(account, sessionTokenIssuer));
+        return AccountLoginSuccess.For(account, twoFactorTicketIssuer, sessionTokenIssuer);
     }
 }
