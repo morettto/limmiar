@@ -214,15 +214,6 @@ decisão.
   argumento explícito do call site em vez de um default escondido dentro de `NotaPage`.
 - **`KEK_FIXTURE` foi removida** -- só existia para ser o default do prop opcional; sem
   prop opcional, não tem mais chamador.
-- **Correção de atribuição:** a frase "o ticket previa a válvula de escape" que descrevia
-  a decisão acima em `.harness/diff/S08-07.md` não vinha do ticket -- era uma instrução do
-  orquestrador no prompt de despacho do implementador dessa fatia, não texto do ficheiro do
-  ticket. O ticket S08-07 só tinha os três critérios de aceite. A bullet acima manteve, na
-  altura, uma variante do mesmo engano ("o ticket S08-07 pedia a solução mais estreita...")
-  -- só corrigida na ronda 2 ([[S08-19 README de pages-notas atribui ao ticket S08-07 uma
-  preferência que ele não formula]]): a preferência pela solução mais estreita era do
-  orquestrador, ao despachar o ticket (decisão de âmbito), não do ticket em si.
-
 ## Decisões desta fatia (S08-27)
 
 Origem: achado 3.1 do `reviewer-thermo`, ronda 2 da cadeia de review da spec S08 --

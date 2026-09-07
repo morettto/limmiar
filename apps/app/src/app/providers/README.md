@@ -22,9 +22,12 @@ aqui: `SessionProvider` só monta `<SessionContext.Provider>` com o valor que ca
    desde S08-20/S18-08. Desde S18-05 corre as purgas num `for-of` sequencial com `try/catch` por
    purga -- uma que falhe não trava as outras nem o logout/troca de sessão, provado pelo teste que
    faz `clearApiKey` rebentar e confirma que `purgarIndiceBusca` (a purga seguinte na lista) ainda
-   apaga o índice OPFS da conta que sai. Desde S18-08, o `catch` também deixa rasto: `console.error`
-   com o `nome` literal da purga (não `purga.name` -- minificação em produção apagaria o nome) e o
-   `accountId`, provado pelo teste que força `clearApiKey` a rejeitar e verifica a mensagem.
+   apaga o índice OPFS da conta que sai. Essa garantia o `Promise.allSettled` anterior também dava
+   (S18-14): o que o `for-of` traz é legibilidade do rasto por nome, ao par com o `console.error`
+   nomeado abaixo, a custo de latência irrelevante num logout. Desde S18-08, o `catch` também
+   deixa rasto: `console.error` com o `nome` literal da purga (não `purga.name` -- minificação
+   em produção apagaria o nome) e o `accountId`, provado pelo teste que força `clearApiKey` a
+   rejeitar e verifica a mensagem.
 3. `useSession()` (`entities/account/session-context.tsx`) lê o `SessionContext` React. Fora de
    um `<SessionProvider>` ancestral, lança (`useSession: nenhum <SessionProvider> ancestral`) em
    vez de devolver um default silencioso (S18-03) -- um erro de montagem em produção deixa de
@@ -58,6 +61,14 @@ aqui: `SessionProvider` só monta `<SessionContext.Provider>` com o valor que ca
   aqui.** `purgar-conta.ts` só importa e acrescenta a `PURGAS` -- FSD permite `app` importar
   `features`, e a lógica de OPFS/convenção de diretório da conta pertence ao módulo dono do
   índice de busca, não à composição de sessão.
+- **Regra: quem abre a raiz OPFS tem de ter entrada em `PURGAS` (S18-12).** Um módulo de
+  produção que chame `navigator.storage.getDirectory()` escreve blobs escopados a uma conta;
+  sem entrada em `PURGAS`, esses blobs sobrevivem ao logout. `arch.test.ts` ("purgas de conta
+  cobrem quem abre a raiz OPFS") varre `src/`, cruza cada módulo que faz essa chamada com os
+  nomes citados dentro do literal `PURGAS`, e fica vermelho no que sobrar -- importar um tipo
+  do mesmo módulo não conta. A outra metade da regra é `dirIndiceDaConta`
+  (`features/nota-biblioteca/indice-store.ts`): escritor e purga resolvem o diretório da conta
+  pela mesma função, para não poderem divergir.
 - **Na troca de conta, a purga da conta anterior é disparada antes de registar a nova, mas não
   esperada (S08-20).** `iniciarSessao` continua síncrona e faz `void purgarConta(anterior)` antes
   de `sessaoDaConta.registar(account)`. Como `purgarConta` é `async`, só a primeira purga da lista

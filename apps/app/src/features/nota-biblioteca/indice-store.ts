@@ -45,13 +45,22 @@ export function opfsIndice(
   }
 }
 
-/** Apaga o blob do índice da conta, se existir. Convenção: diretório `<raiz OPFS>/<accountId>`,
+/** Diretório OPFS da conta, `<raiz OPFS>/<accountId>`: única definição da convenção, para o
+ *  escritor e a purga não poderem divergir (S18-12, ver README). Sem `criar`, um diretório
+ *  ausente lança `NotFoundError` -- o que a purga quer; quem escreve passa `{ criar: true }`. */
+export async function dirIndiceDaConta(
+  accountId: string,
+  { criar = false }: { criar?: boolean } = {},
+): Promise<FileSystemDirectoryHandle> {
+  const raiz = await navigator.storage.getDirectory()
+  return raiz.getDirectoryHandle(accountId, { create: criar })
+}
+
+/** Apaga o blob do índice da conta, se existir. Convenção: diretório `dirIndiceDaConta`,
  *  ficheiro `ARQUIVO_INDICE` -- o mesmo que `opfsIndice` já usa. */
 export async function purgarIndiceBusca(accountId: string): Promise<void> {
-  const raiz = await navigator.storage.getDirectory()
   try {
-    const dir = await raiz.getDirectoryHandle(accountId)
-    await opfsIndice(dir).apagar()
+    await opfsIndice(await dirIndiceDaConta(accountId)).apagar()
   } catch (erro) {
     // Sem diretório/ficheiro: no-op silencioso. Qualquer outro erro propaga -- quem
     // engole é o `catch {}` de `purgarConta`.

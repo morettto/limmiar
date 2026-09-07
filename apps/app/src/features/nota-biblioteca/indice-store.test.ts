@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { FakeDirectoryHandle, stubOpfsRoot } from '../../test-support/fake-opfs'
 import { chaveIndiceDaConta, type ChaveIndiceBusca } from './indice-crypto'
 import { construirIndice } from './indice'
-import { opfsIndice, persistirIndice, purgarIndiceBusca, restaurarIndice } from './indice-store'
+import { dirIndiceDaConta, opfsIndice, persistirIndice, purgarIndiceBusca, restaurarIndice } from './indice-store'
 
 const ACCOUNT_ID = '11111111-1111-1111-1111-111111111111'
 const IMPRESSAO = '1:0|2:0'
@@ -18,6 +18,33 @@ function toHex(bytes: Uint8Array): string {
     .map((byte) => byte.toString(16).padStart(2, '0'))
     .join('')
 }
+
+describe('dirIndiceDaConta', () => {
+  let restoreOpfsRoot: (() => void) | null = null
+
+  afterEach(() => {
+    restoreOpfsRoot?.()
+    restoreOpfsRoot = null
+  })
+
+  it('devolve o diretorio `<raiz OPFS>/<accountId>` que ja existe', async () => {
+    const raiz = new FakeDirectoryHandle()
+    const dirConta = await raiz.getDirectoryHandle(ACCOUNT_ID, { create: true })
+    restoreOpfsRoot = stubOpfsRoot(raiz)
+
+    expect(await dirIndiceDaConta(ACCOUNT_ID)).toBe(dirConta as unknown as FileSystemDirectoryHandle)
+  })
+
+  it('sem o diretorio da conta lanca NotFoundError, e so com `criar` o cria', async () => {
+    const raiz = new FakeDirectoryHandle()
+    restoreOpfsRoot = stubOpfsRoot(raiz)
+
+    await expect(dirIndiceDaConta(ACCOUNT_ID)).rejects.toThrow(DOMException)
+    expect(await dirIndiceDaConta(ACCOUNT_ID, { criar: true })).toBe(
+      raiz.dirs.get(ACCOUNT_ID) as unknown as FileSystemDirectoryHandle,
+    )
+  })
+})
 
 describe('purgarIndiceBusca', () => {
   let restoreOpfsRoot: (() => void) | null = null

@@ -98,6 +98,35 @@ function ValueCapturer({ onValue }: { onValue: (value: ReturnType<typeof useSess
   return null
 }
 
+const KEY_STORE = '../../features/copilot-byok/key-store'
+
+// Monta o provider com `clearApiKey` mockado. Pegadinha de `renderRouter` em router.test.tsx:
+// `SessionContext` fresco tem de vir do mesmo registo de módulos que o `SessionProvider`
+// fresco, daí os dois virem de import dinâmico depois do mesmo `vi.resetModules()`.
+async function montarComPurgaMockada(clearApiKey: (accountId: string) => unknown): Promise<void> {
+  vi.doMock(KEY_STORE, () => ({ clearApiKey: vi.fn(clearApiKey) }))
+  vi.resetModules()
+  const { SessionProvider: SessionProviderComMockDePurga } = await import('./SessionProvider')
+  const { useSession: useSessionFresco } = await import('../../entities/account/session-context')
+
+  function ConsumerFresco() {
+    const { sessao, terminarSessao } = useSessionFresco()
+    return (
+      <div>
+        <p data-testid="sessao">{sessao === null ? 'sem-sessao' : sessao.id}</p>
+        <button onClick={() => terminarSessao()}>terminar</button>
+      </div>
+    )
+  }
+
+  seedStoredAccount(ACCOUNT)
+  render(
+    <SessionProviderComMockDePurga>
+      <ConsumerFresco />
+    </SessionProviderComMockDePurga>,
+  )
+}
+
 let restoreOpfsRoot: (() => void) | null = null
 
 describe('SessionProvider', () => {
@@ -106,6 +135,8 @@ describe('SessionProvider', () => {
     window.sessionStorage.clear()
     window.localStorage.clear()
     vi.restoreAllMocks()
+    vi.doUnmock(KEY_STORE)
+    vi.resetModules()
     restoreOpfsRoot?.()
     restoreOpfsRoot = null
   })
@@ -262,38 +293,13 @@ describe('SessionProvider', () => {
   it('a purge that throws synchronously does not stop terminarSessao from clearing the session, nor the next purge in the list (o indice ainda e apagado)', async () => {
     // Prova que purgarConta não deixa um throw síncrono de clearApiKey escapar para terminarSessao
     // (que chama purgarConta em fire-and-forget, sem esperar por ela), e que a purga seguinte
-    // na lista (purgarIndiceBusca) ainda corre -- README `app/providers`, linhas 19-20.
-    vi.doMock('../../features/copilot-byok/key-store', () => ({
-      clearApiKey: vi.fn(() => {
-        throw new Error('purge boom')
-      }),
-    }))
-    vi.resetModules()
+    // na lista (purgarIndiceBusca) ainda corre -- README `app/providers`, "Fluxo principal".
     const raiz = new FakeDirectoryHandle()
     const dirA = await seedIndiceBusca(raiz, ACCOUNT.id)
     restoreOpfsRoot = stubOpfsRoot(raiz)
-    // Mesma pegadinha de `renderRouter` em router.test.tsx: `SessionContext` fresco tem de vir
-    // do mesmo registo de módulos que o `SessionProvider` fresco, por isso os dois vêm de um
-    // import dinâmico depois do mesmo `vi.resetModules()`.
-    const { SessionProvider: SessionProviderComMockDePurga } = await import('./SessionProvider')
-    const { useSession: useSessionFresco } = await import('../../entities/account/session-context')
-
-    function ConsumerFresco() {
-      const { sessao, terminarSessao } = useSessionFresco()
-      return (
-        <div>
-          <p data-testid="sessao">{sessao === null ? 'sem-sessao' : sessao.id}</p>
-          <button onClick={() => terminarSessao()}>terminar</button>
-        </div>
-      )
-    }
-
-    seedStoredAccount(ACCOUNT)
-    render(
-      <SessionProviderComMockDePurga>
-        <ConsumerFresco />
-      </SessionProviderComMockDePurga>,
-    )
+    await montarComPurgaMockada(() => {
+      throw new Error('purge boom')
+    })
     expect(screen.getByTestId('sessao').textContent).toBe(ACCOUNT.id)
 
     expect(() => fireEvent.click(screen.getByRole('button', { name: 'terminar' }))).not.toThrow()
@@ -303,40 +309,13 @@ describe('SessionProvider', () => {
     await waitFor(() => {
       expect(dirA.files.has('indice-busca')).toBe(false)
     })
-
-    vi.doUnmock('../../features/copilot-byok/key-store')
-    vi.resetModules()
   })
 
   it('uma purga que rejeita deixa rasto no console com o nome da purga e o accountId, sem conteudo do blob nem chave', async () => {
-    vi.doMock('../../features/copilot-byok/key-store', () => ({
-      clearApiKey: vi.fn(() => Promise.reject(new Error('purge boom'))),
-    }))
-    vi.resetModules()
     const raiz = new FakeDirectoryHandle()
     restoreOpfsRoot = stubOpfsRoot(raiz)
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
-    // Mesma pegadinha de `renderRouter`: `SessionContext` fresco tem de vir do mesmo registo de
-    // módulos que o `SessionProvider` fresco.
-    const { SessionProvider: SessionProviderComMockDePurga } = await import('./SessionProvider')
-    const { useSession: useSessionFresco } = await import('../../entities/account/session-context')
-
-    function ConsumerFresco() {
-      const { sessao, terminarSessao } = useSessionFresco()
-      return (
-        <div>
-          <p data-testid="sessao">{sessao === null ? 'sem-sessao' : sessao.id}</p>
-          <button onClick={() => terminarSessao()}>terminar</button>
-        </div>
-      )
-    }
-
-    seedStoredAccount(ACCOUNT)
-    render(
-      <SessionProviderComMockDePurga>
-        <ConsumerFresco />
-      </SessionProviderComMockDePurga>,
-    )
+    await montarComPurgaMockada(() => Promise.reject(new Error('purge boom')))
 
     fireEvent.click(screen.getByRole('button', { name: 'terminar' }))
 
@@ -347,10 +326,6 @@ describe('SessionProvider', () => {
       )
     })
     expect(consoleError).toHaveBeenCalledWith(expect.stringContaining(ACCOUNT.id), expect.any(Error))
-
-    consoleError.mockRestore()
-    vi.doUnmock('../../features/copilot-byok/key-store')
-    vi.resetModules()
   })
 
   it('the context value keeps the same reference across a re-render that does not change `sessao`', () => {
