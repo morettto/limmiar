@@ -14,12 +14,44 @@ public enum AccountGoogleAuthFailureReason
 /// <see cref="Result{TValue,TFailure}"/> (molde Api.Platform, ADR
 /// docs/adr/0011-store-service-nao-devolve-tuplo-nullable.md).
 /// </summary>
-public sealed record AccountGoogleAuthSuccess(
-    Account Account,
-    bool IsNewAccount,
-    TwoFactorRequirement TwoFactorRequirement,
-    string? TwoFactorTicket,
-    SessionTokenPair? Session);
+/// <remarks>
+/// Construtor privado, <see cref="For"/> é a única fábrica -- mesmo invariante de
+/// <see cref="AccountLoginSuccess"/> (S08-28), ver lá o porquê.
+/// </remarks>
+public sealed record AccountGoogleAuthSuccess
+{
+    public Account Account { get; }
+
+    public bool IsNewAccount { get; }
+
+    public TwoFactorRequirement TwoFactorRequirement { get; }
+
+    public string? TwoFactorTicket { get; }
+
+    public SessionTokenPair? Session { get; }
+
+    private AccountGoogleAuthSuccess(
+        Account account, bool isNewAccount, TwoFactorRequirement twoFactorRequirement, string? twoFactorTicket, SessionTokenPair? session)
+    {
+        Account = account;
+        IsNewAccount = isNewAccount;
+        TwoFactorRequirement = twoFactorRequirement;
+        TwoFactorTicket = twoFactorTicket;
+        Session = session;
+    }
+
+    public static AccountGoogleAuthSuccess For(
+        Account account, bool isNewAccount, ITwoFactorTicketIssuer twoFactorTicketIssuer, ISessionTokenIssuer sessionTokenIssuer)
+    {
+        var requirement = TwoFactorPolicy.Determine(account);
+        return new(
+            account,
+            isNewAccount,
+            requirement,
+            IssueTwoFactorTicketIfRequired(account, requirement, twoFactorTicketIssuer),
+            IssueSessionIfNoTwoFactorPending(account, requirement, sessionTokenIssuer));
+    }
+}
 
 public sealed class ContinueWithGoogleHandler(
     IGoogleIdentityProvider googleIdentityProvider, IAccountStore store, ITwoFactorTicketIssuer twoFactorTicketIssuer, ISessionTokenIssuer sessionTokenIssuer)
@@ -30,31 +62,23 @@ public sealed class ContinueWithGoogleHandler(
         var identity = await googleIdentityProvider.VerifyIdTokenAsync(request.IdToken, cancellationToken);
         if (identity is null)
         {
-            return Result<AccountGoogleAuthSuccess, AccountGoogleAuthFailureReason>.Failure(AccountGoogleAuthFailureReason.InvalidGoogleToken);
+            return AccountGoogleAuthFailureReason.InvalidGoogleToken;
         }
 
         var normalizedEmail = AccountEmail.Normalize(identity.Email);
         var existing = await store.FindByEmailAsync(normalizedEmail, cancellationToken);
-        if (existing is not null)
-        {
-            return Result<AccountGoogleAuthSuccess, AccountGoogleAuthFailureReason>.Success(new AccountGoogleAuthSuccess(
-                existing,
-                IsNewAccount: false,
-                TwoFactorPolicy.Determine(existing),
-                IssueTwoFactorTicketIfRequired(existing, twoFactorTicketIssuer),
-                IssueSessionIfNoTwoFactorPending(existing, sessionTokenIssuer)));
-        }
+        var account = existing ?? await CreateAccountAsync(normalizedEmail, request.RequestedRole, identity.SubjectId, store, cancellationToken);
+        return AccountGoogleAuthSuccess.For(account, isNewAccount: existing is null, twoFactorTicketIssuer, sessionTokenIssuer);
+    }
 
+    private static async Task<Account> CreateAccountAsync(
+        string normalizedEmail, AccountRole requestedRole, string googleSubjectId, IAccountStore store, CancellationToken cancellationToken)
+    {
         var account = new Account(
-            Guid.NewGuid(), normalizedEmail, request.RequestedRole, PasswordVerifier: null, identity.SubjectId,
-            VerificationStatus: InitialVerificationStatus(request.RequestedRole));
+            Guid.NewGuid(), normalizedEmail, requestedRole, PasswordVerifier: null, googleSubjectId,
+            VerificationStatus: InitialVerificationStatus(requestedRole));
         await store.InsertAsync(account, cancellationToken);
-        return Result<AccountGoogleAuthSuccess, AccountGoogleAuthFailureReason>.Success(new AccountGoogleAuthSuccess(
-            account,
-            IsNewAccount: true,
-            TwoFactorPolicy.Determine(account),
-            IssueTwoFactorTicketIfRequired(account, twoFactorTicketIssuer),
-            IssueSessionIfNoTwoFactorPending(account, sessionTokenIssuer)));
+        return account;
     }
 
     private static AccountVerificationStatus InitialVerificationStatus(AccountRole role) =>

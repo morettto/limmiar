@@ -75,15 +75,15 @@ public static class AuthEndpoints
         }
 
         var result = await sender.Send(new LoginCommand(request.Email, request.PasswordVerifier), cancellationToken);
-        if (!result.TryGetValue(out var success, out _))
-        {
-            return ProblemJson(StatusCodes.Status401Unauthorized, "Invalid credentials", AccountsProblemCodes.AuthInvalidCredentials);
-        }
-
-        var account = success.Account;
-        return TypedResults.Ok(new LoginResponse(
-            account.Id, account.Email, account.Role, success.TwoFactorRequirement, success.TwoFactorTicket,
-            success.Session?.AccessToken, success.Session?.RefreshToken, success.Session?.AccessTokenExpiresAt));
+        return result.Match<Results<Ok<LoginResponse>, JsonHttpResult<LimmiarProblemDetails>>>(
+            success =>
+            {
+                var account = success.Account;
+                return TypedResults.Ok(new LoginResponse(
+                    account.Id, account.Email, account.Role, success.TwoFactorRequirement, success.TwoFactorTicket,
+                    success.Session?.AccessToken, success.Session?.RefreshToken, success.Session?.AccessTokenExpiresAt));
+            },
+            _ => ProblemJson(StatusCodes.Status401Unauthorized, "Invalid credentials", AccountsProblemCodes.AuthInvalidCredentials));
     }
 
     private static async Task<Results<Ok<GoogleAuthResponse>, JsonHttpResult<LimmiarProblemDetails>>> HandleGoogleAsync(
@@ -95,15 +95,15 @@ public static class AuthEndpoints
         }
 
         var result = await sender.Send(new ContinueWithGoogleCommand(request.IdToken, request.RequestedRole), cancellationToken);
-        if (!result.TryGetValue(out var success, out _))
-        {
-            return ProblemJson(StatusCodes.Status401Unauthorized, "Invalid Google token", AccountsProblemCodes.AuthGoogleTokenInvalid);
-        }
-
-        var account = success.Account;
-        return TypedResults.Ok(new GoogleAuthResponse(
-            account.Id, account.Email, account.Role, success.IsNewAccount, success.TwoFactorRequirement, success.TwoFactorTicket,
-            success.Session?.AccessToken, success.Session?.RefreshToken, success.Session?.AccessTokenExpiresAt));
+        return result.Match<Results<Ok<GoogleAuthResponse>, JsonHttpResult<LimmiarProblemDetails>>>(
+            success =>
+            {
+                var account = success.Account;
+                return TypedResults.Ok(new GoogleAuthResponse(
+                    account.Id, account.Email, account.Role, success.IsNewAccount, success.TwoFactorRequirement, success.TwoFactorTicket,
+                    success.Session?.AccessToken, success.Session?.RefreshToken, success.Session?.AccessTokenExpiresAt));
+            },
+            _ => ProblemJson(StatusCodes.Status401Unauthorized, "Invalid Google token", AccountsProblemCodes.AuthGoogleTokenInvalid));
     }
 
     private static Results<Ok<RefreshTokenResponse>, JsonHttpResult<LimmiarProblemDetails>> HandleRefreshAsync(

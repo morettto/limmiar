@@ -11,10 +11,11 @@ página já calculou.
 
 ## Fluxo principal
 
-1. No mount (e sempre que `chaveIndice`/`accountId` mudarem), se
-   `chaveIndice !== null` e `accountId !== null`:
-   a. Calcula `impressao = impressaoDigital(notas)` (ticket S08-09) -- resume que notas (e
-      que revisão de cada uma) as `notas` atuais cobrem.
+1. A cada render, calcula `impressao = impressaoDigital(notas)` (ticket S08-09) -- resume
+   que notas (e que revisão de cada uma) as `notas` atuais cobrem. No mount (e sempre que
+   `chaveIndice`/`accountId`/`impressao` mudarem), se `chaveIndice !== null` e
+   `accountId !== null`:
+   a. Usa a `impressao` já calculada no corpo do render (ticket S08-25).
    b. `restaurarIndice(store, chaveIndice, accountId, impressao)` -- tenta abrir um índice já
       persistido *e* que ainda cubra exatamente essas notas. Um blob de uma impressão
       diferente (nota nova/editada/apagada desde a última gravação) não é adotado: `null`,
@@ -108,10 +109,6 @@ página já calculou.
 - **Sem `useMemo` em `agruparPorPaciente(itens)`/`buscar(indice, termo)`.** As duas são
   baratas (uma fila de assinatura, não uma tabela grande) e recalculam a cada render de
   qualquer forma -- sem sinal medido de que isso seja um problema real nesta fatia.
-- **`impressao` calculada dentro de `preparar`, não em `useMemo`/dependência própria
-  (ticket S08-09).** `impressaoDigital(notas)` é O(n log n) e já roda a cada disparo do
-  efeito, que já depende de `notas` -- mesma razão do "sem `useMemo`" abaixo, um valor a
-  mais na dependency array do `useEffect` só duplicaria o que `notas` já expressa.
 - **`preparar(chaveIndice).catch(...)` para um estado `erro` local, não um `ResultadoBusca`
   novo.** A rejeição de `restaurarIndice`/`persistirIndice` (OPFS negada/corrompida, chave
   ou AAD errada) não é "sem resultado" nem "a preparar" -- são estados de `ResultadoBusca` que
@@ -122,18 +119,24 @@ página já calculou.
   `ResultadoBusca` obrigaria `BibliotecaNotas` (e todo teste que já cobre os três estados
   hoje) a saber renderizar erro também, ampliando um contrato já acordado no portão de
   forma sem necessidade.
-- **O `useEffect` que restaura/constrói/persiste o índice depende só de `chaveIndice` e
-  `accountId` (ticket S08-13).** São esses os dois valores que identificam *qual* índice
-  carregar -- `notas`, `store` e `t` não mudam essa identidade, só o conteúdo que o efeito lê
-  quando dispara. `notas`/`store`/`t` passam a ser lidos via `useEffectEvent` (`lerAtuais`,
-  React 19.2), que devolve os valores do último render sem os tornar reativos, em vez de
-  entrarem na dependency array; o corpo do efeito continua igual, só a fonte dos três valores
-  muda. Consequência direta: uma
-  mudança em `notas` já não reindexa sozinha -- o efeito só volta a correr quando
-  `chaveIndice`/`accountId` mudam. Hoje isso não custa nada porque o único chamador
-  (`BibliotecaRouteComponent`) passa `notas={[]}` fixture; quem ligar notas reais tem de
-  disparar a reindexação por outra via (mudar `chaveIndice`/`accountId`, ou um ticket futuro
-  que trate a reindexação em condições).
+- **`impressao` calculada no corpo do render, não em `useMemo`, e dependência do `useEffect`
+  no lugar de `notas` (ticket S08-25, substitui a decisão do ticket S08-09 e corrige o
+  ticket S08-13).** `impressaoDigital(notas)` é O(n log n), string, barata o bastante para
+  recalcular a cada render (mesma razão do "sem `useMemo`" acima) -- e é a identidade real
+  do que o índice cobre: duas `notas` de conteúdo diferente têm `impressao` diferente mesmo
+  com a mesma identidade de array. Entra na dependency array do `useEffect`
+  (`[chaveIndice, accountId, impressao]`) porque comparação por valor (string) é o que a
+  reindexação precisa, não comparação por identidade de array. `store` e `mensagemErroBusca`
+  não entram na array: `store` é a constante de módulo `BIBLIOTECA_STORE_FIXTURE` (no
+  router) e `mensagemErroBusca` é uma string igual entre renders (não há regra
+  `exhaustive-deps` neste projeto -- o oxlint só corre `react/rules-of-hooks`), lidos
+  diretamente do closure do efeito. O ticket S08-13 tinha tirado `notas` das deps e lido
+  `notas`/`store`/`mensagemErroBusca` via `useEffectEvent` (`lerAtuais`, React 19.2) -- a
+  documentação do React 19.2 desaconselha esse uso (é para lógica tipo-evento não reativa,
+  não para encolher a dependency array), e o resultado era regressão real: uma mudança em
+  `notas` deixava de reindexar sozinha. `BibliotecaPage.test.tsx` prova o comportamento
+  corrigido: rerender com `notas` de conteúdo diferente (mesma `chaveIndice`/`accountId`)
+  faz `store.gravar` correr de novo.
 
 ## Fora de âmbito
 

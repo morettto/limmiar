@@ -1,5 +1,4 @@
 using Mediator;
-using static Api.Accounts.AccountAuthenticationOrchestration;
 
 namespace Api.Accounts;
 
@@ -19,8 +18,7 @@ public sealed class RegisterHandler(IAccountStore store, ITwoFactorTicketIssuer 
             Guid.NewGuid(), normalizedEmail, request.Role, request.PasswordVerifier, GoogleSubjectId: null,
             VerificationStatus: InitialVerificationStatus(request.Role));
         await store.InsertAsync(account, cancellationToken);
-        return AccountRegistrationResult.Success(
-            account, IssueTwoFactorTicketIfRequired(account, twoFactorTicketIssuer), IssueSessionIfNoTwoFactorPending(account, sessionTokenIssuer));
+        return AccountRegistrationResult.Success(account, twoFactorTicketIssuer, sessionTokenIssuer);
     }
 
     private static AccountVerificationStatus InitialVerificationStatus(AccountRole role) =>

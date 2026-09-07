@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLingui } from '@lingui/react/macro'
 import type { Ancora } from '@limmiar/copilot'
 import type { CryptoKey } from '@limmiar/crypto'
@@ -14,12 +14,10 @@ import { FilaEEditor } from '../../widgets/soap-editor/FilaEEditor'
 const NOTA_FIXTURE_ID = 'nota-fixture-1'
 const PATIENT_FIXTURE_ID = 'paciente-fixture-1'
 
-// ponytail: sem sessão/keychain real nesta rota ainda -- mesma situação de CopilotKeyPage.
-// Com estes valores, `appendPatientEntry`/`assinarNota` caem no caminho de "falha de rede",
-// sem perda de dados. Quem ligar a sessão substitui-os por props, sem mexer em `aoAssinar`.
+// ponytail: baseUrl continua fixture -- não entra em nenhuma guarda (ao contrário de
+// accessToken/S08-27), então promovê-lo a prop não muda cobertura nem comportamento; upgrade
+// natural no mesmo diff que ligar accessToken de verdade (ver README).
 const BASE_URL_FIXTURE = ''
-const ACCOUNT_ID_FIXTURE = ''
-const ACCESS_TOKEN_FIXTURE = ''
 const RECORD_FIXTURE = { wrappedDek: new Uint8Array(0), entries: [] as { sequence: number; ciphertext: Uint8Array<ArrayBuffer> }[] }
 
 function notaFixture(): Nota {
@@ -39,11 +37,17 @@ export interface NotaPageProps {
   // `BibliotecaPage`. `router.tsx` monta com `kek={null}` enquanto não há KeychainProvider;
   // os testes injetam uma chave real para exercitar o caminho pós-guarda.
   kek: CryptoKey | null
+  // Vem da sessão real desde o S08-27, mesmo padrão do `accountId` de `BibliotecaPage`
+  // (S18-01). `null` sem sessão -- guarda o mount e `aoAssinar` (ver README).
+  accountId: string | null
+  // Prop desde o S08-27 (era constante fixture) -- mesmo motivo do `kek: CryptoKey | null`:
+  // sem Keychain montado ainda, `router.tsx` passa `null`. Guarda o mount e `aoAssinar`.
+  accessToken: string | null
 }
 
 // ponytail: fila com um único item fixo -- a fila real continua fora desta fatia. `aoAssinar`
 // já grava no prontuário e assina de facto, e marca só o item de `nota.id`.
-export function NotaPage({ kek }: NotaPageProps) {
+export function NotaPage({ kek, accountId, accessToken }: NotaPageProps) {
   const { t, i18n } = useLingui()
   const [notas, setNotas] = useState<Record<string, Nota>>(() => ({ [NOTA_FIXTURE_ID]: notaFixture() }))
   const [mensagem, setMensagem] = useState<Mensagem | null>(null)
@@ -53,10 +57,6 @@ export function NotaPage({ kek }: NotaPageProps) {
   // `appendPatientEntry` já ter sido gravado (ver comentário em `aoAssinar`).
   const ultimaRevisaoGravadaRef = useRef<Record<string, number>>({})
   const proximaSequenciaRef = useRef(RECORD_FIXTURE.entries.length + 1)
-  // `Object.values` sobre o `Record` devolvia array nova em toda renderização, mesmo sem
-  // mudar conteúdo; o `useMemo` faz a identidade da prop seguir o conteúdo -- garantia
-  // preventiva, sem consumidor hoje que dependa dela (ver README).
-  const listaNotas = useMemo(() => Object.values(notas), [notas])
 
   function marcarAssinada(notaId: string) {
     setNotas((atuais) =>
@@ -66,13 +66,15 @@ export function NotaPage({ kek }: NotaPageProps) {
 
   useEffect(() => {
     // ponytail: pergunta pela nota fixture no mount (fila real -> efeito por nota selecionada).
-    // Fail-open na falha (ver README): a chave primária do Postgres é a trava a sério.
-    obterAssinatura(BASE_URL_FIXTURE, ACCOUNT_ID_FIXTURE, ACCESS_TOKEN_FIXTURE, NOTA_FIXTURE_ID)
+    // Guarda simétrica ao `kek === null` de `aoAssinar` (S08-27): sem accountId/accessToken
+    // reais, nenhum pedido sai.
+    if (accountId === null || accessToken === null) return
+    obterAssinatura(BASE_URL_FIXTURE, accountId, accessToken, NOTA_FIXTURE_ID)
       .then((r) => {
         if (r.ok) marcarAssinada(NOTA_FIXTURE_ID)
       })
       .catch(() => {}) // rede em baixo: `request` não apanha a rejeição do fetch
-  }, [])
+  }, [accountId, accessToken])
 
   // Foca a listbox da fila (sem forwardRef através de FilaEEditor/FilaAssinatura -- é a
   // única instância de `role="listbox"` na página) para o `j`/`k` seguinte continuar de
@@ -89,7 +91,7 @@ export function NotaPage({ kek }: NotaPageProps) {
       setMensagem({ status: 'erro', texto: t`Esta nota já está assinada.` })
       return
     }
-    if (kek === null) {
+    if (kek === null || accountId === null || accessToken === null) {
       setMensagem({ status: 'erro', texto: t`Sem sessão ativa. Não é possível assinar.` })
       return
     }
@@ -99,7 +101,7 @@ export function NotaPage({ kek }: NotaPageProps) {
       if (ultimaRevisaoGravadaRef.current[nota.id] !== nota.revisao) {
         const sequence = proximaSequenciaRef.current
         const ciphertext = await sealEntry(dek, nota.patientId, sequence, notaParaEntrada(nota))
-        const gravado = await appendPatientEntry(BASE_URL_FIXTURE, ACCOUNT_ID_FIXTURE, ACCESS_TOKEN_FIXTURE, nota.patientId, {
+        const gravado = await appendPatientEntry(BASE_URL_FIXTURE, accountId, accessToken, nota.patientId, {
           sequence,
           ciphertext,
         })
@@ -112,7 +114,7 @@ export function NotaPage({ kek }: NotaPageProps) {
       }
 
       const signature = await selarAssinatura(dek, nota.id, nota)
-      const resultado = await assinarNota(BASE_URL_FIXTURE, ACCOUNT_ID_FIXTURE, ACCESS_TOKEN_FIXTURE, nota.id, {
+      const resultado = await assinarNota(BASE_URL_FIXTURE, accountId, accessToken, nota.id, {
         revision: nota.revisao,
         signature,
       })
@@ -155,7 +157,7 @@ export function NotaPage({ kek }: NotaPageProps) {
       <audio ref={audioRef} hidden />
       {mensagem?.status === 'sucesso' && <p role="status">{mensagem.texto}</p>}
       {mensagem?.status === 'erro' && <p role="alert">{mensagem.texto}</p>}
-      <FilaEEditor notas={listaNotas} onChangeNota={onChangeNota} aoTocar={aoTocar} aoAssinar={aoAssinar} />
+      <FilaEEditor notas={Object.values(notas)} onChangeNota={onChangeNota} aoTocar={aoTocar} aoAssinar={aoAssinar} />
     </>
   )
 }

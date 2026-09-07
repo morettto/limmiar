@@ -4,9 +4,11 @@ namespace Api.Platform;
 
 /// <summary>
 /// A store/service boundary result: either a value or a typed failure reason, never both nor
-/// neither.
+/// neither. <c>default(Result&lt;TValue, TFailure&gt;)</c> is constructible (it is a struct)
+/// and reads as a failure with reason 0 -- a real, named member in every production failure
+/// enum in this repository.
 /// </summary>
-public sealed class Result<TValue, TFailure>
+public readonly record struct Result<TValue, TFailure>
     where TValue : class
     where TFailure : struct, Enum
 {
@@ -23,18 +25,21 @@ public sealed class Result<TValue, TFailure>
 
     public static Result<TValue, TFailure> Failure(TFailure failure) => new(null, failure);
 
+    // Unambiguous because TValue : class and TFailure : struct, Enum can never be the same type.
+    public static implicit operator Result<TValue, TFailure>(TValue value) => Success(value);
+
+    public static implicit operator Result<TValue, TFailure>(TFailure failure) => Failure(failure);
+
+    // No production caller left after S08-26 (all went through Match); kept for tests that
+    // only need the value, not worth rewriting ~19 call sites to Match for this.
     /// <summary>True on success.</summary>
-    public bool TryGetValue([NotNullWhen(true)] out TValue? value, out TFailure failure)
+    public bool TryGetValue([NotNullWhen(true)] out TValue? value)
     {
         value = this.value;
-        failure = this.failure;
         return this.value is not null;
     }
 
-    /// <summary>True on failure.</summary>
-    public bool TryGetFailure(out TFailure failure)
-    {
-        failure = this.failure;
-        return this.value is null;
-    }
+    /// <summary>Calls exactly one of the two, never both.</summary>
+    public TResult Match<TResult>(Func<TValue, TResult> onSuccess, Func<TFailure, TResult> onFailure) =>
+        value is not null ? onSuccess(value) : onFailure(failure);
 }

@@ -38,10 +38,10 @@ prop -- buscá-los de um servidor é a fatia 4. Sem áudio, sem edição de nota
 - `FilaAssinatura` (`FilaAssinatura.tsx`) -- componente React, props `itens: readonly
   Nota[]`, `selecionadoId`, `onSelecionar`.
 - `EstadoNota`, `ESTADO_PENDENTE` e `ESTADO_ASSINADA` vivem em `entities/nota/nota.ts`
-  desde o ticket S08-06 (fundir `ItemFila` em `Nota`); `ESTADOS_NOTA` nasceu no S08-16 e é
-  o que este módulo itera direto para renderizar as abas (`ESTADOS_NOTA.map(...)`, sem
-  alias local -- o `const ABAS = ESTADOS_NOTA` que existiu era 1:1 com um só uso, eliminado
-  no S08-22). Ver `entities/nota/README.md`, "Decisões da fatia S08-06".
+  desde o ticket S08-06 (fundir `ItemFila` em `Nota`). Ver `entities/nota/README.md`,
+  "Decisões da fatia S08-06".
+- `ORDEM_ABAS` (`FilaAssinatura.tsx`) -- a ordem de apresentação das abas, declarada e
+  usada só aqui. Ver "Decisão: ordem das abas vive aqui, não em `ESTADOS_NOTA`" abaixo.
 - `proximoIndice(indice, total, tecla)` (`navegacao-teclado.ts`) -- seam puro, sem React,
   sem browser, 100% interno a esta feature (desde S08-08; `ehAtalhoAssinar` viveu aqui até
   essa fatia, ver `features/nota-editor/README.md` para onde foi e porquê).
@@ -50,6 +50,17 @@ prop -- buscá-los de um servidor é a fatia 4. Sem áudio, sem edição de nota
 
 ## Decisões desta fatia
 
+- **Ordem das abas vive aqui, não em `ESTADOS_NOTA`, e tem o seu próprio teste (S08-31).**
+  `ESTADOS_NOTA` (`entities/nota/nota.ts`) existe só para derivar o tipo `EstadoNota` --
+  usá-lo diretamente para renderizar as abas (`ESTADOS_NOTA.map(...)`) tornava reordenar
+  esse array uma forma silenciosa de reordenar a interface. O S08-22 apagou `const ABAS =
+  ESTADOS_NOTA` por parecer um alias de uso único; não era ruído, era exatamente o sítio
+  onde a ordem de render estava declarada -- a cadeia de review da spec S08 apanhou isto
+  (achado 3.2) e o S08-31 repôs a declaração como `ORDEM_ABAS` (`FilaAssinatura.tsx`), uma
+  constante local desta feature. `FilaAssinatura.test.tsx` tem um teste que monta a fila
+  com `ESTADOS_NOTA` mockado e invertido (`vi.doMock`) e continua a exigir "Pendentes"
+  antes de "Assinadas" -- é o que prova que reordenar `ESTADOS_NOTA` não reordena a UI; sem
+  esse teste, a garantia ficaria só na leitura do código.
 - **Índice ativo sobrevive a `itens` que encolhem "por fora" (mesma aba, sem `trocarAba`).**
   `itens` é uma prop controlada pelo widget-pai; ele pode mudar de tamanho sob a aba já
   ativa (ex.: `aoAssinar` em `NotaPage` marca a única nota pendente como assinada,

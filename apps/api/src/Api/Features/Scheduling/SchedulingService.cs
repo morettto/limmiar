@@ -30,18 +30,18 @@ public sealed class SchedulingService(IAccountStore accounts, ScheduledSessionSt
         var authorizationFailure = await AuthorizeAsync(professionalId, cancellationToken);
         if (authorizationFailure is not null)
         {
-            return Result<ScheduledSession, SchedulingFailureReason>.Failure(authorizationFailure.Value);
+            return authorizationFailure.Value;
         }
 
         try
         {
             // timestamptz requires a zero-offset (UTC) value from Npgsql.
             var session = await store.InsertAsync(professionalId, patientId, startsAt.ToUniversalTime(), durationMinutes, cancellationToken);
-            return Result<ScheduledSession, SchedulingFailureReason>.Success(session);
+            return session;
         }
         catch (ScheduledSessionSlotConflictException)
         {
-            return Result<ScheduledSession, SchedulingFailureReason>.Failure(SchedulingFailureReason.SlotTaken);
+            return SchedulingFailureReason.SlotTaken;
         }
     }
 
@@ -51,7 +51,7 @@ public sealed class SchedulingService(IAccountStore accounts, ScheduledSessionSt
         var authorizationFailure = await AuthorizeAsync(professionalId, cancellationToken);
         if (authorizationFailure is not null)
         {
-            return Result<ScheduledSession, SchedulingFailureReason>.Failure(authorizationFailure.Value);
+            return authorizationFailure.Value;
         }
 
         try
@@ -60,7 +60,7 @@ public sealed class SchedulingService(IAccountStore accounts, ScheduledSessionSt
         }
         catch (ScheduledSessionSlotConflictException)
         {
-            return Result<ScheduledSession, SchedulingFailureReason>.Failure(SchedulingFailureReason.SlotTaken);
+            return SchedulingFailureReason.SlotTaken;
         }
     }
 
@@ -69,7 +69,7 @@ public sealed class SchedulingService(IAccountStore accounts, ScheduledSessionSt
         var authorizationFailure = await AuthorizeAsync(professionalId, cancellationToken);
         if (authorizationFailure is not null)
         {
-            return Result<ScheduledSession, SchedulingFailureReason>.Failure(authorizationFailure.Value);
+            return authorizationFailure.Value;
         }
 
         return await store.CancelAsync(professionalId, sessionId, DateTimeOffset.UtcNow, cancellationToken);

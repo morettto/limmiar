@@ -9,3 +9,10 @@ paths = [
   '''packages/crypto/src/.*\.test\.ts$''',
   '''apps/api/src/Api/Api\.http$''',
 ]
+
+# Fixture ids in tests. The convention across the suite is <coisa>-fixture-<n>,
+# and generic-api-key fires on one when it lands on the same line as an
+# identifier containing "token". Narrower than allowlisting the test files.
+regexes = [
+  '''^[a-z]+-fixture-\d+$''',
+]

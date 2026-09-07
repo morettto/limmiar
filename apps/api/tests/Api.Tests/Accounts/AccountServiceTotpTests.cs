@@ -316,7 +316,7 @@ public sealed class AccountServiceTotpTests
 
         var result = await service.LoginAsync(account.Email, SomeVerifier, CancellationToken.None);
 
-        Assert.True(result.TryGetValue(out var success, out _));
+        Assert.True(result.TryGetValue(out var success));
         Assert.Equal(TwoFactorRequirement.ChallengeRequired, success.TwoFactorRequirement);
     }
 
@@ -330,7 +330,7 @@ public sealed class AccountServiceTotpTests
 
         var result = await service.LoginAsync(account.Email, SomeVerifier, CancellationToken.None);
 
-        Assert.True(result.TryGetValue(out var success, out _));
+        Assert.True(result.TryGetValue(out var success));
         Assert.NotNull(success.TwoFactorTicket);
         Assert.True(ticketIssuer.Validate(success.TwoFactorTicket!, account.Id));
     }
@@ -344,7 +344,7 @@ public sealed class AccountServiceTotpTests
 
         var result = await service.LoginAsync(account.Email, SomeVerifier, CancellationToken.None);
 
-        Assert.True(result.TryGetValue(out var success, out _));
+        Assert.True(result.TryGetValue(out var success));
         Assert.Equal(TwoFactorRequirement.NotApplicable, success.TwoFactorRequirement);
     }
 
@@ -357,7 +357,7 @@ public sealed class AccountServiceTotpTests
 
         var result = await service.LoginAsync(account.Email, SomeVerifier, CancellationToken.None);
 
-        Assert.True(result.TryGetValue(out var success, out _));
+        Assert.True(result.TryGetValue(out var success));
         Assert.Null(success.TwoFactorTicket);
     }
 
@@ -370,7 +370,7 @@ public sealed class AccountServiceTotpTests
 
         var result = await service.GoogleAuthAsync("valid-id-token", AccountRole.Professional, CancellationToken.None);
 
-        Assert.True(result.TryGetValue(out var success, out _));
+        Assert.True(result.TryGetValue(out var success));
         Assert.Equal(TwoFactorRequirement.SetupRequired, success.TwoFactorRequirement);
     }
 
@@ -384,7 +384,7 @@ public sealed class AccountServiceTotpTests
 
         var result = await service.GoogleAuthAsync("valid-id-token", AccountRole.Professional, CancellationToken.None);
 
-        Assert.True(result.TryGetValue(out var success, out _));
+        Assert.True(result.TryGetValue(out var success));
         Assert.NotNull(success.TwoFactorTicket);
         Assert.True(ticketIssuer.Validate(success.TwoFactorTicket!, success.Account.Id));
     }
@@ -398,7 +398,7 @@ public sealed class AccountServiceTotpTests
 
         var result = await service.GoogleAuthAsync("valid-id-token", AccountRole.Patient, CancellationToken.None);
 
-        Assert.True(result.TryGetValue(out var success, out _));
+        Assert.True(result.TryGetValue(out var success));
         Assert.Equal(TwoFactorRequirement.NotApplicable, success.TwoFactorRequirement);
     }
 
@@ -411,7 +411,7 @@ public sealed class AccountServiceTotpTests
 
         var result = await service.GoogleAuthAsync("valid-id-token", AccountRole.Patient, CancellationToken.None);
 
-        Assert.True(result.TryGetValue(out var success, out _));
+        Assert.True(result.TryGetValue(out var success));
         Assert.Null(success.TwoFactorTicket);
     }
 
@@ -426,7 +426,7 @@ public sealed class AccountServiceTotpTests
 
         var result = await service.GoogleAuthAsync("valid-id-token", AccountRole.Patient, CancellationToken.None);
 
-        Assert.True(result.TryGetValue(out var success, out _));
+        Assert.True(result.TryGetValue(out var success));
         Assert.NotNull(success.TwoFactorTicket);
         Assert.True(ticketIssuer.Validate(success.TwoFactorTicket!, existingAccount.Id));
     }
@@ -464,7 +464,7 @@ public sealed class AccountServiceTotpTests
 
         var result = await service.LoginAsync(account.Email, SomeVerifier, CancellationToken.None);
 
-        Assert.True(result.TryGetValue(out var success, out _));
+        Assert.True(result.TryGetValue(out var success));
         Assert.NotNull(success.Session);
     }
 
@@ -477,7 +477,7 @@ public sealed class AccountServiceTotpTests
 
         var result = await service.LoginAsync(account.Email, SomeVerifier, CancellationToken.None);
 
-        Assert.True(result.TryGetValue(out var success, out _));
+        Assert.True(result.TryGetValue(out var success));
         Assert.Null(success.Session);
     }
 
@@ -490,7 +490,7 @@ public sealed class AccountServiceTotpTests
 
         var result = await service.GoogleAuthAsync("valid-id-token", AccountRole.Patient, CancellationToken.None);
 
-        Assert.True(result.TryGetValue(out var success, out _));
+        Assert.True(result.TryGetValue(out var success));
         Assert.NotNull(success.Session);
     }
 
@@ -503,7 +503,7 @@ public sealed class AccountServiceTotpTests
 
         var result = await service.GoogleAuthAsync("valid-id-token", AccountRole.Professional, CancellationToken.None);
 
-        Assert.True(result.TryGetValue(out var success, out _));
+        Assert.True(result.TryGetValue(out var success));
         Assert.Null(success.Session);
     }
 

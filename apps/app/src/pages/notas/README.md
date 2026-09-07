@@ -15,8 +15,18 @@ decisão.
 1. Monta com uma fila de um único item e uma nota fixa (`notaFixture()`), ambos com um id
    fixture (`NOTA_FIXTURE_ID`/`PATIENT_FIXTURE_ID`) -- não há ainda uma fila real vinda de
    um backend (fica fora de âmbito, ver `widgets/soap-editor/README.md`).
-2. **Efeito de arranque (S08-11):** no mount, `useEffect(..., [])` pergunta ao servidor
-   (`obterAssinatura`, `entities/nota/api.ts`) se a nota fixture já está assinada. `ok:true`
+2. **Efeito de arranque (S08-11), guardado desde o S08-27:** no mount, `useEffect(...,
+   [accountId, accessToken])` pergunta ao servidor (`obterAssinatura`, `entities/nota/api.ts`)
+   se a nota fixture já está assinada -- mas só dispara se `accountId !== null` **e**
+   `accessToken !== null`, guarda no mesmo idioma do `if (kek === null)` de `aoAssinar` (ver
+   3.b abaixo). O ticket S08-27 corrigiu um defeito de raiz: antes desta guarda, o efeito
+   disparava sempre, mesmo com `accountId`/`accessToken` vazios (constantes de módulo, não
+   props), mandando `/accounts//notes/nota-fixture-1/signature` com `Authorization: Bearer `
+   a cada mount de `/notas` -- um pedido sem caminho de sucesso possível, engolido por
+   `.catch(() => {})`. Hoje `accountId`/`accessToken` são ambos props `string | null` (ver
+   "Decisões desta fatia (S08-27)"), e `router.tsx` passa `accountId` real (sessão) com
+   `accessToken={null}` (sem Keychain ainda) -- então a guarda continua a bloquear em
+   produção, mas por uma prop `null`, não por uma constante impossível de testar. `ok:true`
    chama `marcarAssinada`, deixando `EditorSoap` em leitura apenas logo no primeiro render
    útil -- um reload é, portanto, um mount novo, e a trava não se perde. Critério "reload não
    perde a trava" tem prova executada, não por inferência: `NotaPage.test.tsx` ("reload
@@ -24,18 +34,13 @@ decisão.
    desmonta (`cleanup()` -- simula o reload, apaga toda memória do cliente) e monta de novo com
    `obterAssinatura` a devolver `ok:true` só na segunda vez; fixa que é a resposta do servidor,
    não estado do cliente, que repõe `estado === 'assinada'` na instância nova de `EditorSoap`.
-   `ok:false` (404
-   `notes.signature_not_found`, o caso normal de uma nota por assinar) e a promessa rejeitada
-   (rede em baixo, 401 no arranque) colapsam no mesmo `if (r.ok)`: nenhum dos dois produz
-   `role="alert"`/`role="status"` -- 404 não é acionável, e falha de rede/401 no boot também
-   não. Sem flag de cancelamento: as três credenciais e o id são constantes de módulo (deps
-   `[]` são honestas), `marcarAssinada` é idempotente, e `setState` depois do desmonte é
-   no-op no React 19. **Fail-open**: se a pergunta falhar, a nota fica editável -- a trava a
-   sério é a chave primária do Postgres, e um cliente desatualizado apanha o 409
-   `notes.already_signed` que `aoAssinar` já trata (ver 2.e abaixo). Fail-closed trancaria
-   toda nota de uma app local-first sempre que a rede caísse. `ponytail:` teto conhecido:
-   offline, um reload não recupera a trava -- upgrade natural é cachear o último resultado
-   conhecido localmente.
+   `ok:false` (404 `notes.signature_not_found`, o caso normal de uma nota por assinar) e a
+   promessa rejeitada (rede em baixo, 401 no arranque) colapsam no mesmo `if (r.ok)`: nenhum
+   dos dois produz `role="alert"`/`role="status"`. **Fail-open**: se a pergunta falhar, a nota
+   fica editável -- a trava a sério é a chave primária do Postgres, e um cliente desatualizado
+   apanha o 409 `notes.already_signed` que `aoAssinar` já trata (ver 3.f abaixo). A guarda em
+   si (accountId/accessToken ausentes) tem prova própria, à parte: ver "Prova de zero pedidos
+   de rede" em "Decisões desta fatia (S08-27)".
 3. `⌘↵`/`Ctrl+↵` no editor (via `EditorSoap`/`FilaEEditor`, ver `ehAtalhoAssinar`) chama
    `aoAssinar(nota)`, que segue uma ordem fixa e não inversível:
    a. **Guarda de nota já assinada (S08-11), antes de qualquer outra guarda:** se
@@ -45,11 +50,16 @@ decisão.
       está vazio para essa nota -- sem esta guarda, um `⌘↵` gravaria uma entrada nova no
       prontuário append-only para uma nota já assinada, que é exatamente o defeito do
       ticket (a chave primária recusa a segunda linha, mas só depois de já ter gravado).
-   b. Guarda de sessão: se `kek === null` (o que `NotaRouteComponent` sempre passa hoje, ver
-      "Pontos de entrada"), mostra `role="alert"` com uma mensagem de estado permanente
-      ("Sem sessão ativa. Não é possível assinar.") e retorna **sem** chamar `openRecord`
-      nem nenhuma outra função de cripto/rede -- mesmo padrão estrutural do `dek === null`
-      em `pages/biblioteca/BibliotecaPage.tsx`.
+   b. Guarda de sessão (S08-27: `kek === null || accountId === null || accessToken === null`,
+      era só `kek === null` até então) -- `kek`/`accessToken` são sempre `null` hoje (ver
+      "Pontos de entrada"), então esta guarda continua a disparar sempre em produção,
+      mostrando `role="alert"` com uma mensagem de estado permanente ("Sem sessão ativa. Não
+      é possível assinar.") e retornando **sem** chamar `openRecord` nem nenhuma outra função
+      de cripto/rede -- mesmo padrão estrutural do `dek === null` em
+      `pages/biblioteca/BibliotecaPage.tsx`. Juntar as três condições (em vez de guardas
+      separadas) mantém uma só mensagem para "sem sessão", e dá ao TypeScript a estreita de
+      `accountId`/`accessToken` para `string` no resto da função -- as três credenciais
+      precisam existir antes de qualquer chamada.
    c. `openRecord(kek, record, nota.patientId)` -- desembrulha a DEK do prontuário.
    d. Se a revisão desta nota ainda não foi gravada (`ultimaRevisaoGravadaRef`), sela
       (`sealEntry`) e grava (`appendPatientEntry`) uma entrada de prontuário com
@@ -66,15 +76,18 @@ decisão.
 
 ## Pontos de entrada
 
-- `NotaPage({ kek }: NotaPageProps)` -- componente React puro. `kek: CryptoKey | null` é
-  prop **obrigatória** (sem default) desde a ronda 1 de correção do S08-07 -- mesmo
-  contrato de `pages/biblioteca/BibliotecaPage`'s `dek: CryptoKey | null`. Testes injetam
-  uma `CryptoKey` real para exercitar o caminho pós-guarda.
-- `NotaRouteComponent()` (`app/routing/router.tsx`) -- monta `<NotaPage kek={null} />` na
-  rota `/notas`; é quem hoje decide o valor de `kek`, enquanto não existir
-  `KeychainProvider`/sessão real (mesmo padrão de `BibliotecaRouteComponent`/`dek={null}`
-  em `pages/biblioteca/README.md`). Ver "Decisões desta fatia (S08-07)" e "ronda 1 de
-  correção" abaixo.
+- `NotaPage({ kek, accountId, accessToken }: NotaPageProps)` -- componente React puro. `kek:
+  CryptoKey | null` é prop **obrigatória** (sem default) desde a ronda 1 de correção do
+  S08-07 -- mesmo contrato de `pages/biblioteca/BibliotecaPage`'s `dek: CryptoKey | null`.
+  `accountId: string | null` e `accessToken: string | null` são obrigatórias desde o S08-27,
+  mesmo contrato do `accountId` de `BibliotecaPage`. Testes injetam uma
+  `CryptoKey`/`accountId`/`accessToken` reais para exercitar os caminhos pós-guarda.
+- `NotaRouteComponent()` (`app/routing/router.tsx`) -- monta `<NotaPage kek={null}
+  accountId={sessao?.id ?? null} accessToken={null} />` na rota `/notas`; `accountId` vem de
+  `useSession()` desde o S08-27 (mesmo padrão de
+  `BibliotecaRouteComponent`/`CopilotKeyRouteComponent`, S18-01), `kek`/`accessToken`
+  continuam `null` enquanto não existir `KeychainProvider`. Ver "Decisões desta fatia
+  (S08-07)", "Decisões desta fatia (S08-27)" e "ronda 1 de correção" abaixo.
 
 ## Decisões desta fatia (atualizado no ticket S08-06)
 
@@ -89,27 +102,21 @@ decisão.
   sem alteração. `<FilaEEditor>` passa a receber `notas` numa prop só, em vez de
   `itens`+`notas` separados.
 - **`notas={Object.values(notas)}` virou `notas={listaNotas}`, com `listaNotas =
-  useMemo(() => Object.values(notas), [notas])` (S08-18).** `Object.values` sobre um
-  `Record` cria uma array nova a cada chamada, mesmo sem mudança de conteúdo; sem
-  `useMemo`, `FilaEEditor` recebia uma array de identidade nova em toda renderização de
-  `NotaPage` -- incluindo as que só mudam `mensagem` (ex.: a guarda de sessão em
-  `aoAssinar`) e não tocam em `notas`. Garantia preventiva: hoje não há consumidor que
-  dependa dessa identidade -- `FilaEEditor` não está memoizado, e não tem efeito nenhum que
-  leve `notas` numa dependency array. `pages/biblioteca/BibliotecaPage` recebe `notas`
-  como prop e, até o S08-13, levava-a na dependency array do efeito do índice -- o que
-  tornava esse efeito sensível à estabilidade de identidade de quem lha passasse. O
-  S08-13 tirou `notas` das deps (hoje `[chaveIndice, accountId]`) e passou a ler o valor
-  atual via `useEffectEvent` (`lerAtuais`, ver `pages/biblioteca/README.md`): a exigência
-  de identidade que existia ali deixou de existir -- quem ler este README não deve repô-la.
-  `onChangeNota`, `aoTocar` e `aoAssinar` continuam a ser recriadas a cada render de
-  `NotaPage`: só `notas` tem identidade estável, e quem memoizar `FilaEEditor` no futuro não
-  pode assumir o mesmo das outras props. `NotaPage.test.tsx` prova por referência (`toBe`),
-  não por igualdade estrutural, no teste "render que só muda mensagem (kek === null) não
-  troca a referência de notas".
+  useMemo(() => Object.values(notas), [notas])` (S08-18) -- e voltou a
+  `notas={Object.values(notas)}` direto, sem `useMemo` (ticket S08-25).** O `useMemo` do
+  S08-18 era garantia preventiva, por escrito: "hoje não há consumidor que dependa dessa
+  identidade". O consumidor que a teria justificado era o `useEffect` do índice em
+  `pages/biblioteca/BibliotecaPage` -- mas esse efeito é de outra página (`notas` próprias,
+  não as desta), nunca leu esta identidade, e o S08-25 corrigiu justamente esse efeito para
+  depender de `impressao` (`impressaoDigital(notas)`, uma string), não da identidade da
+  array -- ver `pages/biblioteca/README.md`, "O `useEffect` que restaura/constrói/persiste
+  o índice". Sem consumidor real em lado nenhum, o `useMemo` ficou puro custo: apagado, e
+  `Object.values(notas)` volta a correr direto no JSX. `FilaEEditor` continua a receber uma
+  array de identidade nova em toda renderização de `NotaPage` (incluindo as que só mudam
+  `mensagem`) -- sem `FilaEEditor` memoizado nem efeito que leve `notas` numa dependency
+  array, essa identidade nova não move nada.
 - **O `Record<string, Nota>` não virou `useState<Nota[]>`.** O `Record` dá atualização
-  O(1) por id, decisão deliberada do S08-06; trocar a forma do estado só para obter uma
-  identidade estável que o `useMemo` já dá numa linha seria mais diff pela mesma coisa, sem
-  motivo novo para desfazer essa decisão.
+  O(1) por id, decisão deliberada do S08-06 -- sem motivo novo para desfazer essa decisão.
 - **A lógica de `aoAssinar` (ordem, guardas, mensagens) não mudou.** Só a forma de
   `marcarAssinada` por dentro mudou (map sobre array → update de chave num `Record`); os
   três ramos de desfecho (sucesso, 409, falha de rede) continuam exatamente como estavam.
@@ -140,17 +147,17 @@ decisão.
   inexistente + piso de cobertura) justificou a prop opcional na altura. A ronda 1 de
   correção abaixo tornou `kek` **obrigatória**, alinhando com o critério de aceite 2 do
   ticket (`kek: CryptoKey | null`).
-- **`record`/`baseUrl`/`accountId`/`accessToken` continuam fixtures locais, não props.**
-  Não existe ainda nenhum `KeychainProvider`/sessão real montada em lado nenhum da app
-  (mesma situação, mesmo motivo, do `kek={null}, accountId=""` de
-  `pages/settings/CopilotKeyPage.tsx`) -- inventar aqui uma forma de os receber via
-  query string alargaria esta fatia para construir a wiring de sessão que nenhuma outra
-  página tem, e que nenhuma spec pediu ainda. `ponytail:` o comentário no topo de
-  `NotaPage.tsx` nomeia o teto (as chamadas de rede reais falham com estas credenciais) e
-  o caminho de upgrade (substituir os quatro valores quando existir Keychain/sessão --
-  a lógica de `aoAssinar` não muda). Consequência prática: contra o `wrangler dev` que o
-  e2e sobe, `aoAssinar` cai sempre no caminho de "sem sessão" (antes: falha de rede) --
-  `e2e/assinar-nota.spec.ts` prova o percurso de teclado até aí.
+- **`record`/`baseUrl`/`accountId`/`accessToken` continuavam fixtures locais, não props --
+  corrigido para `accountId`/`accessToken` no S08-27, `record`/`baseUrl` continuam fixture,
+  ver "Decisões desta fatia (S08-27)" abaixo.** Na altura (S08-07), não existia ainda nenhum
+  `KeychainProvider`/sessão real montada em lado nenhum da app (mesma situação do
+  `kek={null}, accountId=""` de `pages/settings/CopilotKeyPage.tsx`) -- inventar aqui uma
+  forma de os receber via query string teria alargado a fatia para construir a wiring de
+  sessão que nenhuma outra página tinha, e que nenhuma spec pedia ainda. Consequência prática
+  à data: contra o `wrangler dev` que o e2e sobe, `aoAssinar` caía sempre no caminho de "sem
+  sessão" (antes: falha de rede) -- `e2e/assinar-nota.spec.ts` prova o percurso de teclado até
+  aí, e continua a provar hoje pela mesma guarda, agora também por falta de
+  `accountId`/`accessToken`.
 - **`marcarAssinada` atualiza só a entrada de `notaId`** (desde S08-06, dentro do `Record`
   de `notas` -- ver a decisão no topo deste README; antes da fusão, era um `.map` sobre o
   array `itens`), pagando a dívida `ponytail:` da fatia 3 (que marcava a fila inteira, e só
@@ -216,12 +223,71 @@ decisão.
   preferência que ele não formula]]): a preferência pela solução mais estreita era do
   orquestrador, ao despachar o ticket (decisão de âmbito), não do ticket em si.
 
+## Decisões desta fatia (S08-27)
+
+Origem: achado 3.1 do `reviewer-thermo`, ronda 2 da cadeia de review da spec S08 --
+`/notas` era a única das três rotas de produto (`/settings/copilot`, `/biblioteca`, `/notas`)
+que tinha ficado de fora da ligação a `useSession()` que o S18-01 fez para as outras duas, e
+o mount de `NotaPage` disparava `obterAssinatura` sempre, com `accountId`/`accessToken` vazios.
+
+- **`accountId` deixou de ser fixture e passou a prop `string | null`, ligada em
+  `NotaRouteComponent` via `useSession()` (mesmo padrão de `BibliotecaRouteComponent`/
+  `CopilotKeyRouteComponent`, S18-01).** Fecha a assimetria: as três rotas de produto usam
+  hoje o mesmo padrão para `accountId`. `ACCOUNT_ID_FIXTURE` foi apagada de `NotaPage.tsx` --
+  não sobrou nenhuma sentinela `accountId=""` em lado nenhum (ver nota abaixo sobre
+  `key-store.ts`).
+- **`accessToken` também deixou de ser fixture (`ACCESS_TOKEN_FIXTURE`, uma constante `''`) e
+  passou a prop `string | null`, exatamente como `kek`.** Motivo estrutural: uma constante de
+  módulo comparada consigo mesma (`ACCESS_TOKEN_FIXTURE === ''`) é sempre verdadeira, então o
+  corpo do efeito de mount (`obterAssinatura(...).then(...)`) ficava **código morto**,
+  incobrível por qualquer teste. `router.tsx` monta com `accessToken={null}` -- mesmo padrão,
+  mesmo motivo do `kek={null}` que já lá estava: sem
+  `KeychainProvider`, não há token real para passar. Isto também fecha uma segunda
+  assimetria que sobrou da primeira ronda desta fatia: `kek` já era prop `null` e
+  `accessToken` era constante fixture -- duas formas de dizer "sem Keychain ainda". **O que
+  falta para deixar de ser `null` de verdade:** um provider que guarde o `accessToken` da
+  sessão viva (e o renove, já que expira -- ver o ramo `auth.access_token_invalid` em
+  `aoAssinar`, item 3.f) e passe um valor real em `NotaRouteComponent`, no lugar de `null` --
+  a lógica de `NotaPage` não muda nada, só a origem do valor (mesmo caminho de upgrade do
+  `kek`).
+- **`BASE_URL_FIXTURE` continua constante, não virou prop.** Ao contrário de `accessToken`,
+  `baseUrl` nunca entra em nenhuma condição -- não há `if (baseUrl === ...)` em lado nenhum,
+  então não sofre do problema de "constante comparada consigo mesma vira código morto" que
+  motivou a mudança de `accessToken`. Promovê-lo a prop aqui seria simetria cega (o próprio
+  ticket pediu para não arrastar por simetria): mais uma prop, mais um argumento em
+  `NotaRouteComponent`, sem nenhum ramo novo a cobrir e sem nenhum defeito a fechar. Upgrade
+  natural no mesmo diff que ligar `accessToken` de verdade, quando/se a app tiver mais de uma
+  `baseUrl` (hoje só há uma, a do `wrangler dev`/produção).
+- **Nenhum `accountId`/`accessToken` colapsou para `''`.** O S18-04 trocou `accountId=""` por
+  `string | null` nas outras páginas de produto justamente para não reintroduzir a sentinela
+  que `key-store.ts` rejeita (`key-store: accountId must not be empty`); esta fatia manteve
+  `string | null` de ponta a ponta nas duas props, sem nenhum `?? ''` a colapsar o tipo.
+- **A guarda do mount ganhou `[accountId, accessToken]` como dependência** (era `[]`) --
+  honesto agora que ambas são props que podem mudar (troca de conta, Keychain a ligar),
+  não mais constantes de módulo.
+- **Prova de zero pedidos de rede (critério de aceite 1):** `NotaPage.test.tsx` tem dois
+  testes -- um com `accountId === null` que espia `fetch` de verdade (religando
+  `entities/nota/api` real via `vi.importActual`, porque o módulo vem mockado no resto do
+  ficheiro) e prova zero chamadas; outro com `accountId` real e `accessToken === null` que
+  prova que `obterAssinatura` (a função mockada) nunca é invocada. Com `accessToken` agora
+  prop (não constante), o describe block "mount pergunta ao servidor se a nota já está
+  assinada" (S08-11, 4 testes) voltou a ser alcançável, montando com `accountId`/`accessToken`
+  reais -- restaurado com as mesmas asserções de sempre, só a chamada a `obterAssinatura`
+  passou a incluir os valores de teste em vez de `''`.
+- **Dois testes novos, sem relação com a guarda, fecham 100% em `NotaPage.test.tsx` isolado:**
+  `onChangeNota` e o ramo real de `aoTocar` (`audioRef.current` não-nulo) só tinham prova em
+  `router.test.tsx`, nunca neste ficheiro -- inofensivo enquanto a etapa 6 media cobertura
+  pela suíte inteira, mas o comando de verificação por ficheiro
+  (`vitest run --coverage src/pages/notas/NotaPage.test.tsx`) não os alcançava sozinho.
+  Réplicas mínimas do que `router.test.tsx` já prova, sem mexer nesse ficheiro.
+
 ## Fora de âmbito
 
 - Fila real (múltiplas notas/pacientes vindas de um backend) -- ver
   `widgets/soap-editor/README.md`.
-- Sessão/Keychain real (substituir `record`/`baseUrl`/`accountId`/`accessToken` por props
-  reais, e `router.tsx` a passar uma `kek` não-nula) -- ver as decisões acima.
+- Keychain real (um valor não-nulo de verdade para `kek`/`accessToken` em `router.tsx`) --
+  `accountId` e o mecanismo de `accessToken` (prop vs. constante) já saíram desta lista no
+  S08-27; falta só o provider que produza os valores reais, ver as decisões acima.
 - Mostrar quando/por quem a nota foi assinada continua fluxo futuro, ainda sem nenhuma tela
   -- o S08-11 usa `obterAssinatura` (`entities/nota/api.ts`, reposto neste ticket com
   chamador, ver `entities/nota/README.md`) só para decidir `estado`, sem exibir

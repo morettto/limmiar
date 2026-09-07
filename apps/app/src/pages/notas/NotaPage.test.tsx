@@ -27,16 +27,23 @@ const CIPHERTEXT = new Uint8Array([1, 2, 3])
 const SIGNATURE = new Uint8Array([4, 5, 6])
 const SIGNED_AT = '2026-08-27T10:05:00Z'
 
-function renderNotaPage(kek: CryptoKey | null = null) {
+const ACCOUNT_ID_TEST = 'conta-fixture-teste-1'
+const ACCESS_TOKEN_TEST = 'token-fixture-teste-1'
+
+function renderNotaPage(
+  kek: CryptoKey | null = null,
+  accountId: string | null = ACCOUNT_ID_TEST,
+  accessToken: string | null = ACCESS_TOKEN_TEST,
+) {
   return render(
     <I18nProvider i18n={i18n}>
-      <NotaPage kek={kek} />
+      <NotaPage kek={kek} accountId={accountId} accessToken={accessToken} />
     </I18nProvider>,
   )
 }
 
-async function renderEObterProps(kek?: CryptoKey | null) {
-  renderNotaPage(kek)
+async function renderEObterProps(kek?: CryptoKey | null, accountId?: string | null, accessToken?: string | null) {
+  renderNotaPage(kek, accountId, accessToken)
   const { FilaEEditor } = await import('../../widgets/soap-editor/FilaEEditor')
   const props = () => vi.mocked(FilaEEditor).mock.calls.at(-1)![0]
   const notaId = props().notas[0]!.id
@@ -90,6 +97,70 @@ describe('NotaPage', () => {
     play.mockRestore()
   })
 
+  it('aoTocar toca a âncora no reprodutor real quando o ref do <audio> existe', async () => {
+    const play = vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined)
+    renderNotaPage()
+
+    const { FilaEEditor } = await import('../../widgets/soap-editor/FilaEEditor')
+    const props = vi.mocked(FilaEEditor).mock.calls[0]![0]
+
+    props.aoTocar({ inicioMs: 2500, fimMs: 3000 })
+
+    expect(play).toHaveBeenCalledTimes(1)
+    play.mockRestore()
+  })
+
+  it('onChangeNota atualiza a nota em memória, refletida na renderização seguinte', async () => {
+    const { props, notaId } = await renderEObterProps()
+    const notaEditada = { ...notaPorId(props, notaId), revisao: 1 }
+
+    act(() => props().onChangeNota(notaEditada))
+
+    expect(props().notas.find((nota) => nota.id === notaId)).toEqual(notaEditada)
+  })
+
+  // S08-27: guarda simétrica ao `kek === null` de `aoAssinar` -- sem accountId ou accessToken
+  // reais (ambos props agora), nenhum pedido sai. Prova as duas metades, uma por variável.
+  describe('mount não dispara obterAssinatura sem accountId e accessToken reais (S08-27)', () => {
+    it('critério de aceite 1: accountId === null -- nenhum pedido de rede sai, espiando fetch de verdade', async () => {
+      const fetchMock = vi.fn().mockResolvedValue(new Response('{}'))
+      vi.stubGlobal('fetch', fetchMock)
+      // `entities/nota/api` está mockado no topo do ficheiro -- sem religar a implementação real
+      // aqui, o espião em `fetch` nunca veria nada, com ou sem guarda, e o teste não provaria nada.
+      const real = await vi.importActual<typeof import('../../entities/nota/api')>('../../entities/nota/api')
+      const { obterAssinatura } = await import('../../entities/nota/api')
+      vi.mocked(obterAssinatura).mockImplementation(real.obterAssinatura)
+
+      try {
+        const { props, notaId } = await renderEObterProps(null, null)
+        await act(async () => {})
+
+        expect(fetchMock).not.toHaveBeenCalled()
+        expect(props().notas.find((nota) => nota.id === notaId)?.estado).toBe(ESTADO_PENDENTE)
+      } finally {
+        vi.unstubAllGlobals()
+      }
+    })
+
+    it('accountId real mas accessToken === null -- nenhum pedido de rede sai, espiando fetch de verdade', async () => {
+      const fetchMock = vi.fn().mockResolvedValue(new Response('{}'))
+      vi.stubGlobal('fetch', fetchMock)
+      const real = await vi.importActual<typeof import('../../entities/nota/api')>('../../entities/nota/api')
+      const { obterAssinatura } = await import('../../entities/nota/api')
+      vi.mocked(obterAssinatura).mockImplementation(real.obterAssinatura)
+
+      try {
+        const { props, notaId } = await renderEObterProps(null, ACCOUNT_ID_TEST, null)
+        await act(async () => {})
+
+        expect(fetchMock).not.toHaveBeenCalled()
+        expect(props().notas.find((nota) => nota.id === notaId)?.estado).toBe(ESTADO_PENDENTE)
+      } finally {
+        vi.unstubAllGlobals()
+      }
+    })
+  })
+
   describe('mount pergunta ao servidor se a nota já está assinada', () => {
     it('obterAssinatura ok=true marca a nota assinada, sem role=alert', async () => {
       const { obterAssinatura } = await import('../../entities/nota/api')
@@ -103,7 +174,7 @@ describe('NotaPage', () => {
       const { props, notaId } = await renderEObterProps()
       await act(async () => {})
 
-      expect(vi.mocked(obterAssinatura)).toHaveBeenCalledWith('', '', '', notaId)
+      expect(vi.mocked(obterAssinatura)).toHaveBeenCalledWith('', ACCOUNT_ID_TEST, ACCESS_TOKEN_TEST, notaId)
       expect(props().notas.find((nota) => nota.id === notaId)?.estado).toBe(ESTADO_ASSINADA)
       expect(screen.queryByRole('alert')).toBeNull()
     })
@@ -174,20 +245,6 @@ describe('NotaPage', () => {
     })
   })
 
-  describe('identidade da prop notas entre renders', () => {
-    it('render que só muda mensagem (kek === null) não troca a referência de notas', async () => {
-      const { FilaEEditor } = await import('../../widgets/soap-editor/FilaEEditor')
-      const { props, notaId } = await renderEObterProps(null)
-      const notasAntes = props().notas
-      const chamadasAntes = vi.mocked(FilaEEditor).mock.calls.length
-
-      await assinar(props, notaId)
-
-      expect(vi.mocked(FilaEEditor).mock.calls.length).toBeGreaterThan(chamadasAntes)
-      expect(props().notas).toBe(notasAntes)
-    })
-  })
-
   describe('aoAssinar sem sessão (kek === null)', () => {
     it('mostra mensagem explícita de sessão ausente e nunca chama openRecord', async () => {
       const { openRecord } = await import('../../entities/patient/patient-crypto')
@@ -226,7 +283,7 @@ describe('NotaPage', () => {
 
       await assinar(props, notaId)
 
-      expect(vi.mocked(appendPatientEntry)).toHaveBeenCalledWith('', '', '', 'paciente-fixture-1', {
+      expect(vi.mocked(appendPatientEntry)).toHaveBeenCalledWith('', ACCOUNT_ID_TEST, ACCESS_TOKEN_TEST, 'paciente-fixture-1', {
         sequence: 1,
         ciphertext: CIPHERTEXT,
       })

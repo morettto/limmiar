@@ -44,7 +44,7 @@ module.exports = {
     {
       name: 'fsd-no-cross-slice',
       comment:
-        'FSD slice isolation: a slice depends on lower layers, never on a sibling slice of its own layer. Invariant: every file lives inside a named slice folder (no loose files at a layer root) -- not checked by this regex, verified by hand across all four layers instead. The two composition exceptions (recovery, device-pairing-new) get their own rules below, scoped to the exact accepted pair, and are carved out of this general rule via from.pathNot so their broader traffic still routes through those dedicated rules. The exception list is debt with its own ticket (promote recovery and device-pairing-new to widgets).',
+        'FSD slice isolation: a slice depends on lower layers, never on a sibling slice of its own layer. The two composition exceptions (recovery, device-pairing-new) get their own rules below, scoped to the exact accepted pair, and are carved out of this general rule via from.pathNot so their broader traffic still routes through those dedicated rules. The exception list is debt with its own ticket (promote recovery and device-pairing-new to widgets).',
       severity: 'error',
       from: {
         path: '^src/(pages|widgets|features|entities)/([^/]+)/',
@@ -54,6 +54,14 @@ module.exports = {
         path: '^src/$1/',
         pathNot: '^src/$1/$2/',
       },
+    },
+    {
+      name: 'fsd-no-loose-layer-files',
+      comment:
+        'Only fires on a loose file that itself has an outgoing import; a loose file with zero imports or one only imported by others slips through -- arch.test.ts has the filesystem-level net that catches those.',
+      severity: 'error',
+      from: { path: '^src/(pages|widgets|features|entities)/[^/]+\\.(ts|tsx)$' },
+      to: {},
     },
     {
       name: 'fsd-no-cross-slice-recovery',

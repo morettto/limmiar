@@ -58,7 +58,7 @@ msgstr "Attendi che l'altro dispositivo legga il codice prima di consentire l'ac
 msgid "Aponte a câmera para o código QR exibido no outro dispositivo."
 msgstr "Inquadra con la fotocamera il codice QR mostrato sull'altro dispositivo."
 
-#: src/features/nota-fila/FilaAssinatura.tsx:37
+#: src/features/nota-fila/FilaAssinatura.tsx:42
 msgid "Assinadas"
 msgstr "Firmate"
 
@@ -239,7 +239,7 @@ msgstr "Questa frase non verrà mostrata di nuovo. Conservala in un luogo sicuro
 msgid "notes.signature_not_found"
 msgstr "Questa nota non è ancora stata firmata."
 
-#: src/pages/notas/NotaPage.tsx:89
+#: src/pages/notas/NotaPage.tsx:91
 msgid "Esta nota já está assinada."
 msgstr "Questa nota è già stata firmata."
 
@@ -248,7 +248,7 @@ msgstr "Questa nota è già stata firmata."
 msgid "notes.already_signed"
 msgstr "Questa nota è già stata firmata."
 
-#: src/pages/notas/NotaPage.tsx:130
+#: src/pages/notas/NotaPage.tsx:132
 msgid "Esta nota já tinha sido assinada. As alterações feitas depois não estão cobertas por essa assinatura."
 msgstr "Questa nota era già stata firmata. Le modifiche fatte dopo non sono coperte da questa firma."
 
@@ -257,7 +257,7 @@ msgstr "Questa nota era già stata firmata. Le modifiche fatte dopo non sono cop
 msgid "agenda.session_cancelled"
 msgstr "Questa sessione è stata annullata."
 
-#: src/features/nota-fila/FilaAssinatura.tsx:65
+#: src/features/nota-fila/FilaAssinatura.tsx:70
 msgid "Estado da nota"
 msgstr "Stato della nota"
 
@@ -289,11 +289,11 @@ msgstr "Questa cartella è cambiata su un altro dispositivo. Ricarica e riprova.
 msgid "Estes códigos não serão exibidos novamente. Guarde-os em um local seguro: eles são a única forma de recuperar o acesso à sua conta caso você perca o aplicativo autenticador."
 msgstr "Questi codici non verranno mostrati di nuovo. Conservali in un luogo sicuro: sono l'unico modo per recuperare l'accesso al tuo account se perdi l'app di autenticazione."
 
-#: src/pages/notas/NotaPage.tsx:137
+#: src/pages/notas/NotaPage.tsx:139
 msgid "Falha ao assinar a nota. Tente novamente."
 msgstr "Impossibile firmare la nota. Riprova."
 
-#: src/features/nota-fila/FilaAssinatura.tsx:81
+#: src/features/nota-fila/FilaAssinatura.tsx:86
 #: src/widgets/soap-editor/FilaEEditor.tsx:31
 msgid "Fila de assinatura"
 msgstr "Coda di firma"
@@ -408,11 +408,11 @@ msgstr "Nessuna registrazione vocale trovata per questo account."
 msgid "Nenhuma nota encontrada."
 msgstr "Nessuna nota trovata."
 
-#: src/features/nota-fila/FilaAssinatura.tsx:89
+#: src/features/nota-fila/FilaAssinatura.tsx:94
 msgid "Nenhuma nota nesta aba."
 msgstr "Nessuna nota in questa scheda."
 
-#: src/pages/notas/NotaPage.tsx:123
+#: src/pages/notas/NotaPage.tsx:125
 msgid "Nota assinada em {dataAssinatura}."
 msgstr "Nota firmata il {dataAssinatura}."
 
@@ -448,7 +448,7 @@ msgstr "Pazienti"
 msgid "Parear novo dispositivo"
 msgstr "Abbina nuovo dispositivo"
 
-#: src/features/nota-fila/FilaAssinatura.tsx:36
+#: src/features/nota-fila/FilaAssinatura.tsx:41
 msgid "Pendentes"
 msgstr "In attesa"
 
@@ -506,7 +506,7 @@ msgstr "Salva"
 msgid "Selecione uma nota na fila."
 msgstr "Seleziona una nota nella coda."
 
-#: src/pages/notas/NotaPage.tsx:93
+#: src/pages/notas/NotaPage.tsx:95
 msgid "Sem sessão ativa. Não é possível assinar."
 msgstr "Nessuna sessione attiva. Impossibile firmare."
 

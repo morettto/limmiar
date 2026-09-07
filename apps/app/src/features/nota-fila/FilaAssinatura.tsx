@@ -1,7 +1,12 @@
 import { useState, type KeyboardEvent } from 'react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { proximoIndice } from './navegacao-teclado'
-import { ESTADO_PENDENTE, ESTADOS_NOTA, type EstadoNota, type Nota } from '../../entities/nota/nota'
+import { ESTADO_ASSINADA, ESTADO_PENDENTE, type EstadoNota, type Nota } from '../../entities/nota/nota'
+
+// Ordem de apresentação das abas: decisão desta feature, não de ESTADOS_NOTA (que só
+// deriva o tipo EstadoNota). Reordenar ESTADOS_NOTA não reordena a UI -- ver README,
+// "ordem das abas vive aqui" (S08-31, achado 3.2).
+const ORDEM_ABAS: readonly EstadoNota[] = [ESTADO_PENDENTE, ESTADO_ASSINADA]
 
 export interface FilaAssinaturaProps {
   itens: readonly Nota[]
@@ -63,7 +68,7 @@ export function FilaAssinatura({ itens, selecionadoId, onSelecionar }: FilaAssin
   return (
     <div>
       <div role="tablist" aria-label={t`Estado da nota`} className="mb-2 flex gap-1">
-        {ESTADOS_NOTA.map((estadoAba) => (
+        {ORDEM_ABAS.map((estadoAba) => (
           <button
             key={estadoAba}
             type="button"

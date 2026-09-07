@@ -66,7 +66,7 @@ public sealed class ScheduledSessionStore(NpgsqlDataSource dataSource)
 
         if (await LockAndGuardAsync(scope, sessionId, cancellationToken) is { } rejection)
         {
-            return Result<ScheduledSession, SchedulingFailureReason>.Failure(rejection);
+            return rejection;
         }
 
         await using var updateCommand = scope.Connection.CreateCommand();
@@ -94,7 +94,7 @@ public sealed class ScheduledSessionStore(NpgsqlDataSource dataSource)
         }
 
         await scope.Transaction.CommitAsync(cancellationToken);
-        return Result<ScheduledSession, SchedulingFailureReason>.Success(moved);
+        return moved;
     }
 
     /// <summary>Same lock and same guards as <see cref="MoveAsync"/>; only writes <c>cancelled_at</c>.</summary>
@@ -105,7 +105,7 @@ public sealed class ScheduledSessionStore(NpgsqlDataSource dataSource)
 
         if (await LockAndGuardAsync(scope, sessionId, cancellationToken) is { } rejection)
         {
-            return Result<ScheduledSession, SchedulingFailureReason>.Failure(rejection);
+            return rejection;
         }
 
         await using var updateCommand = scope.Connection.CreateCommand();
@@ -127,7 +127,7 @@ public sealed class ScheduledSessionStore(NpgsqlDataSource dataSource)
         }
 
         await scope.Transaction.CommitAsync(cancellationToken);
-        return Result<ScheduledSession, SchedulingFailureReason>.Success(cancelled);
+        return cancelled;
     }
 
     /// <summary>

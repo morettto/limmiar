@@ -22,8 +22,8 @@ concorrência real (ver `docs/adr/ADR-S04-02-horario-em-claro-servidor-zero-know
   SchedulingFailureReason>` (S08-21, molde `Api.Notes`/`Api.Patients`, ADR
   `docs/adr/0011-store-service-nao-devolve-tuplo-nullable.md`): o store já fala o vocabulário
   final de falha, não há tipo intermédio a traduzir a jusante, e a exclusividade
-  valor-ou-falha é estrutural (`TryGetValue`/`TryGetFailure`), não um `required bool
-  Succeeded` com dois nullables.
+  valor-ou-falha é estrutural (`Match`), não um `required bool Succeeded` com dois
+  nullables.
 - `SchedulingService` -- `AuthorizeAsync` (privado) verifica a conta uma única vez para
   `ScheduleAsync`/`MoveAsync`/`CancelAsync` (existe, é Profissional Ativo, reusando
   `AccountAuthorizationGuard.CanCreatePatientRecords`, o mesmo guard que `PatientService`

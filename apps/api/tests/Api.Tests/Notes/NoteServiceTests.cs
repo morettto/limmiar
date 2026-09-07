@@ -52,7 +52,9 @@ public sealed class NoteServiceTests : IAsyncLifetime
 
         var result = await service.SignAsync(Guid.NewGuid(), Guid.NewGuid(), 0, new byte[60], CancellationToken.None);
 
-        Assert.True(result.TryGetFailure(out var failureReason));
+        var failureReason = result.Match(
+            _ => throw new InvalidOperationException("expected a failure"),
+            reason => reason);
         Assert.Equal(SignNoteFailureReason.AccountNotFound, failureReason);
     }
 
@@ -66,7 +68,9 @@ public sealed class NoteServiceTests : IAsyncLifetime
 
         var result = await service.SignAsync(account.Id, Guid.NewGuid(), 0, new byte[60], CancellationToken.None);
 
-        Assert.True(result.TryGetFailure(out var failureReason));
+        var failureReason = result.Match(
+            _ => throw new InvalidOperationException("expected a failure"),
+            reason => reason);
         Assert.Equal(SignNoteFailureReason.NotAuthorizedToCreateRecords, failureReason);
     }
 
@@ -82,7 +86,9 @@ public sealed class NoteServiceTests : IAsyncLifetime
 
         var result = await service.SignAsync(account.Id, noteId, 0, new byte[60], CancellationToken.None);
 
-        Assert.True(result.TryGetFailure(out var failureReason));
+        var failureReason = result.Match(
+            _ => throw new InvalidOperationException("expected a failure"),
+            reason => reason);
         Assert.Equal(SignNoteFailureReason.AlreadySigned, failureReason);
     }
 
