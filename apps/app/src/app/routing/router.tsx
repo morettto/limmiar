@@ -10,7 +10,7 @@ import { CopilotKeyPage } from '../../pages/settings/CopilotKeyPage'
 import { NotaPage } from '../../pages/notas/NotaPage'
 import { BibliotecaPage } from '../../pages/biblioteca/BibliotecaPage'
 import { parseEstadoConsentimento, type EstadoConsentimento } from '../../entities/consentimento/api'
-import { useSession } from '../providers/SessionProvider'
+import { useSession } from '../../entities/account/session-context'
 import { E2eMicrofoneScaffold } from './E2eMicrofoneScaffold'
 
 function readSearchString(search: Record<string, unknown>, key: string): string {
@@ -25,15 +25,10 @@ function readSearchString(search: Record<string, unknown>, key: string): string 
 
 const rootRoute = createRootRoute()
 
-function IndexRouteComponent() {
-  const { sessao, terminarSessao } = useSession()
-  return <HomePage email={sessao?.email ?? null} onSair={terminarSessao} />
-}
-
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
-  component: IndexRouteComponent,
+  component: HomePage,
 })
 
 interface MagicLinkCallbackSearch {
@@ -201,18 +196,10 @@ function E2eMicrofoneRouteComponent() {
 // playwright.config.ts exercises a real `vite build`, not `vite dev`.
 
 
-// useSession() only works under app/routing (fsd-pages-no-app forbids pages from importing app),
-// so this thin wrapper is the one place that can read `sessao` and hand CopilotKeyPage a real
-// accountId -- reintroduced after S07-04 follow-up B3 removed it, for that reason.
-function CopilotKeyRouteComponent() {
-  const { sessao } = useSession()
-  return <CopilotKeyPage accountId={sessao?.id ?? null} />
-}
-
 const copilotSettingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/settings/copilot',
-  component: CopilotKeyRouteComponent,
+  component: CopilotKeyPage,
 })
 
 // ponytail: mesma situação, mesmo motivo do `dek={null}` de BibliotecaRouteComponent --
@@ -232,13 +219,12 @@ const notaRoute = createRoute({
 })
 
 // ponytail: mesma situação do `kek={null}` de CopilotKeyPage/NotaPage -- sem KeychainProvider
-// ainda. `chaveIndice={null}` deixa BibliotecaPage em `a-preparar` sem abrir OPFS. `accountId` já
-// vem da sessão real (S18-01); só falta o chaveiro, fora de âmbito desta spec.
+// ainda. `chaveIndice={null}` deixa BibliotecaPage em `a-preparar` sem abrir OPFS; a página lê a
+// própria sessão via useSession() (S18-10). Só falta o chaveiro, fora de âmbito desta spec.
 const BIBLIOTECA_STORE_FIXTURE = { ler: async () => null, gravar: async () => {}, apagar: async () => {} }
 
 function BibliotecaRouteComponent() {
-  const { sessao } = useSession()
-  return <BibliotecaPage notas={[]} accountId={sessao?.id ?? null} chaveIndice={null} store={BIBLIOTECA_STORE_FIXTURE} />
+  return <BibliotecaPage notas={[]} chaveIndice={null} store={BIBLIOTECA_STORE_FIXTURE} />
 }
 
 // Ticket S08-02, fatias 4-5: biblioteca de notas com busca cifrada no cliente. Rota normal

@@ -1,14 +1,12 @@
 import { Link } from '@tanstack/react-router'
 import { Trans } from '@lingui/react/macro'
-
-export interface HomePageProps {
-  email: string | null
-  onSair: () => void
-}
+import { useSession } from '../../entities/account/session-context'
 
 // ponytail: this <div id="app-shell"> is a navigation stub, not a real landing page --
 // replace it together with the real landing page, not as a standalone cleanup.
-export function HomePage({ email, onSair }: HomePageProps) {
+export function HomePage() {
+  const { sessao, terminarSessao } = useSession()
+  const email = sessao?.email ?? null
   return (
     <div id="app-shell">
       Limmiar
@@ -18,7 +16,7 @@ export function HomePage({ email, onSair }: HomePageProps) {
       {email !== null ? (
         <>
           <span data-testid="conta-sessao">{email}</span>
-          <button type="button" onClick={onSair}>
+          <button type="button" onClick={terminarSessao}>
             <Trans>Sair</Trans>
           </button>
         </>

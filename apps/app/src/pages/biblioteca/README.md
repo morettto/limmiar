@@ -57,9 +57,10 @@ página já calculou.
 
 ## Pontos de entrada
 
-- `BibliotecaPage({ notas, accountId, chaveIndice, store })` -- componente React.
-  `accountId: string | null` (S18-04) -- `null` sem sessão, tratado no mesmo ramo cedo do
-  efeito que `chaveIndice === null` já cobria (ver Decisões).
+- `BibliotecaPage({ notas, chaveIndice, store })` -- componente React. `accountId` não é prop
+  (S18-10): a página lê `useSession().sessao?.id ?? null` sozinha (`entities/account/session-context.tsx`),
+  `null` sem sessão, tratado no mesmo ramo cedo do efeito que `chaveIndice === null` já cobria
+  (ver Decisões).
   `chaveIndice: ChaveIndiceBusca | null` (`features/nota-biblioteca/indice-crypto.ts`,
   ticket S08-10) só aceita o tipo marcado que `chaveIndiceDaConta(kek)` produz -- uma
   `CryptoKey` crua (ex.: uma DEK de paciente) não compila aqui, ver
@@ -76,16 +77,18 @@ página já calculou.
 
 ## Decisões desta fatia
 
-- **`notas`/`accountId`/`chaveIndice`/`store` são todos props, sem fixture interna.**
-  Ao contrário de `NotaPage` (que guarda fixtures fixas dentro do próprio componente),
-  a forma acordada no portão deste ticket exige que `BibliotecaPage` receba tudo por
-  parâmetro -- é o container "fino" que a instrução de página deste harness pede. As
-  fixtures (`chaveIndice={null}`, `store` que nunca acha nada, `notas` vazias) vivem em
-  `BibliotecaRouteComponent`, no router -- mesmo padrão, mesmo motivo do
-  `kek={null}` de `CopilotKeyPage`, só que um nível acima (na composição da
-  rota, não dentro da página).
-- **`accountId: string | null`, não `string` com sentinela `''` (S18-04).**
-  `BibliotecaRouteComponent` passa `sessao?.id ?? null`; o efeito que restaura/constrói o
+- **`notas`/`chaveIndice`/`store` são props, sem fixture interna; `accountId` não é prop
+  (S18-10).** Ao contrário de `NotaPage` (que guarda fixtures fixas dentro do próprio
+  componente), a forma acordada no portão deste ticket exige que `BibliotecaPage` receba
+  `notas`/`chaveIndice`/`store` por parâmetro -- é o container "fino" que a instrução de página
+  deste harness pede. As fixtures (`chaveIndice={null}`, `store` que nunca acha nada, `notas`
+  vazias) vivem em `BibliotecaRouteComponent`, no router -- mesmo padrão, mesmo motivo do
+  `kek={null}` de `CopilotKeyPage`, só que um nível acima (na composição da rota, não dentro da
+  página). `accountId` era prop até S18-09; S18-10 tirou-a: a página lê
+  `useSession().sessao?.id ?? null` sozinha (`entities/account/session-context.tsx`), o que
+  apagou o `useSession()`/wrapper que `BibliotecaRouteComponent` tinha só para essa injeção.
+- **`accountId` deriva de `useSession().sessao?.id ?? null`, não `string` com sentinela `''`
+  (S18-04, movido de prop para leitura direta em S18-10).** O efeito que restaura/constrói o
   índice trata `accountId === null` no mesmo ramo cedo que já tratava `chaveIndice === null`
   (nenhuma das duas condições tem hoje índice para carregar) -- sem reintroduzir a sentinela
   que `assertAccountId` (`features/copilot-byok/key-store.ts`) rejeitaria noutra página.

@@ -5,11 +5,14 @@
 Dono único da identidade da conta autenticada, do login/recuperação até qualquer leitor da
 sessão em toda a app (spec S18, ticket S18-01). `session.ts` (`criarSessaoDeConta(storage)`,
 `sessaoDaConta`) é a única fonte de verdade de "quem está logado agora" -- ninguém mais grava
-ou lê `sessionStorage['limmiar:account']` diretamente. Esta slice não conhece purgas: apagar a
-sessão no logout/troca de conta e disparar limpeza de outros dados (chaveiro, índice de busca
-em OPFS...) é orquestração de fora, não responsabilidade de `entities` -- a regra
-`fsd-no-cross-slice` (`.dependency-cruiser.cjs`) já impede `entities/account` de conhecer
-`entities/nota`/`features/*` para forçar essa fronteira em compilação, não só em prosa.
+ou lê `sessionStorage['limmiar:account']` diretamente. `session-context.tsx` (S18-10) é o React
+`Context`/hook (`SessionContext`, `useSession()`) que expõe essa sessão à árvore -- React puro,
+zero imports de `features`, para que qualquer `pages/`/`features/` possa chamá-lo sem violar
+`fsd-pages-no-app`. Esta slice não conhece purgas: apagar a sessão no logout/troca de conta e
+disparar limpeza de outros dados (chaveiro, índice de busca em OPFS...) é orquestração de fora,
+não responsabilidade de `entities` -- a regra `fsd-no-cross-slice` (`.dependency-cruiser.cjs`) já
+impede `entities/account` de conhecer `entities/nota`/`features/*` para forçar essa fronteira em
+compilação, não só em prosa.
 
 ## Fluxo principal
 
@@ -17,9 +20,10 @@ em OPFS...) é orquestração de fora, não responsabilidade de `entities` -- a 
    `features/magic-link-auth/MagicLinkCallback`) autentica a conta e chama o próprio
    `onAuthenticated`/`onRecovered` -- eles não gravam a sessão sozinhos desde o S18-01 (antes,
    cada um chamava `recordSession` direto; ver Decisões).
-2. Só `app/routing/router.tsx` liga esse callback a `iniciarSessao` de
-   `app/providers/SessionProvider.tsx`, que por sua vez chama `sessaoDaConta.registar(account)`
-   -- grava em `window.sessionStorage` e atualiza o estado React do provider na mesma chamada.
+2. `app/routing/router.tsx` liga esse callback a `iniciarSessao` de
+   `app/providers/SessionProvider.tsx` (via `useSession()`, `session-context.tsx`), que por sua
+   vez chama `sessaoDaConta.registar(account)` -- grava em `window.sessionStorage` e atualiza o
+   estado React do provider na mesma chamada.
 3. No mount do `SessionProvider` (qualquer navegação/reload da SPA), `sessaoDaConta.ler()`
    tenta restaurar a sessão gravada. Quatro ramos degradam para `null`, nunca lançam: nada
    gravado; JSON corrompido; valor parseado que não é um objeto não-nulo (array e o literal
@@ -36,17 +40,25 @@ em OPFS...) é orquestração de fora, não responsabilidade de `entities` -- a 
 - `sessaoDaConta: SessaoDeConta` (`session.ts`) -- a instância real, fechada sobre
   `window.sessionStorage`. Import direto do ficheiro (`entities/account/session`), não pelo
   barrel `index.ts` -- mesma disciplina de isolamento do antigo `recordSession` (S08-08).
-- Consumido só por `app/providers/SessionProvider.tsx` (`useSession()` expõe `sessao`,
-  `iniciarSessao`, `terminarSessao` a toda a árvore React). Nenhuma página em `src/pages/` pode
-  importar `SessionProvider` diretamente -- a regra `fsd-pages-no-app` proíbe `pages` → `app`;
-  quem precisa da conta recebe `accountId`/callback como prop, ligada por um route component em
-  `app/routing/router.tsx`.
+- `SessionContext`, `useSession(): ContextoSessao` (`session-context.tsx`, S18-10) -- expõe
+  `sessao`, `iniciarSessao`, `terminarSessao` a toda a árvore React. Qualquer `pages/`/`features/`
+  pode chamar `useSession()` diretamente (React puro, nenhuma dependência de `app`), sem precisar
+  de um route component intermédio a converter sessão em props -- `app/providers/SessionProvider.tsx`
+  é quem monta `<SessionContext.Provider>` com o estado real.
 - `Account`, `AccountRole`, `TwoFactorRequirement` (`account.ts`); `register`, `login`,
   `continueWithGoogle`, `requestMagicLink`, `verifyMagicLink`, `recoverAccess`... (`api.ts`) --
   ver `index.ts` para a lista completa; não mudaram nesta fatia.
 
 ## Decisões desta fatia
 
+- **`SessionContext`/`useSession()` desceram de `app/providers/SessionProvider.tsx` para
+  `session-context.tsx` nesta slice (S18-10).** Viviam em `app/providers` porque nasceram junto
+  com `SessionProvider`; `fsd-pages-no-app` (`.dependency-cruiser.cjs`) proíbe `pages` de importar
+  `app`, então três route components (`IndexRouteComponent`, `CopilotKeyRouteComponent`,
+  `BibliotecaRouteComponent`) existiam só para chamar `useSession()` em `app/routing` e passar o
+  resultado como prop. `entities` já é camada que `pages` pode importar -- descer o contexto
+  (React puro, sem `clearApiKey`/`purgarIndiceBusca`, que ficaram em `SessionProvider.tsx`) apagou
+  os três wrappers sem mudar nenhum comportamento observável.
 - **`ler()` valida `id`, `email`, `role` e `twoFactorRequirement` (S18-02, review de segurança).**
   Um `sessionStorage` editável no DevTools não deve conseguir forjar um `role` ou um
   `twoFactorRequirement` que o predicado `valor is Account` depois trata como garantido para

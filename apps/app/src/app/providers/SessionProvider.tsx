@@ -1,15 +1,8 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import type { Account } from '../../entities/account'
 import { sessaoDaConta } from '../../entities/account/session'
+import { SessionContext } from '../../entities/account/session-context'
 import { purgarConta } from './purgar-conta'
-
-export interface ContextoSessao {
-  sessao: Account | null
-  iniciarSessao(account: Account): void
-  terminarSessao(): void
-}
-
-const SessionContext = createContext<ContextoSessao | null>(null)
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [sessao, setSessao] = useState<Account | null>(() => sessaoDaConta.ler())
@@ -36,12 +29,4 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const value = useMemo(() => ({ sessao, iniciarSessao, terminarSessao }), [sessao, iniciarSessao, terminarSessao])
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>
-}
-
-export function useSession(): ContextoSessao {
-  const value = useContext(SessionContext)
-  if (value === null) {
-    throw new Error('useSession: nenhum <SessionProvider> ancestral')
-  }
-  return value
 }

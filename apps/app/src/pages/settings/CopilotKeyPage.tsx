@@ -1,15 +1,13 @@
 import { useNavigate } from '@tanstack/react-router'
+import { useSession } from '../../entities/account/session-context'
 import { CopilotKeySetup } from '../../features/copilot-byok/CopilotKeySetup'
 
-export interface CopilotKeyPageProps {
-  accountId: string | null
-}
-
-// ponytail: `kek` is still pinned to `null` because no KeychainProvider is mounted anywhere yet,
-// so this route correctly shows the locked screen with "Pular". Whoever wires up the keychain
-// connects it here, in the same diff. `accountId` now comes from the caller (S18-01).
-export function CopilotKeyPage({ accountId }: CopilotKeyPageProps) {
+// ponytail: `kek` is still pinned to `null` -- no KeychainProvider mounted yet. Whoever wires up
+// the keychain connects it here. `accountId` comes straight from useSession() (S18-10), no
+// `?? ''` collapse; CopilotKeySetup treats `accountId === null` the same as `kek === null`.
+export function CopilotKeyPage() {
+  const { sessao } = useSession()
   const navigate = useNavigate()
   const onDone = () => navigate({ to: '/' })
-  return <CopilotKeySetup accountId={accountId ?? ''} kek={null} onDone={onDone} />
+  return <CopilotKeySetup accountId={sessao?.id ?? null} kek={null} onDone={onDone} />
 }

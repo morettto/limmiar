@@ -3,9 +3,11 @@
 ## Responsabilidade
 
 Composição de providers de topo da SPA. `AppProviders` monta a árvore real (`I18nProvider` +
-`SessionProvider`) usada por `App.tsx`; `SessionProvider` é o dono único do estado de sessão em
-React (`useSession()`), sobre `entities/account/session.ts` -- ver
-`entities/account/README.md` para a fonte de verdade da persistência.
+`SessionProvider`) usada por `App.tsx`; `SessionProvider` é o dono único do *estado* de sessão
+(`useState`/`iniciarSessao`/`terminarSessao`/purga), sobre `entities/account/session.ts` -- ver
+`entities/account/README.md` para a fonte de verdade da persistência. Desde S18-10, o React
+`Context` e o hook `useSession()` em si vivem em `entities/account/session-context.tsx`, não
+aqui: `SessionProvider` só monta `<SessionContext.Provider>` com o valor que calcula.
 
 ## Fluxo principal
 
@@ -23,22 +25,30 @@ React (`useSession()`), sobre `entities/account/session.ts` -- ver
    apaga o índice OPFS da conta que sai. Desde S18-08, o `catch` também deixa rasto: `console.error`
    com o `nome` literal da purga (não `purga.name` -- minificação em produção apagaria o nome) e o
    `accountId`, provado pelo teste que força `clearApiKey` a rejeitar e verifica a mensagem.
-3. `useSession()` lê o `SessionContext` React. Fora de um `<SessionProvider>` ancestral, lança
-   (`useSession: nenhum <SessionProvider> ancestral`) em vez de devolver um default silencioso
-   (S18-03) -- um erro de montagem em produção deixa de correr código sensível a sessão sem
-   provider sem avisar ninguém.
+3. `useSession()` (`entities/account/session-context.tsx`) lê o `SessionContext` React. Fora de
+   um `<SessionProvider>` ancestral, lança (`useSession: nenhum <SessionProvider> ancestral`) em
+   vez de devolver um default silencioso (S18-03) -- um erro de montagem em produção deixa de
+   correr código sensível a sessão sem provider sem avisar ninguém.
 
 ## Pontos de entrada
 
 - `AppProviders({ children })` (`AppProviders.tsx`) -- monta em `App.tsx`.
-- `SessionProvider({ children })`, `useSession(): ContextoSessao` (`SessionProvider.tsx`).
-  `useSession` só pode ser chamado a partir de `app/routing/router.tsx` (`fsd-pages-no-app`
-  proíbe `pages` de importar `app` diretamente).
+- `SessionProvider({ children })` (`SessionProvider.tsx`) -- monta `<SessionContext.Provider>`.
+  `useSession(): ContextoSessao` e `SessionContext` em si vivem em
+  `entities/account/session-context.tsx` (S18-10); qualquer `pages/`/`features/` pode chamar
+  `useSession()` diretamente, sem passar por `app/routing`.
 - `purgarConta(accountId): Promise<void>` (`purgar-conta.ts`) -- não é React (sem JSX), por isso
   vive fora de `SessionProvider.tsx`; só `SessionProvider` a chama.
 
 ## Decisões relevantes
 
+- **`SessionContext`/`useSession()` desceram para `entities/account/session-context.tsx`, React
+  puro sem imports de `features` (S18-10).** `SessionProvider.tsx` era o único dono de ambos, o
+  que forçava `useSession()` a só poder ser chamado a partir de `app/routing/router.tsx`
+  (`fsd-pages-no-app` proíbe `pages` de importar `app`) -- daí três route components
+  (`IndexRouteComponent`, `CopilotKeyRouteComponent`, `BibliotecaRouteComponent`) que existiam só
+  para injetar sessão em props. Com o contexto em `entities/account`, `pages` chama `useSession()`
+  direto; `SessionProvider` continua o único dono do *estado* (não do contexto em si).
 - **`SessionContext` é `createContext<ContextoSessao | null>(null)`, não um default no-op
   (S18-03).** O default anterior (`SEM_PROVIDER`, sessão nula e funções no-op) existia só para
   não forçar `router.test.tsx` a montar `<SessionProvider>` em ~25 sítios; esse custo de teste

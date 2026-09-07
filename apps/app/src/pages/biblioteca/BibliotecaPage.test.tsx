@@ -4,6 +4,8 @@ import { I18nProvider } from '@lingui/react'
 import { webcrypto as limmiarWebcrypto } from '@limmiar/crypto'
 import { dynamicActivate, i18n } from '../../shared/i18n'
 import { ESTADO_PENDENTE, type Nota } from '../../entities/nota/nota'
+import type { Account } from '../../entities/account'
+import { SessionContext, type ContextoSessao } from '../../entities/account/session-context'
 import { construirIndice, impressaoDigital, notaParaDoc, serializarIndice } from '../../features/nota-biblioteca/indice'
 import { chaveIndiceDaConta, selarIndice, type ChaveIndiceBusca } from '../../features/nota-biblioteca/indice-crypto'
 import { BibliotecaPage, type BibliotecaPageProps } from './BibliotecaPage'
@@ -13,6 +15,39 @@ vi.mock('../../widgets/biblioteca/BibliotecaNotas', () => ({
 }))
 
 const ACCOUNT_ID = '77777777-7777-7777-7777-777777777777'
+
+type Store = BibliotecaPageProps['store']
+
+function sessaoParaConta(accountId: string): Account {
+  return {
+    id: accountId,
+    email: 'user@example.com',
+    role: 'Professional',
+    twoFactorRequirement: 'NotApplicable',
+    twoFactorTicket: null,
+  }
+}
+
+function sessaoValue(accountId: string | null): ContextoSessao {
+  return {
+    sessao: accountId === null ? null : sessaoParaConta(accountId),
+    iniciarSessao: vi.fn(),
+    terminarSessao: vi.fn(),
+  }
+}
+
+// Único wrapper de montagem de BibliotecaPage: `accountId` deixou de ser prop (S18-10) --
+// entra via `<SessionContext.Provider>`, e cada chamada monta um provider fresco com o
+// `accountId` pedido (`null` vira `sessao: null`).
+function montar(props: BibliotecaPageProps, accountId: string | null) {
+  return (
+    <I18nProvider i18n={i18n}>
+      <SessionContext.Provider value={sessaoValue(accountId)}>
+        <BibliotecaPage {...props} />
+      </SessionContext.Provider>
+    </I18nProvider>
+  )
+}
 
 async function makeChave(): Promise<ChaveIndiceBusca> {
   const kek = await limmiarWebcrypto.importKek(crypto.getRandomValues(new Uint8Array(32)))
@@ -39,26 +74,17 @@ function nota(): Nota {
   }
 }
 
-async function renderEObterProps(overrides: Partial<BibliotecaPageProps> = {}) {
+async function renderEObterProps(overrides: Partial<BibliotecaPageProps> & { accountId?: string | null } = {}) {
   const { BibliotecaNotas } = await import('../../widgets/biblioteca/BibliotecaNotas')
   const chaveIndice =
     'chaveIndice' in overrides ? (overrides.chaveIndice as ChaveIndiceBusca | null) : await makeChave()
   const accountId = 'accountId' in overrides ? (overrides.accountId as string | null) : ACCOUNT_ID
-  const store = overrides.store ?? {
+  const store: Store = overrides.store ?? {
     ler: vi.fn().mockResolvedValue(null),
     gravar: vi.fn().mockResolvedValue(undefined),
     apagar: vi.fn().mockResolvedValue(undefined),
   }
-  const utils = render(
-    <I18nProvider i18n={i18n}>
-      <BibliotecaPage
-        notas={overrides.notas ?? [nota()]}
-        accountId={accountId}
-        chaveIndice={chaveIndice}
-        store={store}
-      />
-    </I18nProvider>,
-  )
+  const utils = render(montar({ notas: overrides.notas ?? [nota()], chaveIndice, store }, accountId))
   const props = () => vi.mocked(BibliotecaNotas).mock.calls.at(-1)![0]
   return { ...utils, props, store }
 }
@@ -156,16 +182,7 @@ describe('BibliotecaPage', () => {
     // `notas` e `store` novos por identidade (literais recriados, como um chamador que não
     // memoiza faria) mas com o mesmo conteúdo -- o pai rerenderizando sozinho não pode
     // disparar uma segunda leitura/gravação em OPFS.
-    rerender(
-      <I18nProvider i18n={i18n}>
-        <BibliotecaPage
-          notas={[{ ...notaAtual }]}
-          accountId={ACCOUNT_ID}
-          chaveIndice={chaveIndice}
-          store={{ ler, gravar, apagar }}
-        />
-      </I18nProvider>,
-    )
+    rerender(montar({ notas: [{ ...notaAtual }], chaveIndice, store: { ler, gravar, apagar } }, ACCOUNT_ID))
     // `ler` já reflete o rerender espúrio -- `store.ler()` roda até ao primeiro `await`
     // dentro do próprio `act()` do `rerender`. `gravar` não: a cadeia WebCrypto por trás
     // (packages/crypto/src/webcrypto.ts) só termina em ciclos reais do event loop.
@@ -175,16 +192,7 @@ describe('BibliotecaPage', () => {
     // "desmontar antes de persistirIndice resolver") ancora a espera num sinal real: se o
     // rerender espúrio também tivesse disparado o efeito, `gravar` chegaria a 3, não 2.
     const OUTRA_CONTA_ID = '88888888-8888-8888-8888-888888888888'
-    rerender(
-      <I18nProvider i18n={i18n}>
-        <BibliotecaPage
-          notas={[{ ...notaAtual }]}
-          accountId={OUTRA_CONTA_ID}
-          chaveIndice={chaveIndice}
-          store={{ ler, gravar, apagar }}
-        />
-      </I18nProvider>,
-    )
+    rerender(montar({ notas: [{ ...notaAtual }], chaveIndice, store: { ler, gravar, apagar } }, OUTRA_CONTA_ID))
     await waitFor(() => expect(gravar).toHaveBeenCalledTimes(2))
 
     expect(ler).toHaveBeenCalledTimes(2)
@@ -234,16 +242,7 @@ describe('BibliotecaPage', () => {
     expect(gravar).toHaveBeenCalledTimes(1)
 
     const notaEditada = { ...notaAtual, revisao: notaAtual.revisao + 1 }
-    rerender(
-      <I18nProvider i18n={i18n}>
-        <BibliotecaPage
-          notas={[notaEditada]}
-          accountId={ACCOUNT_ID}
-          chaveIndice={chaveIndice}
-          store={{ ler, gravar, apagar }}
-        />
-      </I18nProvider>,
-    )
+    rerender(montar({ notas: [notaEditada], chaveIndice, store: { ler, gravar, apagar } }, ACCOUNT_ID))
 
     await waitFor(() => expect(gravar).toHaveBeenCalledTimes(2))
     expect(ler).toHaveBeenCalledTimes(2)
@@ -260,9 +259,10 @@ describe('BibliotecaPage', () => {
     expect(gravar).not.toHaveBeenCalled()
   })
 
-  // S18-04: accountId agora é `string | null` -- mesmo ramo que chaveIndice===null já cobria,
-  // sem precisar da sentinela `''` que assertAccountId (key-store.ts) rejeitaria noutra página.
-  it('accountId === null: o resultado fica em a-preparar, sem tocar em ler/gravar', async () => {
+  // S18-04: accountId derivado de `useSession().sessao?.id ?? null` (S18-10: deixou de ser
+  // prop) -- mesmo ramo que chaveIndice===null já cobria, sem precisar da sentinela `''` que
+  // assertAccountId (features/copilot-byok/key-store.ts) rejeitaria noutra página.
+  it('sem sessão (sessao === null): o resultado fica em a-preparar, sem tocar em ler/gravar', async () => {
     const ler = vi.fn()
     const gravar = vi.fn()
     const apagar = vi.fn()
@@ -345,8 +345,10 @@ describe('BibliotecaPage', () => {
 
     render(
       <I18nProvider i18n={i18n}>
-        {/* @ts-expect-error chaveIndiceDaConta é a única porta para ChaveIndiceBusca */}
-        <BibliotecaPage notas={[]} accountId={ACCOUNT_ID} chaveIndice={chaveDePaciente} store={store} />
+        <SessionContext.Provider value={sessaoValue(ACCOUNT_ID)}>
+          {/* @ts-expect-error chaveIndiceDaConta é a única porta para ChaveIndiceBusca */}
+          <BibliotecaPage notas={[]} chaveIndice={chaveDePaciente} store={store} />
+        </SessionContext.Provider>
       </I18nProvider>,
     )
   })

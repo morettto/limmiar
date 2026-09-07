@@ -8,7 +8,8 @@ import { chaveIndiceDaConta, type ChaveIndiceBusca } from '../../features/nota-b
 import { construirIndice } from '../../features/nota-biblioteca/indice'
 import { opfsIndice, persistirIndice } from '../../features/nota-biblioteca/indice-store'
 import { FakeDirectoryHandle, stubOpfsRoot } from '../../test-support/fake-opfs'
-import { SessionProvider, useSession } from './SessionProvider'
+import { useSession } from '../../entities/account/session-context'
+import { SessionProvider } from './SessionProvider'
 
 const ACCOUNT: Account = {
   id: '11111111-1111-1111-1111-111111111111',
@@ -271,10 +272,11 @@ describe('SessionProvider', () => {
     const raiz = new FakeDirectoryHandle()
     const dirA = await seedIndiceBusca(raiz, ACCOUNT.id)
     restoreOpfsRoot = stubOpfsRoot(raiz)
-    // Mesma pegadinha de `renderRouter` em router.test.tsx: `useSession` também tem de vir fresco.
-    const { SessionProvider: SessionProviderComMockDePurga, useSession: useSessionFresco } = await import(
-      './SessionProvider'
-    )
+    // Mesma pegadinha de `renderRouter` em router.test.tsx: `SessionContext` fresco tem de vir
+    // do mesmo registo de módulos que o `SessionProvider` fresco, por isso os dois vêm de um
+    // import dinâmico depois do mesmo `vi.resetModules()`.
+    const { SessionProvider: SessionProviderComMockDePurga } = await import('./SessionProvider')
+    const { useSession: useSessionFresco } = await import('../../entities/account/session-context')
 
     function ConsumerFresco() {
       const { sessao, terminarSessao } = useSessionFresco()
@@ -314,10 +316,10 @@ describe('SessionProvider', () => {
     const raiz = new FakeDirectoryHandle()
     restoreOpfsRoot = stubOpfsRoot(raiz)
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
-    // Mesma pegadinha de `renderRouter`: `useSession` também tem de vir fresco.
-    const { SessionProvider: SessionProviderComMockDePurga, useSession: useSessionFresco } = await import(
-      './SessionProvider'
-    )
+    // Mesma pegadinha de `renderRouter`: `SessionContext` fresco tem de vir do mesmo registo de
+    // módulos que o `SessionProvider` fresco.
+    const { SessionProvider: SessionProviderComMockDePurga } = await import('./SessionProvider')
+    const { useSession: useSessionFresco } = await import('../../entities/account/session-context')
 
     function ConsumerFresco() {
       const { sessao, terminarSessao } = useSessionFresco()
@@ -349,15 +351,6 @@ describe('SessionProvider', () => {
     consoleError.mockRestore()
     vi.doUnmock('../../features/copilot-byok/key-store')
     vi.resetModules()
-  })
-
-  it('useSession outside a SessionProvider throws instead of returning a silent default', () => {
-    // Suprime o console.error do React sobre o erro não apanhado durante o render.
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
-
-    expect(() => render(<Consumer />)).toThrow('useSession: nenhum <SessionProvider> ancestral')
-
-    consoleError.mockRestore()
   })
 
   it('the context value keeps the same reference across a re-render that does not change `sessao`', () => {

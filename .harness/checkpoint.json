@@ -1,9 +1,9 @@
 {
   "turno_iniciado": "2026-09-07",
-  "tickets_planejados": [],
+  "tickets_planejados": ["S18-10"],
   "tickets_concluidos": [],
-  "ticket_atual": "",
+  "ticket_atual": "S18-10",
   "spec_fechada": "S08",
   "branch_da_mr": "feat/S08-S18-colheita-cadeia-de-spec",
-  "worktree": "sem worktree separado nesta sessao -- trabalho direto em C:/Users/m0retto/Documents/projects/limmiar, branch feat/S08-S18-colheita-cadeia-de-spec, 0 atras de origin/main. Verificacao de fecho da S08 corrida e verde; corpo da MR escrito em .harness/mr/S08-colheita.md; MR aberta em https://github.com/morettto/limmiar/pull/17; falta a aceitacao humana."
+  "worktree": "sem worktree separado. S18-10 na branch feat/S18-10-sessao-em-entities, cortada do HEAD de feat/S08-S18-colheita-cadeia-de-spec (a PR #17 toca os mesmos ficheiros). Etapas 1 a 6 fechadas; etapa 6 verde com 593 testes e cobertura a 100% nos quatro eixos. Etapa 7 em curso nesta sessao: os tres revisores (lang, spec, lean) despachados em paralelo em sonnet sobre .harness/diff/S18-10.md, ronda 1, depois de o limite de sessao da API ter reiniciado as 17:50. Arvore por commitar: 17 modificados e 4 novos (os novos em git add -N, aparecem como A). Falta a etapa 8. Relay em Limmiar/Handoffs/2026-09-07T1814 S18-10 dev-dev.md. A PR #17 do fecho da spec S08 continua a espera de aceitacao humana."
 }

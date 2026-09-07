@@ -5,7 +5,8 @@ import { SUPPORTED_PROVIDERS, type AiProvider } from './provider-registry'
 import { saveApiKey } from './key-store'
 
 export interface CopilotKeySetupProps {
-  accountId: string
+  /** null = no account in session; same locked screen as kek === null (S18-10). */
+  accountId: string | null
   /** null = the keychain is locked; the form shows no input (same contract as patients/PatientWallet.tsx). */
   kek: CryptoKey | null
   providers?: readonly AiProvider[]
@@ -21,7 +22,7 @@ export function CopilotKeySetup({ accountId, kek, providers = SUPPORTED_PROVIDER
   const [persist, setPersist] = useState(false)
   const [state, setState] = useState<Status>({ status: 'idle' })
 
-  if (kek === null) {
+  if (kek === null || accountId === null) {
     // ponytail: the skip affordance is duplicated across both the locked and unlocked
     // branches on purpose -- collapse it into a shared footer only if a third branch shows up.
     return (
@@ -37,14 +38,15 @@ export function CopilotKeySetup({ accountId, kek, providers = SUPPORTED_PROVIDER
   }
 
   // Reassigned to a plain `const` (not just referenced) so its own declared type narrows to
-  // CryptoKey once and for all -- referencing the destructured `kek` prop straight from inside
-  // handleSubmit's closure would keep TS's wider `CryptoKey | null` param type instead.
+  // CryptoKey/string once and for all -- referencing the destructured `kek`/`accountId` props
+  // straight from inside handleSave's closure would keep TS's wider `| null` param types instead.
   const unlockedKek = kek
+  const knownAccountId = accountId
 
   async function handleSave() {
     setState({ status: 'saving' })
     try {
-      await saveApiKey(unlockedKek, accountId, providerId, apiKey, persist)
+      await saveApiKey(unlockedKek, knownAccountId, providerId, apiKey, persist)
       onDone()
     } catch {
       setState({ status: 'error' })
