@@ -64,6 +64,12 @@ compilação, não só em prosa.
   `twoFactorRequirement` que o predicado `valor is Account` depois trata como garantido para
   quem ler `sessao` do contexto -- mesmo que hoje nenhum consumidor leia esses dois campos.
   `twoFactorTicket` continua sem validação própria (`string | null` aceita qualquer coisa).
+- **`ler()` constrói o `Account` campo a campo, não por spread do que estiver no storage
+  (S18-11).** `ehConta` valida quatro campos, mas `{ ...parsed, twoFactorTicket: null }`
+  preservava qualquer propriedade a mais que alguém escrevesse no `sessionStorage` pelo DevTools,
+  dentro de um objeto que o resto da app trata como `Account` garantido -- o predicado prometia
+  uma forma e o valor devolvido não era essa forma. Agora `ler()` desestrutura os quatro campos
+  validados e devolve só esses mais `twoFactorTicket: null`.
 - **`twoFactorTicket` nunca persiste em `sessionStorage` (S18-07).** É um segredo do fluxo 2FA
   que o servidor já invalida ao consumir (~10 min, `TwoFactorEndpoints.cs`) -- não há razão para
   o gravar. `registar()` grava a conta sem esse campo; `ler()` força-o sempre a `null` (defesa em

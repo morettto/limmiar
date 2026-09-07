@@ -27,7 +27,10 @@ ser chamado direto de qualquer `pages/` -- este módulo deixou de ser o único s
    `/auth/recovery-phrase-setup`, `/e2e/microfone`) só quando `VITE_ENABLE_E2E_TEST_ROUTES ===
    'true'` -- gate de build-time, não `import.meta.env.DEV`, porque `playwright.config.ts` corre
    um `vite build` real, não `vite dev`.
-3. `E2eMicrofoneScaffold.tsx` é andaime de E2E puro (sem equivalente de produção): fica fora de
+3. `magicLinkCallbackRoute` resolve o `baseUrl` por `baseUrlDeConfianca(search)`, não por
+   `readSearchString`: com o portão de e2e desligado devolve `API_BASE_URL`
+   (`import.meta.env.VITE_API_BASE_URL ?? ''`, constante de build) e ignora a query string.
+4. `E2eMicrofoneScaffold.tsx` é andaime de E2E puro (sem equivalente de produção): fica fora de
    `router.tsx` para o router continuar só tabela de rotas e a sua copy ficar fora do portão de
    i18n.
 
@@ -38,6 +41,15 @@ ser chamado direto de qualquer `pages/` -- este módulo deixou de ser o único s
 
 ## Decisões relevantes
 
+- **A fronteira de confiança do `baseUrl` (S18-13).** `/auth/magic-link` é a única rota de
+  autenticação que fica fora do portão `VITE_ENABLE_E2E_TEST_ROUTES`, e é alcançada por um link
+  que chega ao utilizador de fora. Aceitar `baseUrl` da query string aí punha `verifyMagicLink` e
+  `completeWebAuthnCeremony` a falar com o servidor que o remetente do link escolhesse, e a
+  entregar-lhe o resultado da cerimónia WebAuthn -- limitado, mas não fechado, pelo facto de o
+  `relyingPartyId` ter de bater com a origem da app. Em produção o host passa a constante de
+  build; a query string só conta sob o mesmo portão que já protege `/auth/screen`,
+  `/auth/recover` e as rotas de emparelhamento, que é onde o e2e precisa dela. As outras rotas
+  continuam a ler `baseUrl` por `readSearchString` porque já estão todas atrás desse portão.
 - **`IndexRouteComponent`/`CopilotKeyRouteComponent` foram apagados (S18-10).** Existiam só
   para converter `sessao` em props porque `useSession()` vivia em `app/providers`, atrás da
   fronteira `fsd-pages-no-app`. Descer `useSession()` para `entities/account/session-context.tsx`

@@ -18,6 +18,17 @@ function readSearchString(search: Record<string, unknown>, key: string): string 
   return typeof value === 'string' ? value : ''
 }
 
+const E2E_ROUTES_LIGADAS = import.meta.env.VITE_ENABLE_E2E_TEST_ROUTES === 'true'
+
+// Fronteira de confiança (S18-13, ver README): em produção o host da API é constante de build; a
+// query string só conta sob o portão de e2e. Um `?baseUrl=` num link de magic link não põe a app
+// a falar com o servidor do remetente.
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
+
+function baseUrlDeConfianca(search: Record<string, unknown>): string {
+  return E2E_ROUTES_LIGADAS ? readSearchString(search, 'baseUrl') : API_BASE_URL
+}
+
 
 // The root route's component is deliberately unset: TanStack Router's default root already
 // renders an <Outlet/> for the matched child, which is exactly this app's shell, so an explicit
@@ -40,7 +51,7 @@ const magicLinkCallbackRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/auth/magic-link',
   validateSearch: (search: Record<string, unknown>): MagicLinkCallbackSearch => ({
-    baseUrl: readSearchString(search, 'baseUrl'),
+    baseUrl: baseUrlDeConfianca(search),
     token: readSearchString(search, 'token'),
   }),
   component: MagicLinkCallbackRouteComponent,
@@ -237,7 +248,7 @@ const bibliotecaRoute = createRoute({
 })
 
 const routeTree =
-  import.meta.env.VITE_ENABLE_E2E_TEST_ROUTES === 'true'
+  E2E_ROUTES_LIGADAS
     ? rootRoute.addChildren([
         indexRoute,
         magicLinkCallbackRoute,

@@ -129,6 +129,14 @@ describe('criarSessaoDeConta', () => {
     expect(sessao.ler()).toEqual({ ...ACCOUNT, twoFactorTicket: null })
   })
 
+  it('ler() builds the Account explicitly -- extra fields in storage do not survive', () => {
+    const storage = createFakeStorage()
+    storage.setItem('limmiar:account', JSON.stringify({ ...ACCOUNT, isAdmin: true, kek: 'segredo' }))
+    const sessao = criarSessaoDeConta(storage)
+
+    expect(sessao.ler()).toEqual({ ...ACCOUNT, twoFactorTicket: null })
+  })
+
   it('terminar() then ler() returns null', () => {
     const sessao = criarSessaoDeConta(createFakeStorage())
     sessao.registar(ACCOUNT)

@@ -242,8 +242,8 @@ describe('router', () => {
     await expect(props.store.apagar()).resolves.toBeUndefined()
   })
 
-  it('resolves /auth/magic-link and passes baseUrl/token through to MagicLinkCallback', async () => {
-    const router = await loadRouterAt('/auth/magic-link?baseUrl=http%3A%2F%2Fapi.test&token=tok-123')
+  it('resolves /auth/magic-link and passes baseUrl/token through to MagicLinkCallback (E2E gate on)', async () => {
+    const router = await loadRouterAt('/auth/magic-link?baseUrl=http%3A%2F%2Fapi.test&token=tok-123', true)
 
     await renderRouter(router)
     await screen.findByTestId('magic-link-callback')
@@ -255,7 +255,7 @@ describe('router', () => {
   })
 
   it('/auth/magic-link wires onAuthenticated to iniciarSessao -- calling it records the session', async () => {
-    const router = await loadRouterAt('/auth/magic-link?baseUrl=http%3A%2F%2Fapi.test&token=tok-123')
+    const router = await loadRouterAt('/auth/magic-link?baseUrl=http%3A%2F%2Fapi.test&token=tok-123', true)
     await renderRouter(router)
     await screen.findByTestId('magic-link-callback')
 
@@ -271,7 +271,7 @@ describe('router', () => {
   })
 
   it('/auth/magic-link falls back to empty strings when baseUrl/token are absent from the query string', async () => {
-    const router = await loadRouterAt('/auth/magic-link')
+    const router = await loadRouterAt('/auth/magic-link', true)
 
     await renderRouter(router)
     await screen.findByTestId('magic-link-callback')
@@ -280,6 +280,20 @@ describe('router', () => {
     const props = vi.mocked(MagicLinkCallback).mock.calls[0]![0]
     expect(props.baseUrl).toBe('')
     expect(props.token).toBe('')
+  })
+
+  it('/auth/magic-link ignores baseUrl from the query string with the E2E gate off (S18-13)', async () => {
+    // Sem o portão, o host da API é constante de build (nenhuma neste ambiente de teste, logo '').
+    // Um link com `?baseUrl=` de terceiros não redireciona a cerimónia WebAuthn.
+    const router = await loadRouterAt('/auth/magic-link?baseUrl=https%3A%2F%2Fatacante.tld&token=tok-123')
+
+    await renderRouter(router)
+    await screen.findByTestId('magic-link-callback')
+
+    const { MagicLinkCallback } = await import('../../features/magic-link-auth/MagicLinkCallback')
+    const props = vi.mocked(MagicLinkCallback).mock.calls[0]![0]
+    expect(props.baseUrl).toBe('')
+    expect(props.token).toBe('tok-123')
   })
 
   it('/auth/screen (E2E-only) forwards baseUrl, derives a Professional initialRole, and its getGoogleIdToken always rejects', async () => {
