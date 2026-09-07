@@ -1,17 +1,9 @@
 {
-  "turno_iniciado": "2026-09-06",
-  "tickets_planejados": [
-    "S08-27",
-    "S08-28",
-    "S08-31"
-  ],
-  "tickets_concluidos": [
-    "S08-27",
-    "S08-28",
-    "S08-31"
-  ],
+  "turno_iniciado": "2026-09-07",
+  "tickets_planejados": [],
+  "tickets_concluidos": [],
   "ticket_atual": "",
-  "spec_fechada": "",
-  "branch_da_mr": "",
-  "worktree": "sem worktree separado nesta sessao -- trabalho direto em C:/Users/m0retto/Documents/projects/limmiar, branch feat/S08-S18-colheita-cadeia-de-spec, 0 atras de origin/main"
+  "spec_fechada": "S08",
+  "branch_da_mr": "feat/S08-S18-colheita-cadeia-de-spec",
+  "worktree": "sem worktree separado nesta sessao -- trabalho direto em C:/Users/m0retto/Documents/projects/limmiar, branch feat/S08-S18-colheita-cadeia-de-spec, 0 atras de origin/main. Verificacao de fecho da S08 corrida e verde; corpo da MR escrito em .harness/mr/S08-colheita.md; falta abrir a MR e a aceitacao humana."
 }
