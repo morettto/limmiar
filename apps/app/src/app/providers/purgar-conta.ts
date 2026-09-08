@@ -1,5 +1,5 @@
 import { clearApiKey } from '../../features/copilot-byok/key-store'
-import { purgarIndiceBusca } from '../../features/nota-biblioteca/indice-store'
+import { purgarOpfsDaConta } from '../../entities/account/opfs-conta'
 
 type PurgaDeConta = (accountId: string) => void | Promise<void>
 type EntradaDePurga = readonly [nome: string, purga: PurgaDeConta]
@@ -9,7 +9,7 @@ type EntradaDePurga = readonly [nome: string, purga: PurgaDeConta]
 // minifica funções, e `name` deixaria de ser legível no rasto do catch abaixo.
 const PURGAS: readonly EntradaDePurga[] = [
   ['clearApiKey', clearApiKey],
-  ['purgarIndiceBusca', purgarIndiceBusca],
+  ['purgarOpfsDaConta', purgarOpfsDaConta],
 ]
 
 export async function purgarConta(accountId: string): Promise<void> {

@@ -110,17 +110,14 @@ describe('router', () => {
     expect(router.state.matches.some((match) => match.routeId === '/auth/screen')).toBe(false)
   })
 
-  // S18-04: IndexRouteComponent só liga useSession() a HomePage (mockada aqui) -- o conteúdo
-  // visual (span/botão condicionais a email) é provado por HomePage.test.tsx, sem router.
-  it('resolves the index route ("/") and wires useSession() to HomePage: email=null with no session', async () => {
+  // S18-10: o índice não tem route component próprio -- `indexRoute.component = HomePage`
+  // direto. HomePage é mockada aqui só para provar que a rota resolve para ela; o
+  // comportamento real (email/onSair via useSession()) é provado por HomePage.test.tsx.
+  it('resolves the index route ("/") to HomePage', async () => {
     const router = await loadRouterAt('/')
 
     await renderRouter(router)
     await screen.findByTestId('home-page')
-
-    const { HomePage } = await import('../../pages/home/HomePage')
-    const props = vi.mocked(HomePage).mock.calls[0]![0]
-    expect(props.email).toBeNull()
 
     const matches = router.state.matches
     expect(matches).toHaveLength(2)
@@ -129,28 +126,10 @@ describe('router', () => {
     expect(matches[1]?.fullPath).toBe('/')
   })
 
-  it('wires useSession() to HomePage: email set with a live session; onSair calls terminarSessao', async () => {
-    seedStoredAccount(ACCOUNT)
-    const router = await loadRouterAt('/')
-
-    await renderRouter(router)
-    await screen.findByTestId('home-page')
-
-    const { HomePage } = await import('../../pages/home/HomePage')
-    const props = vi.mocked(HomePage).mock.calls[0]![0]
-    expect(props.email).toBe(ACCOUNT.email)
-    // Semeado diretamente via seedStoredAccount (não passou por registar()) -- storage bruto
-    // continua igual ao que foi semeado.
-    expect(window.sessionStorage.getItem('limmiar:account')).toBe(JSON.stringify(ACCOUNT))
-
-    await act(async () => {
-      props.onSair()
-    })
-
-    expect(window.sessionStorage.getItem('limmiar:account')).toBeNull()
-  })
-
-  it('resolves /settings/copilot with a locked keychain and an empty accountId, and its onDone navigates back to "/"', async () => {
+  // S18-10: `/settings/copilot` resolve para `CopilotKeyPage` direto, sem route component.
+  // CopilotKeyPage não é mockada aqui (só CopilotKeySetup, o filho): este teste prova que a
+  // página real lê a sessão e passa accountId=null sem colapsar para ''.
+  it('resolves /settings/copilot with a locked keychain and accountId=null (no session), and its onDone navigates back to "/"', async () => {
     const router = await loadRouterAt('/settings/copilot')
 
     await renderRouter(router)
@@ -158,7 +137,7 @@ describe('router', () => {
 
     const { CopilotKeySetup } = await import('../../features/copilot-byok/CopilotKeySetup')
     const props = vi.mocked(CopilotKeySetup).mock.calls[0]![0]
-    expect(props.accountId).toBe('')
+    expect(props.accountId).toBeNull()
     expect(props.kek).toBeNull()
 
     await act(async () => {
@@ -246,8 +225,8 @@ describe('router', () => {
   })
 
   // BibliotecaPage é mockado aqui (não BibliotecaNotas): a fixture desta rota é o próprio
-  // `store`, então o teste chama `ler`/`gravar` diretamente em vez de depender de
-  // BibliotecaPage os invocar -- o que só aconteceria com um dek real, fora desta fatia.
+  // `store`, testado direto. `accountId` (S18-10) não é mais prop -- a página lê a própria
+  // sessão; ver `BibliotecaPage.test.tsx` para essa cobertura.
   it('resolves /biblioteca com fixtures vazias e chaveIndice=null; o store fixture nunca acha nada persistido', async () => {
     const router = await loadRouterAt('/biblioteca')
 
@@ -257,38 +236,27 @@ describe('router', () => {
     const { BibliotecaPage } = await import('../../pages/biblioteca/BibliotecaPage')
     const props = vi.mocked(BibliotecaPage).mock.calls[0]![0]
     expect(props.notas).toEqual([])
-    expect(props.accountId).toBeNull()
     expect(props.chaveIndice).toBeNull()
     await expect(props.store.ler()).resolves.toBeNull()
     await expect(props.store.gravar(new Uint8Array())).resolves.toBeUndefined()
     await expect(props.store.apagar()).resolves.toBeUndefined()
   })
 
-  it('resolves /biblioteca with the real accountId from a live session', async () => {
-    seedStoredAccount(ACCOUNT)
-    const router = await loadRouterAt('/biblioteca')
-    await renderRouter(router)
-    await screen.findByTestId('biblioteca-page')
-
-    const { BibliotecaPage } = await import('../../pages/biblioteca/BibliotecaPage')
-    const props = vi.mocked(BibliotecaPage).mock.calls[0]![0]
-    expect(props.accountId).toBe(ACCOUNT.id)
-  })
-
-  it('resolves /auth/magic-link and passes baseUrl/token through to MagicLinkCallback', async () => {
-    const router = await loadRouterAt('/auth/magic-link?baseUrl=http%3A%2F%2Fapi.test&token=tok-123')
+  it('resolves /auth/magic-link and passes the build-constant baseUrl through, with token from the query string (S18-17)', async () => {
+    vi.stubEnv('VITE_API_BASE_URL', 'http://build.example')
+    const router = await loadRouterAt('/auth/magic-link?token=tok-123', true)
 
     await renderRouter(router)
     await screen.findByTestId('magic-link-callback')
 
     const { MagicLinkCallback } = await import('../../features/magic-link-auth/MagicLinkCallback')
     const props = vi.mocked(MagicLinkCallback).mock.calls[0]![0]
-    expect(props.baseUrl).toBe('http://api.test')
+    expect(props.baseUrl).toBe('http://build.example')
     expect(props.token).toBe('tok-123')
   })
 
   it('/auth/magic-link wires onAuthenticated to iniciarSessao -- calling it records the session', async () => {
-    const router = await loadRouterAt('/auth/magic-link?baseUrl=http%3A%2F%2Fapi.test&token=tok-123')
+    const router = await loadRouterAt('/auth/magic-link?token=tok-123', true)
     await renderRouter(router)
     await screen.findByTestId('magic-link-callback')
 
@@ -303,8 +271,8 @@ describe('router', () => {
     expect(window.sessionStorage.getItem('limmiar:account')).toBe(contaPersistidaJson(ACCOUNT))
   })
 
-  it('/auth/magic-link falls back to empty strings when baseUrl/token are absent from the query string', async () => {
-    const router = await loadRouterAt('/auth/magic-link')
+  it('/auth/magic-link falls back to an empty token when absent from the query string', async () => {
+    const router = await loadRouterAt('/auth/magic-link', true)
 
     await renderRouter(router)
     await screen.findByTestId('magic-link-callback')
@@ -313,6 +281,34 @@ describe('router', () => {
     const props = vi.mocked(MagicLinkCallback).mock.calls[0]![0]
     expect(props.baseUrl).toBe('')
     expect(props.token).toBe('')
+  })
+
+  it('/auth/magic-link ignores baseUrl from the query string with the E2E gate off (S18-13)', async () => {
+    // O host da API é sempre constante de build (nenhuma neste ambiente de teste, logo '').
+    // Um link com `?baseUrl=` de terceiros não redireciona a cerimónia WebAuthn.
+    const router = await loadRouterAt('/auth/magic-link?baseUrl=https%3A%2F%2Fatacante.tld&token=tok-123')
+
+    await renderRouter(router)
+    await screen.findByTestId('magic-link-callback')
+
+    const { MagicLinkCallback } = await import('../../features/magic-link-auth/MagicLinkCallback')
+    const props = vi.mocked(MagicLinkCallback).mock.calls[0]![0]
+    expect(props.baseUrl).toBe('')
+    expect(props.token).toBe('tok-123')
+  })
+
+  it('/auth/magic-link ignores baseUrl from the query string with the E2E gate ON too (S18-13/S18-17)', async () => {
+    // A correção do S18-17 apaga o ramo que fazia o portão de e2e governar de onde vem o host da
+    // API desta rota: mesmo com o portão ligado, `?baseUrl=` de terceiros continua ignorado.
+    const router = await loadRouterAt('/auth/magic-link?baseUrl=https%3A%2F%2Fatacante.tld&token=tok-123', true)
+
+    await renderRouter(router)
+    await screen.findByTestId('magic-link-callback')
+
+    const { MagicLinkCallback } = await import('../../features/magic-link-auth/MagicLinkCallback')
+    const props = vi.mocked(MagicLinkCallback).mock.calls[0]![0]
+    expect(props.baseUrl).toBe('')
+    expect(props.token).toBe('tok-123')
   })
 
   it('/auth/screen (E2E-only) forwards baseUrl, derives a Professional initialRole, and its getGoogleIdToken always rejects', async () => {
