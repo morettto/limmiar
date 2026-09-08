@@ -1,17 +1,9 @@
 {
-  "turno_iniciado": "2026-09-07",
-  "tickets_planejados": [
-    "S18-12",
-    "S18-14",
-    "S18-09"
-  ],
-  "tickets_concluidos": [
-    "S18-12",
-    "S18-14",
-    "S18-09"
-  ],
+  "turno_iniciado": "2026-09-08",
+  "tickets_planejados": [],
+  "tickets_concluidos": [],
   "ticket_atual": "",
   "spec_fechada": "S18",
   "branch_da_mr": "feat/S18-10-sessao-em-entities",
-  "worktree": "S18-12, S18-14 e S18-09 fechados em serie na branch feat/S18-10-sessao-em-entities, commit 9f770af, por fazer push e sem merge request (budget push:false, open_pr:false). A spec S18 fica com os catorze tickets concluidos. Por fazer no fecho da spec: a cadeia de review de spec (reviewer-thermo e reviewer-security sobre o diff agregado origin/main...HEAD, tres commits: 1e1b5b7, b656e56, 9f770af) e a merge request. Portoes verdes no commit: tsc -b limpo, oxlint sem erros, lint:arch sem violacoes, 599 testes em 74 ficheiros, cobertura 100% nos quatro eixos."
+  "worktree": "Spec S18 fechada: cadeia de review de spec corrida sobre origin/main...HEAD (.harness/diff/S18.md), branch pushada, MR em rascunho https://github.com/morettto/limmiar/pull/18. Seguranca sem bloqueante. Estrutura com quatro bloqueantes, convertidos nos tickets S18-15 a S18-18 (S18-16 bloqueado por S18-15). A MR sai de rascunho quando o dono decidir entre manter a ADR de purga por registo explicito e adotar a purga recursiva do diretorio da conta (B1), e sobre apagar o ramo do baseUrl (B3). Portoes verdes: tsc -b limpo, oxlint sem erros, depcruise sem violacoes, 599 testes em 74 ficheiros, cobertura 100% nos quatro eixos."
 }
