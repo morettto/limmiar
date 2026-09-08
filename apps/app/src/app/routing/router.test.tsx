@@ -242,20 +242,21 @@ describe('router', () => {
     await expect(props.store.apagar()).resolves.toBeUndefined()
   })
 
-  it('resolves /auth/magic-link and passes baseUrl/token through to MagicLinkCallback (E2E gate on)', async () => {
-    const router = await loadRouterAt('/auth/magic-link?baseUrl=http%3A%2F%2Fapi.test&token=tok-123', true)
+  it('resolves /auth/magic-link and passes the build-constant baseUrl through, with token from the query string (S18-17)', async () => {
+    vi.stubEnv('VITE_API_BASE_URL', 'http://build.example')
+    const router = await loadRouterAt('/auth/magic-link?token=tok-123', true)
 
     await renderRouter(router)
     await screen.findByTestId('magic-link-callback')
 
     const { MagicLinkCallback } = await import('../../features/magic-link-auth/MagicLinkCallback')
     const props = vi.mocked(MagicLinkCallback).mock.calls[0]![0]
-    expect(props.baseUrl).toBe('http://api.test')
+    expect(props.baseUrl).toBe('http://build.example')
     expect(props.token).toBe('tok-123')
   })
 
   it('/auth/magic-link wires onAuthenticated to iniciarSessao -- calling it records the session', async () => {
-    const router = await loadRouterAt('/auth/magic-link?baseUrl=http%3A%2F%2Fapi.test&token=tok-123', true)
+    const router = await loadRouterAt('/auth/magic-link?token=tok-123', true)
     await renderRouter(router)
     await screen.findByTestId('magic-link-callback')
 
@@ -270,7 +271,7 @@ describe('router', () => {
     expect(window.sessionStorage.getItem('limmiar:account')).toBe(contaPersistidaJson(ACCOUNT))
   })
 
-  it('/auth/magic-link falls back to empty strings when baseUrl/token are absent from the query string', async () => {
+  it('/auth/magic-link falls back to an empty token when absent from the query string', async () => {
     const router = await loadRouterAt('/auth/magic-link', true)
 
     await renderRouter(router)
@@ -283,9 +284,23 @@ describe('router', () => {
   })
 
   it('/auth/magic-link ignores baseUrl from the query string with the E2E gate off (S18-13)', async () => {
-    // Sem o portão, o host da API é constante de build (nenhuma neste ambiente de teste, logo '').
+    // O host da API é sempre constante de build (nenhuma neste ambiente de teste, logo '').
     // Um link com `?baseUrl=` de terceiros não redireciona a cerimónia WebAuthn.
     const router = await loadRouterAt('/auth/magic-link?baseUrl=https%3A%2F%2Fatacante.tld&token=tok-123')
+
+    await renderRouter(router)
+    await screen.findByTestId('magic-link-callback')
+
+    const { MagicLinkCallback } = await import('../../features/magic-link-auth/MagicLinkCallback')
+    const props = vi.mocked(MagicLinkCallback).mock.calls[0]![0]
+    expect(props.baseUrl).toBe('')
+    expect(props.token).toBe('tok-123')
+  })
+
+  it('/auth/magic-link ignores baseUrl from the query string with the E2E gate ON too (S18-13/S18-17)', async () => {
+    // A correção do S18-17 apaga o ramo que fazia o portão de e2e governar de onde vem o host da
+    // API desta rota: mesmo com o portão ligado, `?baseUrl=` de terceiros continua ignorado.
+    const router = await loadRouterAt('/auth/magic-link?baseUrl=https%3A%2F%2Fatacante.tld&token=tok-123', true)
 
     await renderRouter(router)
     await screen.findByTestId('magic-link-callback')

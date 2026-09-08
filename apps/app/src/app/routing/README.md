@@ -27,9 +27,10 @@ ser chamado direto de qualquer `pages/` -- este módulo deixou de ser o único s
    `/auth/recovery-phrase-setup`, `/e2e/microfone`) só quando `VITE_ENABLE_E2E_TEST_ROUTES ===
    'true'` -- gate de build-time, não `import.meta.env.DEV`, porque `playwright.config.ts` corre
    um `vite build` real, não `vite dev`.
-3. `magicLinkCallbackRoute` resolve o `baseUrl` por `baseUrlDeConfianca(search)`, não por
-   `readSearchString`: com o portão de e2e desligado devolve `API_BASE_URL`
-   (`import.meta.env.VITE_API_BASE_URL ?? ''`, constante de build) e ignora a query string.
+3. `magicLinkCallbackRoute` passa sempre `baseUrl={API_BASE_URL}`
+   (`import.meta.env.VITE_API_BASE_URL ?? ''`, constante de build) ao `MagicLinkCallback` --
+   `MagicLinkCallbackSearch` só tem `token`, lido por `readSearchString`. Nenhum ramo, gate de e2e
+   incluído, deixa a query string escolher o servidor (S18-17, ver Decisões).
 4. `E2eMicrofoneScaffold.tsx` é andaime de E2E puro (sem equivalente de produção): fica fora de
    `router.tsx` para o router continuar só tabela de rotas e a sua copy ficar fora do portão de
    i18n.
@@ -41,15 +42,32 @@ ser chamado direto de qualquer `pages/` -- este módulo deixou de ser o único s
 
 ## Decisões relevantes
 
-- **A fronteira de confiança do `baseUrl` (S18-13).** `/auth/magic-link` é a única rota de
-  autenticação que fica fora do portão `VITE_ENABLE_E2E_TEST_ROUTES`, e é alcançada por um link
-  que chega ao utilizador de fora. Aceitar `baseUrl` da query string aí punha `verifyMagicLink` e
-  `completeWebAuthnCeremony` a falar com o servidor que o remetente do link escolhesse, e a
-  entregar-lhe o resultado da cerimónia WebAuthn -- limitado, mas não fechado, pelo facto de o
-  `relyingPartyId` ter de bater com a origem da app. Em produção o host passa a constante de
-  build; a query string só conta sob o mesmo portão que já protege `/auth/screen`,
-  `/auth/recover` e as rotas de emparelhamento, que é onde o e2e precisa dela. As outras rotas
-  continuam a ler `baseUrl` por `readSearchString` porque já estão todas atrás desse portão.
+- **A fronteira de confiança do `baseUrl` apaga o ramo em vez de o acrescentar (S18-13, revisto no
+  S18-17).** `/auth/magic-link` é a única rota de autenticação que fica fora do portão
+  `VITE_ENABLE_E2E_TEST_ROUTES`, e é alcançada por um link que chega ao utilizador de fora. Aceitar
+  `baseUrl` da query string aí punha `verifyMagicLink` e `completeWebAuthnCeremony` a falar com o
+  servidor que o remetente do link escolhesse, e a entregar-lhe o resultado da cerimónia WebAuthn --
+  limitado, mas não fechado, pelo facto de o `relyingPartyId` ter de bater com a origem da app. O
+  S18-13 fechou esse buraco acrescentando um `baseUrlDeConfianca(search)` que só devolvia a query
+  string sob o portão de e2e; o S18-17 apagou esse ramo por inteiro: `E2E_ROUTES_LIGADAS` passou a
+  governar duas coisas sem relação (que rotas se registam, e de onde vem o host da API desta
+  cerimónia), `VITE_API_BASE_URL` não estava definida em lado nenhum do repositório (sempre `''`),
+  e `validateSearch` devolvia um `baseUrl` que nunca tinha vindo da search -- serializável de volta
+  para o URL em navegações a partir desta rota. O host da API desta rota é agora constante de build
+  em todos os builds, e2e incluído: `playwright.config.ts` passa `VITE_API_BASE_URL` no `env` do
+  `webServer` que corre `vite build` (mesmo mecanismo que já existia para `API_BASE_URL`,
+  hardcoded, do servidor .NET), e `e2e/magic-link-login.spec.ts` já não põe `baseUrl` na query
+  string do link. Um `?baseUrl=` de terceiros continua provadamente ignorado, agora com o portão
+  de e2e ligado e desligado (`router.test.tsx`). As outras rotas continuam a ler `baseUrl` por
+  `readSearchString` porque já estão todas atrás desse portão -- mover as nove rotas para uma
+  origem única em `shared/api/client.ts` é spec própria, fora deste ticket.
+  **Nota de calibração que acompanha o dia em que `VITE_API_BASE_URL` ganhar um valor real:** essa
+  constante passa a ser a única âncora de confiança do host da cerimónia de autenticação, e tem de
+  entrar em `connect-src` de `apps/app/security-headers.ts` no mesmo diff -- esse ficheiro já deriva
+  `connect-src` de `SUPPORTED_PROVIDERS` (ver `features/copilot-byok/README.md`, secção "Fora deste
+  módulo, mas lê dele") e já tem o seu próprio ponytail a marcar que `'self'` só cobre a API .NET
+  enquanto ela partilhar esta origem; sem esse diff em conjunto, o browser bloqueia as chamadas de
+  `/auth/magic-link` para o novo host.
 - **`IndexRouteComponent`/`CopilotKeyRouteComponent` foram apagados (S18-10).** Existiam só
   para converter `sessao` em props porque `useSession()` vivia em `app/providers`, atrás da
   fronteira `fsd-pages-no-app`. Descer `useSession()` para `entities/account/session-context.tsx`

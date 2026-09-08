@@ -23,6 +23,9 @@ export default defineConfig({
       timeout: 30_000,
       env: {
         VITE_ENABLE_E2E_TEST_ROUTES: 'true',
+        // O host da API entra como constante de build (router.tsx, S18-17), não pela query
+        // string: sem isto /auth/magic-link falaria sempre com API_BASE_URL === ''.
+        VITE_API_BASE_URL: API_BASE_URL,
       },
     },
     {
