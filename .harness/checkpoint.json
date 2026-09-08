@@ -6,9 +6,13 @@
     "S18-17",
     "S18-18"
   ],
-  "tickets_concluidos": [],
-  "ticket_atual": "S18-15",
+  "tickets_concluidos": [
+    "S18-15",
+    "S18-16",
+    "S18-17"
+  ],
+  "ticket_atual": "S18-18",
   "spec_fechada": "S18",
   "branch_da_mr": "feat/S18-10-sessao-em-entities",
-  "worktree": "S18-15 IMPLEMENTADO E VERDE, NAO COMITADO. Arvore suja por cima de cb16e27: 595 testes, cobertura 100% nos quatro eixos, tsc/oxlint/lint:i18n/lint:arch limpos. Desenho, ADR (docs/adr/ADR-S18-01 + nota no vault + revogacao parcial na spec S18 linha 118), codigo, READMEs e ARCHITECTURE.md ja feitos: NAO refazer. Falta so a cadeia de review por ticket, o receipt e o commit. O ADR e o checkpoint na arvore foram escritos pela sessao-pai, NAO por processo concorrente. Descoberta que fecha o S18-16 sem o implementar: dirIndiceDaConta so tinha um chamador de producao (purgarIndiceBusca) e ambos morreram aqui. O par vermelho/verde de cada fatia esta no relay: Handoffs/2026-09-08T2200 S18-15 dev-dev.md. Ler primeiro."
+  "worktree": "S18-17 FECHADO em bec0cec: cadeia de review por ticket verde (lang sem achado, lean duas notas nao bloqueantes, spec um bloqueante no AC3 resolvido por prova), receipt em Receipts/2026-09-08-S18-17.md, ticket e board em Concluido. O e2e do magic link CORRE nesta maquina: 4 testes verdes em 24,9 s. O que o travava era public/models/sherpa-onnx-wasm-main-asr.data (651 MiB, gitignored) contra o limite de 25 MiB por asset dos Workers; parquear o diretorio durante a corrida e repor no fim resolve. Dois buracos do projeto descobertos e por virar ticket: a suite e2e de apps/app nao corre em nenhum job de CI (quality-gates.yml:391 so corre pnpm --filter site test:e2e), e apps/app/e2e/ mais apps/app/playwright.config.ts estao fora dos dois tsconfig, logo tsc -b nao os cobre. A seguir: S18-18 (colide com S18-17 em router.tsx, ja comitado, sem conflito), depois portao de maquina, depois o check vermelho do PR 18 (i18n extract: referencias de linha dos .po desatualizadas, corrige-se com pnpm --filter app check:i18n-extract), depois ronda 2 dos eixos de spec, corpo do PR e gh pr ready 18."
 }
