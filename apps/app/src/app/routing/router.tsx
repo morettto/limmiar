@@ -207,11 +207,10 @@ const copilotSettingsRoute = createRoute({
 })
 
 // ponytail: mesma situação, mesmo motivo do `dek={null}` de BibliotecaRouteComponent --
-// sem KeychainProvider ainda. `accountId` já vem da sessão real (S08-27, mesmo padrão do
-// S18-01); `kek`/`accessToken` continuam `null` até existir Keychain -- fora de âmbito.
+// sem KeychainProvider ainda. `kek`/`accessToken` continuam `null` até existir Keychain --
+// fora de âmbito; a página lê a própria sessão via useSession() (S18-18).
 function NotaRouteComponent() {
-  const { sessao } = useSession()
-  return <NotaPage kek={null} accountId={sessao?.id ?? null} accessToken={null} />
+  return <NotaPage kek={null} accessToken={null} />
 }
 
 // Ticket S08-01, fatia 2/5: Tela P4.1 (fila de assinatura + editor SOAP). Monta com uma

@@ -78,15 +78,18 @@ página já calculou.
 ## Decisões desta fatia
 
 - **`notas`/`chaveIndice`/`store` são props, sem fixture interna; `accountId` não é prop
-  (S18-10).** Ao contrário de `NotaPage` (que guarda fixtures fixas dentro do próprio
-  componente), a forma acordada no portão deste ticket exige que `BibliotecaPage` receba
-  `notas`/`chaveIndice`/`store` por parâmetro -- é o container "fino" que a instrução de página
-  deste harness pede. As fixtures (`chaveIndice={null}`, `store` que nunca acha nada, `notas`
-  vazias) vivem em `BibliotecaRouteComponent`, no router -- mesmo padrão, mesmo motivo do
-  `kek={null}` de `CopilotKeyPage`, só que um nível acima (na composição da rota, não dentro da
-  página). `accountId` era prop até S18-09; S18-10 tirou-a: a página lê
-  `useSession().sessao?.id ?? null` sozinha (`entities/account/session-context.tsx`), o que
-  apagou o `useSession()`/wrapper que `BibliotecaRouteComponent` tinha só para essa injeção.
+  (S18-10).** Ao contrário de `NotaPage` (que guarda a nota/fila fixture dentro do próprio
+  componente, mas partilha a mesma convenção de `accountId` desde o S18-18), a forma acordada
+  no portão deste ticket exige que `BibliotecaPage` receba `notas`/`chaveIndice`/`store` por
+  parâmetro -- é o container "fino" que a instrução de página deste harness pede. As fixtures
+  (`chaveIndice={null}`, `store` que nunca acha nada, `notas` vazias) vivem em
+  `BibliotecaRouteComponent`, no router -- mesmo padrão, mesmo motivo do `kek={null}` de
+  `CopilotKeyPage`, só que um nível acima (na composição da rota, não dentro da página).
+  `accountId` era prop até S18-09; S18-10 tirou-a: a página lê `useSession().sessao?.id ??
+  null` sozinha (`entities/account/session-context.tsx`), o que apagou o `useSession()`/wrapper
+  que `BibliotecaRouteComponent` tinha só para essa injeção -- o S18-18 fez o mesmo em
+  `NotaPage`/`NotaRouteComponent`, então as duas páginas de produto partilham hoje a mesma
+  convenção de `accountId`.
 - **`accountId` deriva de `useSession().sessao?.id ?? null`, não `string` com sentinela `''`
   (S18-04, movido de prop para leitura direta em S18-10).** O efeito que restaura/constrói o
   índice trata `accountId === null` no mesmo ramo cedo que já tratava `chaveIndice === null`

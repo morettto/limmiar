@@ -3,6 +3,8 @@ import { act, cleanup, render, screen } from '@testing-library/react'
 import { I18nProvider } from '@lingui/react'
 import { i18n, dynamicActivate } from '../../shared/i18n'
 import { ESTADO_ASSINADA, ESTADO_PENDENTE } from '../../entities/nota/nota'
+import type { Account } from '../../entities/account'
+import { SessionContext, type ContextoSessao } from '../../entities/account/session-context'
 import { NotaPage } from './NotaPage'
 
 vi.mock('../../widgets/soap-editor/FilaEEditor', () => ({
@@ -30,6 +32,26 @@ const SIGNED_AT = '2026-08-27T10:05:00Z'
 const ACCOUNT_ID_TEST = 'conta-fixture-teste-1'
 const ACCESS_TOKEN_TEST = 'token-fixture-teste-1'
 
+function sessaoParaConta(accountId: string): Account {
+  return {
+    id: accountId,
+    email: 'user@example.com',
+    role: 'Professional',
+    twoFactorRequirement: 'NotApplicable',
+    twoFactorTicket: null,
+  }
+}
+
+function sessaoValue(accountId: string | null): ContextoSessao {
+  return {
+    sessao: accountId === null ? null : sessaoParaConta(accountId),
+    iniciarSessao: vi.fn(),
+    terminarSessao: vi.fn(),
+  }
+}
+
+// `accountId` deixou de ser prop (S18-18) -- entra via `<SessionContext.Provider>`, mesmo
+// padrão de `BibliotecaPage.test.tsx`. `null` vira `sessao: null` (sem sessão).
 function renderNotaPage(
   kek: CryptoKey | null = null,
   accountId: string | null = ACCOUNT_ID_TEST,
@@ -37,7 +59,9 @@ function renderNotaPage(
 ) {
   return render(
     <I18nProvider i18n={i18n}>
-      <NotaPage kek={kek} accountId={accountId} accessToken={accessToken} />
+      <SessionContext.Provider value={sessaoValue(accountId)}>
+        <NotaPage kek={kek} accessToken={accessToken} />
+      </SessionContext.Provider>
     </I18nProvider>,
   )
 }
@@ -120,7 +144,8 @@ describe('NotaPage', () => {
   })
 
   // S08-27: guarda simétrica ao `kek === null` de `aoAssinar` -- sem accountId ou accessToken
-  // reais (ambos props agora), nenhum pedido sai. Prova as duas metades, uma por variável.
+  // reais, nenhum pedido sai. Prova as duas metades, uma por variável. `accountId` entra via
+  // sessão (S18-18), `accessToken` continua prop.
   describe('mount não dispara obterAssinatura sem accountId e accessToken reais (S08-27)', () => {
     it('critério de aceite 1: accountId === null -- nenhum pedido de rede sai, espiando fetch de verdade', async () => {
       const fetchMock = vi.fn().mockResolvedValue(new Response('{}'))

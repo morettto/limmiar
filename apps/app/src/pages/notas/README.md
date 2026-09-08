@@ -23,10 +23,11 @@ decisão.
    disparava sempre, mesmo com `accountId`/`accessToken` vazios (constantes de módulo, não
    props), mandando `/accounts//notes/nota-fixture-1/signature` com `Authorization: Bearer `
    a cada mount de `/notas` -- um pedido sem caminho de sucesso possível, engolido por
-   `.catch(() => {})`. Hoje `accountId`/`accessToken` são ambos props `string | null` (ver
-   "Decisões desta fatia (S08-27)"), e `router.tsx` passa `accountId` real (sessão) com
+   `.catch(() => {})`. Hoje `accessToken` é prop `string | null` (ver "Decisões desta fatia
+   (S08-27)") e `accountId` deriva de `useSession().sessao?.id ?? null` dentro da própria
+   `NotaPage` (S18-18, ver "Decisões desta fatia (S18-18)"); `router.tsx` passa
    `accessToken={null}` (sem Keychain ainda) -- então a guarda continua a bloquear em
-   produção, mas por uma prop `null`, não por uma constante impossível de testar. `ok:true`
+   produção, mas por uma sessão ausente, não por uma constante impossível de testar. `ok:true`
    chama `marcarAssinada`, deixando `EditorSoap` em leitura apenas logo no primeiro render
    útil -- um reload é, portanto, um mount novo, e a trava não se perde. Critério "reload não
    perde a trava" tem prova executada, não por inferência: `NotaPage.test.tsx` ("reload
@@ -76,18 +77,18 @@ decisão.
 
 ## Pontos de entrada
 
-- `NotaPage({ kek, accountId, accessToken }: NotaPageProps)` -- componente React puro. `kek:
+- `NotaPage({ kek, accessToken }: NotaPageProps)` -- componente React puro. `kek:
   CryptoKey | null` é prop **obrigatória** (sem default) desde a ronda 1 de correção do
   S08-07 -- mesmo contrato de `pages/biblioteca/BibliotecaPage`'s `dek: CryptoKey | null`.
-  `accountId: string | null` e `accessToken: string | null` são obrigatórias desde o S08-27,
-  mesmo contrato do `accountId` de `BibliotecaPage`. Testes injetam uma
-  `CryptoKey`/`accountId`/`accessToken` reais para exercitar os caminhos pós-guarda.
+  `accessToken: string | null` é obrigatória desde o S08-27. `accountId` não é prop (S18-18,
+  ver "Decisões desta fatia" abaixo): a página lê `useSession().sessao?.id ?? null` sozinha,
+  mesmo padrão de `pages/biblioteca/BibliotecaPage` desde o S18-10. Testes injetam uma
+  `CryptoKey`/`accessToken` reais via prop e um `accountId` real via
+  `<SessionContext.Provider>` para exercitar os caminhos pós-guarda.
 - `NotaRouteComponent()` (`app/routing/router.tsx`) -- monta `<NotaPage kek={null}
-  accountId={sessao?.id ?? null} accessToken={null} />` na rota `/notas`; `accountId` vem de
-  `useSession()` desde o S08-27 (mesmo padrão de
-  `BibliotecaRouteComponent`/`CopilotKeyRouteComponent`, S18-01), `kek`/`accessToken`
-  continuam `null` enquanto não existir `KeychainProvider`. Ver "Decisões desta fatia
-  (S08-07)", "Decisões desta fatia (S08-27)" e "ronda 1 de correção" abaixo.
+  accessToken={null} />` na rota `/notas`; `kek`/`accessToken` continuam `null` enquanto não
+  existir `KeychainProvider`. Ver "Decisões desta fatia (S08-07)", "Decisões desta fatia
+  (S08-27)", "Decisões desta fatia (S18-18)" e "ronda 1 de correção" abaixo.
 
 ## Decisões desta fatia (atualizado no ticket S08-06)
 
@@ -223,10 +224,12 @@ o mount de `NotaPage` disparava `obterAssinatura` sempre, com `accountId`/`acces
 
 - **`accountId` deixou de ser fixture e passou a prop `string | null`, ligada em
   `NotaRouteComponent` via `useSession()` (mesmo padrão de `BibliotecaRouteComponent`/
-  `CopilotKeyRouteComponent`, S18-01).** Fecha a assimetria: as três rotas de produto usam
-  hoje o mesmo padrão para `accountId`. `ACCOUNT_ID_FIXTURE` foi apagada de `NotaPage.tsx` --
-  não sobrou nenhuma sentinela `accountId=""` em lado nenhum (ver nota abaixo sobre
-  `key-store.ts`).
+  `CopilotKeyRouteComponent`, S18-01). Superado pelo S18-18** (ver "Decisões desta fatia
+  (S18-18)" abaixo): `accountId` deixou de ser prop outra vez, desta vez para a própria
+  `NotaPage` ler `useSession()` sozinha -- mesma construção que o S18-10 já tinha desfeito em
+  `BibliotecaPage`. Fecha a assimetria: as três rotas de produto usam hoje o mesmo padrão
+  para `accountId`. `ACCOUNT_ID_FIXTURE` foi apagada de `NotaPage.tsx` -- não sobrou nenhuma
+  sentinela `accountId=""` em lado nenhum (ver nota abaixo sobre `key-store.ts`).
 - **`accessToken` também deixou de ser fixture (`ACCESS_TOKEN_FIXTURE`, uma constante `''`) e
   passou a prop `string | null`, exatamente como `kek`.** Motivo estrutural: uma constante de
   módulo comparada consigo mesma (`ACCESS_TOKEN_FIXTURE === ''`) é sempre verdadeira, então o
@@ -271,6 +274,21 @@ o mount de `NotaPage` disparava `obterAssinatura` sempre, com `accountId`/`acces
   pela suíte inteira, mas o comando de verificação por ficheiro
   (`vitest run --coverage src/pages/notas/NotaPage.test.tsx`) não os alcançava sozinho.
   Réplicas mínimas do que `router.test.tsx` já prova, sem mexer nesse ficheiro.
+
+## Decisões desta fatia (S18-18)
+
+O S18-10 tirou `accountId` de `BibliotecaPage`; `NotaPage` ficou para trás na convenção antiga
+do S08-27/S18-01. Este ticket alinha as duas, sem mudar comportamento de produção.
+
+- **`accountId` deixou de ser prop.** `NotaPageProps` fica só com `kek` e `accessToken`; dentro
+  do componente, `const { sessao } = useSession(); const accountId = sessao?.id ?? null` -- o
+  mesmo par de linhas de `BibliotecaPage.tsx`. As guardas `accountId === null` e a dependency
+  array do efeito não mudaram: só a origem do valor.
+- **`NotaRouteComponent` deixou de chamar `useSession()`** -- ficou `<NotaPage kek={null}
+  accessToken={null} />`, espelhando `BibliotecaRouteComponent`. O import de `useSession` em
+  `router.tsx` continua a servir os route components que chamam `iniciarSessao`.
+- **Para montar esta página num teste, envolve-a num `<SessionContext.Provider>`** (ver
+  `NotaPage.test.tsx`), não passes `accountId`.
 
 ## Fora de âmbito
 
