@@ -48,6 +48,11 @@ compilação, não só em prosa.
 - `Account`, `AccountRole`, `TwoFactorRequirement` (`account.ts`); `register`, `login`,
   `continueWithGoogle`, `requestMagicLink`, `verifyMagicLink`, `recoverAccess`... (`api.ts`) --
   ver `index.ts` para a lista completa; não mudaram nesta fatia.
+- `purgarOpfsDaConta(accountId): Promise<void>` (`opfs-conta.ts`, S18-15) -- a conta é dona da
+  árvore `<raiz OPFS>/<accountId>`; esta é a única definição dessa convenção. Import por
+  caminho profundo (`entities/account/opfs-conta`), fora do barrel `index.ts` -- mesma
+  disciplina de `session-context.tsx` acima. Único chamador: `PURGAS` em
+  `app/providers/purgar-conta.ts` (ver `app/providers/README.md`).
 
 ## Decisões desta fatia
 
@@ -57,7 +62,8 @@ compilação, não só em prosa.
   `app`, então três route components (`IndexRouteComponent`, `CopilotKeyRouteComponent`,
   `BibliotecaRouteComponent`) existiam só para chamar `useSession()` em `app/routing` e passar o
   resultado como prop. `entities` já é camada que `pages` pode importar -- descer o contexto
-  (React puro, sem `clearApiKey`/`purgarIndiceBusca`, que ficaram em `SessionProvider.tsx`) apagou
+  (React puro, sem `clearApiKey`/`purgarOpfsDaConta` -- então `purgarIndiceBusca`, ver
+  Decisões, "purgarOpfsDaConta" -- que ficaram em `SessionProvider.tsx`) apagou
   os três wrappers sem mudar nenhum comportamento observável.
 - **`ler()` valida `id`, `email`, `role` e `twoFactorRequirement` (S18-02, review de segurança).**
   Um `sessionStorage` editável no DevTools não deve conseguir forjar um `role` ou um
@@ -79,6 +85,11 @@ compilação, não só em prosa.
   `RecoveryScreen`, páginas de rota...) sem ganho: quem lê `state.account.twoFactorTicket` fá-lo
   sempre a partir da resposta fresca da API (`AuthScreen.tsx`, `RecoveryScreen.tsx`), nunca de
   `useSession().sessao`.
+- **`purgarOpfsDaConta` apaga `<raiz OPFS>/<accountId>` inteira, recursivamente (S18-15).**
+  Substitui o guarda estático que cruzava quem abre a raiz OPFS com o literal `PURGAS`
+  (`arch.test.ts`, S18-12) -- ver `app/providers/README.md` para o porquê de o guarda ter sido
+  apagado em vez de estendido. Diretório ausente é no-op (`NotFoundError`); qualquer outro
+  erro propaga para o `catch` de `purgarConta`.
 - **`recordSession`/`createSessionRecorder` foram apagados, não mantidos como alias.** Zero
   chamadores depois do S18-01: os três ecrãs de entrada pararam de gravar a sessão sozinhos, e
   `criarSessaoDeConta`/`sessaoDaConta` (com `ler`/`terminar` novos) tomaram o lugar por inteiro.

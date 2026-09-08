@@ -10,5 +10,5 @@
   "ticket_atual": "S18-15",
   "spec_fechada": "S18",
   "branch_da_mr": "feat/S18-10-sessao-em-entities",
-  "worktree": "Decisao do dono tomada em 2026-09-08: purga recursiva do diretorio da conta (B1), ADR revogada na parte de OPFS, PURGAS mantem-se para localStorage. Os quatro bloqueantes S18-15 a S18-18 tem de fechar e o PR 18 sai de rascunho. NADA foi implementado ainda: HEAD cb16e27 nao tem codigo de producao novo. O relay com a ordem de execucao, o que muda em cada ticket e o que fazer antes de tirar o PR de rascunho esta em Handoffs/2026-09-08-S18-fecho-sem-erros dev-dev.md no vault. Ler esse ficheiro primeiro."
+  "worktree": "S18-15 IMPLEMENTADO E VERDE, NAO COMITADO. Arvore suja por cima de cb16e27: 595 testes, cobertura 100% nos quatro eixos, tsc/oxlint/lint:i18n/lint:arch limpos. Desenho, ADR (docs/adr/ADR-S18-01 + nota no vault + revogacao parcial na spec S18 linha 118), codigo, READMEs e ARCHITECTURE.md ja feitos: NAO refazer. Falta so a cadeia de review por ticket, o receipt e o commit. O ADR e o checkpoint na arvore foram escritos pela sessao-pai, NAO por processo concorrente. Descoberta que fecha o S18-16 sem o implementar: dirIndiceDaConta so tinha um chamador de producao (purgarIndiceBusca) e ambos morreram aqui. O par vermelho/verde de cada fatia esta no relay: Handoffs/2026-09-08T2200 S18-15 dev-dev.md. Ler primeiro."
 }

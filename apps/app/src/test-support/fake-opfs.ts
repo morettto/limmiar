@@ -77,10 +77,21 @@ export class FakeDirectoryHandle {
     for (const name of this.files.keys()) yield name
   }
 
-  async removeEntry(name: string): Promise<void> {
-    if (!this.files.delete(name)) {
-      throw new DOMException(`ficheiro inexistente: ${name}`, 'NotFoundError')
+  async removeEntry(name: string, options?: { recursive?: boolean }): Promise<void> {
+    if (this.files.delete(name)) return
+    // ponytail: apagar um diretório sem `recursive` cai em NotFoundError, quando a API real
+    // apagaria um vazio -- nenhum chamador deste fake o faz sem a flag, e exigi-la é
+    // precisamente o que prova que produção a passa.
+    const dir = options?.recursive ? this.dirs.get(name) : undefined
+    if (dir) {
+      // Esvazia o próprio diretório, não só a referência do pai -- um handle antigo agarrado
+      // por um teste não deve continuar a ver ficheiros de um diretório já removido.
+      dir.files.clear()
+      dir.dirs.clear()
+      this.dirs.delete(name)
+      return
     }
+    throw new DOMException(`entrada inexistente: ${name}`, 'NotFoundError')
   }
 }
 

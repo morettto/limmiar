@@ -57,16 +57,7 @@ ver os READMEs dos dois para o fluxo de composição.
    por diretório já escopado à conta pelo chamador). `ler` devolve `null` quando o ficheiro
    ainda não existe (apanha só `NotFoundError`; qualquer outro erro propaga). `apagar`
    (ticket S08-09) faz `dir.removeEntry(ARQUIVO_INDICE)`.
-9. `dirIndiceDaConta(accountId, { criar })` (`indice-store.ts`, ticket S18-12) resolve
-   `<raiz OPFS>/<accountId>`: lê a raiz (`navigator.storage.getDirectory()`) e entra em
-   `getDirectoryHandle(accountId, { create: criar })`. É a única definição da convenção --
-   escritor e purga passam por aqui, para não poderem divergir (ver Decisões).
-10. `purgarIndiceBusca(accountId)` (`indice-store.ts`, ticket S08-20) é o chamador de produção
-   de `opfsIndice(dir).apagar()`: `dirIndiceDaConta(accountId)` (sem `criar`) e `apagar()` num
-   único try; qualquer `NotFoundError` (sem diretório da conta, ou diretório sem
-   `indice-busca`) vira `return` silencioso, tudo o resto propaga. Único chamador: `PURGAS` em
-   `app/providers/purgar-conta.ts`, disparada em fire-and-forget no logout e na troca de conta.
-11. `persistirIndice(gravar, chave, accountId, indice, impressao)` (parâmetro solto, `gravar`
+9. `persistirIndice(gravar, chave, accountId, indice, impressao)` (parâmetro solto, `gravar`
    sozinho -- só usa esse campo) e `restaurarIndice(store, chave, accountId, impressao)`
    (`store: { ler, apagar }` inteiro -- os dois precisam de andar juntos) compõem os passos
    5+7+8: serializar (com a impressão) → selar → gravar, e ler → abrir → carregar (com a
@@ -98,16 +89,13 @@ ver os READMEs dos dois para o fluxo de composição.
   `abrirIndice(chave: ChaveIndiceBusca, accountId, selado): Promise<Uint8Array<ArrayBuffer>>`
   (`indice-crypto.ts`).
 - `LerSelado`, `GravarSelado`, `ApagarSelado`, `opfsIndice(dir): { ler, gravar, apagar }`,
-  `dirIndiceDaConta(accountId, { criar }?): Promise<FileSystemDirectoryHandle>` (ticket S18-12),
   `persistirIndice(gravar: GravarSelado, chave: ChaveIndiceBusca, accountId, indice, impressao): Promise<void>`,
-  `restaurarIndice(store: { ler, apagar }, chave: ChaveIndiceBusca, accountId, impressao): Promise<MiniSearch<DocNota> | null>`,
-  `purgarIndiceBusca(accountId: string): Promise<void>` (ticket S08-20) (`indice-store.ts`).
+  `restaurarIndice(store: { ler, apagar }, chave: ChaveIndiceBusca, accountId, impressao): Promise<MiniSearch<DocNota> | null>`
+  (`indice-store.ts`).
 - Chamador (fatias 4-5): `widgets/biblioteca/BibliotecaNotas.tsx` renderiza `GrupoPaciente[]`
   e `ResultadoBusca`; `pages/biblioteca/BibliotecaPage.tsx` é quem chama
   `agruparPorPaciente`/`buscar`/`persistirIndice`/`restaurarIndice` de facto, na rota
   `/biblioteca`.
-- Chamador de `purgarIndiceBusca` (ticket S08-20): `app/providers/purgar-conta.ts`, via
-  `PURGAS` (logout e troca de conta) -- ver `app/providers/README.md`.
 
 ## Decisões desta fatia
 
@@ -187,24 +175,15 @@ ver os READMEs dos dois para o fluxo de composição.
   Só a rejeição de `apagar` é engolida -- `ler` e `abrirIndice` continuam a propagar como
   antes; um erro nesses dois passos não tem um passo seguinte que o corrija sozinho.
 
-- **A convenção `<raiz OPFS>/<accountId>/indice-busca` tem uma definição só, exportada:
-  `dirIndiceDaConta` (ticket S18-12, reverte a decisão do S08-20).** Até ao S18-12,
-  `purgarIndiceBusca` fixava o diretório em código próprio enquanto `opfsIndice(dir)` aceitava
-  qualquer diretório do chamador -- não havia escritor de produção, mas no dia em que houvesse,
-  escolher outro diretório punha a purga a apagar um caminho que já não era o certo, e a falhar
-  em silêncio pelo caminho do `NotFoundError` (tratado como no-op legítimo). Purga que não
-  encontra nada e purga que não tem nada para apagar ficavam indistinguíveis, que num produto
-  com dever de retirada é o modo de falha a evitar. Agora escritor e purga resolvem o diretório
-  pela mesma função, e divergirem deixou de ser possível em vez de apenas improvável. `criar`
-  é `false` por omissão: criar um diretório vazio a cada logout seria semear lixo no OPFS.
-  Nota deliberada: com a raiz OPFS lida dentro do `try` da purga, um `NotFoundError` vindo do
-  próprio `getDirectory()` passaria a no-op silencioso -- a spec de OPFS não o produz (rejeita
-  com `SecurityError`/`UnknownError`), e separar os dois `await` duplicaria a guarda de
-  `NotFoundError` por um caso que não existe. Pelo mesmo motivo de antes, a purga usa
-  `opfsIndice(dir).apagar()` (um `removeEntry(ARQUIVO_INDICE)`), não
-  `raiz.removeEntry(accountId, { recursive: true })` -- o diretório da conta pode vir a
-  guardar dados de outros módulos, e apagar a árvore inteira apagaria isso também. Um
-  diretório vazio que sobra não é texto em claro e não é problema.
+- **`dirIndiceDaConta`/`purgarIndiceBusca` foram apagados (ticket S18-15), revertendo a decisão
+  do S18-12 registada aqui antes.** O argumento que este módulo tinha contra apagar a árvore
+  inteira da conta ("o diretório da conta pode vir a guardar dados de outros módulos") deixou
+  de valer: o dono do desenho decidiu que purgar `<raiz OPFS>/<accountId>` inteira é o
+  invariante certo, precisamente porque um blob fora do índice de busca (um chunk de
+  `features/live-session/chunk-store.ts`) sobrevivia ao logout sob o guarda antigo. Ver
+  `entities/account/README.md` e `app/providers/README.md` para o desenho novo
+  (`purgarOpfsDaConta`) -- este módulo só perdeu um chamador de purga próprio, `opfsIndice`
+  continua a única porta OPFS do índice de busca em si.
 
 ## Fora de âmbito
 

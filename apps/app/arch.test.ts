@@ -1,5 +1,5 @@
-import { readFileSync, readdirSync } from 'node:fs'
-import { dirname, relative, resolve, sep } from 'node:path'
+import { readdirSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { cruise } from 'dependency-cruiser'
 import extractDepcruiseConfig from 'dependency-cruiser/config-utl/extract-depcruise-config'
 import { describe, expect, it } from 'vitest'
@@ -106,57 +106,5 @@ describe('arch-fixture slice names track src', () => {
         expect(realSlices, `arch-fixture/src/${layer}/${slice} não existe em src/${layer}`).toContain(slice)
       }
     }
-  })
-})
-
-const SRC = resolve(import.meta.dirname, 'src')
-const PURGAR_CONTA = resolve(SRC, 'app/providers/purgar-conta.ts')
-
-const semExtensao = (caminho: string) => relative(SRC, caminho).split(sep).join('/').replace(/\.tsx?$/, '')
-
-const ficheirosDeProducao = (dir: string): string[] =>
-  readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    const caminho = resolve(dir, entry.name)
-    if (entry.isDirectory()) return entry.name === 'test-support' ? [] : ficheirosDeProducao(caminho)
-    return /\.tsx?$/.test(entry.name) && !/\.(test|spec)\.tsx?$/.test(entry.name) ? [caminho] : []
-  })
-
-/** Módulos que abrem a raiz OPFS e cujo nome importado não aparece dentro do literal `PURGAS`
- *  de `purgar-conta.ts`. Um blob escrito por um deles sobreviveria ao logout. */
-function modulosOpfsSemPurga(
-  modulos: ReadonlyArray<readonly [modulo: string, fonte: string]>,
-  fontePurgarConta: string,
-): string[] {
-  // Até ao `]` na coluna 0: o `[]` da anotação de tipo e o de cada entrada fecham antes.
-  const literalPurgas = /const PURGAS[^=]*=\s*\[([\s\S]*?)\n\]/.exec(fontePurgarConta)?.[1] ?? ''
-  // Identificadores citados dentro do literal, não o texto cru: importar um tipo do mesmo
-  // módulo não pode passar por entrada de purga.
-  const citados = new Set(literalPurgas.split(/[^A-Za-z0-9_$]+/))
-  const registados = new Set<string>()
-  for (const [, nomes, especificador] of fontePurgarConta.matchAll(/import \{([^}]+)\} from '([^']+)'/g)) {
-    const naLista = nomes.split(',').some((nome) => citados.has(nome.trim()))
-    if (naLista) registados.add(semExtensao(resolve(dirname(PURGAR_CONTA), especificador)))
-  }
-  return modulos
-    .filter(([, fonte]) => fonte.includes('navigator.storage.getDirectory'))
-    .map(([modulo]) => modulo)
-    .filter((modulo) => !registados.has(modulo))
-}
-
-describe('purgas de conta cobrem quem abre a raiz OPFS', () => {
-  // A convenção `<raiz OPFS>/<accountId>` vive em `dirIndiceDaConta` (S18-12); este teste é a
-  // outra metade: quem abre a raiz tem de estar em `PURGAS`, ou o blob sobrevive ao logout.
-  it('todo módulo de produção que chama navigator.storage.getDirectory() tem entrada em PURGAS', () => {
-    const modulos = ficheirosDeProducao(SRC).map((f) => [semExtensao(f), readFileSync(f, 'utf8')] as const)
-
-    expect(modulosOpfsSemPurga(modulos, readFileSync(PURGAR_CONTA, 'utf8'))).toEqual([])
-  })
-
-  it('um módulo novo que abre a raiz OPFS sem entrada em PURGAS é apanhado', () => {
-    const gravadorNovo = ['features/live-session/chunk-writer', 'await navigator.storage.getDirectory()'] as const
-
-    expect(modulosOpfsSemPurga([gravadorNovo], readFileSync(PURGAR_CONTA, 'utf8'))).toEqual([
-      'features/live-session/chunk-writer',
-    ])
   })
 })
