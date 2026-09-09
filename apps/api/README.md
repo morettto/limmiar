@@ -92,6 +92,10 @@ tentar arrancar o container, não passam silenciosamente. Os testes puramente un
   como `"pendente"|"concedido"|"revogado"`. Fatia 3 de seis do ticket S10-02: ainda sem
   consumidor real (o portão do microfone e a máquina de sessão são as fatias 4 e 5). Ver o
   README do módulo (`src/Api/Features/Consent/README.md`).
+- `src/Api/Features/Billing` -- cliente AbacatePay e dedupe de webhooks (S12-01,
+  `abacatepay_webhook_events`, migração `0009_...`), a única tabela sem RLS -- ver
+  `docs/adr/ADR-S12-01-dedupe-de-webhook-sem-rls.md` e o README do módulo
+  (`src/Api/Features/Billing/README.md`).
 - `src/Api/Platform` -- (S08-14, S08-26) `Result<TValue, TFailure>`, o molde partilhado de
   resultado store/service do repositório: um valor de sucesso ou uma razão de falha (`enum`),
   nunca os dois nem nenhum (contrato completo no doc comment do próprio `Result.cs`). Usado
