@@ -61,7 +61,12 @@ tentar arrancar o container, não passam silenciosamente. Os testes puramente un
   o S06-02 -- `PatientEndpoints` e `VoiceEnrollmentEndpoints` chamam a mesma cópia, nenhum dos
   dois mantém a sua própria. `PUT /accounts/{accountId}/voice-enrollment` é idempotente
   (re-cadastro substitui, `204`, nunca `409`); `DELETE` é `404` (não `204` silencioso) quando
-  não há cadastro para remover. Nenhuma das três rotas usa
+  não há cadastro para remover. Os três verbos distinguem o mesmo par de causas com o mesmo
+  `code`: `auth.account_not_found` para conta desconhecida, `voice.enrollment_not_found` para
+  conta real sem cadastro -- `GetAsync` devolve `Result<VoiceEnrollment,
+  VoiceEnrollmentFailureReason>` (S06-04) em vez de um `VoiceEnrollment?`, que apagava a
+  distinção, e `MapFailureToProblem` é o mapeador único partilhado por `GET` e `DELETE`.
+  Nenhuma das três rotas usa
   `AccountAuthorizationGuard.CanCreatePatientRecords` -- cadastro de voz é a própria conta do
   profissional, não um registo de paciente, então a única guarda é
   `IsAuthorizedForAccount` (o token pertence a esta conta).
@@ -102,7 +107,8 @@ tentar arrancar o container, não passam silenciosamente. Os testes puramente un
   por `NoteService.SignAsync`, `PatientService.CreatePatientAsync`/`AppendEntryAsync`, e desde
   o S08-21 também por `LoginHandler`/`ContinueWithGoogleHandler` (`Api.Accounts`),
   `ConsentService.RecordAsync` e `SchedulingService`/`ScheduledSessionStore`
-  (`Move`/`CancelAsync`). `Api.Audit.AuditVerification` deliberadamente não migrou -- não é um
+  (`Move`/`CancelAsync`), e desde o S06-04 por `VoiceEnrollmentService.GetAsync`.
+  `Api.Audit.AuditVerification` deliberadamente não migrou -- não é um
   par valor-ou-falha (`Ok()` não carrega valor nenhum), ver o README do módulo
   (`src/Api/Features/Audit/README.md`).
 - `src/Api/Platform/Problems` -- `LimmiarProblemDetails` (RFC 7807 + `code` + `params`

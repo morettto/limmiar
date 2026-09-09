@@ -241,7 +241,7 @@ public sealed class VoiceEnrollmentEndpointsTests
         Assert.Equal("auth.account_not_found", doc.RootElement.GetProperty("code").GetString());
     }
 
-    /// <summary>Same bypass technique as the PUT test above, reaching VoiceEnrollmentService.GetAsync with an account that does not exist -- regression test for the account! null-dereference that used to throw instead of returning 404 (ronda 2, B2).</summary>
+    /// <summary>Same bypass technique as the PUT test above, reaching VoiceEnrollmentService.GetAsync's AccountNotFound branch specifically -- distinct from the NotEnrolled branch (GetVoiceEnrollment_WithoutPriorEnrollment_Returns404WithProblemDetails), which fires for a real account that just has no cadastro. Same symmetry PUT/DELETE already had.</summary>
     [Fact]
     public async Task GetVoiceEnrollment_WithUnknownAccountId_Returns404WithProblemDetails()
     {
@@ -255,7 +255,7 @@ public sealed class VoiceEnrollmentEndpointsTests
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
         using var doc = JsonDocument.Parse(body);
-        Assert.Equal("voice.enrollment_not_found", doc.RootElement.GetProperty("code").GetString());
+        Assert.Equal("auth.account_not_found", doc.RootElement.GetProperty("code").GetString());
     }
 
     /// <summary>Same bypass technique as the PUT test above, reaching VoiceEnrollmentService.DeleteAsync's AccountNotFound branch specifically -- distinct from the NotEnrolled branch (DeleteVoiceEnrollment_WithoutPriorEnrollment_Returns404WithProblemDetails), which fires for a real account that just has no cadastro.</summary>
