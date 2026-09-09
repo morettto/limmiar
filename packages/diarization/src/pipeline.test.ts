@@ -5,7 +5,9 @@ import { montarTranscricaoCanonica } from './canonico'
 import { processarDiarizacao } from './pipeline'
 
 describe('processarDiarizacao', () => {
-  // Mesmos fixtures de src/integracao.test.ts (critério S06-02).
+  // Mesmos fixtures de src/integracao.test.ts (critério S06-02), copiados de
+  // propósito: exportá-los de um .test.ts faria o vitest reexecutar a suite de
+  // origem aqui, contando o mesmo teste duas vezes.
   const turnos: TurnoLocutor[] = [
     { locutor: 'SPEAKER_00', inicioMs: 0, fimMs: 2000 },
     { locutor: 'SPEAKER_01', inicioMs: 2000, fimMs: 4000 },
@@ -37,11 +39,6 @@ describe('processarDiarizacao', () => {
     const trechosEsperados = montarTranscricaoCanonica(palavrasAtribuidas, rotulos)
 
     expect(trechos).toEqual(trechosEsperados)
-    expect(trechos).toEqual([
-      { locutor: 'voce', palavras: palavrasAtribuidas.slice(0, 3) },
-      { locutor: 'paciente', palavras: palavrasAtribuidas.slice(3, 5) },
-      { locutor: 'voce', palavras: palavrasAtribuidas.slice(5, 8) },
-    ])
   })
 
   it('reencaminha margemMinima para classificarLocutores — deixa de decidir quando o argumento sobe acima da diferença de similaridade', () => {
