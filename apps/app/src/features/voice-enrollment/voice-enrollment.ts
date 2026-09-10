@@ -1,7 +1,7 @@
-import { type CryptoKey, webcrypto } from '@limmiar/crypto'
+import { type CryptoKey } from '@limmiar/crypto'
 import { request, type ProblemResult } from '../../shared/api'
 import { decodeBase64, encodeBase64 } from '../../shared/lib/base64'
-import { voiceDekAad, voiceEmbeddingAad } from './voice-crypto'
+import { selarEmbedding } from './voice-crypto'
 
 type VoiceEnrollmentResult = { ok: true } | ProblemResult
 
@@ -19,15 +19,13 @@ export async function cadastrarVoz(
   kek: CryptoKey,
   embedding: readonly number[],
 ): Promise<VoiceEnrollmentResult> {
-  const { dek, wrapped } = await webcrypto.generateWrappedDek(kek, voiceDekAad(accountId))
-  const plaintext = new Uint8Array(Float32Array.from(embedding).buffer)
-  const sealedEmbedding = await webcrypto.encrypt(dek, plaintext, voiceEmbeddingAad(accountId))
+  const { wrappedDek, sealedEmbedding } = await selarEmbedding(kek, accountId, embedding)
 
   const result = await request(
     baseUrl,
     'PUT',
     voiceEnrollmentPath(accountId),
-    { wrappedDek: encodeBase64(wrapped), sealedEmbedding: encodeBase64(sealedEmbedding) },
+    { wrappedDek: encodeBase64(wrappedDek), sealedEmbedding: encodeBase64(sealedEmbedding) },
     token,
   )
 
