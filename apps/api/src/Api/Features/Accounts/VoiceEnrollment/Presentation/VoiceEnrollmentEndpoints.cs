@@ -61,10 +61,10 @@ public static class VoiceEnrollmentEndpoints
             return sealedEmbeddingProblem;
         }
 
-        var result = await voiceEnrollmentService.EnrollAsync(accountId, request.WrappedDek, request.SealedEmbedding, cancellationToken);
-        if (!result.Succeeded)
+        var failure = await voiceEnrollmentService.EnrollAsync(accountId, request.WrappedDek, request.SealedEmbedding, cancellationToken);
+        if (failure is not null)
         {
-            return ProblemJson(StatusCodes.Status404NotFound, "Account not found", AccountsProblemCodes.AuthAccountNotFound);
+            return MapFailureToProblem(failure.Value);
         }
 
         return TypedResults.NoContent();
@@ -100,10 +100,10 @@ public static class VoiceEnrollmentEndpoints
             return AccessTokenUnauthorizedProblem();
         }
 
-        var result = await voiceEnrollmentService.DeleteAsync(accountId, cancellationToken);
-        if (!result.Succeeded)
+        var failure = await voiceEnrollmentService.DeleteAsync(accountId, cancellationToken);
+        if (failure is not null)
         {
-            return MapFailureToProblem(result.FailureReason!.Value);
+            return MapFailureToProblem(failure.Value);
         }
 
         return TypedResults.NoContent();
