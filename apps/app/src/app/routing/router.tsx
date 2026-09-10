@@ -25,9 +25,22 @@ function readSearchString(search: Record<string, unknown>, key: string): string 
 
 const rootRoute = createRootRoute()
 
+// ponytail: mesma situação do `kek={null}` de CopilotKeyPage/NotaPage -- sem KeychainProvider,
+// `accessToken`/`kek` continuam `null` e `notas`/`sessoes` vazias (painel em "chaveiro
+// bloqueado", S09-01). `accountId` já vem da sessão real (S18-01), como em `BibliotecaPage`.
 function IndexRouteComponent() {
   const { sessao, terminarSessao } = useSession()
-  return <HomePage email={sessao?.email ?? null} onSair={terminarSessao} />
+  return (
+    <HomePage
+      email={sessao?.email ?? null}
+      onSair={terminarSessao}
+      accountId={sessao?.id ?? null}
+      accessToken={null}
+      kek={null}
+      notas={[]}
+      sessoes={[]}
+    />
+  )
 }
 
 const indexRoute = createRoute({

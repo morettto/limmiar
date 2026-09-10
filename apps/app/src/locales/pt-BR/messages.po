@@ -92,6 +92,10 @@ msgstr "Campo inválido: {field}."
 msgid "Carregando pacientes..."
 msgstr "Carregando pacientes..."
 
+#: src/widgets/painel-profissional/PainelProfissional.tsx:128
+msgid "Carregando painel..."
+msgstr "Carregando painel..."
+
 #: src/features/copilot-byok/CopilotKeySetup.tsx:81
 msgid "Chave de API"
 msgstr "Chave de API"
@@ -103,6 +107,10 @@ msgstr "Chaveiro bloqueado. Desbloqueie para cadastrar sua chave de API."
 #: src/widgets/patient-wallet/PatientWallet.tsx:85
 msgid "Chaveiro bloqueado. Desbloqueie para ver a carteira de pacientes."
 msgstr "Chaveiro bloqueado. Desbloqueie para ver a carteira de pacientes."
+
+#: src/widgets/painel-profissional/PainelProfissional.tsx:118
+msgid "Chaveiro bloqueado. Desbloqueie para ver o painel."
+msgstr "Chaveiro bloqueado. Desbloqueie para ver o painel."
 
 #: src/features/totp-enrollment/TotpSetup.tsx:158
 msgid "Código de 6 dígitos do aplicativo autenticador"
@@ -141,7 +149,7 @@ msgstr "Como você vai usar o Limmiar?"
 msgid "Concluindo o pareamento..."
 msgstr "Concluindo o pareamento..."
 
-#: src/pages/home/HomePage.tsx:16
+#: src/pages/home/HomePage.tsx:31
 msgid "Configurar copiloto de IA"
 msgstr "Configurar copiloto de IA"
 
@@ -334,6 +342,22 @@ msgstr "Guardei meus códigos"
 msgid "Guardei minha frase"
 msgstr "Guardei minha frase"
 
+#: src/widgets/painel-profissional/PainelProfissional.tsx:166
+msgid "Indicadores"
+msgstr "Indicadores"
+
+#: src/widgets/painel-profissional/PainelProfissional.tsx:148
+msgid "Iniciar próxima sessão"
+msgstr "Iniciar próxima sessão"
+
+#: src/widgets/painel-profissional/PainelProfissional.tsx:152
+msgid "Iniciar próxima sessão às {hora}"
+msgstr "Iniciar próxima sessão às {hora}"
+
+#: src/widgets/painel-profissional/PainelProfissional.tsx:152
+msgid "Iniciar próxima: {nome} {hora}"
+msgstr "Iniciar próxima: {nome} {hora}"
+
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:138
 msgid "agenda.slot_taken"
@@ -363,6 +387,10 @@ msgstr "Não foi possível acessar a câmera para escanear o código."
 #: src/widgets/patient-wallet/PatientWallet.tsx:68
 msgid "Não foi possível carregar a carteira de pacientes. Tente novamente."
 msgstr "Não foi possível carregar a carteira de pacientes. Tente novamente."
+
+#: src/widgets/painel-profissional/PainelProfissional.tsx:103
+msgid "Não foi possível carregar o painel. Tente novamente."
+msgstr "Não foi possível carregar o painel. Tente novamente."
 
 #: src/features/device-pairing-primary/PairPrimaryDevice.tsx:57
 msgid "Não foi possível concluir o pareamento com segurança. Tente novamente."
@@ -436,6 +464,7 @@ msgid "errors.generic"
 msgstr "Ocorreu um erro inesperado. Tente novamente."
 
 #: src/widgets/auth-screen/AuthScreen.tsx:174
+#: src/widgets/painel-profissional/PainelProfissional.tsx:181
 #: src/widgets/patient-wallet/PatientWallet.tsx:120
 msgid "Paciente"
 msgstr "Paciente"
@@ -443,6 +472,10 @@ msgstr "Paciente"
 #: src/widgets/patient-wallet/PatientWallet.tsx:118
 msgid "Pacientes"
 msgstr "Pacientes"
+
+#: src/widgets/painel-profissional/PainelProfissional.tsx:168
+msgid "Pacientes ativos"
+msgstr "Pacientes ativos"
 
 #: src/features/device-pairing-primary/PairingQr.tsx:149
 msgid "Parear novo dispositivo"
@@ -490,11 +523,16 @@ msgstr "Recuperar acesso"
 msgid "Recuperar acesso à conta"
 msgstr "Recuperar acesso à conta"
 
+#: src/widgets/painel-profissional/PainelProfissional.tsx:178
+#: src/widgets/painel-profissional/PainelProfissional.tsx:179
+msgid "Requer você"
+msgstr "Requer você"
+
 #: src/widgets/patient-wallet/PatientWallet.tsx:121
 msgid "Risco"
 msgstr "Risco"
 
-#: src/pages/home/HomePage.tsx:22
+#: src/pages/home/HomePage.tsx:37
 msgid "Sair"
 msgstr "Sair"
 
@@ -518,6 +556,10 @@ msgstr "Senha"
 #: src/shared/api/problem-messages.ts:142
 msgid "agenda.session_not_found"
 msgstr "Sessão não encontrada."
+
+#: src/widgets/painel-profissional/PainelProfissional.tsx:171
+msgid "Sessões na semana"
+msgstr "Sessões na semana"
 
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:134

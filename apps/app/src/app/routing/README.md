@@ -37,6 +37,10 @@ página real, incluindo o único sítio autorizado a chamar `useSession()` fora 
 
 ## Decisões relevantes
 
+- **`IndexRouteComponent` passa `accountId`/`accessToken`/`kek`/`notas`/`sessoes` a `HomePage`
+  desde S09-01**, além de `email`/`onSair` (que já existiam) -- mesma fixture
+  `accessToken=null`/`kek=null`/`notas=[]`/`sessoes=[]` do resto do router enquanto não existe
+  `KeychainProvider`; ver `pages/home/README.md` e `widgets/painel-profissional/README.md`.
 - **`CopilotKeyRouteComponent`/`BibliotecaRouteComponent` passam `sessao?.id ?? null`, nunca
   `?? ''` (S18-04).** A sentinela `''` era a mesma armadilha que `assertAccountId`
   (`features/copilot-byok/key-store.ts`) rejeita -- `CopilotKeyPageProps.accountId` e

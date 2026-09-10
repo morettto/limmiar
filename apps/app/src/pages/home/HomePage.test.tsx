@@ -10,10 +10,23 @@ vi.mock('@tanstack/react-router', () => ({
   Link: ({ to, children }: { to: string; children: React.ReactNode }) => <a href={to}>{children}</a>,
 }))
 
-function renderHomePage(email: string | null, onSair: () => void = vi.fn()) {
+function renderHomePage(
+  email: string | null,
+  onSair: () => void = vi.fn(),
+  props: Partial<React.ComponentProps<typeof HomePage>> = {},
+) {
   return render(
     <I18nProvider i18n={i18n}>
-      <HomePage email={email} onSair={onSair} />
+      <HomePage
+        email={email}
+        onSair={onSair}
+        accountId={null}
+        accessToken={null}
+        kek={null}
+        notas={[]}
+        sessoes={[]}
+        {...props}
+      />
     </I18nProvider>,
   )
 }
@@ -51,5 +64,11 @@ describe('HomePage', () => {
 
     expect(screen.queryByTestId('conta-sessao')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Sair' })).toBeNull()
+  })
+
+  it('monta o painel profissional com as props da sessão (chaveiro bloqueado por omissão)', async () => {
+    renderHomePage('conta@example.com')
+
+    expect(await screen.findByText('Chaveiro bloqueado. Desbloqueie para ver o painel.')).toBeTruthy()
   })
 })
