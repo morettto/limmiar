@@ -36,5 +36,13 @@
     <PackageReference Include="Mediator.Abstractions" Version="3.0.2" />
     <PackageReference Include="Mediator.SourceGenerator" Version="3.0.2" PrivateAssets="all" />
   </ItemGroup>
-  
+
+  <!-- AbacatePayClient.MapResponse (S12-01) is the pure seam that maps status+envelope to a
+       Result without any HTTP, internal on purpose (no production caller needs it public),
+       exposed to the test assembly only via the SDK's built-in InternalsVisibleTo item
+       (no hand-written AssemblyInfo.cs / attribute needed, .NET 8+ SDK feature). -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Api.Tests" />
+  </ItemGroup>
+
 </Project>

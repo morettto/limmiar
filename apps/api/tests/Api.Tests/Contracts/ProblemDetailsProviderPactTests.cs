@@ -38,6 +38,7 @@ public sealed class ProblemDetailsProviderPactTests
         builder.Configuration["StaffAccess:ApiKey"] = "test-staff-api-key";
         builder.Configuration["WebAuthn:RelyingPartyId"] = "limmiar.test";
         builder.Configuration["WebAuthn:ExpectedOrigin"] = "https://limmiar.test";
+        builder.Configuration["AbacatePay:WebhookSecret"] = "whsec_test123";
 
         await using var app = Program.BuildApp(builder);
 

@@ -1,9 +1,9 @@
 {
-  "turno_iniciado": "2026-09-07",
-  "tickets_planejados": [],
-  "tickets_concluidos": [],
+  "turno_iniciado": "2026-09-08",
+  "tickets_planejados": ["S12-01"],
+  "tickets_concluidos": ["S12-01"],
   "ticket_atual": "",
   "spec_fechada": "S08",
-  "branch_da_mr": "feat/S08-S18-colheita-cadeia-de-spec",
-  "worktree": "sem worktree separado nesta sessao -- trabalho direto em C:/Users/m0retto/Documents/projects/limmiar, branch feat/S08-S18-colheita-cadeia-de-spec, 0 atras de origin/main. Verificacao de fecho da S08 corrida e verde; corpo da MR escrito em .harness/mr/S08-colheita.md; MR aberta em https://github.com/morettto/limmiar/pull/17; falta a aceitacao humana."
+  "branch_da_mr": "feat/S12-01-cliente-abacatepay",
+  "worktree": "sem worktree separado nesta sessao -- trabalho direto em C:/Users/m0retto/Documents/projects/limmiar, branch feat/S12-01-cliente-abacatepay, 0 atras de origin/main. Etapa 5 a meio: fatias 1 a 4 das nove verdes, confirmadas por corrida independente em 2026-09-09 (592 testes, 100% de linhas, condicoes e metodos, exit code 0), nada commitado. Faltam as fatias 5 a 9: migracao 0009, AbacatePayWebhookStore, RowLevelSecurityCoverageTests, BillingEndpoints ponta a ponta, MissingConfigurationTests, job de drift, mais o ADR e as entradas em apps/api/README.md e ARCHITECTURE.md. A etapa 2 (scout) ja esta feita: a tabela de ancoras file:line vive no handoff. A janela 2026-09-09T0100 abriu em zona AMARELA e fechou sem abrir fatia nova, por regra do context-relay. Trace TDD em Tickets/S12-01-trace.log. Relay em Handoffs/2026-09-09T0130 S12-01 dev-dev. A MR da S08 continua aberta em https://github.com/morettto/limmiar/pull/17 a espera de aceitacao humana."
 }

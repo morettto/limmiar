@@ -1,0 +1,49 @@
+name: AbacatePay drift (nightly)
+
+on:
+  schedule:
+    # 04:41 UTC daily — off the hour, away from mutation-nightly's 03:17.
+    - cron: '41 4 * * *'
+  workflow_dispatch:
+
+# No pull_request trigger on purpose: a red drift run means "the provider
+# changed something, go read", never "block this PR".
+
+jobs:
+  drift-probe:
+    name: "AbacatePay drift probe (live sandbox)"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # schedule/workflow_dispatch already default to the repo's default
+          # branch, but this run's whole point is to probe what main pins
+          # against the live provider, so pin it explicitly rather than
+          # relying on whatever ref a manual dispatch happened to be
+          # triggered from.
+          ref: main
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Check sandbox credentials
+        id: creds
+        env:
+          ABACATEPAY_SANDBOX_API_KEY: ${{ secrets.ABACATEPAY_SANDBOX_API_KEY }}
+        run: |
+          if [ -z "$ABACATEPAY_SANDBOX_API_KEY" ]; then
+            echo "have_key=false" >> "$GITHUB_OUTPUT"
+            echo "Sem ABACATEPAY_SANDBOX_API_KEY: sonda salta, não falha." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "have_key=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Probe live sandbox
+        if: steps.creds.outputs.have_key == 'true'
+        env:
+          ABACATEPAY_SANDBOX_API_KEY: ${{ secrets.ABACATEPAY_SANDBOX_API_KEY }}
+        # -p:CollectCoverage=false: a filtered run would break the 100% floor.
+        run: dotnet test apps/api/Api.sln -c Release --filter "Category=Drift" -p:CollectCoverage=false

@@ -63,6 +63,24 @@ public sealed class MissingConfigurationTests
         Assert.Contains("WebAuthn:ExpectedOrigin", exception.Message);
     }
 
+    /// <summary>AbacatePay:WebhookSecret is the last fail-fast guard in Program.Composition.cs (BillingComposition.AddBilling runs after every other AddXxx) -- every earlier guard is set here so this test reaches it specifically.</summary>
+    [Fact]
+    public void CreatingHost_WithoutAbacatePayWebhookSecret_ThrowsInvalidOperationException()
+    {
+        using var factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder =>
+            {
+                builder.UseSetting("ConnectionStrings:AppDb", "Host=127.0.0.1;Port=1;Username=app_role;Password=unused;");
+                builder.UseSetting("StaffAccess:ApiKey", "test-staff-api-key");
+                builder.UseSetting("WebAuthn:RelyingPartyId", "limmiar.test");
+                builder.UseSetting("WebAuthn:ExpectedOrigin", "https://limmiar.test");
+            });
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("AbacatePay:WebhookSecret", exception.Message);
+    }
+
     [Fact]
     public async Task Main_WithMigrateOnlyFlagAndWithoutAdminDbConnectionString_ThrowsInvalidOperationException()
     {

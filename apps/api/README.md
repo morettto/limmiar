@@ -61,7 +61,18 @@ tentar arrancar o container, não passam silenciosamente. Os testes puramente un
   o S06-02 -- `PatientEndpoints` e `VoiceEnrollmentEndpoints` chamam a mesma cópia, nenhum dos
   dois mantém a sua própria. `PUT /accounts/{accountId}/voice-enrollment` é idempotente
   (re-cadastro substitui, `204`, nunca `409`); `DELETE` é `404` (não `204` silencioso) quando
-  não há cadastro para remover. Nenhuma das três rotas usa
+  não há cadastro para remover. Os três verbos distinguem o mesmo par de causas com o mesmo
+  `code`: `auth.account_not_found` para conta desconhecida, `voice.enrollment_not_found` para
+  conta real sem cadastro. `EnrollAsync`/`DeleteAsync` devolvem `Task<VoiceEnrollmentFailureReason?>`
+  (`null` = sucesso); `GetAsync` devolve `Result<VoiceEnrollment, VoiceEnrollmentFailureReason>`
+  (S06-04) por ser o caso com valor. `MapFailureToProblem` (`Presentation/VoiceEnrollmentEndpoints.cs`)
+  é o único mapeador de falha, partilhado pelos três verbos -- desde o S06-07 não há mais um
+  segundo molde de falha (`VoiceEnrollmentResult` com `Succeeded`/`FailureReason?` nullable,
+  que deixava `{ Succeeded = false, FailureReason = null }` construível e sem significado, e
+  obrigava o `PUT` a reconstruir o problem à mão em vez de chamar `MapFailureToProblem`); o
+  ficheiro que tinha essa classe foi renomeado de `VoiceEnrollmentResult.cs` para
+  `VoiceEnrollment.cs` (só ficam lá o `record VoiceEnrollment` e o `enum
+  VoiceEnrollmentFailureReason`). Nenhuma das três rotas usa
   `AccountAuthorizationGuard.CanCreatePatientRecords` -- cadastro de voz é a própria conta do
   profissional, não um registo de paciente, então a única guarda é
   `IsAuthorizedForAccount` (o token pertence a esta conta).
@@ -92,13 +103,18 @@ tentar arrancar o container, não passam silenciosamente. Os testes puramente un
   como `"pendente"|"concedido"|"revogado"`. Fatia 3 de seis do ticket S10-02: ainda sem
   consumidor real (o portão do microfone e a máquina de sessão são as fatias 4 e 5). Ver o
   README do módulo (`src/Api/Features/Consent/README.md`).
+- `src/Api/Features/Billing` -- cliente AbacatePay e dedupe de webhooks (S12-01,
+  `abacatepay_webhook_events`, migração `0009_...`), a única tabela sem RLS -- ver
+  `docs/adr/ADR-S12-01-dedupe-de-webhook-sem-rls.md` e o README do módulo
+  (`src/Api/Features/Billing/README.md`).
 - `src/Api/Platform` -- (S08-14, S08-26) `Result<TValue, TFailure>`, o molde partilhado de
   resultado store/service do repositório: um valor de sucesso ou uma razão de falha (`enum`),
   nunca os dois nem nenhum (contrato completo no doc comment do próprio `Result.cs`). Usado
   por `NoteService.SignAsync`, `PatientService.CreatePatientAsync`/`AppendEntryAsync`, e desde
   o S08-21 também por `LoginHandler`/`ContinueWithGoogleHandler` (`Api.Accounts`),
   `ConsentService.RecordAsync` e `SchedulingService`/`ScheduledSessionStore`
-  (`Move`/`CancelAsync`). `Api.Audit.AuditVerification` deliberadamente não migrou -- não é um
+  (`Move`/`CancelAsync`), e desde o S06-04 por `VoiceEnrollmentService.GetAsync`.
+  `Api.Audit.AuditVerification` deliberadamente não migrou -- não é um
   par valor-ou-falha (`Ok()` não carrega valor nenhum), ver o README do módulo
   (`src/Api/Features/Audit/README.md`).
 - `src/Api/Platform/Problems` -- `LimmiarProblemDetails` (RFC 7807 + `code` + `params`

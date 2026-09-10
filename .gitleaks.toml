@@ -13,6 +13,10 @@ paths = [
 # Fixture ids in tests. The convention across the suite is <coisa>-fixture-<n>,
 # and generic-api-key fires on one when it lands on the same line as an
 # identifier containing "token". Narrower than allowlisting the test files.
+# Chave pública publicada pelo fornecedor, não segredo: o valor exato da constante
+# AbacatePayWebhookSignature.PublicKey (generic-api-key dispara quando a chave partilha
+# a linha com uma palavra-chave; hoje vai sozinha na sua linha, isto é prevenção).
 regexes = [
   '''^[a-z]+-fixture-\d+$''',
+  '''^t9dXRhHHo3yDEj5pVDYz0frf7q6bMKyMRmxxCPIPp3RCplBfXRxqlC6ZpiWmOqj4L63qEaeUOtrCI8P0VMUgo6iIga2ri9ogaHFs0WIIywSMg0q7RmBfybe1E5XJcfC4IW3alNqym0tXoAKkzvfEjZxV6bE0oG2zJrNNYmUCKZyV0KZ3JS8Votf9EAWWYdiDkMkpbMdPggfh1EqHlVkMiTady6jOR3hyzGEHrIz2Ret0xHKMbiqkr9HS1JhNHDX9$''',
 ]
