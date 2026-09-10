@@ -22,35 +22,47 @@ sabe da outra; a composição e o isolamento de falha por fonte vivem só aqui.
    objeto e é um type predicate porque o `tsc -b` do `build` exige que a guarda
    estreite os três valores — um `boolean` compilava no `tsc --noEmit` e caía no
    `build`.
-2. Senão, `listPatients` → `openSummaries` (Web Worker, default
-   `openSummariesInWorker`, injetável por prop para teste) → decifra os
-   sumários. Se `listPatients` falhar, KPI "Pacientes ativos" mostra "—", uma
-   linha `role="alert"` aparece, e tanto o risco quanto o consentimento somem da
-   fila (os `patientId` vinham dali) — mas a assinatura (vem de `notas`, prop,
-   nunca falha) continua.
+2. Senão, o `useEffect` carrega as duas fontes em paralelo via `Promise.all`
+   (S09-02): `carregarPacientes` (`listPatients` → `openSummaries`, Web Worker,
+   default `openSummariesInWorker`, injetável por prop para teste, →
+   `obterConsentimentos` por paciente) e `carregarSessoes`
+   (`listarSessoes(baseUrl, accId, token, agora, agora + SETE_DIAS_MS)`). Cada
+   uma tem o seu próprio `.catch` que absorve qualquer rejeição (rede, JSON
+   malformado) e a converte no mesmo `ResultadoFonte<T>` que um `ProblemResult`
+   já produz — nenhuma das duas rejeita para o `Promise.all`, senão a falha de
+   uma derrubaria a outra. Se `listPatients` falhar, KPI "Pacientes ativos"
+   mostra "—", uma linha `role="alert"` aparece, e tanto o risco quanto o
+   consentimento somem da fila (os `patientId` vinham dali) — mas a assinatura
+   (vem de `notas`, prop, nunca falha) continua. Se `listarSessoes` falhar, KPI
+   "Sessões na semana" mostra "—" e um **segundo** `role="alert"`, irmão do
+   primeiro, aparece com o motivo — a ação principal cai para "Iniciar próxima
+   sessão" sem nome (não há sessão para nomear).
 3. Com os pacientes resolvidos, um `obterConsentimentos` por paciente via
    `Promise.allSettled` — o paciente cujo pedido falhar cai da lista de
    consentimentos, os outros continuam de pé (critério de aceite 4).
-4. Render: `proximaSessao(sessoes, new Date())` decide a sessão da ação
-   principal; o nome vem do sumário decifrado casado por `patientId` — nunca o
-   `patientId` cru quando o sumário falta ou não decifrou (critério 1).
-   `juntarRequerVoce` agrega risco+assinatura+consentimento sem duplicar nem
-   perder item (critério 2); exatamente dois `KpiStrip.Item` — nenhuma métrica
-   de vaidade (critério 3).
+4. Render: `proximaSessao(sessoes.dados, new Date())` (só quando `sessoes.ok`,
+   senão `null`) decide a sessão da ação principal; o nome vem do sumário
+   decifrado casado por `patientId` — nunca o `patientId` cru quando o sumário
+   falta ou não decifrou (critério 1). `juntarRequerVoce` agrega
+   risco+assinatura+consentimento sem duplicar nem perder item (critério 2);
+   exatamente dois `KpiStrip.Item` — nenhuma métrica de vaidade (critério 3).
 
 ## Pontos de entrada
 
 - `PainelProfissional` (`PainelProfissional.tsx`) — componente React. Props:
   `baseUrl`, `accountId: string | null`, `accessToken: string | null`,
-  `kek: CryptoKey | null`, `notas: readonly Nota[]`,
-  `sessoes: readonly SessaoAgendada[]`, `openSummaries?` (seam de teste).
+  `kek: CryptoKey | null`, `notas: readonly Nota[]`, `openSummaries?` (seam de
+  teste). **`sessoes` saiu das props no S09-02** — o widget carrega-as sozinho,
+  no mesmo `useEffect` que já carregava os pacientes (ver "Decisões desta
+  fatia" da forma S09-02, `.harness/S09-02-forma.md` §1: guarda kek/conta/token
+  única, mesmo `cancelled`/`AbortController`, sem duplicar em `HomePage`/router).
 - `itensDeRisco`, `itensDeAssinatura`, `itensDeConsentimento`, `juntarRequerVoce`
   (`requer-voce.ts`) — puros, testados isoladamente do React em
   `requer-voce.test.ts`.
 - Consumido por `pages/home/HomePage.tsx`, que por sua vez é montada por
   `IndexRouteComponent` (`app/routing/router.tsx`) com as props da sessão real
-  (`accountId`) e fixture (`accessToken`/`kek`/`notas`/`sessoes`) enquanto não
-  existir `KeychainProvider` nem os `GET`s de nota/agenda.
+  (`accountId`) e fixture (`accessToken`/`kek`/`notas`) enquanto não existir
+  `KeychainProvider` nem o `GET` de nota.
 
 ## Decisões desta fatia
 
@@ -84,11 +96,28 @@ sabe da outra; a composição e o isolamento de falha por fonte vivem só aqui.
   observar instantes diferentes numa fronteira de segundo, fazendo o botão de
   ação e o KPI "Sessões na semana" discordarem entre si (nota da ronda 1).
 
+## Decisões do S09-02
+
+- **As sessões carregam-se no widget, não no router.** `sessoes` saiu das props;
+  o `useEffect` já existente ganhou uma segunda fonte. Alternativa rejeitada:
+  carregar no router e passar por prop — duplicaria a guarda
+  `chaveiroDestrancado` fora do widget, um segundo `AbortController` e um
+  `sessoes: readonly SessaoAgendada[]` simples em vez de `ResultadoFonte<...>`
+  (ver `.harness/S09-02-forma.md` §1).
+- **Duas fontes, dois `.catch`, um só `Promise.all`.** `carregarPacientes` e
+  `carregarSessoes` nunca rejeitam para fora de si — cada uma converte a sua
+  própria falha (rede ou `ProblemResult`) no mesmo `ResultadoFonte<T>` antes de
+  entrar no `Promise.all`, para a falha de uma fonte nunca arrastar a outra.
+  Por isso o `carregar(...)` externo não tem `.catch()` (ao contrário de
+  `PatientWallet.tsx`): um `.catch` aí ficaria morto — nunca dispararia — e
+  reprovaria o portão de cobertura de funções.
+- **`SETE_DIAS_MS` exportada de `entities/agenda/sessao.ts`.** Único ponto que
+  define a janela de 7 dias; o widget usa o mesmo valor para pedir ao backend
+  (`listarSessoes(..., agora, agora + SETE_DIAS_MS)`) e para o KPI
+  (`sessoesNaSemana`), sem repetir o literal.
+
 ## Fora de âmbito (ver `.harness/S09-01-forma.md`, secção 1 e "Decisões que esperam o humano")
 
-- Nenhum `GET` de agenda: `sessoes` chega sempre por prop. Critério 1 fica verde
-  em teste e cinzento em produção até esse endpoint existir (ticket de backend
-  a jusante).
 - Nenhuma listagem real de notas: `notas` também chega por prop, hoje sempre
   `[]` a partir do router — a fila de assinatura nasce vazia em produção pelo
   mesmo motivo.

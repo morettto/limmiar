@@ -12,4 +12,10 @@ internal static class AccountsProblemResults
             StatusCodes.Status401Unauthorized,
             "Missing or invalid access token",
             AccountsProblemCodes.AuthAccessTokenInvalid);
+
+    internal static JsonHttpResult<LimmiarProblemDetails> ForbiddenProblem() =>
+        ProblemResults.ProblemJson(
+            StatusCodes.Status403Forbidden,
+            "Access token does not authorize this account",
+            AccountsProblemCodes.AuthForbidden);
 }

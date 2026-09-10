@@ -11,6 +11,7 @@ export const problemCodes = [
   'auth.device_pairing_payload_not_ready',
   'auth.device_pairing_session_not_found',
   'auth.email_already_registered',
+  'auth.forbidden',
   'auth.google_token_invalid',
   'auth.invalid_credentials',
   'auth.invalid_recovery_phrase',

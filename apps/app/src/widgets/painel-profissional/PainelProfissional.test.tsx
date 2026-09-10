@@ -40,7 +40,6 @@ function renderPainel(props: Partial<React.ComponentProps<typeof PainelProfissio
         accessToken="token-1"
         kek={FAKE_KEK}
         notas={[]}
-        sessoes={[]}
         {...props}
       />
     </I18nProvider>,
@@ -68,8 +67,28 @@ function consentimentosResponse() {
   })
 }
 
-function fetchMockPadrao(patientIds: string[]) {
+function agendaResponse(sessoes: SessaoAgendada[]) {
+  return new Response(
+    JSON.stringify({
+      sessions: sessoes.map((sessao) => ({
+        sessionId: sessao.sessionId,
+        patientId: sessao.patientId,
+        startsAt: sessao.inicioEm,
+        durationMinutes: sessao.duracaoMinutos,
+        cancelledAt: sessao.canceladaEm,
+      })),
+    }),
+    { status: 200, headers: { 'Content-Type': 'application/json' } },
+  )
+}
+
+// `/agenda/sessions` sempre 200 com `[]` por omissão -- senão os testes que nem mencionam
+// agenda (ex.: os de consentimento) ganhavam um `role="alert"` espúrio (achado do F4).
+function fetchMockPadrao(patientIds: string[], sessoes: SessaoAgendada[] = []) {
   return vi.fn().mockImplementation((url: string) => {
+    if (url.includes('/agenda/sessions')) {
+      return Promise.resolve(agendaResponse(sessoes))
+    }
     if (url.includes('/consents')) {
       return Promise.resolve(consentimentosResponse())
     }
@@ -153,17 +172,52 @@ describe('PainelProfissional', () => {
   })
 
   it('critério 1: nomeia o paciente correto da sessão seguinte na ação principal', async () => {
-    vi.stubGlobal('fetch', fetchMockPadrao(['p-1']))
     const sessao = sessaoEm1h('p-1')
+    const fetchMock = fetchMockPadrao(['p-1'], [sessao])
+    vi.stubGlobal('fetch', fetchMock)
     const openSummaries = vi.fn().mockResolvedValue([
       { patientId: 'p-1', ok: true, name: 'Amelia', risk: 'baixo' },
     ] satisfies SummaryResult[])
 
-    renderPainel({ sessoes: [sessao], openSummaries })
+    renderPainel({ openSummaries })
 
     const hora = horaDaSessao(sessao.inicioEm, 'pt-BR')
     const botao = await screen.findByRole('button', { name: new RegExp(`Amelia.*${hora}`) })
     expect(botao).toBeTruthy()
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/accounts/acc-1/agenda/sessions?from='),
+      expect.anything(),
+    )
+  })
+
+  it('critério: /agenda/sessions falha (500) — KPI "Sessões na semana" = "—", role="alert" com o motivo, "Pacientes ativos" continua numérico, botão sem nome', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/agenda/sessions')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ code: 'unexpected_error', params: {} }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/problem+json' },
+          }),
+        )
+      }
+      if (url.includes('/consents')) {
+        return Promise.resolve(consentimentosResponse())
+      }
+      return Promise.resolve(patientsResponse(['p-1']))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const openSummaries = vi.fn().mockResolvedValue([
+      { patientId: 'p-1', ok: true, name: 'Amelia', risk: 'baixo' },
+    ] satisfies SummaryResult[])
+
+    renderPainel({ openSummaries })
+
+    const kpi = await screen.findByText('Sessões na semana')
+    expect(kpi.parentElement?.textContent).toContain('—')
+    expect(screen.getByRole('alert')).toBeTruthy()
+    const kpiPacientes = await screen.findByText('Pacientes ativos')
+    expect(kpiPacientes.parentElement?.textContent).toMatch(/\d/)
+    expect(screen.getByRole('button', { name: /Iniciar próxima/ })).toBeTruthy()
   })
 
   it('sem sessão seguinte: a ação principal não nomeia ninguém', async () => {
@@ -172,7 +226,7 @@ describe('PainelProfissional', () => {
       { patientId: 'p-1', ok: true, name: 'Amelia', risk: 'baixo' },
     ] satisfies SummaryResult[])
 
-    renderPainel({ sessoes: [], openSummaries })
+    renderPainel({ openSummaries })
 
     await waitFor(() => expect(openSummaries).toHaveBeenCalled())
     expect(screen.queryByText(/Amelia/)).toBeNull()
@@ -180,11 +234,11 @@ describe('PainelProfissional', () => {
   })
 
   it('sumário não decifrado (ok:false): a ação principal nunca mostra o uuid do paciente', async () => {
-    vi.stubGlobal('fetch', fetchMockPadrao(['p-1']))
     const sessao = sessaoEm1h('p-1')
+    vi.stubGlobal('fetch', fetchMockPadrao(['p-1'], [sessao]))
     const openSummaries = vi.fn().mockResolvedValue([{ patientId: 'p-1', ok: false }] satisfies SummaryResult[])
 
-    renderPainel({ sessoes: [sessao], openSummaries })
+    renderPainel({ openSummaries })
 
     await waitFor(() => expect(openSummaries).toHaveBeenCalled())
     const botao = screen.getByRole('button', { name: /Iniciar próxima/ })
@@ -205,7 +259,9 @@ describe('PainelProfissional', () => {
 
     renderPainel({ notas })
 
-    expect(await screen.findByRole('alert')).toBeTruthy()
+    // O mesmo fetch (não encaminhado por URL) também falha o listarSessoes acima --
+    // dois alerts, um por fonte (pacientes e agenda), não um só.
+    expect(await screen.findAllByRole('alert')).toHaveLength(2)
     const kpi = await screen.findByText('Pacientes ativos')
     expect(kpi.parentElement?.textContent).toContain('—')
     fireEvent.click(screen.getByRole('button', { name: 'Requer você' }))
@@ -216,6 +272,9 @@ describe('PainelProfissional', () => {
 
   it('critério 4: um obterConsentimentos rejeita — os outros pacientes continuam de pé', async () => {
     const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/agenda/sessions')) {
+        return Promise.resolve(agendaResponse([]))
+      }
       if (url.includes('/p-falha/consents')) {
         return Promise.resolve(
           new Response(JSON.stringify({ code: 'consent.not_authorized_to_record', params: {} }), {
@@ -264,7 +323,8 @@ describe('PainelProfissional', () => {
 
     renderPainel({})
 
-    expect(await screen.findByRole('alert')).toBeTruthy()
+    // Mesma exceção derruba as duas fontes (nenhuma rota por URL neste mock) -- dois alerts.
+    expect(await screen.findAllByRole('alert')).toHaveLength(2)
   })
 
   it('desmontar antes de listPatients rejeitar ignora o fallback de erro (cancelled=true no catch)', async () => {

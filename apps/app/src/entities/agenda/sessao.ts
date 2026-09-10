@@ -1,4 +1,4 @@
-const SETE_DIAS_MS = 7 * 24 * 60 * 60 * 1000
+export const SETE_DIAS_MS = 7 * 24 * 60 * 60 * 1000
 
 export interface SessaoAgendada {
   readonly sessionId: string

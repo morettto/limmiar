@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { AdaptivePanel, KpiStrip } from '@limmiar/ui'
 import type { CryptoKey } from '@limmiar/crypto'
-import { horaDaSessao, proximaSessao, sessoesNaSemana, type SessaoAgendada } from '../../entities/agenda/sessao'
+import { listarSessoes } from '../../entities/agenda/api'
+import { horaDaSessao, proximaSessao, sessoesNaSemana, SETE_DIAS_MS, type SessaoAgendada } from '../../entities/agenda/sessao'
 import { obterConsentimentos, type ConsentimentosDoPaciente } from '../../entities/consentimento/api'
 import type { Nota } from '../../entities/nota/nota'
 import { listPatients } from '../../entities/patient/api'
@@ -22,7 +23,6 @@ export interface PainelProfissionalProps {
   /** null = the keychain is locked; the panel shows no names and makes no request. */
   kek: CryptoKey | null
   notas: readonly Nota[]
-  sessoes: readonly SessaoAgendada[]
   /** Test seam; defaults to the real Web Worker decrypt path. */
   openSummaries?: (kek: CryptoKey, items: SealedSummary[], signal?: AbortSignal) => Promise<SummaryResult[]>
 }
@@ -33,6 +33,7 @@ type EstadoPainel =
   | {
       status: 'pronto'
       pacientes: ResultadoFonte<{ sumarios: readonly SummaryResult[]; consentimentos: readonly ConsentimentosPorPaciente[] }>
+      sessoes: ResultadoFonte<readonly SessaoAgendada[]>
     }
 
 // Fonte única da guarda (`estadoInicial` e `useEffect`) -- ver README, "guarda unificada".
@@ -58,7 +59,6 @@ export function PainelProfissional({
   accessToken,
   kek,
   notas,
-  sessoes,
   openSummaries = openSummariesInWorker,
 }: PainelProfissionalProps) {
   const { i18n, t } = useLingui()
@@ -75,18 +75,21 @@ export function PainelProfissional({
     const abortController = new AbortController()
     setEstado({ status: 'a-carregar' })
 
-    async function carregar(unlockedKek: CryptoKey, accId: string, token: string) {
+    type PacientesFonte = ResultadoFonte<{
+      sumarios: readonly SummaryResult[]
+      consentimentos: readonly ConsentimentosPorPaciente[]
+    }>
+
+    async function carregarPacientes(unlockedKek: CryptoKey, accId: string, token: string): Promise<PacientesFonte> {
       const listados = await listPatients(baseUrl, accId, token)
-      if (cancelled) return
+      if (cancelled) return { ok: false, motivo: '' }
 
       if (!listados.ok) {
-        const motivo = translateProblemCode(listados.code, listados.params, i18n)
-        setEstado({ status: 'pronto', pacientes: { ok: false, motivo } })
-        return
+        return { ok: false, motivo: translateProblemCode(listados.code, listados.params, i18n) }
       }
 
       const decifrados = await openSummaries(unlockedKek, listados.patients, abortController.signal)
-      if (cancelled) return
+      if (cancelled) return { ok: false, motivo: '' }
 
       // ponytail: `obterConsentimentos` por paciente (fan-out N+1) -- endpoint em lote é o
       // upgrade quando isso virar gargalo. `allSettled` apanha a rejeição genuína (rede);
@@ -100,7 +103,7 @@ export function PainelProfissional({
           return { ok: true, item: { patientId: resumo.patientId, consentimentos: resultado.consentimentos } }
         }),
       )
-      if (cancelled) return
+      if (cancelled) return { ok: false, motivo: '' }
 
       const consentimentosOk = resultados
         .filter(
@@ -109,18 +112,40 @@ export function PainelProfissional({
         )
         .map((resultado) => resultado.value.item)
 
-      setEstado({
-        status: 'pronto',
-        pacientes: { ok: true, dados: { sumarios: decifrados, consentimentos: consentimentosOk } },
-      })
+      return { ok: true, dados: { sumarios: decifrados, consentimentos: consentimentosOk } }
     }
 
-    carregar(chaveiro.kek, chaveiro.accountId, chaveiro.accessToken).catch(() => {
-      if (!cancelled) {
-        const motivo = t`Não foi possível carregar o painel. Tente novamente.`
-        setEstado({ status: 'pronto', pacientes: { ok: false, motivo } })
+    async function carregarSessoes(accId: string, token: string): Promise<ResultadoFonte<readonly SessaoAgendada[]>> {
+      const agora = new Date()
+      const resultado = await listarSessoes(baseUrl, accId, token, agora, new Date(agora.getTime() + SETE_DIAS_MS))
+      if (!resultado.ok) {
+        return { ok: false, motivo: translateProblemCode(resultado.code, resultado.params, i18n) }
       }
-    })
+      return { ok: true, dados: resultado.sessoes }
+    }
+
+    async function carregar(unlockedKek: CryptoKey, accId: string, token: string) {
+      // As duas fontes nunca rejeitam para o `Promise.all` -- cada uma tem o seu próprio
+      // `.catch`, senão uma falha de rede na agenda derrubaria também os pacientes (e vice-versa).
+      const [pacientes, sessoes] = await Promise.all([
+        carregarPacientes(unlockedKek, accId, token).catch(
+          (): PacientesFonte => ({ ok: false, motivo: t`Não foi possível carregar o painel. Tente novamente.` }),
+        ),
+        carregarSessoes(accId, token).catch(
+          (): ResultadoFonte<readonly SessaoAgendada[]> => ({
+            ok: false,
+            motivo: t`Não foi possível carregar a agenda.`,
+          }),
+        ),
+      ])
+      if (cancelled) return
+
+      setEstado({ status: 'pronto', pacientes, sessoes })
+    }
+
+    // Sem `.catch()` aqui (ao contrário de `PatientWallet`): `carregar` em si não rejeita --
+    // as duas fontes já absorvem a própria falha acima -- um `.catch` só ficaria morto.
+    void carregar(chaveiro.kek, chaveiro.accountId, chaveiro.accessToken)
 
     return () => {
       cancelled = true
@@ -148,7 +173,7 @@ export function PainelProfissional({
     )
   }
 
-  const { pacientes } = estado
+  const { pacientes, sessoes } = estado
 
   function nomeDoPaciente(patientId: string): string | null {
     if (!pacientes.ok) {
@@ -159,7 +184,7 @@ export function PainelProfissional({
   }
 
   const agora = new Date()
-  const proxima = proximaSessao(sessoes, agora)
+  const proxima = sessoes.ok ? proximaSessao(sessoes.dados, agora) : null
 
   function rotuloAcaoPrincipal(): string {
     if (proxima === null) {
@@ -184,11 +209,19 @@ export function PainelProfissional({
           label={t`Pacientes ativos`}
           value={pacientes.ok ? pacientes.dados.sumarios.filter((item) => item.ok).length : '—'}
         />
-        <KpiStrip.Item label={t`Sessões na semana`} value={sessoesNaSemana(sessoes, agora)} />
+        <KpiStrip.Item
+          label={t`Sessões na semana`}
+          value={sessoes.ok ? sessoesNaSemana(sessoes.dados, agora) : '—'}
+        />
       </KpiStrip>
       {!pacientes.ok && (
         <p role="alert" className="text-sm text-red-700">
           {pacientes.motivo}
+        </p>
+      )}
+      {!sessoes.ok && (
+        <p role="alert" className="text-sm text-red-700">
+          {sessoes.motivo}
         </p>
       )}
       <AdaptivePanel label={t`Requer você`}>

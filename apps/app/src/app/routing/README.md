@@ -37,10 +37,12 @@ página real, incluindo o único sítio autorizado a chamar `useSession()` fora 
 
 ## Decisões relevantes
 
-- **`IndexRouteComponent` passa `accountId`/`accessToken`/`kek`/`notas`/`sessoes` a `HomePage`
+- **`IndexRouteComponent` passa `accountId`/`accessToken`/`kek`/`notas` a `HomePage`
   desde S09-01**, além de `email`/`onSair` (que já existiam) -- mesma fixture
-  `accessToken=null`/`kek=null`/`notas=[]`/`sessoes=[]` do resto do router enquanto não existe
+  `accessToken=null`/`kek=null`/`notas=[]` do resto do router enquanto não existe
   `KeychainProvider`; ver `pages/home/README.md` e `widgets/painel-profissional/README.md`.
+  `sessoes` saiu desta lista no S09-02 -- não é mais prop de `HomePage`, o painel
+  profissional carrega-as sozinho no seu próprio `useEffect`.
 - **`CopilotKeyRouteComponent`/`BibliotecaRouteComponent` passam `sessao?.id ?? null`, nunca
   `?? ''` (S18-04).** A sentinela `''` era a mesma armadilha que `assertAccountId`
   (`features/copilot-byok/key-store.ts`) rejeita -- `CopilotKeyPageProps.accountId` e

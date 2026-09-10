@@ -1,7 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import { Trans } from '@lingui/react/macro'
 import type { CryptoKey } from '@limmiar/crypto'
-import type { SessaoAgendada } from '../../entities/agenda/sessao'
 import type { Nota } from '../../entities/nota/nota'
 import { PainelProfissional } from '../../widgets/painel-profissional/PainelProfissional'
 
@@ -18,12 +17,11 @@ export interface HomePageProps {
   /** null = sem KeychainProvider ainda -- o painel monta em "chaveiro bloqueado". */
   kek: CryptoKey | null
   notas: readonly Nota[]
-  sessoes: readonly SessaoAgendada[]
 }
 
 // ponytail: this <div id="app-shell"> is a navigation stub, not a real landing page --
 // replace it together with the real landing page, not as a standalone cleanup.
-export function HomePage({ email, onSair, accountId, accessToken, kek, notas, sessoes }: HomePageProps) {
+export function HomePage({ email, onSair, accountId, accessToken, kek, notas }: HomePageProps) {
   return (
     <div id="app-shell">
       Limmiar
@@ -44,7 +42,6 @@ export function HomePage({ email, onSair, accountId, accessToken, kek, notas, se
         accessToken={accessToken}
         kek={kek}
         notas={notas}
-        sessoes={sessoes}
       />
     </div>
   )

@@ -24,7 +24,6 @@ function renderHomePage(
         accessToken={null}
         kek={null}
         notas={[]}
-        sessoes={[]}
         {...props}
       />
     </I18nProvider>,
