@@ -8,7 +8,6 @@ import {
   itensDeRisco,
   juntarRequerVoce,
   type ItemRequerVoce,
-  type ResultadoFonte,
 } from './requer-voce'
 
 function nota(overrides: Partial<Nota> = {}): Nota {
@@ -66,15 +65,12 @@ describe('itensDeConsentimento', () => {
 
 describe('juntarRequerVoce', () => {
   it('o mesmo paciente em risco e consentimento gera dois itens — não perde nenhum', () => {
-    const fontes: ResultadoFonte<readonly ItemRequerVoce[]>[] = [
-      { ok: true, dados: [{ id: 'risco:p-1', fonte: 'risco', referencia: 'p-1', patientId: 'p-1' }] },
-      { ok: true, dados: [] },
-      {
-        ok: true,
-        dados: [{ id: 'consentimento:p-1:gravacao', fonte: 'consentimento', referencia: 'p-1:gravacao', patientId: 'p-1' }],
-      },
+    const listas: (readonly ItemRequerVoce[])[] = [
+      [{ id: 'risco:p-1', fonte: 'risco', referencia: 'p-1', patientId: 'p-1' }],
+      [],
+      [{ id: 'consentimento:p-1:gravacao', fonte: 'consentimento', referencia: 'p-1:gravacao', patientId: 'p-1' }],
     ]
-    expect(juntarRequerVoce(fontes)).toEqual([
+    expect(juntarRequerVoce(listas)).toEqual([
       { id: 'risco:p-1', fonte: 'risco', referencia: 'p-1', patientId: 'p-1' },
       { id: 'consentimento:p-1:gravacao', fonte: 'consentimento', referencia: 'p-1:gravacao', patientId: 'p-1' },
     ])
@@ -82,19 +78,7 @@ describe('juntarRequerVoce', () => {
 
   it('o mesmo item entregue duas vezes colapsa — não duplica', () => {
     const item: ItemRequerVoce = { id: 'risco:p-1', fonte: 'risco', referencia: 'p-1', patientId: 'p-1' }
-    const fontes: ResultadoFonte<readonly ItemRequerVoce[]>[] = [
-      { ok: true, dados: [item] },
-      { ok: true, dados: [item] },
-    ]
-    expect(juntarRequerVoce(fontes)).toEqual([item])
-  })
-
-  it('uma fonte em erro é ignorada, as outras continuam intactas', () => {
-    const item: ItemRequerVoce = { id: 'assinatura:n-1', fonte: 'assinatura', referencia: 'n-1', patientId: 'p-1' }
-    const fontes: ResultadoFonte<readonly ItemRequerVoce[]>[] = [
-      { ok: false, motivo: 'falhou' },
-      { ok: true, dados: [item] },
-    ]
-    expect(juntarRequerVoce(fontes)).toEqual([item])
+    const listas: (readonly ItemRequerVoce[])[] = [[item], [item]]
+    expect(juntarRequerVoce(listas)).toEqual([item])
   })
 })

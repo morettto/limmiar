@@ -9,9 +9,11 @@ import { listPatients } from '../../entities/patient/api'
 import type { SealedSummary, SummaryResult } from '../../entities/patient/patient-summary'
 import { openSummariesInWorker } from '../../entities/patient/worker-client'
 import { translateProblemCode } from '../../shared/api'
-import { itensDeAssinatura, itensDeConsentimento, itensDeRisco, juntarRequerVoce, type ResultadoFonte } from './requer-voce'
+import { itensDeAssinatura, itensDeConsentimento, itensDeRisco, juntarRequerVoce } from './requer-voce'
 
 type ConsentimentosPorPaciente = { patientId: string; consentimentos: ConsentimentosDoPaciente }
+
+type ResultadoFonte<T> = { ok: true; dados: T } | { ok: false; motivo: string }
 
 export interface PainelProfissionalProps {
   baseUrl: string
@@ -30,8 +32,7 @@ type EstadoPainel =
   | { status: 'a-carregar' }
   | {
       status: 'pronto'
-      pacientes: ResultadoFonte<readonly SummaryResult[]>
-      consentimentos: ResultadoFonte<readonly ConsentimentosPorPaciente[]>
+      pacientes: ResultadoFonte<{ sumarios: readonly SummaryResult[]; consentimentos: readonly ConsentimentosPorPaciente[] }>
     }
 
 // Fonte única da guarda (`estadoInicial` e `useEffect`) -- ver README, "guarda unificada".
@@ -80,7 +81,7 @@ export function PainelProfissional({
 
       if (!listados.ok) {
         const motivo = translateProblemCode(listados.code, listados.params, i18n)
-        setEstado({ status: 'pronto', pacientes: { ok: false, motivo }, consentimentos: { ok: false, motivo } })
+        setEstado({ status: 'pronto', pacientes: { ok: false, motivo } })
         return
       }
 
@@ -110,15 +111,14 @@ export function PainelProfissional({
 
       setEstado({
         status: 'pronto',
-        pacientes: { ok: true, dados: decifrados },
-        consentimentos: { ok: true, dados: consentimentosOk },
+        pacientes: { ok: true, dados: { sumarios: decifrados, consentimentos: consentimentosOk } },
       })
     }
 
     carregar(chaveiro.kek, chaveiro.accountId, chaveiro.accessToken).catch(() => {
       if (!cancelled) {
         const motivo = t`Não foi possível carregar o painel. Tente novamente.`
-        setEstado({ status: 'pronto', pacientes: { ok: false, motivo }, consentimentos: { ok: false, motivo } })
+        setEstado({ status: 'pronto', pacientes: { ok: false, motivo } })
       }
     })
 
@@ -148,13 +148,13 @@ export function PainelProfissional({
     )
   }
 
-  const { pacientes, consentimentos } = estado
+  const { pacientes } = estado
 
   function nomeDoPaciente(patientId: string): string | null {
     if (!pacientes.ok) {
       return null
     }
-    const resumo = pacientes.dados.find((item) => item.patientId === patientId)
+    const resumo = pacientes.dados.sumarios.find((item) => item.patientId === patientId)
     return resumo !== undefined && resumo.ok ? resumo.name : null
   }
 
@@ -170,13 +170,11 @@ export function PainelProfissional({
     return nome === null ? t`Iniciar próxima sessão às ${hora}` : t`Iniciar próxima: ${nome} ${hora}`
   }
 
-  const fonteRisco = pacientes.ok
-    ? { ok: true as const, dados: itensDeRisco(pacientes.dados) }
-    : { ok: false as const, motivo: pacientes.motivo }
-  const fonteConsentimento = consentimentos.ok
-    ? { ok: true as const, dados: itensDeConsentimento(consentimentos.dados) }
-    : { ok: false as const, motivo: consentimentos.motivo }
-  const itens = juntarRequerVoce([fonteRisco, { ok: true, dados: itensDeAssinatura(notas) }, fonteConsentimento])
+  const itens = juntarRequerVoce([
+    pacientes.ok ? itensDeRisco(pacientes.dados.sumarios) : [],
+    itensDeAssinatura(notas),
+    pacientes.ok ? itensDeConsentimento(pacientes.dados.consentimentos) : [],
+  ])
 
   return (
     <div className="mx-auto max-w-3xl p-4">
@@ -184,7 +182,7 @@ export function PainelProfissional({
       <KpiStrip aria-label={t`Indicadores`}>
         <KpiStrip.Item
           label={t`Pacientes ativos`}
-          value={pacientes.ok ? pacientes.dados.filter((item) => item.ok).length : '—'}
+          value={pacientes.ok ? pacientes.dados.sumarios.filter((item) => item.ok).length : '—'}
         />
         <KpiStrip.Item label={t`Sessões na semana`} value={sessoesNaSemana(sessoes, agora)} />
       </KpiStrip>

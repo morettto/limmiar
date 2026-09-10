@@ -57,11 +57,17 @@ sabe da outra; a composição e o isolamento de falha por fonte vivem só aqui.
 - **`ItemRequerVoce` nunca carrega o nome do paciente.** O nome só existe
   decifrado em `SummaryResult`; o render resolve por `patientId` a cada
   renderização — nenhum nome em claro é copiado para uma segunda estrutura.
-- **`ResultadoFonte<T>` em vez de lançar.** `Promise.allSettled` +
-  `{ok:true,dados}|{ok:false,motivo}` por fonte é o mecanismo do critério 4: uma
-  `ErrorBoundary` apanha throws de render, não promessas rejeitadas, e
-  desmontaria a subárvore inteira — o oposto do que "a falha de uma fonte não
-  derruba o painel inteiro" pede.
+- **`ResultadoFonte<T>` (local a `PainelProfissional.tsx`) em vez de lançar.**
+  `Promise.allSettled` + `{ok:true,dados}|{ok:false,motivo}` é o mecanismo do
+  critério 4: uma `ErrorBoundary` apanha throws de render, não promessas
+  rejeitadas, e desmontaria a subárvore inteira — o oposto do que "a falha de
+  uma fonte não derruba o painel inteiro" pede. Fonte única: o estado `pronto`
+  tem um só `pacientes: ResultadoFonte<{ sumarios, consentimentos }>` — os
+  sumários e os consentimentos nascem juntos (mesmo `listPatients`) e falham
+  juntos; não há dois `motivo` divergentes para o mesmo erro. `juntarRequerVoce`
+  (`requer-voce.ts`) não conhece `ResultadoFonte`: recebe listas já resolvidas
+  (`[]` quando `pacientes` falhou), o isolamento de falha por fonte é decidido
+  na chamada, em `PainelProfissional.tsx`.
 - `ponytail:` o `useEffect` faz um `obterConsentimentos` por paciente (fan-out
   N+1) em vez de um endpoint em lote — teto conhecido: aceitável enquanto a
   lista de pacientes ativos for pequena; upgrade natural é

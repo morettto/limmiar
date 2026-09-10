@@ -13,8 +13,6 @@ export interface ItemRequerVoce {
   readonly patientId: string
 }
 
-export type ResultadoFonte<T> = { ok: true; dados: T } | { ok: false; motivo: string }
-
 export function itensDeRisco(sumarios: readonly SummaryResult[]): ItemRequerVoce[] {
   return sumarios
     .filter((sumario) => sumario.ok && sumario.risk === 'elevado')
@@ -42,14 +40,11 @@ export function itensDeConsentimento(
   )
 }
 
-/** Ignora as fontes em erro; Map por id, primeiro a entrar ganha. Ordem: risco, assinatura, consentimento. */
-export function juntarRequerVoce(fontes: readonly ResultadoFonte<readonly ItemRequerVoce[]>[]): readonly ItemRequerVoce[] {
+/** Map por id, primeiro a entrar ganha. Ordem: risco, assinatura, consentimento. */
+export function juntarRequerVoce(listas: readonly (readonly ItemRequerVoce[])[]): readonly ItemRequerVoce[] {
   const porId = new Map<string, ItemRequerVoce>()
-  for (const fonte of fontes) {
-    if (!fonte.ok) {
-      continue
-    }
-    for (const item of fonte.dados) {
+  for (const lista of listas) {
+    for (const item of lista) {
       if (!porId.has(item.id)) {
         porId.set(item.id, item)
       }
