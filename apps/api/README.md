@@ -63,10 +63,16 @@ tentar arrancar o container, não passam silenciosamente. Os testes puramente un
   (re-cadastro substitui, `204`, nunca `409`); `DELETE` é `404` (não `204` silencioso) quando
   não há cadastro para remover. Os três verbos distinguem o mesmo par de causas com o mesmo
   `code`: `auth.account_not_found` para conta desconhecida, `voice.enrollment_not_found` para
-  conta real sem cadastro -- `GetAsync` devolve `Result<VoiceEnrollment,
-  VoiceEnrollmentFailureReason>` (S06-04) em vez de um `VoiceEnrollment?`, que apagava a
-  distinção, e `MapFailureToProblem` é o mapeador único partilhado por `GET` e `DELETE`.
-  Nenhuma das três rotas usa
+  conta real sem cadastro. `EnrollAsync`/`DeleteAsync` devolvem `Task<VoiceEnrollmentFailureReason?>`
+  (`null` = sucesso); `GetAsync` devolve `Result<VoiceEnrollment, VoiceEnrollmentFailureReason>`
+  (S06-04) por ser o caso com valor. `MapFailureToProblem` (`Presentation/VoiceEnrollmentEndpoints.cs`)
+  é o único mapeador de falha, partilhado pelos três verbos -- desde o S06-07 não há mais um
+  segundo molde de falha (`VoiceEnrollmentResult` com `Succeeded`/`FailureReason?` nullable,
+  que deixava `{ Succeeded = false, FailureReason = null }` construível e sem significado, e
+  obrigava o `PUT` a reconstruir o problem à mão em vez de chamar `MapFailureToProblem`); o
+  ficheiro que tinha essa classe foi renomeado de `VoiceEnrollmentResult.cs` para
+  `VoiceEnrollment.cs` (só ficam lá o `record VoiceEnrollment` e o `enum
+  VoiceEnrollmentFailureReason`). Nenhuma das três rotas usa
   `AccountAuthorizationGuard.CanCreatePatientRecords` -- cadastro de voz é a própria conta do
   profissional, não um registo de paciente, então a única guarda é
   `IsAuthorizedForAccount` (o token pertence a esta conta).
