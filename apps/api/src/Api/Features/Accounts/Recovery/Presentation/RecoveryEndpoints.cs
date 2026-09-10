@@ -28,6 +28,7 @@ public static class RecoveryEndpoints
             .Produces<RegisterRecoveryVerifierResponse>(StatusCodes.Status200OK)
             .Produces<LimmiarProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")
+            .Produces<LimmiarProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json");
     }
@@ -60,9 +61,9 @@ public static class RecoveryEndpoints
         ISender sender,
         CancellationToken cancellationToken)
     {
-        if (!IsAuthorizedForAccount(authorization, accountId, sessionTokenIssuer))
+        if (AccountAccessProblem(authorization, accountId, sessionTokenIssuer) is { } accessProblem)
         {
-            return AccessTokenUnauthorizedProblem();
+            return accessProblem;
         }
 
         if (request.RecoveryVerifier is not { Length: AccountVerifierLengths.PasswordVerifierLength })

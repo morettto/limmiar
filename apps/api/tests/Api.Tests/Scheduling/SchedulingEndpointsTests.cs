@@ -228,6 +228,28 @@ public sealed class SchedulingEndpointsTests : IAsyncLifetime
         Assert.Equal("auth.access_token_invalid", doc.RootElement.GetProperty("code").GetString());
     }
 
+    /// <summary>A real, valid bearer token -- just for a different account than the one in the route -- must not authorize. Same wrong-owner shape as PatientEndpointsTests.PostPatient_WithValidTokenForDifferentAccount_Returns403WithProblemDetails.</summary>
+    [Fact]
+    public async Task PostScheduledSession_WithValidTokenForDifferentAccount_Returns403WithProblemDetails()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        await RegisterActiveProfessionalAsync(client, "sched-schedule-wrong-owner@example.com");
+
+        using var otherClient = factory.CreateClient();
+        var otherAccountId = await RegisterProfessionalWithoutVerificationAsync(otherClient, "sched-schedule-wrong-owner-target@example.com");
+
+        var response = await client.PostAsJsonAsync(
+            $"/accounts/{otherAccountId}/agenda/sessions",
+            new ScheduleSessionRequest(Guid.NewGuid(), SomeStart, 50),
+            SchedulingJsonContext.Default.ScheduleSessionRequest);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(body);
+        Assert.Equal("auth.forbidden", doc.RootElement.GetProperty("code").GetString());
+    }
+
     [Fact]
     public async Task PostScheduledSession_WithUnverifiedProfessional_Returns403WithProblemDetails()
     {

@@ -51,7 +51,8 @@ tentar arrancar o container, não passam silenciosamente. Os testes puramente un
 - `src/Api/Endpoints` -- Minimal API, um ficheiro por área (`AuthEndpoints`,
   `DevicePairingEndpoints`, `PatientEndpoints`, `ProfessionalVerificationEndpoints`,
   `RecoveryEndpoints`, `SchedulingEndpoints`, `TwoFactorEndpoints`, `VoiceEnrollmentEndpoints`).
-  Todos os oito ficheiros de endpoints partilham a única cópia de `IsAuthorizedForAccount`,
+  Todos os oito ficheiros de endpoints partilham a única cópia de
+  `SessionTokenIssuerAuthorization.AccountAccessProblem`,
   `ProblemJson`, `ValidationProblem` e `AccessTokenUnauthorizedProblem` em `EndpointHelpers.cs`
   (`internal static class`, só usado dentro deste assembly) -- não há cópia local de nenhum
   destes em nenhum ficheiro de endpoints; cada ficheiro só mantém o helper que de facto é só
@@ -64,7 +65,7 @@ tentar arrancar o container, não passam silenciosamente. Os testes puramente un
   não há cadastro para remover. Nenhuma das três rotas usa
   `AccountAuthorizationGuard.CanCreatePatientRecords` -- cadastro de voz é a própria conta do
   profissional, não um registo de paciente, então a única guarda é
-  `IsAuthorizedForAccount` (o token pertence a esta conta).
+  `SessionTokenIssuerAuthorization.AccountAccessProblem` (o token pertence a esta conta).
 - `src/Api/Features/Audit` -- trilha de auditoria encadeada por hash (`audit_entries` e
   `audit_anchors`, migração `0006_create_audit_trail.sql`): `AuditChain.ComputeHash`/`Verify`
   são puros (zero I/O, zero DI); a imposição de não-fork da cadeia é

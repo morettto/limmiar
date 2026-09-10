@@ -27,7 +27,8 @@ public static class ConsentEndpoints
             .WithSummary("Read the current consent status for both purposes")
             .WithDescription("The current status for Gravacao and AnaliseIa, each an independent fold over the same append-only event log -- Pendente with no events, otherwise the decision of the most recent event for that purpose. Requires an Authorization: Bearer access token for this exact account.")
             .Produces<ConsentSnapshot>(StatusCodes.Status200OK)
-            .Produces<LimmiarProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json");
+            .Produces<LimmiarProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")
+            .Produces<LimmiarProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json");
     }
 
     private static async Task<Results<Created<RecordConsentResponse>, JsonHttpResult<LimmiarProblemDetails>>> HandleRecordAsync(
@@ -39,9 +40,9 @@ public static class ConsentEndpoints
         ConsentService consentService,
         CancellationToken cancellationToken)
     {
-        if (!IsAuthorizedForAccount(authorization, accountId, sessionTokenIssuer))
+        if (AccountAccessProblem(authorization, accountId, sessionTokenIssuer) is { } accessProblem)
         {
-            return AccessTokenUnauthorizedProblem();
+            return accessProblem;
         }
 
         if (!TryParseDefinedEnum<ConsentPurpose>(request.Purpose, out var purpose))
@@ -70,9 +71,9 @@ public static class ConsentEndpoints
         ConsentService consentService,
         CancellationToken cancellationToken)
     {
-        if (!IsAuthorizedForAccount(authorization, accountId, sessionTokenIssuer))
+        if (AccountAccessProblem(authorization, accountId, sessionTokenIssuer) is { } accessProblem)
         {
-            return AccessTokenUnauthorizedProblem();
+            return accessProblem;
         }
 
         var snapshot = await consentService.SnapshotAsync(accountId, patientId, cancellationToken);

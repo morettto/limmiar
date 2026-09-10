@@ -18,7 +18,8 @@ public static class DevicePairingEndpoints
             .WithSummary("Open a device-pairing session")
             .WithDescription("Called by the already-authorized device; the returned sessionId is what it encodes into the QR code. Requires an Authorization: Bearer access token for this exact account.")
             .Produces<CreatePairingSessionResponse>(StatusCodes.Status201Created)
-            .Produces<LimmiarProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json");
+            .Produces<LimmiarProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")
+            .Produces<LimmiarProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json");
 
         app.MapPost("/devices/pairing-sessions/{sessionId}/claim", HandleClaim)
             .WithName("PostDevicePairingSessionClaim")
@@ -33,6 +34,7 @@ public static class DevicePairingEndpoints
             .WithDescription("Consumes nothing, so the primary device can poll it as often as it likes. Requires an Authorization: Bearer access token for this exact account; a session belonging to another account is reported as if it did not exist.")
             .Produces<PairingClaimStatusResponse>(StatusCodes.Status200OK)
             .Produces<LimmiarProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")
+            .Produces<LimmiarProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json");
 
         app.MapPost("/accounts/{accountId:guid}/devices/pairing-sessions/{sessionId}/payload", HandleSubmitPayload)
@@ -41,6 +43,7 @@ public static class DevicePairingEndpoints
             .WithDescription("Valid exactly once, and only after a device has claimed the session. The ciphertext is opaque to this backend. Requires an Authorization: Bearer access token for this exact account.")
             .Produces(StatusCodes.Status204NoContent)
             .Produces<LimmiarProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")
+            .Produces<LimmiarProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json");
 
@@ -60,9 +63,9 @@ public static class DevicePairingEndpoints
         ISessionTokenIssuer sessionTokenIssuer,
         IDevicePairingIssuer pairingIssuer)
     {
-        if (!IsAuthorizedForAccount(authorization, accountId, sessionTokenIssuer))
+        if (AccountAccessProblem(authorization, accountId, sessionTokenIssuer) is { } accessProblem)
         {
-            return AccessTokenUnauthorizedProblem();
+            return accessProblem;
         }
 
         var (sessionId, expiresAt) = pairingIssuer.Create(accountId, request.PrimaryPublicKey);
@@ -92,9 +95,9 @@ public static class DevicePairingEndpoints
         ISessionTokenIssuer sessionTokenIssuer,
         IDevicePairingIssuer pairingIssuer)
     {
-        if (!IsAuthorizedForAccount(authorization, accountId, sessionTokenIssuer))
+        if (AccountAccessProblem(authorization, accountId, sessionTokenIssuer) is { } accessProblem)
         {
-            return AccessTokenUnauthorizedProblem();
+            return accessProblem;
         }
 
         var result = pairingIssuer.GetClaimStatus(sessionId, accountId);
@@ -115,9 +118,9 @@ public static class DevicePairingEndpoints
         ISender sender,
         CancellationToken cancellationToken)
     {
-        if (!IsAuthorizedForAccount(authorization, accountId, sessionTokenIssuer))
+        if (AccountAccessProblem(authorization, accountId, sessionTokenIssuer) is { } accessProblem)
         {
-            return AccessTokenUnauthorizedProblem();
+            return accessProblem;
         }
 
         var result = await sender.Send(new SubmitPairingPayloadCommand(sessionId, accountId, request.EncryptedKek), cancellationToken);

@@ -46,19 +46,16 @@ concorrência real (ver `docs/adr/ADR-S04-02-horario-em-claro-servidor-zero-know
   `SchedulingService`, molde `PatientEndpoints.HandleListPatientsAsync` +
   `ProfessionalVerificationEndpoints.HandleListQueueAsync`, que injeta `IAccountStore`
   diretamente): o service só acrescentaria `AuthorizeAsync` e a tradução de `SlotTaken`, e
-  nenhum dos dois se aplica a uma leitura. Este é o único dos seis endpoints de Scheduling que
-  distingue 401 de 403 (S09-02 B4, decisão do humano por RFC 9110): sem token ou token
-  inválido/expirado dá 401 `auth.access_token_invalid` (§15.5.2); um token válido mas de OUTRA
-  conta dá 403 `auth.forbidden` (§15.5.4), com o MESMO corpo quer a conta do URL exista quer
-  não -- o 403 decide-se só por "o token não é desta conta", sem consultar a existência da
-  conta, então não a vaga; a RLS é a segunda camada de isolamento. Usa
-  `SessionTokenIssuerAuthorization.AuthorizeForAccount` (devolve `Unauthorized` /
-  `ForbiddenOtherAccount` / `Authorized`), acrescentado ao lado do `IsAuthorizedForAccount`
-  booleano original -- os outros cinco ficheiros de endpoints continuam a chamar
-  `IsAuthorizedForAccount` e a dar 401 para conta alheia (alinhá-los ao 403 é follow-up fora
-  deste ticket). Usa também os helpers partilhados `ProblemJson`/`ValidationProblem`/
-  `AccessTokenUnauthorizedProblem`/`ForbiddenProblem`. Um único
-  `MapFailureToProblem(SchedulingFailureReason)` cobre as três rotas de escrita.
+  nenhum dos dois se aplica a uma leitura. Todos os seis endpoints de Scheduling distinguem
+  401 de 403 (decisão do humano por RFC 9110): sem token ou token inválido/expirado dá 401
+  `auth.access_token_invalid` (§15.5.2); um token válido mas de OUTRA conta dá 403
+  `auth.forbidden` (§15.5.4), com o MESMO corpo quer a conta do URL exista quer não -- o 403
+  decide-se só por "o token não é desta conta", sem consultar a existência da conta, então
+  não a vaga; a RLS é a segunda camada de isolamento. Todos usam
+  `SessionTokenIssuerAuthorization.AccountAccessProblem` (ver `Accounts.Sessions/README.md`
+  para o contrato do helper). Usa também os helpers partilhados
+  `ProblemJson`/`ValidationProblem`. Um único `MapFailureToProblem(SchedulingFailureReason)`
+  cobre as três rotas de escrita.
 
 ## Decisões relevantes
 

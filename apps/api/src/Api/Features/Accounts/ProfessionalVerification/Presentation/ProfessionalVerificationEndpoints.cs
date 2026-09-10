@@ -21,6 +21,7 @@ public static class ProfessionalVerificationEndpoints
             .Produces<SubmitProfessionalCredentialResponse>(StatusCodes.Status200OK)
             .Produces<LimmiarProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")
+            .Produces<LimmiarProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json");
 
@@ -50,9 +51,9 @@ public static class ProfessionalVerificationEndpoints
         ISender sender,
         CancellationToken cancellationToken)
     {
-        if (!IsAuthorizedForAccount(authorization, accountId, sessionTokenIssuer))
+        if (AccountAccessProblem(authorization, accountId, sessionTokenIssuer) is { } accessProblem)
         {
-            return AccessTokenUnauthorizedProblem();
+            return accessProblem;
         }
 
         if (!TryValidateSubmission(request, out var validationProblem))

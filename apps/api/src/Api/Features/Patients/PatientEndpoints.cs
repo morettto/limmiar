@@ -59,9 +59,9 @@ public static class PatientEndpoints
         PatientService patientService,
         CancellationToken cancellationToken)
     {
-        if (!IsAuthorizedForAccount(authorization, accountId, sessionTokenIssuer))
+        if (AccountAccessProblem(authorization, accountId, sessionTokenIssuer) is { } accessProblem)
         {
-            return AccessTokenUnauthorizedProblem();
+            return accessProblem;
         }
 
         if (!TryValidateSealedBlobShape(request.WrappedDek, "wrappedDek", out var wrappedDekProblem))
@@ -92,9 +92,9 @@ public static class PatientEndpoints
         PatientService patientService,
         CancellationToken cancellationToken)
     {
-        if (!IsAuthorizedForAccount(authorization, accountId, sessionTokenIssuer))
+        if (AccountAccessProblem(authorization, accountId, sessionTokenIssuer) is { } accessProblem)
         {
-            return AccessTokenUnauthorizedProblem();
+            return accessProblem;
         }
 
         if (!TryValidateSealedBlobShape(request.Ciphertext, "ciphertext", out var ciphertextProblem))
@@ -119,9 +119,9 @@ public static class PatientEndpoints
         PatientService patientService,
         CancellationToken cancellationToken)
     {
-        if (!IsAuthorizedForAccount(authorization, accountId, sessionTokenIssuer))
+        if (AccountAccessProblem(authorization, accountId, sessionTokenIssuer) is { } accessProblem)
         {
-            return AccessTokenUnauthorizedProblem();
+            return accessProblem;
         }
 
         var record = await patientService.GetPatientAsync(accountId, patientId, cancellationToken);
@@ -145,9 +145,9 @@ public static class PatientEndpoints
         PatientService patientService,
         CancellationToken cancellationToken)
     {
-        if (!IsAuthorizedForAccount(authorization, accountId, sessionTokenIssuer))
+        if (AccountAccessProblem(authorization, accountId, sessionTokenIssuer) is { } accessProblem)
         {
-            return AccessTokenUnauthorizedProblem();
+            return accessProblem;
         }
 
         var entries = await patientService.ListPatientsAsync(accountId, cancellationToken);

@@ -254,9 +254,9 @@ public sealed class PatientEndpointsTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    /// <summary>A valid bearer token for a different account than the one in the route must not authorize -- same wrong-owner shape as PostPatient_WithValidTokenForDifferentAccount_Returns401WithProblemDetails, so the listing doesn't even attempt to read.</summary>
+    /// <summary>A valid bearer token for a different account than the one in the route must not authorize -- same wrong-owner shape as PostPatient_WithValidTokenForDifferentAccount_Returns403WithProblemDetails, so the listing doesn't even attempt to read.</summary>
     [Fact]
-    public async Task ListPatients_WithValidTokenForDifferentAccount_Returns401WithProblemDetails()
+    public async Task ListPatients_WithValidTokenForDifferentAccount_Returns403WithProblemDetails()
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
@@ -267,7 +267,7 @@ public sealed class PatientEndpointsTests : IAsyncLifetime
 
         var response = await client.GetAsync($"/accounts/{otherAccountId}/patients");
 
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     /// <summary>A professional with no patients yet gets 200 + an empty array, never a 404 -- the token already ties accountId to a real account.</summary>
@@ -340,9 +340,9 @@ public sealed class PatientEndpointsTests : IAsyncLifetime
         Assert.Equal("auth.access_token_invalid", doc.RootElement.GetProperty("code").GetString());
     }
 
-    /// <summary>A real, valid bearer token -- just for a different account than the one in the route -- must not authorize. Distinct branch from the missing-header case (line 138): here ValidateAccess succeeds but returns an accountId that doesn't match the route, so IsAuthorizedForAccount's `== accountId` comparison itself is what returns false.</summary>
+    /// <summary>A real, valid bearer token -- just for a different account than the one in the route -- must not authorize. Distinct branch from the missing-header case (line 138): here ValidateAccess succeeds but returns an accountId that doesn't match the route, so AccountAccessProblem's `== accountId` comparison itself is what returns the 403.</summary>
     [Fact]
-    public async Task PostPatient_WithValidTokenForDifferentAccount_Returns401WithProblemDetails()
+    public async Task PostPatient_WithValidTokenForDifferentAccount_Returns403WithProblemDetails()
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
@@ -359,10 +359,10 @@ public sealed class PatientEndpointsTests : IAsyncLifetime
             new CreatePatientRequest(Guid.NewGuid(), SomeSealedBlob(0x01), SomeSealedBlob(0xAA)),
             PatientsJsonContext.Default.CreatePatientRequest);
 
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
         using var doc = JsonDocument.Parse(body);
-        Assert.Equal("auth.access_token_invalid", doc.RootElement.GetProperty("code").GetString());
+        Assert.Equal("auth.forbidden", doc.RootElement.GetProperty("code").GetString());
     }
 
     /// <summary>A Professional who has not yet been verified (AccountVerificationStatus.Pending) is not authorized to create patient records -- AccountAuthorizationGuard.CanCreatePatientRecords requires Active.</summary>

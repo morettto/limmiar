@@ -30,6 +30,7 @@ public static class NoteEndpoints
             .WithDescription("Exists so the trava (lock) a signed note enforces is imposed by the server, not only remembered in the browser and lost on reload. Requires an Authorization: Bearer access token for this exact account.")
             .Produces<NoteSignatureResponse>(StatusCodes.Status200OK)
             .Produces<LimmiarProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")
+            .Produces<LimmiarProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json");
     }
 
@@ -42,9 +43,9 @@ public static class NoteEndpoints
         NoteService noteService,
         CancellationToken cancellationToken)
     {
-        if (!IsAuthorizedForAccount(authorization, accountId, sessionTokenIssuer))
+        if (AccountAccessProblem(authorization, accountId, sessionTokenIssuer) is { } accessProblem)
         {
-            return AccessTokenUnauthorizedProblem();
+            return accessProblem;
         }
 
         if (!TryValidateSealedBlobShape(request.Signature, "signature", out var signatureProblem))
@@ -73,9 +74,9 @@ public static class NoteEndpoints
         NoteService noteService,
         CancellationToken cancellationToken)
     {
-        if (!IsAuthorizedForAccount(authorization, accountId, sessionTokenIssuer))
+        if (AccountAccessProblem(authorization, accountId, sessionTokenIssuer) is { } accessProblem)
         {
-            return AccessTokenUnauthorizedProblem();
+            return accessProblem;
         }
 
         var signature = await noteService.GetSignatureAsync(accountId, noteId, cancellationToken);

@@ -67,9 +67,9 @@ public static class SchedulingEndpoints
         SchedulingService schedulingService,
         CancellationToken cancellationToken)
     {
-        if (!IsAuthorizedForAccount(authorization, accountId, sessionTokenIssuer))
+        if (AccountAccessProblem(authorization, accountId, sessionTokenIssuer) is { } accessProblem)
         {
-            return AccessTokenUnauthorizedProblem();
+            return accessProblem;
         }
 
         if (!IsValidDuration(request.DurationMinutes, out var durationProblem))
@@ -95,9 +95,9 @@ public static class SchedulingEndpoints
         SchedulingService schedulingService,
         CancellationToken cancellationToken)
     {
-        if (!IsAuthorizedForAccount(authorization, accountId, sessionTokenIssuer))
+        if (AccountAccessProblem(authorization, accountId, sessionTokenIssuer) is { } accessProblem)
         {
-            return AccessTokenUnauthorizedProblem();
+            return accessProblem;
         }
 
         if (!IsValidDuration(request.DurationMinutes, out var durationProblem))
@@ -120,9 +120,9 @@ public static class SchedulingEndpoints
         SchedulingService schedulingService,
         CancellationToken cancellationToken)
     {
-        if (!IsAuthorizedForAccount(authorization, accountId, sessionTokenIssuer))
+        if (AccountAccessProblem(authorization, accountId, sessionTokenIssuer) is { } accessProblem)
         {
-            return AccessTokenUnauthorizedProblem();
+            return accessProblem;
         }
 
         var result = await schedulingService.CancelAsync(accountId, sessionId, cancellationToken);
@@ -140,12 +140,9 @@ public static class SchedulingEndpoints
         ScheduledSessionStore store,
         CancellationToken cancellationToken)
     {
-        switch (AuthorizeForAccount(authorization, accountId, sessionTokenIssuer))
+        if (AccountAccessProblem(authorization, accountId, sessionTokenIssuer) is { } accessProblem)
         {
-            case AccountAuthorizationOutcome.Unauthorized:
-                return AccessTokenUnauthorizedProblem();
-            case AccountAuthorizationOutcome.ForbiddenOtherAccount:
-                return ForbiddenProblem();
+            return accessProblem;
         }
 
         if (!TryParseWindow(from, to, out var fromUtc, out var toUtc, out var windowProblem))

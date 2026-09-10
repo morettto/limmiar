@@ -76,7 +76,7 @@ public sealed class RecoveryEndpointsTests
 
     /// <summary>Core account-scoping regression: a real, valid, unexpired access token for a DIFFERENT account must not authorize this call.</summary>
     [Fact]
-    public async Task PostAccountRecoveryPhrase_WithAccessTokenForAnotherAccount_Returns401WithProblemDetails()
+    public async Task PostAccountRecoveryPhrase_WithAccessTokenForAnotherAccount_Returns403WithProblemDetails()
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
@@ -89,10 +89,10 @@ public sealed class RecoveryEndpointsTests
             new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier),
             AccountsJsonContext.Default.RegisterRecoveryVerifierRequest);
 
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
         using var doc = JsonDocument.Parse(body);
-        Assert.Equal("auth.access_token_invalid", doc.RootElement.GetProperty("code").GetString());
+        Assert.Equal("auth.forbidden", doc.RootElement.GetProperty("code").GetString());
     }
 
     [Fact]
