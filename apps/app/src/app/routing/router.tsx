@@ -25,9 +25,11 @@ function readSearchString(search: Record<string, unknown>, key: string): string 
 
 const rootRoute = createRootRoute()
 
+// ponytail: sem KeychainProvider ainda, `chaveiro` fica sempre `null` -- painel em "chaveiro
+// bloqueado", falha fechada por decisão humana. `notas` vazia pelo mesmo motivo (sem GET de nota).
 function IndexRouteComponent() {
   const { sessao, terminarSessao } = useSession()
-  return <HomePage email={sessao?.email ?? null} onSair={terminarSessao} />
+  return <HomePage email={sessao?.email ?? null} onSair={terminarSessao} chaveiro={null} notas={[]} />
 }
 
 const indexRoute = createRoute({

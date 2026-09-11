@@ -8,7 +8,7 @@ public static class CredentialsComposition
         services.AddSingleton<IGoogleIdentityProvider, GoogleIdentityProvider>();
     }
 
-    public static void MapCredentials(this WebApplication app)
+    public static void MapCredentials(this IEndpointRouteBuilder app)
     {
         app.MapAuthEndpoints();
     }

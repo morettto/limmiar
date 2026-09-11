@@ -14,7 +14,7 @@ msgstr ""
 "Plural-Forms: \n"
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:150
+#: src/shared/api/problem-messages.ts:156
 msgid "agenda.recording_active"
 msgstr "La sesión está grabando y no se puede modificar ahora."
 
@@ -50,7 +50,7 @@ msgid "Aguardando o outro dispositivo enviar a chave..."
 msgstr "Esperando a que el otro dispositivo envíe la clave..."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:112
+#: src/shared/api/problem-messages.ts:118
 msgid "auth.device_pairing_payload_not_ready"
 msgstr "Espera a que el otro dispositivo lea el código antes de liberar el acceso."
 
@@ -92,6 +92,10 @@ msgstr "Campo inválido: {field}."
 msgid "Carregando pacientes..."
 msgstr "Cargando pacientes..."
 
+#: src/widgets/painel-profissional/PainelProfissional.tsx:139
+msgid "Carregando painel..."
+msgstr "Cargando panel..."
+
 #: src/features/copilot-byok/CopilotKeySetup.tsx:81
 msgid "Chave de API"
 msgstr "Clave de API"
@@ -103,6 +107,10 @@ msgstr "Llavero bloqueado. Desbloquéalo para registrar tu clave de API."
 #: src/widgets/patient-wallet/PatientWallet.tsx:85
 msgid "Chaveiro bloqueado. Desbloqueie para ver a carteira de pacientes."
 msgstr "Llavero bloqueado. Desbloquéalo para ver la cartera de pacientes."
+
+#: src/widgets/painel-profissional/PainelProfissional.tsx:129
+msgid "Chaveiro bloqueado. Desbloqueie para ver o painel."
+msgstr "Llavero bloqueado. Desbloquéalo para ver el panel."
 
 #: src/features/totp-enrollment/TotpSetup.tsx:158
 msgid "Código de 6 dígitos do aplicativo autenticador"
@@ -141,7 +149,7 @@ msgstr "¿Cómo vas a usar Limmiar?"
 msgid "Concluindo o pareamento..."
 msgstr "Completando la vinculación..."
 
-#: src/pages/home/HomePage.tsx:16
+#: src/pages/home/HomePage.tsx:27
 msgid "Configurar copiloto de IA"
 msgstr "Configurar copiloto de IA"
 
@@ -235,7 +243,7 @@ msgid "Esta frase não será exibida novamente. Guarde-a em um local seguro: ela
 msgstr "Esta frase no se mostrará de nuevo. Guárdala en un lugar seguro: es la única forma de recuperar el acceso a tu cuenta si pierdes todos tus dispositivos."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:162
+#: src/shared/api/problem-messages.ts:168
 msgid "notes.signature_not_found"
 msgstr "Esta nota aún no ha sido firmada."
 
@@ -244,7 +252,7 @@ msgid "Esta nota já está assinada."
 msgstr "Esta nota ya está firmada."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:158
+#: src/shared/api/problem-messages.ts:164
 msgid "notes.already_signed"
 msgstr "Esta nota ya fue firmada."
 
@@ -253,7 +261,7 @@ msgid "Esta nota já tinha sido assinada. As alterações feitas depois não est
 msgstr "Esta nota ya había sido firmada. Los cambios realizados después no están cubiertos por esa firma."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:146
+#: src/shared/api/problem-messages.ts:152
 msgid "agenda.session_cancelled"
 msgstr "Esta sesión fue cancelada."
 
@@ -262,7 +270,7 @@ msgid "Estado da nota"
 msgstr "Estado de la nota"
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:106
+#: src/shared/api/problem-messages.ts:112
 msgid "auth.device_pairing_session_not_found"
 msgstr "Este código de vinculación ya no es válido. Genera uno nuevo."
 
@@ -281,7 +289,7 @@ msgid "auth.magic_link_invalid"
 msgstr "Este enlace de acceso ya no es válido. Solicita uno nuevo."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:130
+#: src/shared/api/problem-messages.ts:136
 msgid "patients.entry_sequence_conflict"
 msgstr "Este expediente cambió en otro dispositivo. Recarga e intenta de nuevo."
 
@@ -334,8 +342,24 @@ msgstr "Guardé mis códigos"
 msgid "Guardei minha frase"
 msgstr "Guardé mi frase"
 
+#: src/widgets/painel-profissional/PainelProfissional.tsx:180
+msgid "Indicadores"
+msgstr "Indicadores"
+
+#: src/widgets/painel-profissional/PainelProfissional.tsx:164
+msgid "Iniciar próxima sessão"
+msgstr "Iniciar próxima sesión"
+
+#: src/widgets/painel-profissional/PainelProfissional.tsx:168
+msgid "Iniciar próxima sessão às {hora}"
+msgstr "Iniciar próxima sesión a las {hora}"
+
+#: src/widgets/painel-profissional/PainelProfissional.tsx:168
+msgid "Iniciar próxima: {nome} {hora}"
+msgstr "Iniciar próxima: {nome} {hora}"
+
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:138
+#: src/shared/api/problem-messages.ts:144
 msgid "agenda.slot_taken"
 msgstr "Ya existe una sesión en este horario."
 
@@ -360,9 +384,17 @@ msgstr "No se puede enviar la acreditación con la cuenta en su estado actual."
 msgid "Não foi possível acessar a câmera para escanear o código."
 msgstr "No se pudo acceder a la cámara para escanear el código."
 
+#: src/widgets/painel-profissional/PainelProfissional.tsx:197
+msgid "Não foi possível carregar a agenda."
+msgstr "No se pudo cargar la agenda."
+
 #: src/widgets/patient-wallet/PatientWallet.tsx:68
 msgid "Não foi possível carregar a carteira de pacientes. Tente novamente."
 msgstr "No se pudo cargar la cartera de pacientes. Intenta de nuevo."
+
+#: src/widgets/painel-profissional/PainelProfissional.tsx:192
+msgid "Não foi possível carregar o painel. Tente novamente."
+msgstr "No se pudo cargar el panel. Intenta de nuevo."
 
 #: src/features/device-pairing-primary/PairPrimaryDevice.tsx:57
 msgid "Não foi possível concluir o pareamento com segurança. Tente novamente."
@@ -400,7 +432,7 @@ msgid "auth.totp_not_pending"
 msgstr "No hay una configuración de verificación en dos pasos pendiente para esta cuenta."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:154
+#: src/shared/api/problem-messages.ts:160
 msgid "voice.enrollment_not_found"
 msgstr "No se encontró registro de voz para esta cuenta."
 
@@ -417,7 +449,7 @@ msgid "Nota assinada em {dataAssinatura}."
 msgstr "Nota firmada el {dataAssinatura}."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:118
+#: src/shared/api/problem-messages.ts:124
 msgid "auth.device_pairing_payload_not_delivered"
 msgstr "El dispositivo principal aún no ha liberado el acceso. Espera."
 
@@ -431,11 +463,12 @@ msgid "unexpected_error"
 msgstr "Ocurrió un error inesperado en el servidor."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:178
+#: src/shared/api/problem-messages.ts:184
 msgid "errors.generic"
 msgstr "Ocurrió un error inesperado. Inténtalo de nuevo."
 
 #: src/widgets/auth-screen/AuthScreen.tsx:174
+#: src/widgets/painel-profissional/PainelProfissional.tsx:203
 #: src/widgets/patient-wallet/PatientWallet.tsx:120
 msgid "Paciente"
 msgstr "Paciente"
@@ -443,6 +476,10 @@ msgstr "Paciente"
 #: src/widgets/patient-wallet/PatientWallet.tsx:118
 msgid "Pacientes"
 msgstr "Pacientes"
+
+#: src/widgets/painel-profissional/PainelProfissional.tsx:182
+msgid "Pacientes ativos"
+msgstr "Pacientes activos"
 
 #: src/features/device-pairing-primary/PairingQr.tsx:149
 msgid "Parear novo dispositivo"
@@ -473,7 +510,7 @@ msgid "Profissional"
 msgstr "Profesional"
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:122
+#: src/shared/api/problem-messages.ts:128
 msgid "patients.not_found"
 msgstr "Expediente no encontrado."
 
@@ -490,11 +527,16 @@ msgstr "Recuperar acceso"
 msgid "Recuperar acesso à conta"
 msgstr "Recuperar acceso a la cuenta"
 
+#: src/widgets/painel-profissional/PainelProfissional.tsx:200
+#: src/widgets/painel-profissional/PainelProfissional.tsx:201
+msgid "Requer você"
+msgstr "Te necesita"
+
 #: src/widgets/patient-wallet/PatientWallet.tsx:121
 msgid "Risco"
 msgstr "Riesgo"
 
-#: src/pages/home/HomePage.tsx:22
+#: src/pages/home/HomePage.tsx:33
 msgid "Sair"
 msgstr "Cerrar sesión"
 
@@ -515,27 +557,31 @@ msgid "Senha"
 msgstr "Contraseña"
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:142
+#: src/shared/api/problem-messages.ts:148
 msgid "agenda.session_not_found"
 msgstr "Sesión no encontrada."
 
+#: src/widgets/painel-profissional/PainelProfissional.tsx:186
+msgid "Sessões na semana"
+msgstr "Sesiones esta semana"
+
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:134
+#: src/shared/api/problem-messages.ts:140
 msgid "agenda.not_authorized_to_schedule"
 msgstr "Tu cuenta todavía no puede agendar sesiones."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:166
+#: src/shared/api/problem-messages.ts:172
 msgid "notes.not_authorized_to_sign"
 msgstr "Su cuenta todavía no puede firmar notas."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:126
+#: src/shared/api/problem-messages.ts:132
 msgid "patients.not_authorized_to_create_records"
 msgstr "Tu cuenta todavía no puede crear expedientes."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:170
+#: src/shared/api/problem-messages.ts:176
 msgid "consent.not_authorized_to_record"
 msgstr "Su cuenta todavía no puede registrar consentimiento."
 
@@ -577,3 +623,8 @@ msgstr "Verificar"
 #: src/widgets/auth-screen/AuthScreen.tsx:131
 msgid "Verifique seu e-mail para continuar. Enviamos um link de acesso, se este e-mail existir."
 msgstr "Revisa tu correo electrónico para continuar. Enviamos un enlace de acceso, si este correo existe."
+
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:105
+msgid "auth.forbidden"
+msgstr "No tienes acceso a esta cuenta."

@@ -8,7 +8,7 @@ public static class TwoFactorComposition
         services.AddSingleton<ITwoFactorTicketIssuer, TwoFactorTicketIssuer>();
     }
 
-    public static void MapTwoFactor(this WebApplication app)
+    public static void MapTwoFactor(this IEndpointRouteBuilder app)
     {
         app.MapTwoFactorEndpoints();
     }

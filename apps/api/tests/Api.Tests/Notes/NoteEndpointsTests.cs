@@ -100,9 +100,9 @@ public sealed class NoteEndpointsTests : IAsyncLifetime
         Assert.Equal("auth.access_token_invalid", doc.RootElement.GetProperty("code").GetString());
     }
 
-    /// <summary>A real, valid bearer token -- just for a different account than the one in the route -- must not authorize. Same wrong-owner shape as PatientEndpointsTests.PostPatient_WithValidTokenForDifferentAccount_Returns401WithProblemDetails.</summary>
+    /// <summary>A real, valid bearer token -- just for a different account than the one in the route -- must not authorize. Same wrong-owner shape as PatientEndpointsTests.PostPatient_WithValidTokenForDifferentAccount_Returns403WithProblemDetails.</summary>
     [Fact]
-    public async Task PostNoteSignature_WithValidTokenForDifferentAccount_Returns401WithProblemDetails()
+    public async Task PostNoteSignature_WithValidTokenForDifferentAccount_Returns403WithProblemDetails()
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
@@ -116,10 +116,10 @@ public sealed class NoteEndpointsTests : IAsyncLifetime
             new SignNoteRequest(0, SomeSealedSignature()),
             NotesJsonContext.Default.SignNoteRequest);
 
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
         using var doc = JsonDocument.Parse(body);
-        Assert.Equal("auth.access_token_invalid", doc.RootElement.GetProperty("code").GetString());
+        Assert.Equal("auth.forbidden", doc.RootElement.GetProperty("code").GetString());
     }
 
     /// <summary>Boundary validation rejects a signature shorter than AES-256-GCM's iv(12)+tag(16) floor before it ever reaches the store -- a blob that short could never have come from a real seal operation.</summary>

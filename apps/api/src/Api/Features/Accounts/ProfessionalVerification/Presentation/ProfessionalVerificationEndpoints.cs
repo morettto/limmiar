@@ -3,8 +3,6 @@ using Api.Serialization;
 using Mediator;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
-using static Api.Accounts.AccountsProblemResults;
-using static Api.Accounts.SessionTokenIssuerAuthorization;
 using static Api.Problems.ProblemResults;
 
 namespace Api.Accounts;
@@ -12,7 +10,7 @@ namespace Api.Accounts;
 // HandleListQueueAsync/HandleDecideAsync are staff-only (X-Staff-Api-Key, IStaffAccessGuard); HandleSubmitAsync is account-scoped via Bearer access token -- both gates closed security-review findings against forged/unauthenticated calls.
 public static class ProfessionalVerificationEndpoints
 {
-    public static void MapProfessionalVerificationEndpoints(this WebApplication app)
+    public static void MapProfessionalVerificationEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapPost("/accounts/{accountId:guid}/professional-verification", HandleSubmitAsync)
             .WithName("PostProfessionalVerification")
@@ -20,7 +18,6 @@ public static class ProfessionalVerificationEndpoints
             .WithDescription("CRP/CRM are auto-verified and resolve immediately; a document goes to human review (SLA declared in the response). Requires an Authorization: Bearer access token for this exact account.")
             .Produces<SubmitProfessionalCredentialResponse>(StatusCodes.Status200OK)
             .Produces<LimmiarProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")
-            .Produces<LimmiarProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json");
 
@@ -35,6 +32,8 @@ public static class ProfessionalVerificationEndpoints
             .WithName("PostProfessionalVerificationDecision")
             .WithSummary("Approve or reject a queued document submission")
             .WithDescription("Only valid while the account is InReview. Rejection carries a reader-facing reason. Staff-only: requires the X-Staff-Api-Key header.")
+            // Gated by IStaffAccessGuard (X-Staff-Api-Key), not a Bearer access token for the account under review.
+            .AllowWithoutAccountToken()
             .Produces<ProfessionalVerificationDecisionResponse>(StatusCodes.Status200OK)
             .Produces<LimmiarProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")
@@ -45,16 +44,9 @@ public static class ProfessionalVerificationEndpoints
     private static async Task<Results<Ok<SubmitProfessionalCredentialResponse>, JsonHttpResult<LimmiarProblemDetails>>> HandleSubmitAsync(
         Guid accountId,
         SubmitProfessionalCredentialRequest request,
-        [FromHeader(Name = "Authorization")] string? authorization,
-        ISessionTokenIssuer sessionTokenIssuer,
         ISender sender,
         CancellationToken cancellationToken)
     {
-        if (!IsAuthorizedForAccount(authorization, accountId, sessionTokenIssuer))
-        {
-            return AccessTokenUnauthorizedProblem();
-        }
-
         if (!TryValidateSubmission(request, out var validationProblem))
         {
             return validationProblem;

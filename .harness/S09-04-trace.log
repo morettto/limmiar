@@ -1,0 +1,57 @@
+# S09-04 trace — vermelho/verde por fatia
+
+## B1 — GET .../agenda/sessions perde cancelledAt do item (backend)
+
+### Par: ListSessions_ItemsNeverCarryCancelledAtProperty
+comando: dotnet test tests/Api.Tests --filter "FullyQualifiedName~SchedulingEndpointsTests.ListSessions_ItemsNeverCarryCancelledAtProperty"
+vermelho: Assert.All() Failure: Assert.False() Failure / Expected: False / Actual: True (item {"sessionId":...,"cancelledAt":null})
+implementação: ScheduledSessionListItem (SessionId, PatientId, StartsAt, DurationMinutes) ao lado de ScheduledSessionResponse; ListScheduledSessionsResponse passa a IReadOnlyList<ScheduledSessionListItem>; ToListItem mapeia a lista, ToResponse fica intacto para POST/PATCH; SchedulingJsonContext ganha [JsonSerializable(typeof(ScheduledSessionListItem))].
+comando: dotnet test tests/Api.Tests --filter "FullyQualifiedName~SchedulingEndpointsTests"
+verde: Passed! - Failed: 0, Passed: 39, Skipped: 0, Total: 39
+
+## F1 — entities/agenda/api.ts perde cancelledAt do mapeamento
+
+### Par: listarSessoes > GETs …/agenda/sessions?from=&to= (encoded ISO) with a bearer token and maps the 4 fields
+comando: pnpm exec vitest run src/entities/agenda/api.test.ts
+vermelho: AssertionError: expected {...} to strictly equal {...} -- diff mostra "+ canceladaEm: undefined" no recebido (toStrictEqual, não toEqual, é o que expõe isto)
+implementação: api.ts perde `cancelledAt` do tipo do corpo e do mapeamento (4 campos: sessionId, patientId, inicioEm, duracaoMinutos).
+comando: pnpm exec vitest run src/entities/agenda/api.test.ts
+verde: Test Files 1 passed (1) / Tests 2 passed (2)
+
+## F2 — entities/agenda/sessao.ts: porComecar substitui os dois filtros com cancelada/recorte de 7d
+
+### Par: proximaSessao (entrada ordenada) + salta sessão já passada + sessoesNaSemana (conta a 8 dias)
+comando: pnpm exec vitest run src/entities/agenda/sessao.test.ts
+vermelho: 3 failed -- "entrada ordenada devolve a primeira que ainda não começou" (expected object, actual null), "salta sessão já passada" (expected object, actual null), "conta as sessões que ainda não começaram, mesmo fora de 7 dias" (expected 2, actual +0) -- a implementação antiga só aceitava candidatas com canceladaEm === null, e a fixture nova não tem esse campo (undefined !== null), então tudo era tratado como cancelado.
+implementação: canceladaEm sai de SessaoAgendada; porComecar(sessoes, agora) (privada, `inicioEm >= agora`, preserva ordem do servidor) substitui os dois filtros; proximaSessao = porComecar(...)[0] ?? null (sem reduce); sessoesNaSemana = porComecar(...).length (sem recorte de 7 dias).
+comando: pnpm exec vitest run src/entities/agenda/sessao.test.ts
+verde: Test Files 1 passed (1) / Tests 6 passed (6)
+
+## R1 — PainelProfissional.tsx: DadosPacientes nomeado; fixtures do teste sem cancelledAt/canceladaEm
+
+Refactor, fora do loop TDD (forma secção 3, R1) -- nenhuma asserção de PainelProfissional.test.tsx mudou.
+implementação: type DadosPacientes = { sumarios; consentimentos } ao lado de ResultadoFonte; EstadoPainel e carregarPacientes usam ResultadoFonte<DadosPacientes>; o alias local PacientesFonte saiu do useEffect. Em PainelProfissional.test.tsx: agendaResponse() e sessaoEm1h() deixam de mandar cancelledAt/canceladaEm (a fixture já não tem o campo).
+comando: pnpm exec vitest run src/widgets/painel-profissional/PainelProfissional.test.tsx
+verde: (incluído na corrida completa abaixo -- nenhuma asserção mudou, só as fixtures)
+
+## Suite completa (fim do ticket)
+
+comando (api): dotnet test tests/Api.Tests
+resultado: Passed! - Failed: 0, Passed: 586, Skipped: 0, Total: 586
+cobertura: Api | Line 100% | Branch 100% | Method 100%
+
+comando (app): pnpm run test:unit
+resultado: Test Files 77 passed (77) / Tests 628 passed (628)
+cobertura (istanbul): Statements 100% | Branches 100% | Functions 100% | Lines 100%
+
+comando (app): pnpm exec tsc --noEmit
+resultado: sem output (0 erros)
+
+comando (app): pnpm run lint
+resultado: só warnings pré-existentes, nenhum novo -- inclui only-export-components em PainelProfissional.tsx:50 (o `export function estadoInicial`, já existia antes desta fatia; `DadosPacientes`, novo e não exportado, não dispara o aviso) e os de BibliotecaPage/PairingScan/SessionProvider/router.tsx/MagicLinkCallback, todos fora do diff. 0 erros.
+
+comando (app): pnpm run build
+resultado: tsc -b + vite build, "built in 596ms", 0 erros.
+
+comando (api, filtro do ticket): dotnet test tests/Api.Tests --filter "FullyQualifiedName~SchedulingEndpointsTests"
+resultado: Passed! - Failed: 0, Passed: 39, Skipped: 0, Total: 39 -- o coverlet.msbuild falha o gate de 100% line/branch NESTA corrida filtrada porque o threshold do .csproj mede contra o assembly Api inteiro, não só as classes exercitadas pelo filtro (Api | Line 37.6% | Branch 22.22%); não é uma regressão -- a corrida completa (sem --filter), acima, fecha em 100%/100%/100%.

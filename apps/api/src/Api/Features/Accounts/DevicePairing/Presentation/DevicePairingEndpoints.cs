@@ -2,23 +2,19 @@ using Api.Problems;
 using Api.Serialization;
 using Mediator;
 using Microsoft.AspNetCore.Http.HttpResults;
-using Microsoft.AspNetCore.Mvc;
-using static Api.Accounts.AccountsProblemResults;
-using static Api.Accounts.SessionTokenIssuerAuthorization;
 using static Api.Problems.ProblemResults;
 
 namespace Api.Accounts;
 
 public static class DevicePairingEndpoints
 {
-    public static void MapDevicePairingEndpoints(this WebApplication app)
+    public static void MapDevicePairingEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapPost("/accounts/{accountId:guid}/devices/pairing-sessions", HandleCreate)
             .WithName("PostDevicePairingSession")
             .WithSummary("Open a device-pairing session")
             .WithDescription("Called by the already-authorized device; the returned sessionId is what it encodes into the QR code. Requires an Authorization: Bearer access token for this exact account.")
-            .Produces<CreatePairingSessionResponse>(StatusCodes.Status201Created)
-            .Produces<LimmiarProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json");
+            .Produces<CreatePairingSessionResponse>(StatusCodes.Status201Created);
 
         app.MapPost("/devices/pairing-sessions/{sessionId}/claim", HandleClaim)
             .WithName("PostDevicePairingSessionClaim")
@@ -32,7 +28,6 @@ public static class DevicePairingEndpoints
             .WithSummary("Poll whether a device has scanned the QR code yet")
             .WithDescription("Consumes nothing, so the primary device can poll it as often as it likes. Requires an Authorization: Bearer access token for this exact account; a session belonging to another account is reported as if it did not exist.")
             .Produces<PairingClaimStatusResponse>(StatusCodes.Status200OK)
-            .Produces<LimmiarProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json");
 
         app.MapPost("/accounts/{accountId:guid}/devices/pairing-sessions/{sessionId}/payload", HandleSubmitPayload)
@@ -40,7 +35,6 @@ public static class DevicePairingEndpoints
             .WithSummary("Hand over the KEK encrypted to the claiming device")
             .WithDescription("Valid exactly once, and only after a device has claimed the session. The ciphertext is opaque to this backend. Requires an Authorization: Bearer access token for this exact account.")
             .Produces(StatusCodes.Status204NoContent)
-            .Produces<LimmiarProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json");
 
@@ -56,15 +50,8 @@ public static class DevicePairingEndpoints
     private static Results<Created<CreatePairingSessionResponse>, JsonHttpResult<LimmiarProblemDetails>> HandleCreate(
         Guid accountId,
         CreatePairingSessionRequest request,
-        [FromHeader(Name = "Authorization")] string? authorization,
-        ISessionTokenIssuer sessionTokenIssuer,
         IDevicePairingIssuer pairingIssuer)
     {
-        if (!IsAuthorizedForAccount(authorization, accountId, sessionTokenIssuer))
-        {
-            return AccessTokenUnauthorizedProblem();
-        }
-
         var (sessionId, expiresAt) = pairingIssuer.Create(accountId, request.PrimaryPublicKey);
         return TypedResults.Created(
             $"/devices/pairing-sessions/{sessionId}",
@@ -88,15 +75,8 @@ public static class DevicePairingEndpoints
     private static Results<Ok<PairingClaimStatusResponse>, JsonHttpResult<LimmiarProblemDetails>> HandleGetClaimStatus(
         Guid accountId,
         string sessionId,
-        [FromHeader(Name = "Authorization")] string? authorization,
-        ISessionTokenIssuer sessionTokenIssuer,
         IDevicePairingIssuer pairingIssuer)
     {
-        if (!IsAuthorizedForAccount(authorization, accountId, sessionTokenIssuer))
-        {
-            return AccessTokenUnauthorizedProblem();
-        }
-
         var result = pairingIssuer.GetClaimStatus(sessionId, accountId);
         if (!result.Succeeded)
         {
@@ -110,16 +90,9 @@ public static class DevicePairingEndpoints
         Guid accountId,
         string sessionId,
         SubmitPairingPayloadRequest request,
-        [FromHeader(Name = "Authorization")] string? authorization,
-        ISessionTokenIssuer sessionTokenIssuer,
         ISender sender,
         CancellationToken cancellationToken)
     {
-        if (!IsAuthorizedForAccount(authorization, accountId, sessionTokenIssuer))
-        {
-            return AccessTokenUnauthorizedProblem();
-        }
-
         var result = await sender.Send(new SubmitPairingPayloadCommand(sessionId, accountId, request.EncryptedKek), cancellationToken);
         if (!result.Succeeded)
         {

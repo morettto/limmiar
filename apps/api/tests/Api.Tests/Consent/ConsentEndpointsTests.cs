@@ -164,8 +164,9 @@ public sealed class ConsentEndpointsTests : IAsyncLifetime
         Assert.Equal("decision", doc.RootElement.GetProperty("params").GetProperty("field").GetString());
     }
 
+    /// <summary>A real, valid bearer token -- just for a different account than the one in the route -- must not authorize. Same wrong-owner shape as PatientEndpointsTests.PostPatient_WithValidTokenForDifferentAccount_Returns403WithProblemDetails.</summary>
     [Fact]
-    public async Task PostConsent_WithoutBearerForThisAccount_Returns401WithProblemDetails()
+    public async Task PostConsent_WithValidTokenForDifferentAccount_Returns403WithProblemDetails()
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
@@ -176,10 +177,29 @@ public sealed class ConsentEndpointsTests : IAsyncLifetime
 
         var response = await PostConsentAsync(client, otherAccountId, Guid.NewGuid(), "gravacao", "concedido");
 
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
         using var doc = JsonDocument.Parse(body);
-        Assert.Equal("auth.access_token_invalid", doc.RootElement.GetProperty("code").GetString());
+        Assert.Equal("auth.forbidden", doc.RootElement.GetProperty("code").GetString());
+    }
+
+    /// <summary>Same wrong-owner shape as PostConsent above, exercised on the GET half so both Consent handlers are proven to separate 401 from 403 through RequireAccountAccess().</summary>
+    [Fact]
+    public async Task GetConsents_WithValidTokenForDifferentAccount_Returns403WithProblemDetails()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        await RegisterActiveProfessionalAsync(client, "consent-get-wrong-owner@example.com");
+
+        using var otherClient = factory.CreateClient();
+        var otherAccountId = await RegisterProfessionalWithoutVerificationAsync(otherClient, "consent-get-wrong-owner-target@example.com");
+
+        var response = await client.GetAsync($"/accounts/{otherAccountId}/patients/{Guid.NewGuid()}/consents");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(body);
+        Assert.Equal("auth.forbidden", doc.RootElement.GetProperty("code").GetString());
     }
 
     [Fact]

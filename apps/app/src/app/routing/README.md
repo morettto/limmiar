@@ -37,6 +37,11 @@ página real, incluindo o único sítio autorizado a chamar `useSession()` fora 
 
 ## Decisões relevantes
 
+- **`IndexRouteComponent` passa `email`/`onSair`/`chaveiro`/`notas` a `HomePage`.**
+  `chaveiro: { kek, accountId, accessToken } | null` é montado aqui, uma vez
+  só, e sempre `null` enquanto não existe `KeychainProvider` -- falha fechada
+  (chaveiro trancado, sem pedido nenhum), decisão humana; ver
+  `pages/home/README.md` e `widgets/painel-profissional/README.md`.
 - **`CopilotKeyRouteComponent`/`BibliotecaRouteComponent` passam `sessao?.id ?? null`, nunca
   `?? ''` (S18-04).** A sentinela `''` era a mesma armadilha que `assertAccountId`
   (`features/copilot-byok/key-store.ts`) rejeita -- `CopilotKeyPageProps.accountId` e

@@ -25,7 +25,7 @@ public static class AccountsComposition
         });
     }
 
-    public static void MapAccounts(this WebApplication app)
+    public static void MapAccounts(this IEndpointRouteBuilder app)
     {
         app.MapCredentials();
         app.MapTwoFactor();
