@@ -39,10 +39,12 @@ public static class AccountAccessEndpointConventions
     /// metadata list -- including a route's own <see cref="AllowWithoutAccountToken"/> -- rather
     /// than racing it.
     /// </summary>
-    public static TBuilder DeclareAccountAccessOpenApiResponses<TBuilder>(this TBuilder builder)
-        where TBuilder : IEndpointConventionBuilder
+    public static RouteGroupBuilder DeclareAccountAccessOpenApiResponses(this RouteGroupBuilder builder)
     {
-        builder.Finally(endpointBuilder =>
+        // RouteGroupBuilder implements IEndpointConventionBuilder explicitly, so Finally is only
+        // reachable through the interface.
+        IEndpointConventionBuilder conventions = builder;
+        conventions.Finally(endpointBuilder =>
         {
             // Every endpoint mapped in this app is a Minimal API route (no controllers/hubs
             // registered), so this is always a RouteEndpointBuilder -- a direct cast fails loud
