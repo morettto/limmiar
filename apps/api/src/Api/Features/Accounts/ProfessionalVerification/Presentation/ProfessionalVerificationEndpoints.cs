@@ -3,8 +3,6 @@ using Api.Serialization;
 using Mediator;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
-using static Api.Accounts.AccountsProblemResults;
-using static Api.Accounts.SessionTokenIssuerAuthorization;
 using static Api.Problems.ProblemResults;
 
 namespace Api.Accounts;
@@ -18,10 +16,9 @@ public static class ProfessionalVerificationEndpoints
             .WithName("PostProfessionalVerification")
             .WithSummary("Submit (or resubmit) a professional credential")
             .WithDescription("CRP/CRM are auto-verified and resolve immediately; a document goes to human review (SLA declared in the response). Requires an Authorization: Bearer access token for this exact account.")
+            .RequireAccountAccess()
             .Produces<SubmitProfessionalCredentialResponse>(StatusCodes.Status200OK)
             .Produces<LimmiarProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")
-            .Produces<LimmiarProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")
-            .Produces<LimmiarProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json");
 
@@ -46,16 +43,9 @@ public static class ProfessionalVerificationEndpoints
     private static async Task<Results<Ok<SubmitProfessionalCredentialResponse>, JsonHttpResult<LimmiarProblemDetails>>> HandleSubmitAsync(
         Guid accountId,
         SubmitProfessionalCredentialRequest request,
-        [FromHeader(Name = "Authorization")] string? authorization,
-        ISessionTokenIssuer sessionTokenIssuer,
         ISender sender,
         CancellationToken cancellationToken)
     {
-        if (AccountAccessProblem(authorization, accountId, sessionTokenIssuer) is { } accessProblem)
-        {
-            return accessProblem;
-        }
-
         if (!TryValidateSubmission(request, out var validationProblem))
         {
             return validationProblem;

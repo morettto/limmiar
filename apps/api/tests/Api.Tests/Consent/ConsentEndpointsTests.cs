@@ -183,7 +183,7 @@ public sealed class ConsentEndpointsTests : IAsyncLifetime
         Assert.Equal("auth.forbidden", doc.RootElement.GetProperty("code").GetString());
     }
 
-    /// <summary>Same wrong-owner shape as PostConsent above, exercised on the GET half so both Consent handlers are proven to separate 401 from 403 through AccountAccessProblem.</summary>
+    /// <summary>Same wrong-owner shape as PostConsent above, exercised on the GET half so both Consent handlers are proven to separate 401 from 403 through RequireAccountAccess().</summary>
     [Fact]
     public async Task GetConsents_WithValidTokenForDifferentAccount_Returns403WithProblemDetails()
     {

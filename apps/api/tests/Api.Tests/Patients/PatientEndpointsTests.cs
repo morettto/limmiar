@@ -6,10 +6,12 @@ using System.Text;
 using System.Text.Json;
 using Api.Accounts;
 using Api.Patients;
-using Api.Patients;
 using Api.Serialization;
 using Api.Tests.Infrastructure;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Metadata;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
@@ -242,6 +244,78 @@ public sealed class PatientEndpointsTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    /// <summary>RFC 9110 SS15.5.2: a 401 must carry WWW-Authenticate so a well-behaved client knows which scheme to retry with.</summary>
+    [Fact]
+    public async Task GetPatient_WithoutBearerToken_ResponseIncludesWwwAuthenticateHeader()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+
+        var response = await client.GetAsync($"/accounts/{Guid.NewGuid()}/patients/{Guid.NewGuid()}");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal("Bearer", response.Headers.WwwAuthenticate.ToString());
+    }
+
+    /// <summary>The account-access filter must run before the handler's own body validation: a body that fails PatientEndpoints' own shape check (wrappedDek too short) must still 401, not 400, when there is no token at all.</summary>
+    [Fact]
+    public async Task PostPatient_WithInvalidWrappedDekAndWithoutBearerToken_Returns401NotValidation()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync(
+            $"/accounts/{Guid.NewGuid()}/patients",
+            new CreatePatientRequest(Guid.NewGuid(), [0x01, 0x02], SomeSealedBlob(0xAA)),
+            PatientsJsonContext.Default.CreatePatientRequest);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(body);
+        Assert.Equal("auth.access_token_invalid", doc.RootElement.GetProperty("code").GetString());
+    }
+
+    /// <summary>The account-access guard must run before Minimal API's own body binding gets a chance to reject a structurally malformed JSON body -- without this, a request with no token AND a broken body would surface the framework's 400 instead of the 401 the missing token alone already earns (S09-05 ronda 2, reviewer-lang).</summary>
+    [Fact]
+    public async Task PostPatient_WithMalformedJsonBodyAndWithoutBearerToken_Returns401NotBadRequest()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+
+        var response = await client.PostAsync(
+            $"/accounts/{Guid.NewGuid()}/patients",
+            new StringContent("{", System.Text.Encoding.UTF8, "application/json"));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal("Bearer", response.Headers.WwwAuthenticate.ToString());
+        var body = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(body);
+        Assert.Equal("auth.access_token_invalid", doc.RootElement.GetProperty("code").GetString());
+    }
+
+    /// <summary>GetPatient/ListPatients used to declare 401 only, even though both can 403 for a valid token belonging to a different account (S09-05).</summary>
+    [Fact]
+    public void GetPatientAndListPatients_DeclareBothAuthProblemStatusesInOpenApiMetadata()
+    {
+        using var factory = CreateFactory();
+        var endpointDataSource = factory.Services.GetRequiredService<EndpointDataSource>();
+
+        foreach (var routeName in new[] { "GetPatient", "ListPatients" })
+        {
+            var endpoint = endpointDataSource.Endpoints
+                .OfType<RouteEndpoint>()
+                .Single(e => e.Metadata.GetMetadata<IEndpointNameMetadata>()?.EndpointName == routeName);
+
+            var statusCodes = endpoint.Metadata
+                .GetOrderedMetadata<IProducesResponseTypeMetadata>()
+                .Select(m => m.StatusCode)
+                .ToHashSet();
+
+            Assert.Contains(StatusCodes.Status401Unauthorized, statusCodes);
+            Assert.Contains(StatusCodes.Status403Forbidden, statusCodes);
+        }
+    }
+
     /// <summary>Same auth guard as every other patients route -- missing bearer token is rejected before ever reaching PatientService.</summary>
     [Fact]
     public async Task ListPatients_WithoutBearerToken_Returns401WithProblemDetails()
@@ -340,7 +414,7 @@ public sealed class PatientEndpointsTests : IAsyncLifetime
         Assert.Equal("auth.access_token_invalid", doc.RootElement.GetProperty("code").GetString());
     }
 
-    /// <summary>A real, valid bearer token -- just for a different account than the one in the route -- must not authorize. Distinct branch from the missing-header case (line 138): here ValidateAccess succeeds but returns an accountId that doesn't match the route, so AccountAccessProblem's `== accountId` comparison itself is what returns the 403.</summary>
+    /// <summary>A real, valid bearer token -- just for a different account than the one in the route -- must not authorize. Distinct branch from the missing-header case (line 138): here ValidateAccess succeeds but returns an accountId that doesn't match the route, so RequireAccountAccess()'s `== accountId` comparison itself is what returns the 403.</summary>
     [Fact]
     public async Task PostPatient_WithValidTokenForDifferentAccount_Returns403WithProblemDetails()
     {

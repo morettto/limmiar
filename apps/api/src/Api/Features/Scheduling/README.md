@@ -19,66 +19,58 @@ concorrência real (ver `docs/adr/ADR-S04-02-horario-em-claro-servidor-zero-know
   privado partilhado `LockAndGuardAsync`, que lê a linha e corre as três guardas (sessão não
   encontrada, já cancelada, gravação ativa) uma única vez -- cada chamador só faz depois o seu
   próprio `UPDATE`. `MoveAsync`/`CancelAsync` devolvem `Api.Platform.Result<ScheduledSession,
-  SchedulingFailureReason>` (S08-21, molde `Api.Notes`/`Api.Patients`, ADR
-  `docs/adr/0011-store-service-nao-devolve-tuplo-nullable.md`): o store já fala o vocabulário
-  final de falha, não há tipo intermédio a traduzir a jusante, e a exclusividade
-  valor-ou-falha é estrutural (`Match`), não um `required bool Succeeded` com dois
-  nullables. `ListLiveAsync` (S09-02, último membro da classe) é a única leitura: sem
-  `WHERE tenant_id` (a RLS injeta-o via `OpenTenantScopedTransactionAsync`), devolve as
-  linhas vivas na janela pedida ordenadas por `starts_at`.
+  SchedulingFailureReason>`: o store já fala o vocabulário final de falha, não há tipo
+  intermédio a traduzir a jusante, e a exclusividade valor-ou-falha é estrutural (`Match`), não
+  um `required bool Succeeded` com dois nullables. `ListLiveAsync` é a única leitura: sem
+  `WHERE tenant_id` (a RLS injeta-o via `OpenTenantScopedTransactionAsync`), devolve as linhas
+  vivas na janela pedida ordenadas por `starts_at`.
 - `SchedulingService` -- `AuthorizeAsync` (privado) verifica a conta uma única vez para
   `ScheduleAsync`/`MoveAsync`/`CancelAsync` (existe, é Profissional Ativo, reusando
   `AccountAuthorizationGuard.CanCreatePatientRecords`, o mesmo guard que `PatientService`
   usa); cada método público só adapta `ScheduledSessionSlotConflictException` para
   `SchedulingFailureReason.SlotTaken` e devolve `Result<ScheduledSession,
-  SchedulingFailureReason>` -- nenhuma `PostgresException` nem exceção de domínio escapa
-  deste serviço.
-- `Api.Endpoints.SchedulingEndpoints` -- `POST/PATCH/DELETE
-  /accounts/{accountId}/agenda/sessions[/{sessionId}]` e agora também `GET
-  /accounts/{accountId}/agenda/sessions?from=&to=` (S09-02), que lista sessões vivas na
-  janela meio-aberta `[from, to)`, máximo de 7 dias com o limite incluído, ordenadas por
-  `starts_at`. Canceladas ficam sempre de fora (`cancelled_at IS NULL`), coberto pelo mesmo
-  índice parcial `scheduled_sessions_live_slot_uq` -- sem migração nem `GRANT` novo. O item da
-  lista é `ScheduledSessionListItem` (`SessionId`, `PatientId`, `StartsAt`,
-  `DurationMinutes`), sem `CancelledAt` (S09-04): como uma cancelada nunca chega a este
-  endpoint, o campo não tinha razão de existir no fio -- `ScheduledSessionResponse`
-  (POST/PATCH) continua com `CancelledAt?`, porque essas duas rotas devolvem a sessão que
-  acabaram de mutar, cancelada ou não. `from`/
-  `to` ligam-se como `string?` e fazem parse à mão com `DateTimeOffset.TryParse(...,
-  DateTimeStyles.AssumeUniversal)`: ligar diretamente a `DateTimeOffset?` dá 500 em
-  Development (o `BadHttpRequestException` cai no `GlobalProblemExceptionHandler`) e um 400
-  vazio em Production. Vai direto ao `ScheduledSessionStore` (sem passar por
-  `SchedulingService`, molde `PatientEndpoints.HandleListPatientsAsync` +
+  SchedulingFailureReason>` -- nenhuma `PostgresException` nem exceção de domínio escapa deste
+  serviço.
+- `SchedulingEndpoints` -- `POST/PATCH/DELETE /accounts/{accountId}/agenda/sessions[/{sessionId}]`
+  e `GET /accounts/{accountId}/agenda/sessions?from=&to=`, que lista sessões vivas na janela
+  meio-aberta `[from, to)`, máximo de 7 dias com o limite incluído, ordenadas por `starts_at`.
+  Canceladas ficam sempre de fora (`cancelled_at IS NULL`), coberto pelo mesmo índice parcial
+  `scheduled_sessions_live_slot_uq` -- sem migração nem `GRANT` novo. O item da lista é
+  `ScheduledSessionListItem` (`SessionId`, `PatientId`, `StartsAt`, `DurationMinutes`), sem
+  `CancelledAt`: como uma cancelada nunca chega a este endpoint, o campo não tem razão de
+  existir no fio -- `ScheduledSessionResponse` (POST/PATCH) continua com `CancelledAt?`, porque
+  essas duas rotas devolvem a sessão que acabaram de mutar, cancelada ou não. `from`/`to`
+  ligam-se como `string?` e fazem parse à mão com `DateTimeOffset.TryParse(...,
+  DateTimeStyles.AssumeUniversal)`: ligar diretamente a `DateTimeOffset?` dá 500 em Development
+  (o `BadHttpRequestException` cai no `GlobalProblemExceptionHandler`) e um 400 vazio em
+  Production. `GET` vai direto ao `ScheduledSessionStore` (sem passar por `SchedulingService`,
+  molde `PatientEndpoints.HandleListPatientsAsync` +
   `ProfessionalVerificationEndpoints.HandleListQueueAsync`, que injeta `IAccountStore`
   diretamente): o service só acrescentaria `AuthorizeAsync` e a tradução de `SlotTaken`, e
-  nenhum dos dois se aplica a uma leitura. Todos os seis endpoints de Scheduling distinguem
-  401 de 403 (decisão do humano por RFC 9110): sem token ou token inválido/expirado dá 401
-  `auth.access_token_invalid` (§15.5.2); um token válido mas de OUTRA conta dá 403
-  `auth.forbidden` (§15.5.4), com o MESMO corpo quer a conta do URL exista quer não -- o 403
-  decide-se só por "o token não é desta conta", sem consultar a existência da conta, então
-  não a vaga; a RLS é a segunda camada de isolamento. Todos usam
-  `SessionTokenIssuerAuthorization.AccountAccessProblem` (ver `Accounts.Sessions/README.md`
-  para o contrato do helper). Usa também os helpers partilhados
-  `ProblemJson`/`ValidationProblem`. Um único `MapFailureToProblem(SchedulingFailureReason)`
-  cobre as três rotas de escrita.
+  nenhum dos dois se aplica a uma leitura. As quatro rotas usam
+  `RouteHandlerBuilder.RequireAccountAccess()` (`Accounts.Sessions/README.md`) para distinguir
+  401 de 403 (RFC 9110): sem token ou token inválido/expirado dá 401 `auth.access_token_invalid`
+  (§15.5.2); um token válido mas de OUTRA conta dá 403 `auth.forbidden` (§15.5.4), com o MESMO
+  corpo quer a conta do URL exista quer não -- o 403 decide-se só por "o token não é desta
+  conta", sem consultar a existência da conta; a RLS é a segunda camada de isolamento. Usa
+  também os helpers partilhados `ProblemJson`/`ValidationProblem`
+  (`Api.Problems.ProblemResults`). Um único `MapFailureToProblem(SchedulingFailureReason)` cobre
+  as três rotas de escrita.
 
 ## Decisões relevantes
 
 - Índice único parcial em vez de `EXCLUDE USING gist`: o critério de aceite pede deteção de
   "mesmo horário" (exact match), não sobreposição parcial de intervalos -- ver o comentário
   `ponytail:` em `0004_create_scheduled_sessions.sql` para o caminho de upgrade.
-- `recording_active` não tem escritor nem `GRANT UPDATE` de produção neste ticket -- só
+- `recording_active` não tem escritor nem `GRANT UPDATE` de produção neste módulo -- só
   `ScheduledSessionStore.MoveAsync`/`CancelAsync` o leem (sob o lock de linha) para rejeitar
-  mover/cancelar uma sessão com gravação ativa. A futura migração S05/S06 que introduzir o
-  endpoint de gravação tem de acrescentar o `GRANT UPDATE (recording_active)` nessa altura --
-  esse `UPDATE` depois fica na fila do mesmo lock, não é preciso inventar uma segunda tabela
-  nem um segundo lock quando esse endpoint existir.
+  mover/cancelar uma sessão com gravação ativa. O endpoint de gravação que vier a existir tem
+  de acrescentar o `GRANT UPDATE (recording_active)` nessa altura -- esse `UPDATE` depois fica
+  na fila do mesmo lock, não é preciso inventar uma segunda tabela nem um segundo lock.
 - `SchedulingFailureReason` é um único enum partilhado por Schedule/Move/Cancel (não
-  `ScheduleSessionFailureReason` + `MutateSessionFailureReason` em paralelo, quase
-  idênticos): `SlotTaken` só é produzido por Schedule e Move (Cancel nunca muda `starts_at`,
-  logo nunca pode colidir com outra linha viva) -- não há um enum próprio por operação para
-  essa única assimetria. Vive em `SchedulingService.cs`, não num ficheiro `SchedulingResult.cs`
-  à parte -- desde o S08-21, o antigo tipo `SchedulingResult` (`required bool Succeeded` + dois
-  nullables) foi apagado; o limite store/service devolve
-  `Api.Platform.Result<ScheduledSession, SchedulingFailureReason>` diretamente (molde
-  `Api.Notes`/`Api.Patients`, S08-14).
+  `ScheduleSessionFailureReason` + `MutateSessionFailureReason` em paralelo, quase idênticos):
+  `SlotTaken` só é produzido por Schedule e Move (Cancel nunca muda `starts_at`, logo nunca
+  pode colidir com outra linha viva) -- não há um enum próprio por operação para essa única
+  assimetria. Vive em `SchedulingService.cs`, não num ficheiro `SchedulingResult.cs` à parte: o
+  limite store/service devolve `Api.Platform.Result<ScheduledSession, SchedulingFailureReason>`
+  diretamente.

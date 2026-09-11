@@ -1,0 +1,103 @@
+== S09-05 trace ==
+
+[RED 1] cd apps/api && dotnet build Api.sln -c Debug
+  -> CS0246: The type or namespace name 'RequireAccountAccessEndpointFilter' could not be found
+  (RequireAccountAccessEndpointFilterTests.cs references the not-yet-created filter type)
+
+[GREEN 1] cd apps/api && dotnet test tests/Api.Tests/Api.Tests.csproj --filter "FullyQualifiedName~RequireAccountAccessEndpointFilterTests"
+  -> Passed! Failed: 0, Passed: 5, Skipped: 0, Total: 5
+  (RequireAccountAccessEndpointFilter + RequireAccountAccess() extension implemented;
+  401 without/malformed/invalid-token header, 403 wrong account, pass-through on match, all green)
+
+[GREEN 2] cd apps/api && dotnet test tests/Api.Tests/Api.Tests.csproj --filter "FullyQualifiedName~PatientEndpointsTests"
+  -> Passed! Failed: 0, Passed: 30, Skipped: 0, Total: 30
+  (GetPatient_WithoutBearerToken_ResponseIncludesWwwAuthenticateHeader,
+  PostPatient_WithInvalidWrappedDekAndWithoutBearerToken_Returns401NotValidation,
+  GetPatientAndListPatients_DeclareBothAuthProblemStatusesInOpenApiMetadata all pass after
+  PatientEndpoints.cs moved to RequireAccountAccess() and AccessTokenUnauthorizedProblem sends
+  WWW-Authenticate: Bearer)
+
+[RED 2 — confirmed against pre-refactor source, via git stash of apps/api/src]
+cd apps/api && dotnet test tests/Api.Tests/Api.Tests.csproj --filter "FullyQualifiedName~PatientEndpointsTests"
+  -> GetPatient_WithoutBearerToken_ResponseIncludesWwwAuthenticateHeader FAILED
+       Assert.Equal() Failure: Expected "Bearer", Actual ""
+  -> GetPatientAndListPatients_DeclareBothAuthProblemStatusesInOpenApiMetadata FAILED
+       Assert.Contains() Failure: Set [200, 401, 404] does not contain 403
+  -> PostPatient_WithInvalidWrappedDekAndWithoutBearerToken_Returns401NotValidation: PASSED even
+     pre-refactor (the old per-handler guard already ran before body validation) -- kept as a
+     regression guard for the new filter's ordering, not a novel-red test.
+  -> 28/30 passed, 2 failed as above (the 2 tests this refactor exists to fix).
+
+[GREEN 3 — full suite]
+cd apps/api && dotnet test Api.sln -c Debug
+  -> Passed! Failed: 0, Passed: 594, Skipped: 0, Total: 594
+  -> Total coverage: Line 100%, Branch 100%, Method 100%
+  -> Per-file cobertura (all classes) for every touched/new file: line-rate=1 branch-rate=1
+     (RequireAccountAccessEndpointFilter.cs incl. extension class, AccountsProblemResults.cs,
+     SchedulingEndpoints.cs, NoteEndpoints.cs, ConsentEndpoints.cs, PatientEndpoints.cs,
+     DevicePairingEndpoints.cs, RecoveryEndpoints.cs, ProfessionalVerificationEndpoints.cs,
+     VoiceEnrollmentEndpoints.cs)
+
+[AOT check]
+cd apps/api && dotnet publish src/Api/Api.csproj -c Release -r linux-x64 --self-contained -p:PublishAot=true -o publish-ci-test
+  -> error : Cross-OS native compilation is not supported.
+     (decisive line; this worktree runs on win32, the repo's CI AOT target is linux-x64 --
+     genuine cross-OS Native AOT compile needs a Linux host/container, not available here)
+cd apps/api && dotnet publish src/Api/Api.csproj -c Release -r win-x64 --self-contained -p:PublishAot=true -o publish-win-test
+  -> error : Platform linker not found. Ensure ... Desktop Development for C++ workload ...
+     (decisive line; no native C++ toolchain on this machine either, so no RID can complete a
+     real native link locally)
+Fallback per instructions: Directory.Build.props already elevates IL2026;IL2046;IL2055;IL2065;
+IL2067;IL2070;IL2072;IL2075;IL2090;IL2091;IL2111;IL3050;IL3051 to build errors, and
+Api.csproj sets <PublishAot>true</PublishAot> unconditionally, so the AOT/trim compatibility
+analyzer already runs on every `dotnet build`, not only `dotnet publish`. Full clean rebuild
+(removed bin/obj, forced fresh analyzer pass) of src/Api/Api.csproj -c Release:
+  -> Build succeeded. 0 Warning(s) 0 Error(s).
+No IL2xxx/IL3xxx diagnostic appeared before or after this diff -- since any such diagnostic
+would have failed the build outright (WarningsAsErrors), zero warnings here is proof the count
+did not increase (0 -> 0). The new endpoint filter (IEndpointFilter, RouteHandlerBuilder
+extension, DI resolution via RequestServices.GetRequiredService) is exactly the kind of
+Minimal-API surface the Request Delegate Generator + AOT analyzer already understands (the repo
+already ran api-aot-publish in CI before this ticket with 20 handlers using the equivalent
+pattern via a plain static helper call).
+
+[FINAL] cd apps/api && dotnet test Api.sln -c Debug (Debug config, after README updates + full clean AOT-analyzer rebuild in Release)
+  -> Passed! Failed: 0, Passed: 594, Skipped: 0, Total: 594
+  -> Total coverage: Line 100%, Branch 100%, Method 100%
+
+== Ronda 2 (reviewer-lang: IEndpointFilter corre depois do binding) ==
+
+[RED 3] cd apps/api && dotnet test tests/Api.Tests/Api.Tests.csproj --filter "FullyQualifiedName~PostPatient_WithMalformedJsonBodyAndWithoutBearerToken_Returns401NotBadRequest"
+  -> FAILED. Assert.Equal() Failure: Expected Unauthorized, Actual InternalServerError
+  (o filtro corre depois do binding; um corpo `{` malformado rebenta o parse de JSON antes do
+  filtro correr, e nem sequer cai num 400 tratado -- cai num 500 cru. Confirma o achado do
+  reviewer-lang: o critério 4 exige o guard ANTES do binding, IEndpointFilter não serve.)
+
+[GREEN 4] cd apps/api && dotnet test tests/Api.Tests/Api.Tests.csproj --filter "FullyQualifiedName~RequireAccountAccessMiddlewareTests"
+  -> Passed! Failed: 0, Passed: 7, Skipped: 0, Total: 7
+  (RequireAccountAccessMiddleware + RequireAccountAccessMetadata implemented; passthrough
+  without metadata, 401 x3, 403, next-called-on-match, InvalidOperationException on a route
+  missing {accountId})
+
+[GREEN 5] cd apps/api && dotnet test tests/Api.Tests/Api.Tests.csproj --filter "FullyQualifiedName~PatientEndpointsTests"
+  -> Passed! Failed: 0, Passed: 31, Skipped: 0, Total: 31
+  (PostPatient_WithMalformedJsonBodyAndWithoutBearerToken_Returns401NotBadRequest now green --
+  the guard runs in UseMiddleware, before routing hands the request to the endpoint's own
+  RequestDelegate, so a `{` body never reaches JSON binding at all)
+
+[GREEN 6 — full suite after ronda 2]
+cd apps/api && dotnet test Api.sln -c Debug
+  -> Passed! Failed: 0, Passed: 597, Skipped: 0, Total: 597
+  -> Total coverage: Line 100%, Branch 100%, Method 100%
+  -> Per-file cobertura confirmed line-rate=1 branch-rate=1 for: RequireAccountAccessMiddleware.cs
+     (incl. RequireAccountAccessMetadata + extension class), Program.Composition.cs,
+     AccountsProblemResults.cs, and the 8 endpoint files.
+
+[AOT/analyzer check — ronda 2]
+cd apps/api/src/Api && rm -rf bin obj  (clean rebuild, forces fresh analyzer pass)
+cd apps/api && dotnet build src/Api/Api.csproj -c Release
+  -> Build succeeded. 0 Warning(s) 0 Error(s).
+No IL2xxx/IL3xxx diagnostic before or after ronda 2 (WarningsAsErrors would fail the build on
+any). The real linux-x64 PublishAot still cannot run on this win32 machine (same "Cross-OS
+native compilation is not supported" as ronda 1) -- unchanged from before, no native toolchain
+available locally either way.

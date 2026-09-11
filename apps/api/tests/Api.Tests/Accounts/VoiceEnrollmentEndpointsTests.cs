@@ -106,7 +106,7 @@ public sealed class VoiceEnrollmentEndpointsTests
         Assert.Equal("auth.forbidden", doc.RootElement.GetProperty("code").GetString());
     }
 
-    /// <summary>Same wrong-owner shape as Put above, exercised on the GET half so both handlers are proven to separate 401 from 403 through AccountAccessProblem.</summary>
+    /// <summary>Same wrong-owner shape as Put above, exercised on the GET half so both handlers are proven to separate 401 from 403 through RequireAccountAccess().</summary>
     [Fact]
     public async Task GetVoiceEnrollment_WithTokenForDifferentAccount_Returns403WithProblemDetails()
     {
@@ -294,7 +294,7 @@ public sealed class VoiceEnrollmentEndpointsTests
         Assert.Equal("auth.account_not_found", doc.RootElement.GetProperty("code").GetString());
     }
 
-    /// <summary>Registers a Professional and completes mandatory TOTP enrollment (ADR-S02-03), leaving client carrying the real access token as its default Bearer header. Verification status doesn't matter here -- voice enrollment is gated by account ownership only (SessionTokenIssuerAuthorization.AccountAccessProblem), not AccountAuthorizationGuard.CanCreatePatientRecords.</summary>
+    /// <summary>Registers a Professional and completes mandatory TOTP enrollment (ADR-S02-03), leaving client carrying the real access token as its default Bearer header. Verification status doesn't matter here -- voice enrollment is gated by account ownership only (RequireAccountAccess()), not AccountAuthorizationGuard.CanCreatePatientRecords.</summary>
     private static async Task<Guid> RegisterProfessionalAsync(HttpClient client, string email)
     {
         var registerResponse = await client.PostAsJsonAsync(

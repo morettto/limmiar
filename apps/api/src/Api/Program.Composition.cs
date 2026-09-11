@@ -63,6 +63,11 @@ public partial class Program
 
         app.UseCors();
 
+        // Runs after routing has selected an endpoint (so RequireAccountAccessMetadata is
+        // already resolvable) and before that endpoint's own request delegate -- including its
+        // parameter binding -- ever executes. See Accounts.Sessions/README.md.
+        app.UseMiddleware<RequireAccountAccessMiddleware>();
+
         app.MapHealthEndpoints();
         app.MapAccounts();
         app.MapPatients();

@@ -2,9 +2,6 @@ using Api.Problems;
 using Api.Serialization;
 using Mediator;
 using Microsoft.AspNetCore.Http.HttpResults;
-using Microsoft.AspNetCore.Mvc;
-using static Api.Accounts.AccountsProblemResults;
-using static Api.Accounts.SessionTokenIssuerAuthorization;
 using static Api.Problems.ProblemResults;
 
 namespace Api.Accounts;
@@ -25,10 +22,9 @@ public static class RecoveryEndpoints
             .WithName("PostAccountRecoveryPhrase")
             .WithSummary("Register (or rotate) the recovery-phrase verifier for a professional account")
             .WithDescription("Accepts a client-derived verifier -- never the recovery phrase itself (same contract as the password verifier, ADR-S02-02). Requires an Authorization: Bearer access token for this exact account. Always overwrites any previously registered verifier.")
+            .RequireAccountAccess()
             .Produces<RegisterRecoveryVerifierResponse>(StatusCodes.Status200OK)
             .Produces<LimmiarProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")
-            .Produces<LimmiarProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")
-            .Produces<LimmiarProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json");
     }
@@ -56,16 +52,9 @@ public static class RecoveryEndpoints
     private static async Task<Results<Ok<RegisterRecoveryVerifierResponse>, JsonHttpResult<LimmiarProblemDetails>>> HandleRegisterRecoveryVerifierAsync(
         Guid accountId,
         RegisterRecoveryVerifierRequest request,
-        [FromHeader(Name = "Authorization")] string? authorization,
-        ISessionTokenIssuer sessionTokenIssuer,
         ISender sender,
         CancellationToken cancellationToken)
     {
-        if (AccountAccessProblem(authorization, accountId, sessionTokenIssuer) is { } accessProblem)
-        {
-            return accessProblem;
-        }
-
         if (request.RecoveryVerifier is not { Length: AccountVerifierLengths.PasswordVerifierLength })
         {
             return ValidationProblem("recoveryVerifier");

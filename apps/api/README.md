@@ -48,24 +48,29 @@ tentar arrancar o container, não passam silenciosamente. Os testes puramente un
   assinada, e o instante da assinatura -- ver
   `docs/adr/ADR-S08-01-assinatura-visivel-ao-servidor.md` e o README do módulo
   (`src/Api/Features/Notes/README.md`). O blob de assinatura em si continua opaco.
-- `src/Api/Endpoints` -- Minimal API, um ficheiro por área (`AuthEndpoints`,
-  `DevicePairingEndpoints`, `PatientEndpoints`, `ProfessionalVerificationEndpoints`,
-  `RecoveryEndpoints`, `SchedulingEndpoints`, `TwoFactorEndpoints`, `VoiceEnrollmentEndpoints`).
-  Todos os oito ficheiros de endpoints partilham a única cópia de
-  `SessionTokenIssuerAuthorization.AccountAccessProblem`,
-  `ProblemJson`, `ValidationProblem` e `AccessTokenUnauthorizedProblem` em `EndpointHelpers.cs`
-  (`internal static class`, só usado dentro deste assembly) -- não há cópia local de nenhum
-  destes em nenhum ficheiro de endpoints; cada ficheiro só mantém o helper que de facto é só
-  seu (ex. `TwoFactorEndpoints.TicketInvalidProblem`,
-  `ProfessionalVerificationEndpoints.StaffUnauthorizedProblem`). `TryValidateSealedBlobShape`
-  (piso de 28 bytes para um blob AES-256-GCM selado) também mora em `EndpointHelpers.cs` desde
-  o S06-02 -- `PatientEndpoints` e `VoiceEnrollmentEndpoints` chamam a mesma cópia, nenhum dos
-  dois mantém a sua própria. `PUT /accounts/{accountId}/voice-enrollment` é idempotente
-  (re-cadastro substitui, `204`, nunca `409`); `DELETE` é `404` (não `204` silencioso) quando
-  não há cadastro para remover. Nenhuma das três rotas usa
-  `AccountAuthorizationGuard.CanCreatePatientRecords` -- cadastro de voz é a própria conta do
-  profissional, não um registo de paciente, então a única guarda é
-  `SessionTokenIssuerAuthorization.AccountAccessProblem` (o token pertence a esta conta).
+- Minimal API, um ficheiro por área dentro de `src/Api/Features/<Módulo>` (ex.
+  `Scheduling/SchedulingEndpoints.cs`, `Notes/NoteEndpoints.cs`, `Patients/PatientEndpoints.cs`)
+  ou de `src/Api/Features/Accounts/<Fatia>/Presentation` (ex.
+  `DevicePairing/Presentation/DevicePairingEndpoints.cs`). As 20 rotas com `{accountId}` que
+  exigem só "o token é desta conta" (Scheduling, Notes, Consent, Patients -- incluindo
+  `GetPatient`/`ListPatients` --, DevicePairing, VoiceEnrollment, Recovery,
+  ProfessionalVerification/submit) chamam `RouteHandlerBuilder.RequireAccountAccess()`
+  (`Accounts/Sessions/Presentation/RequireAccountAccessMiddleware.cs`, ver
+  `Accounts.Sessions/README.md`) em vez de uma guarda copiada no handler -- a extensão só marca
+  o endpoint com metadata; quem decide 401/403 é o `RequireAccountAccessMiddleware` registado
+  uma única vez em `Program.Composition.cs`, correndo depois do routing e antes de qualquer
+  endpoint, logo antes do binding do corpo/query desse endpoint (um `IEndpointFilter` corre
+  depois desse binding, tarde demais). TwoFactor e as rotas staff-only (`X-Staff-Api-Key`) ficam
+  de fora, essas continuam com a sua própria guarda.
+  `ProblemJson`/`ValidationProblem` vivem em `Api.Problems.ProblemResults`;
+  `TryValidateSealedBlobShape` (piso de 28 bytes para um blob AES-256-GCM selado) vive em
+  `Api.Problems.SealedBlobShape` -- `PatientEndpoints`, `NoteEndpoints` e
+  `VoiceEnrollmentEndpoints` chamam a mesma cópia, nenhum mantém a sua própria. `PUT
+  /accounts/{accountId}/voice-enrollment` é idempotente (re-cadastro substitui, `204`, nunca
+  `409`); `DELETE` é `404` (não `204` silencioso) quando não há cadastro para remover. Nenhuma
+  das três rotas de voice-enrollment usa `AccountAuthorizationGuard.CanCreatePatientRecords` --
+  cadastro de voz é a própria conta do profissional, não um registo de paciente, então a única
+  guarda é a de conta (`RequireAccountAccess()`).
 - `src/Api/Features/Audit` -- trilha de auditoria encadeada por hash (`audit_entries` e
   `audit_anchors`, migração `0006_create_audit_trail.sql`): `AuditChain.ComputeHash`/`Verify`
   são puros (zero I/O, zero DI); a imposição de não-fork da cadeia é

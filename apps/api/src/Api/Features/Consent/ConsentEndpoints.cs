@@ -1,9 +1,6 @@
 using Api.Accounts;
 using Api.Problems;
 using Microsoft.AspNetCore.Http.HttpResults;
-using Microsoft.AspNetCore.Mvc;
-using static Api.Accounts.AccountsProblemResults;
-using static Api.Accounts.SessionTokenIssuerAuthorization;
 using static Api.Problems.ProblemResults;
 
 namespace Api.Consent;
@@ -16,35 +13,26 @@ public static class ConsentEndpoints
             .WithName("PostConsent")
             .WithSummary("Record a consent decision for one purpose")
             .WithDescription("Appends one event to the append-only consent log for (patientId, purpose). Revoking is the same route with decision \"revogado\" -- there is no DELETE or PUT, revoking never updates or deletes the earlier grant. Requires an Authorization: Bearer access token for this exact account, and the account must be an active Professional (same guard as Notes/Patients).")
+            .RequireAccountAccess()
             .Produces<RecordConsentResponse>(StatusCodes.Status201Created)
             .Produces<LimmiarProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")
-            .Produces<LimmiarProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")
-            .Produces<LimmiarProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json");
 
         app.MapGet("/accounts/{accountId:guid}/patients/{patientId:guid}/consents", HandleGetAsync)
             .WithName("GetConsents")
             .WithSummary("Read the current consent status for both purposes")
             .WithDescription("The current status for Gravacao and AnaliseIa, each an independent fold over the same append-only event log -- Pendente with no events, otherwise the decision of the most recent event for that purpose. Requires an Authorization: Bearer access token for this exact account.")
-            .Produces<ConsentSnapshot>(StatusCodes.Status200OK)
-            .Produces<LimmiarProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")
-            .Produces<LimmiarProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json");
+            .RequireAccountAccess()
+            .Produces<ConsentSnapshot>(StatusCodes.Status200OK);
     }
 
     private static async Task<Results<Created<RecordConsentResponse>, JsonHttpResult<LimmiarProblemDetails>>> HandleRecordAsync(
         Guid accountId,
         Guid patientId,
         RecordConsentRequest request,
-        [FromHeader(Name = "Authorization")] string? authorization,
-        ISessionTokenIssuer sessionTokenIssuer,
         ConsentService consentService,
         CancellationToken cancellationToken)
     {
-        if (AccountAccessProblem(authorization, accountId, sessionTokenIssuer) is { } accessProblem)
-        {
-            return accessProblem;
-        }
-
         if (!TryParseDefinedEnum<ConsentPurpose>(request.Purpose, out var purpose))
         {
             return ValidationProblem("purpose");
@@ -66,16 +54,9 @@ public static class ConsentEndpoints
     private static async Task<Results<Ok<ConsentSnapshot>, JsonHttpResult<LimmiarProblemDetails>>> HandleGetAsync(
         Guid accountId,
         Guid patientId,
-        [FromHeader(Name = "Authorization")] string? authorization,
-        ISessionTokenIssuer sessionTokenIssuer,
         ConsentService consentService,
         CancellationToken cancellationToken)
     {
-        if (AccountAccessProblem(authorization, accountId, sessionTokenIssuer) is { } accessProblem)
-        {
-            return accessProblem;
-        }
-
         var snapshot = await consentService.SnapshotAsync(accountId, patientId, cancellationToken);
         return TypedResults.Ok(snapshot);
     }

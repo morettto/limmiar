@@ -139,9 +139,10 @@ para o porquê do consentimento viver em claro no servidor.
   resposta do `GET` e nunca é desserializado de um pedido, usa exatamente esse conversor
   (overload genérico fechado, seguro para AOT) para satisfazer o wire format que o desenho
   documenta; ver `ConsentComposition.cs` acima.
-- **`SnapshotAsync` não valida a conta.** A prova de que `professionalId` é a própria conta
-  já veio do bearer token em `SessionTokenIssuerAuthorization.AccountAccessProblem`, então
-  uma segunda validação em `IAccountStore` seria redundante para essa rota.
+- **`SnapshotAsync` não valida a conta.** A prova de que `professionalId` é a própria conta já
+  veio do bearer token em `RouteHandlerBuilder.RequireAccountAccess()`
+  (`Accounts.Sessions/README.md`), então uma segunda validação em `IAccountStore` seria
+  redundante para essa rota.
 - **`ConsentEndpoints.MapFailureToProblem`** segue o mesmo padrão de
   `NoteEndpoints.MapFailureToProblem`/`PatientEndpoints.MapCreateFailureToProblem`: cada
   ramo nomeado (`AccountNotFound` -> `404`, `NotAuthorizedToCreateRecords` -> `403`) tem

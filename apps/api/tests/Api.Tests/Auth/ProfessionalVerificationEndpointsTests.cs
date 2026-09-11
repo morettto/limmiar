@@ -235,7 +235,7 @@ public sealed class ProfessionalVerificationEndpointsTests
         Assert.Equal("auth.forbidden", doc.RootElement.GetProperty("code").GetString());
     }
 
-    /// <summary>A syntactically well-formed but never-issued Bearer token must resolve to no account -- the other half of AccountAccessProblem's equality check from PostSubmit_WithAccessTokenForAnotherAccount_Returns403WithProblemDetails, where ValidateAccess instead resolves to a real, different account.</summary>
+    /// <summary>A syntactically well-formed but never-issued Bearer token must resolve to no account -- the other half of RequireAccountAccess()'s equality check from PostSubmit_WithAccessTokenForAnotherAccount_Returns403WithProblemDetails, where ValidateAccess instead resolves to a real, different account.</summary>
     [Fact]
     public async Task PostSubmit_WithInvalidAccessToken_Returns401WithProblemDetails()
     {

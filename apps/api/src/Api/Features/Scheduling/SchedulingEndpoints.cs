@@ -2,9 +2,6 @@ using System.Globalization;
 using Api.Accounts;
 using Api.Problems;
 using Microsoft.AspNetCore.Http.HttpResults;
-using Microsoft.AspNetCore.Mvc;
-using static Api.Accounts.AccountsProblemResults;
-using static Api.Accounts.SessionTokenIssuerAuthorization;
 using static Api.Problems.ProblemResults;
 
 namespace Api.Scheduling;
@@ -21,10 +18,9 @@ public static class SchedulingEndpoints
             .WithName("PostScheduledSession")
             .WithSummary("Schedule a session")
             .WithDescription("Two concurrent requests for the same (account, startsAt) slot: exactly one persists, the other gets 409 agenda.slot_taken -- the DB's scheduled_sessions_live_slot_uq partial unique index is what actually decides the race. Requires an Authorization: Bearer access token for this exact account, and the account must be an active Professional.")
+            .RequireAccountAccess()
             .Produces<ScheduledSessionResponse>(StatusCodes.Status201Created)
             .Produces<LimmiarProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")
-            .Produces<LimmiarProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")
-            .Produces<LimmiarProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json");
 
@@ -32,10 +28,9 @@ public static class SchedulingEndpoints
             .WithName("PatchScheduledSession")
             .WithSummary("Move a session to a new slot")
             .WithDescription("Rejected with 409 agenda.recording_active if the session's recording is active, and 409 agenda.session_cancelled if it was already cancelled. Requires an Authorization: Bearer access token for this exact account.")
+            .RequireAccountAccess()
             .Produces<ScheduledSessionResponse>(StatusCodes.Status200OK)
             .Produces<LimmiarProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")
-            .Produces<LimmiarProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")
-            .Produces<LimmiarProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json");
 
@@ -43,18 +38,16 @@ public static class SchedulingEndpoints
             .WithName("ListScheduledSessions")
             .WithSummary("List sessions inside a window")
             .WithDescription("Half-open [from,to), max 7 days, cancelled sessions excluded. from/to are ISO-8601 instants. Requires an Authorization: Bearer access token for this exact account: no/invalid token -> 401, a valid token for a different account -> 403 (same body whether or not that account exists).")
+            .RequireAccountAccess()
             .Produces<ListScheduledSessionsResponse>(StatusCodes.Status200OK)
-            .Produces<LimmiarProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")
-            .Produces<LimmiarProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")
-            .Produces<LimmiarProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json");
+            .Produces<LimmiarProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json");
 
         app.MapDelete("/accounts/{accountId:guid}/agenda/sessions/{sessionId:guid}", HandleCancelAsync)
             .WithName("DeleteScheduledSession")
             .WithSummary("Cancel a session (soft delete)")
             .WithDescription("Writes cancelled_at; the row is never removed. Rejected with 409 agenda.recording_active if the session's recording is active. Requires an Authorization: Bearer access token for this exact account.")
+            .RequireAccountAccess()
             .Produces(StatusCodes.Status204NoContent)
-            .Produces<LimmiarProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")
-            .Produces<LimmiarProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json");
     }
@@ -62,16 +55,9 @@ public static class SchedulingEndpoints
     private static async Task<Results<Created<ScheduledSessionResponse>, JsonHttpResult<LimmiarProblemDetails>>> HandleScheduleAsync(
         Guid accountId,
         ScheduleSessionRequest request,
-        [FromHeader(Name = "Authorization")] string? authorization,
-        ISessionTokenIssuer sessionTokenIssuer,
         SchedulingService schedulingService,
         CancellationToken cancellationToken)
     {
-        if (AccountAccessProblem(authorization, accountId, sessionTokenIssuer) is { } accessProblem)
-        {
-            return accessProblem;
-        }
-
         if (!IsValidDuration(request.DurationMinutes, out var durationProblem))
         {
             return durationProblem;
@@ -90,16 +76,9 @@ public static class SchedulingEndpoints
         Guid accountId,
         Guid sessionId,
         MoveSessionRequest request,
-        [FromHeader(Name = "Authorization")] string? authorization,
-        ISessionTokenIssuer sessionTokenIssuer,
         SchedulingService schedulingService,
         CancellationToken cancellationToken)
     {
-        if (AccountAccessProblem(authorization, accountId, sessionTokenIssuer) is { } accessProblem)
-        {
-            return accessProblem;
-        }
-
         if (!IsValidDuration(request.DurationMinutes, out var durationProblem))
         {
             return durationProblem;
@@ -115,16 +94,9 @@ public static class SchedulingEndpoints
     private static async Task<Results<NoContent, JsonHttpResult<LimmiarProblemDetails>>> HandleCancelAsync(
         Guid accountId,
         Guid sessionId,
-        [FromHeader(Name = "Authorization")] string? authorization,
-        ISessionTokenIssuer sessionTokenIssuer,
         SchedulingService schedulingService,
         CancellationToken cancellationToken)
     {
-        if (AccountAccessProblem(authorization, accountId, sessionTokenIssuer) is { } accessProblem)
-        {
-            return accessProblem;
-        }
-
         var result = await schedulingService.CancelAsync(accountId, sessionId, cancellationToken);
         return result.Match<Results<NoContent, JsonHttpResult<LimmiarProblemDetails>>>(
             _ => TypedResults.NoContent(),
@@ -135,16 +107,9 @@ public static class SchedulingEndpoints
         Guid accountId,
         string? from,
         string? to,
-        [FromHeader(Name = "Authorization")] string? authorization,
-        ISessionTokenIssuer sessionTokenIssuer,
         ScheduledSessionStore store,
         CancellationToken cancellationToken)
     {
-        if (AccountAccessProblem(authorization, accountId, sessionTokenIssuer) is { } accessProblem)
-        {
-            return accessProblem;
-        }
-
         if (!TryParseWindow(from, to, out var fromUtc, out var toUtc, out var windowProblem))
         {
             return windowProblem;
