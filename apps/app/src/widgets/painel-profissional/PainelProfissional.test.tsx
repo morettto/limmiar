@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { I18nProvider } from '@lingui/react'
 import { dynamicActivate, i18n } from '../../shared/i18n'
 import { encodeBase64 } from '../../shared/lib/base64'
-import { estadoInicial, PainelProfissional } from './PainelProfissional'
+import { PainelProfissional } from './PainelProfissional'
 import type { SummaryResult } from '../../entities/patient/patient-summary'
 import { horaDaSessao, type SessaoAgendada } from '../../entities/agenda/sessao'
 import { ESTADO_PENDENTE, ORDEM_SECOES, type Nota } from '../../entities/nota/nota'
@@ -31,8 +31,8 @@ function stubMatchMedia() {
   })) as unknown as typeof window.matchMedia
 }
 
-function renderPainel(props: Partial<React.ComponentProps<typeof PainelProfissional>> = {}) {
-  return render(
+function elementoPainel(props: Partial<React.ComponentProps<typeof PainelProfissional>> = {}) {
+  return (
     <I18nProvider i18n={i18n}>
       <PainelProfissional
         baseUrl="http://api.test"
@@ -42,8 +42,12 @@ function renderPainel(props: Partial<React.ComponentProps<typeof PainelProfissio
         notas={[]}
         {...props}
       />
-    </I18nProvider>,
+    </I18nProvider>
   )
+}
+
+function renderPainel(props: Partial<React.ComponentProps<typeof PainelProfissional>> = {}) {
+  return render(elementoPainel(props))
 }
 
 function patientsResponse(patientIds: string[]) {
@@ -114,27 +118,6 @@ function nota(overrides: Partial<Nota> = {}): Nota {
     ...overrides,
   }
 }
-
-describe('estadoInicial', () => {
-  // `estadoInicial` divergia do `useEffect` (só olhava `kek`) -- flash de "Carregando...".
-  // `render()` não apanha (act() já resolve o efeito antes de devolver); teste direto na
-  // função, a fonte real da guarda unificada (ver README).
-  it('kek presente mas accountId=null também começa bloqueado, não "a-carregar"', () => {
-    expect(estadoInicial(FAKE_KEK, null, 'token-1')).toEqual({ status: 'bloqueado' })
-  })
-
-  it('kek presente mas accessToken=null também começa bloqueado, não "a-carregar"', () => {
-    expect(estadoInicial(FAKE_KEK, 'acc-1', null)).toEqual({ status: 'bloqueado' })
-  })
-
-  it('kek=null começa bloqueado', () => {
-    expect(estadoInicial(null, 'acc-1', 'token-1')).toEqual({ status: 'bloqueado' })
-  })
-
-  it('kek, accountId e accessToken presentes começa "a-carregar"', () => {
-    expect(estadoInicial(FAKE_KEK, 'acc-1', 'token-1')).toEqual({ status: 'a-carregar' })
-  })
-})
 
 describe('PainelProfissional', () => {
   beforeAll(async () => {
@@ -268,6 +251,78 @@ describe('PainelProfissional', () => {
     expect(itens[0].textContent).not.toContain('p-sem-sumario')
   })
 
+  it('critério 2: trocar de conta nunca mostra os dados da conta anterior', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('acc-2')) {
+        return new Promise<Response>(() => {})
+      }
+      if (url.includes('/agenda/sessions')) {
+        return Promise.resolve(agendaResponse([]))
+      }
+      if (url.includes('/consents')) {
+        return Promise.resolve(consentimentosResponse())
+      }
+      return Promise.resolve(patientsResponse(['p-1']))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const openSummaries = vi.fn().mockResolvedValue([
+      { patientId: 'p-1', ok: true, name: 'Amelia', risk: 'baixo' },
+    ] satisfies SummaryResult[])
+
+    const { rerender } = renderPainel({ accountId: 'acc-1', openSummaries })
+    const kpiPacientes = await screen.findByText('Pacientes ativos')
+    await waitFor(() => expect(kpiPacientes.parentElement?.textContent).toContain('1'))
+
+    rerender(elementoPainel({ accountId: 'acc-2', openSummaries }))
+
+    expect(screen.getByText('Carregando painel...')).toBeTruthy()
+    expect(screen.queryByText('Pacientes ativos')).toBeNull()
+  })
+
+  it('critério 2: acc-1 ainda em voo quando troca para acc-2 — a resposta tardia de acc-1 nunca aparece', async () => {
+    const patientsAcc1 = deferred<Response>()
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/accounts/acc-1/patients')) {
+        return patientsAcc1.promise
+      }
+      if (url.includes('/agenda/sessions')) {
+        return Promise.resolve(agendaResponse([]))
+      }
+      if (url.includes('/consents')) {
+        return Promise.resolve(consentimentosResponse())
+      }
+      return Promise.resolve(patientsResponse(['p-novo']))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const openSummaries = vi.fn().mockImplementation((_kek: CryptoKey, items: { patientId: string }[]) =>
+      Promise.resolve(items.map((item) => ({ patientId: item.patientId, ok: true, name: 'Vazamento', risk: 'baixo' }))),
+    )
+
+    const { rerender } = renderPainel({ accountId: 'acc-1', openSummaries })
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/accounts/acc-1/patients'), expect.anything()),
+    )
+
+    rerender(elementoPainel({ accountId: 'acc-2', openSummaries }))
+    const kpi = await screen.findByText('Pacientes ativos')
+    await waitFor(() => expect(kpi.parentElement?.textContent).toContain('1'))
+
+    // acc-1 só responde depois da troca -- prova que o dado tardio não sobrescreve acc-2.
+    // `setTimeout` (macrotask) esvazia a fila de microtasks inteira do carregarPacientes(acc-1)
+    // tardio, sem depender de contar quantos `await` internos ele ainda tem pela frente.
+    patientsAcc1.resolve(patientsResponse(['p-antigo']))
+    await patientsAcc1.promise
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(kpi.parentElement?.textContent).toContain('1')
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(openSummaries).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.arrayContaining([expect.objectContaining({ patientId: 'p-antigo' })]),
+      expect.anything(),
+    )
+  })
+
   it('critério 4: um obterConsentimentos rejeita — os outros pacientes continuam de pé', async () => {
     const fetchMock = vi.fn().mockImplementation((url: string) => {
       if (url.includes('/agenda/sessions')) {
@@ -280,6 +335,33 @@ describe('PainelProfissional', () => {
             headers: { 'Content-Type': 'application/problem+json' },
           }),
         )
+      }
+      if (url.includes('/consents')) {
+        return Promise.resolve(consentimentosResponse())
+      }
+      return Promise.resolve(patientsResponse(['p-falha', 'p-ok']))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const openSummaries = vi.fn().mockResolvedValue([
+      { patientId: 'p-falha', ok: true, name: 'Carla', risk: 'baixo' },
+      { patientId: 'p-ok', ok: true, name: 'Duda', risk: 'baixo' },
+    ] satisfies SummaryResult[])
+
+    renderPainel({ openSummaries })
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/p-ok/consents'), expect.anything()),
+    )
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('critério 4: um obterConsentimentos rejeita de verdade (erro de rede) — os outros pacientes continuam de pé', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/agenda/sessions')) {
+        return Promise.resolve(agendaResponse([]))
+      }
+      if (url.includes('/p-falha/consents')) {
+        return Promise.reject(new Error('rede indisponível'))
       }
       if (url.includes('/consents')) {
         return Promise.resolve(consentimentosResponse())

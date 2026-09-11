@@ -1,0 +1,171 @@
+S09-06 — trace vermelho/verde
+=============================
+
+RONDA 2 (review reviewer-lang)
+===============================
+
+8) Nota 1 (bloqueante): acc-1 pendente no momento da troca
+------------------------------------------------------------------------------
+O teste "critério 2" original só trocava depois de acc-1 já ter resolvido --
+não provava a corrida real (acc-1 ainda em voo). Teste novo: acc-1 fica preso
+num `deferred<Response>()`, a troca para acc-2 acontece com acc-1 ainda
+pendente, acc-2 resolve normalmente, só depois acc-1 responde tarde.
+
+Verde contra a guarda existente (`if (cancelled) return` em `carregar`):
+$ pnpm vitest run src/widgets/painel-profissional/PainelProfissional.test.tsx -t "acc-1 ainda em voo"
+  1 passed
+
+Vermelho por mutação (removida a linha `if (cancelled) return` de `carregar`):
+$ pnpm vitest run src/widgets/painel-profissional/PainelProfissional.test.tsx -t "acc-1 ainda em voo"
+  1 failed
+  AssertionError: expected 'Pacientes ativos0' to contain '1'
+  -> linha decisiva: a resposta tardia de acc-1 (sem paciente nenhum decifrado,
+     porque `cancelled` também zera `decifrados` antes do worker) sobrescreve
+     o KPI de acc-2 (que era 1) com 0 -- a guarda de fora é o único freio.
+
+Verde de novo (guarda restaurada):
+$ pnpm vitest run --coverage src/widgets/painel-profissional
+  2 passed (2) / 24 passed (24), sem erro de cobertura em PainelProfissional.tsx
+
+9) Nota 2: throw new Error('cancelado') misturava cancelamento com erro de rede
+------------------------------------------------------------------------------
+Troca: os dois `throw` (linhas 70 e 77 da versão anterior) saem. Fica um único
+`cancelled ? [] : await openSummaries(...)` no ponto de consumo (onde o
+resultado seria de fato usado) -- menos código que uma sentinela `| null`
+tipada (que exigiria um segundo campo checado em `carregar`, com uma branch
+inalcançável sempre que `cancelled` já fosse `false`). O `.catch` de
+`carregar` volta a ser só para falha de rede/JSON de verdade.
+
+Verde (mesmos testes de desmontagem, sem mudança de comportamento observável):
+$ pnpm vitest run --coverage src/widgets/painel-profissional
+  2 passed (2) / 24 passed (24), sem erro de cobertura
+  -> "desmontar antes de listPatients resolver cancela antes do worker
+     decifrar" continua a provar que `openSummaries` nunca é chamado.
+
+Baseline (antes de qualquer edição)
+-----------------------------------
+$ pnpm vitest run src/widgets/painel-profissional src/entities/agenda
+  4 passed (4) / 33 passed (33)
+  -> ponto de partida verde, confirmado antes de tocar em código.
+
+1) requer-voce.ts: exportar ConsentimentosPorPaciente (refactor mecânico)
+--------------------------------------------------------------------------
+Mudança pura de tipo (extrair + exportar + reusar nos 3 sítios). Sem
+comportamento novo -- não há "vermelho" funcional aqui, a prova é a
+recompilação: os call-sites que ainda usavam o literal `{ patientId; ... }`
+continuam a tipar igual (estrutural) e os testes correm imediatamente verdes.
+$ pnpm vitest run src/widgets/painel-profissional/requer-voce.test.ts
+  1 passed (1) / 7 passed (7)   [verde, decisivo: nenhuma quebra de tipo]
+
+2) entities/agenda/api.ts: listarSessoesDaSemana (comportamento novo)
+------------------------------------------------------------------------
+Vermelho — teste escrito primeiro, função ainda não existe:
+$ pnpm vitest run src/entities/agenda/api.test.ts
+  1 failed | 2 passed (3)
+  TypeError: listarSessoesDaSemana is not a function
+  -> linha decisiva: `const result = await listarSessoesDaSemana(...)` explode
+     porque a função só existia como plano.
+
+Verde — depois de implementar `listarSessoesDaSemana` (chama `listarSessoes`
+com a janela [agora, agora + SETE_DIAS_MS), SETE_DIAS_MS agora privada a api.ts):
+$ pnpm vitest run src/entities/agenda/api.test.ts
+  3 passed (3)
+  -> linha decisiva: `expect(fetchMock).toHaveBeenCalledWith(expectedUrl, ...)`
+     bate com a URL `from=...&to=...+7dias`.
+
+3) entities/agenda/sessao.ts: sessoesNaSemana -> contarPorComecar (rename)
+------------------------------------------------------------------------------
+Rename mecânico (a função já contava certo; só o nome mentia sobre a janela).
+Vermelho transitório: renomear a função sem atualizar sessao.test.ts quebra a
+importação (comprovado ao rodar antes do 2º edit do teste -- decisão tomada em
+bloco, então a prova aqui é o par antes/depois do arquivo de teste já
+renomeado junto):
+$ pnpm vitest run src/entities/agenda
+  2 passed (2) / 9 passed (9)   [verde -- sessao.test.ts já usa contarPorComecar]
+
+4) PainelProfissional.tsx: guarda no render + EstadoPainel sem 'bloqueado'
+------------------------------------------------------------------------------
+Achado 1 do ticket. Reescrita do componente: `estadoInicial` sai (e os seus 4
+testes), `EstadoPainel` fica `'a-carregar' | 'pronto'`, o render decide
+"bloqueado" direto das props via `chaveiroDestrancado`, e o cleanup do efeito
+repõe `{status:'a-carregar'}` (além de `cancelled=true` e `abort()`), para a
+troca de conta nunca herdar o `estado` "pronto" da conta anterior.
+
+Verde imediato nos testes de bloqueio já existentes (kek=null, accountId=null)
+-- continuam a passar porque o efeito também guarda contra fetch (linha
+`if (!chaveiroDestrancado(chaveiro)) return`):
+$ pnpm vitest run src/widgets/painel-profissional
+  2 passed (2) / 22 passed (22)
+
+5) Teste novo: "trocar de conta nunca mostra os dados da conta anterior"
+------------------------------------------------------------------------------
+Escrito primeiro; corrido contra o código já com a guarda no render (passo 4)
+-- já verde (o `act()` síncrono do RTL/jsdom já resolve o efeito antes de
+devolver o controlo ao teste, escondendo a diferença de timing entre "reset no
+corpo do efeito" e "reset no cleanup"). Para não fabricar um "vermelho" falso,
+provei a força do teste por mutação: removi a linha `setEstado({status:
+'a-carregar'})` do cleanup e corri de novo.
+
+Vermelho (mutação: cleanup sem o reset):
+$ pnpm vitest run src/widgets/painel-profissional/PainelProfissional.test.tsx -t "critério 2"
+  1 failed
+  -> linha decisiva: `expect(screen.getByText('Carregando painel...')).toBeTruthy()`
+     falha -- o DOM ainda mostra o KPI "Pacientes ativos" da conta anterior
+     (valor 0, mas presente) em vez do texto de carregamento.
+
+Verde (reset restaurado no cleanup, forma final do ticket):
+$ pnpm vitest run --coverage src/widgets/painel-profissional src/entities/agenda
+  4 passed (4) / 32 passed (32), sem erro de cobertura em nenhum ficheiro tocado
+  -> linha decisiva: mesma asserção acima, agora passa.
+
+Honestidade: este teste não prova uma regressão ativa do código anterior (o
+código antigo já resetava para 'a-carregar' de forma síncrona, dentro do
+próprio efeito) -- prova, por mutação, que a nova arquitetura (guarda no
+render + reset centralizado no cleanup) preserva o invariante e quebra se
+alguém remover o reset no futuro.
+
+6) Achado 2: fabricar { ok:false, motivo:'' } para cancelamento
+------------------------------------------------------------------------------
+Troca: `carregarPacientes` agora usa `throw new Error('cancelado')` nos dois
+pontos de corte reais (após listPatients, após openSummaries) em vez de
+devolver o literal fabricado; o `.catch` que já existia em `carregar` absorve
+esse throw com a MESMA mensagem traduzida de erro genérico -- descartada de
+qualquer forma pelo `if (cancelled) return` logo a seguir. O terceiro ponto
+(depois do fan-out) foi removido por ser морto (achado do próprio ticket): o
+`if (cancelled) return` de `carregar` já cobre esse caso.
+
+Provado pelos testes de desmontagem já existentes (não mudam de
+comportamento, continuam verdes):
+$ pnpm vitest run src/widgets/painel-profissional/PainelProfissional.test.tsx -t "desmontar"
+  4 passed (4)
+
+7) Fan-out Promise.all + catch por item + flat() (achado 2, parte 2)
+------------------------------------------------------------------------------
+Trocado de `Promise.allSettled` + type guard para `Promise.all` com
+`.catch(() => null)` por item e `c?.ok ? [item] : []` + `.flat()`.
+
+Gap de cobertura descoberto (não vermelho funcional, vermelho de cobertura):
+$ pnpm vitest run --coverage src/widgets/painel-profissional
+  ERROR: Coverage for functions (93.75%) ... PainelProfissional.tsx
+  ERROR: Coverage for statements (98.27%) ... PainelProfissional.tsx
+  -> linha decisiva (html report): `.catch(() => null)` nunca executado --
+     o teste existente "obterConsentimentos rejeita" na verdade só simulava um
+     403 resolvido (ok:false), nunca uma rejeição de promise de verdade.
+
+Verde -- teste novo que rejeita de fato (Promise.reject) para um paciente:
+$ pnpm vitest run --coverage src/widgets/painel-profissional
+  2 passed (2) / 23 passed (23), sem erro de cobertura
+  -> linha decisiva: `fetchMock` de `/p-falha/consents` devolve
+     `Promise.reject(new Error(...))`; o teste confirma que `/p-ok/consents`
+     ainda é chamado e não há `role="alert"`.
+
+Resultado final (módulos tocados)
+----------------------------------
+$ pnpm vitest run --coverage src/widgets/painel-profissional src/entities/agenda
+  Test Files  4 passed (4)
+  Tests  32 passed (32)
+  Sem "ERROR: Coverage..." para nenhum ficheiro tocado
+  (ruído esperado de "ERROR: Coverage ... 0%" para ficheiros fora do escopo
+  desta chamada parcial -- o `thresholds.perFile` do vite.config.ts reclama de
+  qualquer arquivo não exercitado quando não se roda a suíte inteira; a
+  suíte completa (`pnpm run test:unit`) é a prova real, ver relatório final).

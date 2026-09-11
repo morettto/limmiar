@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import type { SummaryResult } from '../../entities/patient/patient-summary'
 import { ESTADO_ASSINADA, ESTADO_PENDENTE, ORDEM_SECOES, type Nota } from '../../entities/nota/nota'
-import type { ConsentimentosDoPaciente } from '../../entities/consentimento/api'
 import {
   itensDeAssinatura,
   itensDeConsentimento,
   itensDeRisco,
   juntarRequerVoce,
+  type ConsentimentosPorPaciente,
   type ItemRequerVoce,
 } from './requer-voce'
 
@@ -47,7 +47,7 @@ describe('itensDeAssinatura', () => {
 
 describe('itensDeConsentimento', () => {
   it('gera uma entrada por finalidade pendente', () => {
-    const porPaciente: { patientId: string; consentimentos: ConsentimentosDoPaciente }[] = [
+    const porPaciente: ConsentimentosPorPaciente[] = [
       { patientId: 'p-1', consentimentos: { gravacao: 'pendente', analiseIa: 'concedido' } },
     ]
     expect(itensDeConsentimento(porPaciente)).toEqual([
@@ -56,7 +56,7 @@ describe('itensDeConsentimento', () => {
   })
 
   it('sem finalidade pendente não gera item', () => {
-    const porPaciente: { patientId: string; consentimentos: ConsentimentosDoPaciente }[] = [
+    const porPaciente: ConsentimentosPorPaciente[] = [
       { patientId: 'p-1', consentimentos: { gravacao: 'concedido', analiseIa: 'revogado' } },
     ]
     expect(itensDeConsentimento(porPaciente)).toEqual([])

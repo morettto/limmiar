@@ -92,7 +92,7 @@ msgstr "Invalid field: {field}."
 msgid "Carregando pacientes..."
 msgstr "Loading patients..."
 
-#: src/widgets/painel-profissional/PainelProfissional.tsx:170
+#: src/widgets/painel-profissional/PainelProfissional.tsx:144
 msgid "Carregando painel..."
 msgstr "Loading panel..."
 
@@ -108,7 +108,7 @@ msgstr "Keychain locked. Unlock it to register your API key."
 msgid "Chaveiro bloqueado. Desbloqueie para ver a carteira de pacientes."
 msgstr "Keychain locked. Unlock it to see the patient wallet."
 
-#: src/widgets/painel-profissional/PainelProfissional.tsx:160
+#: src/widgets/painel-profissional/PainelProfissional.tsx:134
 msgid "Chaveiro bloqueado. Desbloqueie para ver o painel."
 msgstr "Keychain locked. Unlock it to see the panel."
 
@@ -342,19 +342,19 @@ msgstr "I've saved my codes"
 msgid "Guardei minha frase"
 msgstr "I've saved my phrase"
 
-#: src/widgets/painel-profissional/PainelProfissional.tsx:207
+#: src/widgets/painel-profissional/PainelProfissional.tsx:181
 msgid "Indicadores"
 msgstr "Indicators"
 
-#: src/widgets/painel-profissional/PainelProfissional.tsx:191
+#: src/widgets/painel-profissional/PainelProfissional.tsx:165
 msgid "Iniciar próxima sessão"
 msgstr "Start next session"
 
-#: src/widgets/painel-profissional/PainelProfissional.tsx:195
+#: src/widgets/painel-profissional/PainelProfissional.tsx:169
 msgid "Iniciar próxima sessão às {hora}"
 msgstr "Start next session at {hora}"
 
-#: src/widgets/painel-profissional/PainelProfissional.tsx:195
+#: src/widgets/painel-profissional/PainelProfissional.tsx:169
 msgid "Iniciar próxima: {nome} {hora}"
 msgstr "Start next: {nome} {hora}"
 
@@ -384,7 +384,7 @@ msgstr "The credential cannot be submitted while the account is in its current s
 msgid "Não foi possível acessar a câmera para escanear o código."
 msgstr "Could not access the camera to scan the code."
 
-#: src/widgets/painel-profissional/PainelProfissional.tsx:137
+#: src/widgets/painel-profissional/PainelProfissional.tsx:109
 msgid "Não foi possível carregar a agenda."
 msgstr "Could not load the schedule."
 
@@ -392,7 +392,7 @@ msgstr "Could not load the schedule."
 msgid "Não foi possível carregar a carteira de pacientes. Tente novamente."
 msgstr "Could not load the patient wallet. Try again."
 
-#: src/widgets/painel-profissional/PainelProfissional.tsx:132
+#: src/widgets/painel-profissional/PainelProfissional.tsx:104
 msgid "Não foi possível carregar o painel. Tente novamente."
 msgstr "Could not load the panel. Try again."
 
@@ -468,7 +468,7 @@ msgid "errors.generic"
 msgstr "An unexpected error occurred. Please try again."
 
 #: src/widgets/auth-screen/AuthScreen.tsx:174
-#: src/widgets/painel-profissional/PainelProfissional.tsx:230
+#: src/widgets/painel-profissional/PainelProfissional.tsx:204
 #: src/widgets/patient-wallet/PatientWallet.tsx:120
 msgid "Paciente"
 msgstr "Patient"
@@ -477,7 +477,7 @@ msgstr "Patient"
 msgid "Pacientes"
 msgstr "Patients"
 
-#: src/widgets/painel-profissional/PainelProfissional.tsx:209
+#: src/widgets/painel-profissional/PainelProfissional.tsx:183
 msgid "Pacientes ativos"
 msgstr "Active patients"
 
@@ -527,8 +527,8 @@ msgstr "Recover access"
 msgid "Recuperar acesso à conta"
 msgstr "Recover account access"
 
-#: src/widgets/painel-profissional/PainelProfissional.tsx:227
-#: src/widgets/painel-profissional/PainelProfissional.tsx:228
+#: src/widgets/painel-profissional/PainelProfissional.tsx:201
+#: src/widgets/painel-profissional/PainelProfissional.tsx:202
 msgid "Requer você"
 msgstr "Needs you"
 
@@ -561,7 +561,7 @@ msgstr "Password"
 msgid "agenda.session_not_found"
 msgstr "Session not found."
 
-#: src/widgets/painel-profissional/PainelProfissional.tsx:213
+#: src/widgets/painel-profissional/PainelProfissional.tsx:187
 msgid "Sessões na semana"
 msgstr "Sessions this week"
 

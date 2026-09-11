@@ -1,5 +1,3 @@
-export const SETE_DIAS_MS = 7 * 24 * 60 * 60 * 1000
-
 export interface SessaoAgendada {
   readonly sessionId: string
   readonly patientId: string
@@ -20,9 +18,8 @@ export function proximaSessao(sessoes: readonly SessaoAgendada[], agora: Date): 
   return porComecar(sessoes, agora)[0] ?? null
 }
 
-/** Pura. Conta as que ainda não começaram. A janela de 7 dias é do pedido ao backend, não
- *  recortada aqui de novo — ver README, "a janela é do pedido". */
-export function sessoesNaSemana(sessoes: readonly SessaoAgendada[], agora: Date): number {
+/** Pura. Conta as que ainda não começaram — sem recortar janela nenhuma. */
+export function contarPorComecar(sessoes: readonly SessaoAgendada[], agora: Date): number {
   return porComecar(sessoes, agora).length
 }
 

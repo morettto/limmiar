@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { listarSessoes } from './api'
+import { listarSessoes, listarSessoesDaSemana } from './api'
 
 const ACCOUNT_ID = '44444444-4444-4444-4444-444444444444'
 const ACCESS_TOKEN = 'access-token-xyz'
@@ -60,5 +60,29 @@ describe('listarSessoes', () => {
     const result = await listarSessoes('http://api.test', ACCOUNT_ID, ACCESS_TOKEN, new Date(), new Date())
 
     expect(result).toEqual({ ok: false, code: 'auth.forbidden', params: {} })
+  })
+})
+
+describe('listarSessoesDaSemana', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('pede a janela [agora, agora + 7 dias) — único ponto que fixa essa largura', async () => {
+    const agora = new Date('2026-09-10T10:00:00.000Z')
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ sessions: [] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await listarSessoesDaSemana('http://api.test', ACCOUNT_ID, ACCESS_TOKEN, agora)
+
+    expect(result).toEqual({ ok: true, sessoes: [] })
+    const seteDiasDepois = new Date(agora.getTime() + 7 * 24 * 60 * 60 * 1000)
+    const expectedUrl = `http://api.test/accounts/${ACCOUNT_ID}/agenda/sessions?from=${encodeURIComponent(agora.toISOString())}&to=${encodeURIComponent(seteDiasDepois.toISOString())}`
+    expect(fetchMock).toHaveBeenCalledWith(expectedUrl, { headers: { Authorization: `Bearer ${ACCESS_TOKEN}` } })
   })
 })

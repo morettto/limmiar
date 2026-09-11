@@ -2,17 +2,15 @@ import { useEffect, useState } from 'react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { AdaptivePanel, KpiStrip } from '@limmiar/ui'
 import type { CryptoKey } from '@limmiar/crypto'
-import { listarSessoes } from '../../entities/agenda/api'
-import { horaDaSessao, proximaSessao, sessoesNaSemana, SETE_DIAS_MS, type SessaoAgendada } from '../../entities/agenda/sessao'
-import { obterConsentimentos, type ConsentimentosDoPaciente } from '../../entities/consentimento/api'
+import { listarSessoesDaSemana } from '../../entities/agenda/api'
+import { contarPorComecar, horaDaSessao, proximaSessao, type SessaoAgendada } from '../../entities/agenda/sessao'
+import { obterConsentimentos } from '../../entities/consentimento/api'
 import type { Nota } from '../../entities/nota/nota'
 import { listPatients } from '../../entities/patient/api'
 import type { SealedSummary, SummaryResult } from '../../entities/patient/patient-summary'
 import { openSummariesInWorker } from '../../entities/patient/worker-client'
 import { translateProblemCode } from '../../shared/api'
-import { itensDeAssinatura, itensDeConsentimento, itensDeRisco, juntarRequerVoce } from './requer-voce'
-
-type ConsentimentosPorPaciente = { patientId: string; consentimentos: ConsentimentosDoPaciente }
+import { itensDeAssinatura, itensDeConsentimento, itensDeRisco, juntarRequerVoce, type ConsentimentosPorPaciente } from './requer-voce'
 
 type ResultadoFonte<T> = { ok: true; dados: T } | { ok: false; motivo: string }
 
@@ -30,7 +28,6 @@ export interface PainelProfissionalProps {
 }
 
 type EstadoPainel =
-  | { status: 'bloqueado' }
   | { status: 'a-carregar' }
   | {
       status: 'pronto'
@@ -38,21 +35,14 @@ type EstadoPainel =
       sessoes: ResultadoFonte<readonly SessaoAgendada[]>
     }
 
-// Fonte única da guarda (`estadoInicial` e `useEffect`) -- ver README, "guarda unificada".
-// Type predicate: o `tsc -b` do `build` recusa `kek` a chegar a `carregar` como `CryptoKey | null`.
+// Fonte única da guarda: o render decide "bloqueado" a partir das props, o efeito usa a
+// mesma função para decidir se busca. tsc -b (build) exige que a guarda estreite os três
+// valores -- um boolean compilava no tsc --noEmit e caía no build.
 type Chaveiro = { kek: CryptoKey | null; accountId: string | null; accessToken: string | null }
 type ChaveiroDestrancado = { kek: CryptoKey; accountId: string; accessToken: string }
 
 function chaveiroDestrancado(chaveiro: Chaveiro): chaveiro is ChaveiroDestrancado {
   return chaveiro.kek !== null && chaveiro.accountId !== null && chaveiro.accessToken !== null
-}
-
-export function estadoInicial(
-  kek: CryptoKey | null,
-  accountId: string | null,
-  accessToken: string | null,
-): EstadoPainel {
-  return chaveiroDestrancado({ kek, accountId, accessToken }) ? { status: 'a-carregar' } : { status: 'bloqueado' }
 }
 
 export function PainelProfissional({
@@ -64,57 +54,42 @@ export function PainelProfissional({
   openSummaries = openSummariesInWorker,
 }: PainelProfissionalProps) {
   const { i18n, t } = useLingui()
-  const [estado, setEstado] = useState<EstadoPainel>(() => estadoInicial(kek, accountId, accessToken))
+  const [estado, setEstado] = useState<EstadoPainel>({ status: 'a-carregar' })
 
   useEffect(() => {
     const chaveiro = { kek, accountId, accessToken }
     if (!chaveiroDestrancado(chaveiro)) {
-      setEstado({ status: 'bloqueado' })
       return
     }
 
     let cancelled = false
     const abortController = new AbortController()
-    setEstado({ status: 'a-carregar' })
 
     async function carregarPacientes(unlockedKek: CryptoKey, accId: string, token: string): Promise<ResultadoFonte<DadosPacientes>> {
       const listados = await listPatients(baseUrl, accId, token)
-      if (cancelled) return { ok: false, motivo: '' }
-
       if (!listados.ok) {
         return { ok: false, motivo: translateProblemCode(listados.code, listados.params, i18n) }
       }
 
-      const decifrados = await openSummaries(unlockedKek, listados.patients, abortController.signal)
-      if (cancelled) return { ok: false, motivo: '' }
+      // `cancelled` verificado no ponto de consumo, não lançado -- ver README, "cancelamento".
+      // ponytail: `signal` só chega até aqui, não a `listPatients`/`obterConsentimentos` -- ver README.
+      const decifrados = cancelled ? [] : await openSummaries(unlockedKek, listados.patients, abortController.signal)
 
       // ponytail: `obterConsentimentos` por paciente (fan-out N+1) -- endpoint em lote é o
-      // upgrade quando isso virar gargalo. `allSettled` apanha a rejeição genuína (rede);
-      // `ProblemResult` vira `{ok:false}` resolvido e filtrado abaixo, não um `throw`.
-      const resultados = await Promise.allSettled(
-        decifrados.map(async (resumo): Promise<{ ok: true; item: ConsentimentosPorPaciente } | { ok: false }> => {
-          const resultado = await obterConsentimentos(baseUrl, accId, token, resumo.patientId)
-          if (!resultado.ok) {
-            return { ok: false }
-          }
-          return { ok: true, item: { patientId: resumo.patientId, consentimentos: resultado.consentimentos } }
+      // upgrade quando isso virar gargalo. Uma rejeição genuína (rede) e um `ProblemResult`
+      // (`{ok:false}`) caem ambos fora da lista -- nenhum dos dois é exceção de domínio.
+      const resultados = await Promise.all(
+        decifrados.map(async (resumo): Promise<ConsentimentosPorPaciente[]> => {
+          const resultado = await obterConsentimentos(baseUrl, accId, token, resumo.patientId).catch(() => null)
+          return resultado?.ok ? [{ patientId: resumo.patientId, consentimentos: resultado.consentimentos }] : []
         }),
       )
-      if (cancelled) return { ok: false, motivo: '' }
 
-      const consentimentosOk = resultados
-        .filter(
-          (resultado): resultado is PromiseFulfilledResult<{ ok: true; item: ConsentimentosPorPaciente }> =>
-            resultado.status === 'fulfilled' && resultado.value.ok,
-        )
-        .map((resultado) => resultado.value.item)
-
-      return { ok: true, dados: { sumarios: decifrados, consentimentos: consentimentosOk } }
+      return { ok: true, dados: { sumarios: decifrados, consentimentos: resultados.flat() } }
     }
 
     async function carregarSessoes(accId: string, token: string): Promise<ResultadoFonte<readonly SessaoAgendada[]>> {
-      const agora = new Date()
-      const resultado = await listarSessoes(baseUrl, accId, token, agora, new Date(agora.getTime() + SETE_DIAS_MS))
+      const resultado = await listarSessoesDaSemana(baseUrl, accId, token, new Date())
       if (!resultado.ok) {
         return { ok: false, motivo: translateProblemCode(resultado.code, resultado.params, i18n) }
       }
@@ -147,10 +122,12 @@ export function PainelProfissional({
     return () => {
       cancelled = true
       abortController.abort()
+      // Repõe "a-carregar" para a próxima conta nunca herdar os dados desta -- ver README.
+      setEstado({ status: 'a-carregar' })
     }
   }, [kek, accountId, accessToken, baseUrl, openSummaries, i18n, t])
 
-  if (estado.status === 'bloqueado') {
+  if (!chaveiroDestrancado({ kek, accountId, accessToken })) {
     return (
       <div className="mx-auto max-w-sm p-4">
         <p role="status">
@@ -208,7 +185,7 @@ export function PainelProfissional({
         />
         <KpiStrip.Item
           label={t`Sessões na semana`}
-          value={sessoes.ok ? sessoesNaSemana(sessoes.dados, agora) : '—'}
+          value={sessoes.ok ? contarPorComecar(sessoes.dados, agora) : '—'}
         />
       </KpiStrip>
       {!pacientes.ok && (

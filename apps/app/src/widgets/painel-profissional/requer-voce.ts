@@ -25,11 +25,11 @@ export function itensDeAssinatura(notas: readonly Nota[]): ItemRequerVoce[] {
     .map((nota) => ({ id: `assinatura:${nota.id}`, fonte: 'assinatura', referencia: nota.id, patientId: nota.patientId }))
 }
 
+export type ConsentimentosPorPaciente = { patientId: string; consentimentos: ConsentimentosDoPaciente }
+
 const FINALIDADES: readonly Finalidade[] = ['gravacao', 'analiseIa']
 
-export function itensDeConsentimento(
-  porPaciente: readonly { patientId: string; consentimentos: ConsentimentosDoPaciente }[],
-): ItemRequerVoce[] {
+export function itensDeConsentimento(porPaciente: readonly ConsentimentosPorPaciente[]): ItemRequerVoce[] {
   return porPaciente.flatMap(({ patientId, consentimentos }) =>
     FINALIDADES.filter((finalidade) => consentimentos[finalidade] === 'pendente').map((finalidade) => ({
       id: `consentimento:${patientId}:${finalidade}`,

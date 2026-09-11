@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { horaDaSessao, proximaSessao, sessoesNaSemana, type SessaoAgendada } from './sessao'
+import { contarPorComecar, horaDaSessao, proximaSessao, type SessaoAgendada } from './sessao'
 
 function sessao(overrides: Partial<SessaoAgendada> = {}): SessaoAgendada {
   return {
@@ -35,18 +35,18 @@ describe('proximaSessao', () => {
   })
 })
 
-describe('sessoesNaSemana', () => {
-  // A janela de 7 dias é do pedido ao backend, não recortada de novo aqui -- uma sessão a
-  // 8 dias ainda conta, porque sessoesNaSemana só filtra o que já começou.
+describe('contarPorComecar', () => {
+  // A janela de 7 dias é do pedido ao backend (listarSessoesDaSemana), não recortada de
+  // novo aqui -- uma sessão a 8 dias ainda conta, porque isto só filtra o que já começou.
   it('conta as sessões que ainda não começaram, mesmo fora de 7 dias', () => {
     const dentro = sessao({ sessionId: 's-dentro', inicioEm: '2026-09-12T10:00:00Z' })
     const a8dias = sessao({ sessionId: 's-8-dias', inicioEm: '2026-09-18T10:00:00Z' })
 
-    expect(sessoesNaSemana([dentro, a8dias], AGORA)).toBe(2)
+    expect(contarPorComecar([dentro, a8dias], AGORA)).toBe(2)
   })
 
   it('sem sessões devolve 0', () => {
-    expect(sessoesNaSemana([], AGORA)).toBe(0)
+    expect(contarPorComecar([], AGORA)).toBe(0)
   })
 })
 
