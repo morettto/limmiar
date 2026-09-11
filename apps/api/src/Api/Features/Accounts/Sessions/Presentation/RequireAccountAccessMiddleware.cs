@@ -63,7 +63,7 @@ public static class AccountAccessEndpointConventions
     }
 
     internal static bool RequiresAccountAccess(RoutePattern routePattern, bool hasOptOut) =>
-        !hasOptOut && routePattern.Parameters.Any(p => p.Name == "accountId");
+        !hasOptOut && routePattern.Parameters.Any(p => string.Equals(p.Name, "accountId", StringComparison.OrdinalIgnoreCase));
 
     private static bool HasOptOut(IList<object> metadata) =>
         metadata.Any(m => m is AllowWithoutAccountTokenMetadata);

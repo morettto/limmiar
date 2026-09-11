@@ -48,6 +48,19 @@ public sealed class RequireAccountAccessMiddlewareTests
         Assert.Equal(StatusCodes.Status200OK, context.Response.StatusCode);
     }
 
+    /// <summary>Routing matches parameter names ignoring case, so a route spelled {AccountId} must not escape the guard.</summary>
+    [Fact]
+    public async Task InvokeAsync_WithAccountIdParameterSpelledInOtherCaseAndNoHeader_Returns401()
+    {
+        var (middleware, context, nextCalled) = CreateContext(
+            "/accounts/{AccountId:guid}/x", authorizationHeader: null, new StubSessionTokenIssuer(RouteAccountId));
+
+        await middleware.InvokeAsync(context);
+
+        Assert.False(nextCalled());
+        Assert.Equal(StatusCodes.Status401Unauthorized, context.Response.StatusCode);
+    }
+
     [Fact]
     public async Task InvokeAsync_WithoutAuthorizationHeader_Returns401AndSendsWwwAuthenticateAndSkipsNext()
     {

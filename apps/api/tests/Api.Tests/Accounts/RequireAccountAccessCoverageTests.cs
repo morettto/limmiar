@@ -37,7 +37,7 @@ public sealed class RequireAccountAccessCoverageTests
 
         var accountIdRoutes = endpointDataSource.Endpoints
             .OfType<RouteEndpoint>()
-            .Where(e => e.RoutePattern.Parameters.Any(p => p.Name == "accountId"))
+            .Where(e => e.RoutePattern.Parameters.Any(p => string.Equals(p.Name, "accountId", StringComparison.OrdinalIgnoreCase)))
             .ToList();
 
         Assert.NotEmpty(accountIdRoutes);

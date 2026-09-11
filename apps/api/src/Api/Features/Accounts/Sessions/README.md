@@ -36,7 +36,11 @@ lado (`Api.Accounts.Credentials`, `Api.Accounts.MagicLink`, etc.).
   (`ProfessionalVerificationEndpoints`, gate é o `X-Staff-Api-Key`). Todas as outras rotas com
   `{accountId}` -- hoje Scheduling, Notes, Consent, Patients, DevicePairing, VoiceEnrollment,
   Recovery, ProfessionalVerification/submit -- estão protegidas sem precisar de dizer nada na
-  rota; uma rota nova com `{accountId}` nasce protegida.
+  rota; uma rota nova com `{accountId}` nasce protegida. O nome do parâmetro compara-se sem
+  distinguir maiúsculas, como o routing faz, por isso `{AccountId}` também fica protegida.
+
+  Limite: a guarda só vê `accountId` como parâmetro de rota. Um endpoint que receba o
+  `accountId` pela query ou pelo corpo não fica protegido por ela; hoje nenhum o faz.
 
   Contrato:
   - Sem header, header sem prefixo `Bearer ` (comparado sem distinguir maiúsculas/minúsculas,
