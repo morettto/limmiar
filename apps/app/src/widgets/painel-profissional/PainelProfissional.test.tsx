@@ -75,7 +75,6 @@ function agendaResponse(sessoes: SessaoAgendada[]) {
         patientId: sessao.patientId,
         startsAt: sessao.inicioEm,
         durationMinutes: sessao.duracaoMinutos,
-        cancelledAt: sessao.canceladaEm,
       })),
     }),
     { status: 200, headers: { 'Content-Type': 'application/json' } },
@@ -102,7 +101,6 @@ function sessaoEm1h(patientId: string): SessaoAgendada {
     patientId,
     inicioEm: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
     duracaoMinutos: 50,
-    canceladaEm: null,
   }
 }
 

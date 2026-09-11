@@ -38,7 +38,12 @@ concorrência real (ver `docs/adr/ADR-S04-02-horario-em-claro-servidor-zero-know
   /accounts/{accountId}/agenda/sessions?from=&to=` (S09-02), que lista sessões vivas na
   janela meio-aberta `[from, to)`, máximo de 7 dias com o limite incluído, ordenadas por
   `starts_at`. Canceladas ficam sempre de fora (`cancelled_at IS NULL`), coberto pelo mesmo
-  índice parcial `scheduled_sessions_live_slot_uq` -- sem migração nem `GRANT` novo. `from`/
+  índice parcial `scheduled_sessions_live_slot_uq` -- sem migração nem `GRANT` novo. O item da
+  lista é `ScheduledSessionListItem` (`SessionId`, `PatientId`, `StartsAt`,
+  `DurationMinutes`), sem `CancelledAt` (S09-04): como uma cancelada nunca chega a este
+  endpoint, o campo não tinha razão de existir no fio -- `ScheduledSessionResponse`
+  (POST/PATCH) continua com `CancelledAt?`, porque essas duas rotas devolvem a sessão que
+  acabaram de mutar, cancelada ou não. `from`/
   `to` ligam-se como `string?` e fazem parse à mão com `DateTimeOffset.TryParse(...,
   DateTimeStyles.AssumeUniversal)`: ligar diretamente a `DateTimeOffset?` dá 500 em
   Development (o `BadHttpRequestException` cai no `GlobalProblemExceptionHandler`) e um 400

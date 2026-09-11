@@ -7,7 +7,6 @@ function sessao(overrides: Partial<SessaoAgendada> = {}): SessaoAgendada {
     patientId: 'p-1',
     inicioEm: '2026-09-10T15:30:00Z',
     duracaoMinutos: 50,
-    canceladaEm: null,
     ...overrides,
   }
 }
@@ -19,49 +18,31 @@ describe('proximaSessao', () => {
     expect(proximaSessao([], AGORA)).toBeNull()
   })
 
-  it('devolve a de menor inicioEm que ainda não passou', () => {
-    const maisCedo = sessao({ sessionId: 's-cedo', inicioEm: '2026-09-10T12:00:00Z' })
-    const maisTarde = sessao({ sessionId: 's-tarde', inicioEm: '2026-09-10T18:00:00Z' })
+  // Entrada já ordenada por starts_at (contrato do GET) -- proximaSessao confia na ordem
+  // do servidor, não ordena de novo.
+  it('entrada ordenada devolve a primeira que ainda não começou', () => {
+    const primeira = sessao({ sessionId: 's-cedo', inicioEm: '2026-09-10T12:00:00Z' })
+    const segunda = sessao({ sessionId: 's-tarde', inicioEm: '2026-09-10T18:00:00Z' })
 
-    expect(proximaSessao([maisTarde, maisCedo], AGORA)).toEqual(maisCedo)
-  })
-
-  it('mantém a mais cedo já encontrada quando a próxima candidata é mais tarde', () => {
-    const maisCedo = sessao({ sessionId: 's-cedo', inicioEm: '2026-09-10T12:00:00Z' })
-    const maisTarde = sessao({ sessionId: 's-tarde', inicioEm: '2026-09-10T18:00:00Z' })
-
-    expect(proximaSessao([maisCedo, maisTarde], AGORA)).toEqual(maisCedo)
-  })
-
-  it('salta sessão cancelada mesmo sendo a mais cedo', () => {
-    const cancelada = sessao({
-      sessionId: 's-cancelada',
-      inicioEm: '2026-09-10T11:00:00Z',
-      canceladaEm: '2026-09-09T00:00:00Z',
-    })
-    const seguinte = sessao({ sessionId: 's-seguinte', inicioEm: '2026-09-10T13:00:00Z' })
-
-    expect(proximaSessao([cancelada, seguinte], AGORA)).toEqual(seguinte)
+    expect(proximaSessao([primeira, segunda], AGORA)).toEqual(primeira)
   })
 
   it('salta sessão já passada', () => {
     const passada = sessao({ sessionId: 's-passada', inicioEm: '2026-09-10T09:00:00Z' })
+    const seguinte = sessao({ sessionId: 's-seguinte', inicioEm: '2026-09-10T13:00:00Z' })
 
-    expect(proximaSessao([passada], AGORA)).toBeNull()
+    expect(proximaSessao([passada, seguinte], AGORA)).toEqual(seguinte)
   })
 })
 
 describe('sessoesNaSemana', () => {
-  it('conta só as sessões não canceladas dentro da janela de 7 dias', () => {
+  // A janela de 7 dias é do pedido ao backend, não recortada de novo aqui -- uma sessão a
+  // 8 dias ainda conta, porque sessoesNaSemana só filtra o que já começou.
+  it('conta as sessões que ainda não começaram, mesmo fora de 7 dias', () => {
     const dentro = sessao({ sessionId: 's-dentro', inicioEm: '2026-09-12T10:00:00Z' })
-    const foraDaJanela = sessao({ sessionId: 's-fora', inicioEm: '2026-09-18T10:00:00Z' })
-    const cancelada = sessao({
-      sessionId: 's-cancelada',
-      inicioEm: '2026-09-13T10:00:00Z',
-      canceladaEm: '2026-09-09T00:00:00Z',
-    })
+    const a8dias = sessao({ sessionId: 's-8-dias', inicioEm: '2026-09-18T10:00:00Z' })
 
-    expect(sessoesNaSemana([dentro, foraDaJanela, cancelada], AGORA)).toBe(1)
+    expect(sessoesNaSemana([dentro, a8dias], AGORA)).toBe(2)
   })
 
   it('sem sessões devolve 0', () => {

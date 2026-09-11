@@ -637,6 +637,29 @@ public sealed class SchedulingEndpointsTests : IAsyncLifetime
         Assert.Equal(new[] { firstId, secondId, thirdId }, body!.Sessions.Select(s => s.SessionId));
     }
 
+    /// <summary>A cancelled session never reaches this endpoint, so the wire item has no reason
+    /// to carry cancelledAt at all -- reading the raw JSON (not the deserialized record) is the
+    /// only way to prove the property itself is gone, not just always null (S09-04 B1).</summary>
+    [Fact]
+    public async Task ListSessions_ItemsNeverCarryCancelledAtProperty()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        var accountId = await RegisterActiveProfessionalAsync(client, "sched-list-no-cancelledat@example.com");
+        var from = SomeStart;
+        var to = from.AddDays(7);
+        await ScheduleSessionAsync(client, accountId, from.AddMinutes(30), 40);
+
+        var response = await ListSessionsAsync(client, accountId, from, to);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(body);
+        var items = doc.RootElement.GetProperty("sessions").EnumerateArray().ToList();
+        Assert.NotEmpty(items);
+        Assert.All(items, item => Assert.False(item.TryGetProperty("cancelledAt", out _)));
+    }
+
     /// <summary>Covers every branch of TryParseWindow -- missing/unparseable from or to, an empty or inverted window, and one second past the 7-day cap (S09-02 B2).</summary>
     public static IEnumerable<object?[]> InvalidWindowCases()
     {

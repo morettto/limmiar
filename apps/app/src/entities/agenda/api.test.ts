@@ -9,7 +9,7 @@ describe('listarSessoes', () => {
     vi.unstubAllGlobals()
   })
 
-  it('GETs …/agenda/sessions?from=&to= (encoded ISO) with a bearer token and maps the 5 fields, incl. a non-null cancelledAt', async () => {
+  it('GETs …/agenda/sessions?from=&to= (encoded ISO) with a bearer token and maps the 4 fields', async () => {
     const de = new Date('2026-09-10T10:00:00.000Z')
     const ate = new Date('2026-09-17T10:00:00.000Z')
     const fetchMock = vi.fn().mockResolvedValue(
@@ -21,7 +21,6 @@ describe('listarSessoes', () => {
               patientId: 'p-1',
               startsAt: '2026-09-10T11:00:00Z',
               durationMinutes: 50,
-              cancelledAt: '2026-09-09T00:00:00Z',
             },
           ],
         }),
@@ -32,7 +31,9 @@ describe('listarSessoes', () => {
 
     const result = await listarSessoes('http://api.test', ACCOUNT_ID, ACCESS_TOKEN, de, ate)
 
-    expect(result).toEqual({
+    // toStrictEqual, não toEqual -- o backend já não manda cancelledAt, e toEqual ignoraria
+    // um canceladaEm: undefined remanescente no mapeamento, ficando verde sem provar nada.
+    expect(result).toStrictEqual({
       ok: true,
       sessoes: [
         {
@@ -40,7 +41,6 @@ describe('listarSessoes', () => {
           patientId: 'p-1',
           inicioEm: '2026-09-10T11:00:00Z',
           duracaoMinutos: 50,
-          canceladaEm: '2026-09-09T00:00:00Z',
         },
       ],
     })

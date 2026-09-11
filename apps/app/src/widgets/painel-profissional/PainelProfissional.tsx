@@ -16,6 +16,8 @@ type ConsentimentosPorPaciente = { patientId: string; consentimentos: Consentime
 
 type ResultadoFonte<T> = { ok: true; dados: T } | { ok: false; motivo: string }
 
+type DadosPacientes = { sumarios: readonly SummaryResult[]; consentimentos: readonly ConsentimentosPorPaciente[] }
+
 export interface PainelProfissionalProps {
   baseUrl: string
   accountId: string | null
@@ -32,7 +34,7 @@ type EstadoPainel =
   | { status: 'a-carregar' }
   | {
       status: 'pronto'
-      pacientes: ResultadoFonte<{ sumarios: readonly SummaryResult[]; consentimentos: readonly ConsentimentosPorPaciente[] }>
+      pacientes: ResultadoFonte<DadosPacientes>
       sessoes: ResultadoFonte<readonly SessaoAgendada[]>
     }
 
@@ -75,12 +77,7 @@ export function PainelProfissional({
     const abortController = new AbortController()
     setEstado({ status: 'a-carregar' })
 
-    type PacientesFonte = ResultadoFonte<{
-      sumarios: readonly SummaryResult[]
-      consentimentos: readonly ConsentimentosPorPaciente[]
-    }>
-
-    async function carregarPacientes(unlockedKek: CryptoKey, accId: string, token: string): Promise<PacientesFonte> {
+    async function carregarPacientes(unlockedKek: CryptoKey, accId: string, token: string): Promise<ResultadoFonte<DadosPacientes>> {
       const listados = await listPatients(baseUrl, accId, token)
       if (cancelled) return { ok: false, motivo: '' }
 
@@ -129,7 +126,7 @@ export function PainelProfissional({
       // `.catch`, senão uma falha de rede na agenda derrubaria também os pacientes (e vice-versa).
       const [pacientes, sessoes] = await Promise.all([
         carregarPacientes(unlockedKek, accId, token).catch(
-          (): PacientesFonte => ({ ok: false, motivo: t`Não foi possível carregar o painel. Tente novamente.` }),
+          (): ResultadoFonte<DadosPacientes> => ({ ok: false, motivo: t`Não foi possível carregar o painel. Tente novamente.` }),
         ),
         carregarSessoes(accId, token).catch(
           (): ResultadoFonte<readonly SessaoAgendada[]> => ({

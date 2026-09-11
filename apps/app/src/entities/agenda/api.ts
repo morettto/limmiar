@@ -27,7 +27,7 @@ export async function listarSessoes(
   }
 
   const body = (await result.response.json()) as {
-    sessions: { sessionId: string; patientId: string; startsAt: string; durationMinutes: number; cancelledAt: string | null }[]
+    sessions: { sessionId: string; patientId: string; startsAt: string; durationMinutes: number }[]
   }
   return {
     ok: true,
@@ -36,7 +36,6 @@ export async function listarSessoes(
       patientId: sessao.patientId,
       inicioEm: sessao.startsAt,
       duracaoMinutos: sessao.durationMinutes,
-      canceladaEm: sessao.cancelledAt,
     })),
   }
 }

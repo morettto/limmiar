@@ -112,9 +112,21 @@ sabe da outra; a composição e o isolamento de falha por fonte vivem só aqui.
   `PatientWallet.tsx`): um `.catch` aí ficaria morto — nunca dispararia — e
   reprovaria o portão de cobertura de funções.
 - **`SETE_DIAS_MS` exportada de `entities/agenda/sessao.ts`.** Único ponto que
-  define a janela de 7 dias; o widget usa o mesmo valor para pedir ao backend
-  (`listarSessoes(..., agora, agora + SETE_DIAS_MS)`) e para o KPI
-  (`sessoesNaSemana`), sem repetir o literal.
+  define a janela de 7 dias; o widget usa o valor só para pedir ao backend
+  (`listarSessoes(..., agora, agora + SETE_DIAS_MS)`) — desde o S09-04,
+  `sessoesNaSemana` já não recorta esse limite superior de novo (ver
+  `entities/agenda/README.md`, "Decisões do S09-04"), então `SETE_DIAS_MS` só
+  aparece aqui, na chamada a `listarSessoes`.
+
+## Decisões do S09-04
+
+- **`DadosPacientes` extraído para tipo nomeado.** O que era um objeto anónimo
+  inline repetido em três sítios (`EstadoPainel`, o alias local `PacientesFonte`
+  dentro do `useEffect`, e o retorno de `carregarPacientes`) virou um único
+  `type DadosPacientes = { sumarios; consentimentos }` ao lado de
+  `ResultadoFonte`. `PacientesFonte` (o alias local) saiu — era só
+  `ResultadoFonte<DadosPacientes>` com outro nome, no mesmo escopo do
+  `useEffect` onde `ResultadoFonte` e `DadosPacientes` já estão em alcance.
 
 ## Fora de âmbito (ver `.harness/S09-01-forma.md`, secção 1 e "Decisões que esperam o humano")
 

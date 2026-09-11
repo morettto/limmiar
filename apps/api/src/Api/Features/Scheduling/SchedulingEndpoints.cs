@@ -151,7 +151,7 @@ public static class SchedulingEndpoints
         }
 
         var sessions = await store.ListLiveAsync(accountId, fromUtc, toUtc, cancellationToken);
-        return TypedResults.Ok(new ListScheduledSessionsResponse(sessions.Select(ToResponse).ToList()));
+        return TypedResults.Ok(new ListScheduledSessionsResponse(sessions.Select(ToListItem).ToList()));
     }
 
     /// <summary>from missing/unparseable -&gt; ValidationProblem("from"); to missing/unparseable, to&lt;=from, or window &gt; 7d -&gt; ValidationProblem("to").</summary>
@@ -206,6 +206,12 @@ public static class SchedulingEndpoints
     private static ScheduledSessionResponse ToResponse(ScheduledSession session) =>
         new(session.Id, session.PatientId, session.StartsAt, session.DurationMinutes, session.CancelledAt);
 
+    // ListLiveAsync only ever returns live rows (cancelled_at IS NULL), so the list item has no
+    // cancelledAt field at all -- unlike ScheduledSessionResponse (POST/PATCH), which can report
+    // a just-cancelled session and keeps the nullable field.
+    private static ScheduledSessionListItem ToListItem(ScheduledSession session) =>
+        new(session.Id, session.PatientId, session.StartsAt, session.DurationMinutes);
+
     // [ExcludeFromCodeCoverage] justification: every named SchedulingFailureReason arm reachable
     // from Schedule, Move or Cancel is exercised by a dedicated test in
     // SchedulingEndpointsTests -- SlotTaken is only reachable from Schedule and Move (Cancel
@@ -240,4 +246,6 @@ public sealed record MoveSessionRequest(DateTimeOffset StartsAt, int DurationMin
 
 public sealed record ScheduledSessionResponse(Guid SessionId, Guid PatientId, DateTimeOffset StartsAt, int DurationMinutes, DateTimeOffset? CancelledAt);
 
-public sealed record ListScheduledSessionsResponse(IReadOnlyList<ScheduledSessionResponse> Sessions);
+public sealed record ScheduledSessionListItem(Guid SessionId, Guid PatientId, DateTimeOffset StartsAt, int DurationMinutes);
+
+public sealed record ListScheduledSessionsResponse(IReadOnlyList<ScheduledSessionListItem> Sessions);
