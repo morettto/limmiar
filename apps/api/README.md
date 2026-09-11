@@ -51,17 +51,16 @@ tentar arrancar o container, não passam silenciosamente. Os testes puramente un
 - Minimal API, um ficheiro por área dentro de `src/Api/Features/<Módulo>` (ex.
   `Scheduling/SchedulingEndpoints.cs`, `Notes/NoteEndpoints.cs`, `Patients/PatientEndpoints.cs`)
   ou de `src/Api/Features/Accounts/<Fatia>/Presentation` (ex.
-  `DevicePairing/Presentation/DevicePairingEndpoints.cs`). As 20 rotas com `{accountId}` que
-  exigem só "o token é desta conta" (Scheduling, Notes, Consent, Patients -- incluindo
-  `GetPatient`/`ListPatients` --, DevicePairing, VoiceEnrollment, Recovery,
-  ProfessionalVerification/submit) chamam `RouteHandlerBuilder.RequireAccountAccess()`
+  `DevicePairing/Presentation/DevicePairingEndpoints.cs`). Toda rota `{accountId}` nasce
+  protegida por `RequireAccountAccessMiddleware`
   (`Accounts/Sessions/Presentation/RequireAccountAccessMiddleware.cs`, ver
-  `Accounts.Sessions/README.md`) em vez de uma guarda copiada no handler -- a extensão só marca
-  o endpoint com metadata; quem decide 401/403 é o `RequireAccountAccessMiddleware` registado
-  uma única vez em `Program.Composition.cs`, correndo depois do routing e antes de qualquer
-  endpoint, logo antes do binding do corpo/query desse endpoint (um `IEndpointFilter` corre
-  depois desse binding, tarde demais). TwoFactor e as rotas staff-only (`X-Staff-Api-Key`) ficam
-  de fora, essas continuam com a sua própria guarda.
+  `Accounts.Sessions/README.md`) sem nenhuma chamada por rota -- fechado por omissão: o
+  middleware decide direto do `RoutePattern` do `RouteEndpoint`, registado uma única vez em
+  `Program.Composition.cs`, correndo depois do routing e antes de qualquer endpoint, logo antes
+  do binding do corpo/query desse endpoint (um `IEndpointFilter` corre depois desse binding,
+  tarde demais). As 4 rotas que autorizam de outra forma -- as 3 de TOTP (ticket de dois
+  fatores) e `professional-verification/decision` (`X-Staff-Api-Key`) -- optam por fora com
+  `.AllowWithoutAccountToken()`, com o porquê no comentário da própria rota.
   `ProblemJson`/`ValidationProblem` vivem em `Api.Problems.ProblemResults`;
   `TryValidateSealedBlobShape` (piso de 28 bytes para um blob AES-256-GCM selado) vive em
   `Api.Problems.SealedBlobShape` -- `PatientEndpoints`, `NoteEndpoints` e
@@ -70,7 +69,7 @@ tentar arrancar o container, não passam silenciosamente. Os testes puramente un
   `409`); `DELETE` é `404` (não `204` silencioso) quando não há cadastro para remover. Nenhuma
   das três rotas de voice-enrollment usa `AccountAuthorizationGuard.CanCreatePatientRecords` --
   cadastro de voz é a própria conta do profissional, não um registo de paciente, então a única
-  guarda é a de conta (`RequireAccountAccess()`).
+  guarda é a de conta.
 - `src/Api/Features/Audit` -- trilha de auditoria encadeada por hash (`audit_entries` e
   `audit_anchors`, migração `0006_create_audit_trail.sql`): `AuditChain.ComputeHash`/`Verify`
   são puros (zero I/O, zero DI); a imposição de não-fork da cadeia é

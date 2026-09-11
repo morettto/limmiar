@@ -8,13 +8,12 @@ namespace Api.Patients;
 
 public static class PatientEndpoints
 {
-    public static void MapPatientEndpoints(this WebApplication app)
+    public static void MapPatientEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapPost("/accounts/{accountId:guid}/patients", HandleCreatePatientAsync)
             .WithName("PostPatient")
             .WithSummary("Create a patient record")
             .WithDescription("Creates the sequence-1 entry, which carries the wrapped DEK for the patient. Every clinical field lives inside the opaque ciphertext blob. Requires an Authorization: Bearer access token for this exact account, and the account must be an active Professional (AccountAuthorizationGuard.CanCreatePatientRecords).")
-            .RequireAccountAccess()
             .Produces<CreatePatientResponse>(StatusCodes.Status201Created)
             .Produces<LimmiarProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")
@@ -24,7 +23,6 @@ public static class PatientEndpoints
             .WithName("PostPatientEntry")
             .WithSummary("Append an entry to a patient's record")
             .WithDescription("Append-only: there is no PUT/PATCH/DELETE for this resource, and re-using a sequence number is a 409 conflict, never a silent overwrite. Sequence must be exactly the current last sequence + 1 -- gaps and reorders are rejected, not just literal overwrites. Requires an Authorization: Bearer access token for this exact account, and the account must be an active Professional (same guard as create).")
-            .RequireAccountAccess()
             .Produces<AppendPatientEntryResponse>(StatusCodes.Status201Created)
             .Produces<LimmiarProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")
@@ -34,7 +32,6 @@ public static class PatientEndpoints
             .WithName("GetPatient")
             .WithSummary("Read a patient's projected record")
             .WithDescription("Returns the append-only entries projected into one record. RLS scopes this to the calling professional's own tenant -- another professional's patient is reported as 404, indistinguishable from an unknown patientId. Requires an Authorization: Bearer access token for this exact account. Deliberately does NOT require AccountAuthorizationGuard.CanCreatePatientRecords: a professional keeps read access to records they already created even if their verification status later changes, since revoking read access to a legal clinical document they authored is a separate, bigger decision than gating new writes.")
-            .RequireAccountAccess()
             .Produces<PatientRecordResponse>(StatusCodes.Status200OK)
             .Produces<LimmiarProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json");
 
@@ -42,7 +39,6 @@ public static class PatientEndpoints
             .WithName("ListPatients")
             .WithSummary("List the calling professional's patients (carteira)")
             .WithDescription("Returns one row per patient -- the sequence-1 (creation) entry only, never subsequent entries. No pagination, filter, or server-side ordering: the client sorts by risk. RLS scopes this to the calling professional's own tenant. Requires an Authorization: Bearer access token for this exact account. Always 200, even with zero patients (empty array) -- there is no 404 for the account itself, the token already ties accountId to a real account. Same read-access decision as GetPatient: does NOT require AccountAuthorizationGuard.CanCreatePatientRecords.")
-            .RequireAccountAccess()
             .Produces<ListPatientsResponse>(StatusCodes.Status200OK);
     }
 

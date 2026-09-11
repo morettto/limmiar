@@ -44,11 +44,12 @@ concorrência real (ver `docs/adr/ADR-S04-02-horario-em-claro-servidor-zero-know
   DateTimeStyles.AssumeUniversal)`: ligar diretamente a `DateTimeOffset?` dá 500 em Development
   (o `BadHttpRequestException` cai no `GlobalProblemExceptionHandler`) e um 400 vazio em
   Production. `GET` vai direto ao `ScheduledSessionStore` (sem passar por `SchedulingService`,
-  molde `PatientEndpoints.HandleListPatientsAsync` +
-  `ProfessionalVerificationEndpoints.HandleListQueueAsync`, que injeta `IAccountStore`
-  diretamente): o service só acrescentaria `AuthorizeAsync` e a tradução de `SlotTaken`, e
-  nenhum dos dois se aplica a uma leitura. As quatro rotas usam
-  `RouteHandlerBuilder.RequireAccountAccess()` (`Accounts.Sessions/README.md`) para distinguir
+  molde `ProfessionalVerificationEndpoints.HandleListQueueAsync`, que também injeta um store
+  diretamente para uma listagem): o service só acrescentaria `AuthorizeAsync` e a tradução de
+  `SlotTaken`, e nenhum dos dois se aplica a uma leitura -- `ListLiveAsync` já devolve
+  exatamente a forma que a rota expõe, sem nenhuma regra de negócio entre o store e a
+  resposta. As quatro rotas têm `{accountId}` no padrão, o que basta para
+  `RequireAccountAccessMiddleware` (`Accounts.Sessions/README.md`) as proteger e distinguir
   401 de 403 (RFC 9110): sem token ou token inválido/expirado dá 401 `auth.access_token_invalid`
   (§15.5.2); um token válido mas de OUTRA conta dá 403 `auth.forbidden` (§15.5.4), com o MESMO
   corpo quer a conta do URL exista quer não -- o 403 decide-se só por "o token não é desta

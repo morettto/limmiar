@@ -8,7 +8,7 @@ namespace Api.Accounts;
 
 public static class RecoveryEndpoints
 {
-    public static void MapRecoveryEndpoints(this WebApplication app)
+    public static void MapRecoveryEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapPost("/auth/recover", HandleRecoverAsync)
             .WithName("PostAuthRecover")
@@ -22,7 +22,6 @@ public static class RecoveryEndpoints
             .WithName("PostAccountRecoveryPhrase")
             .WithSummary("Register (or rotate) the recovery-phrase verifier for a professional account")
             .WithDescription("Accepts a client-derived verifier -- never the recovery phrase itself (same contract as the password verifier, ADR-S02-02). Requires an Authorization: Bearer access token for this exact account. Always overwrites any previously registered verifier.")
-            .RequireAccountAccess()
             .Produces<RegisterRecoveryVerifierResponse>(StatusCodes.Status200OK)
             .Produces<LimmiarProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")

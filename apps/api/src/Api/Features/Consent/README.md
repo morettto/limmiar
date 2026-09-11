@@ -140,7 +140,7 @@ para o porquê do consentimento viver em claro no servidor.
   (overload genérico fechado, seguro para AOT) para satisfazer o wire format que o desenho
   documenta; ver `ConsentComposition.cs` acima.
 - **`SnapshotAsync` não valida a conta.** A prova de que `professionalId` é a própria conta já
-  veio do bearer token em `RouteHandlerBuilder.RequireAccountAccess()`
+  veio do bearer token em `RequireAccountAccessMiddleware`
   (`Accounts.Sessions/README.md`), então uma segunda validação em `IAccountStore` seria
   redundante para essa rota.
 - **`ConsentEndpoints.MapFailureToProblem`** segue o mesmo padrão de

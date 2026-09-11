@@ -12,13 +12,12 @@ public static class SchedulingEndpoints
     private const int MaxDurationMinutes = 1440;
     private static readonly TimeSpan MaxListWindow = TimeSpan.FromDays(7);
 
-    public static void MapSchedulingEndpoints(this WebApplication app)
+    public static void MapSchedulingEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapPost("/accounts/{accountId:guid}/agenda/sessions", HandleScheduleAsync)
             .WithName("PostScheduledSession")
             .WithSummary("Schedule a session")
             .WithDescription("Two concurrent requests for the same (account, startsAt) slot: exactly one persists, the other gets 409 agenda.slot_taken -- the DB's scheduled_sessions_live_slot_uq partial unique index is what actually decides the race. Requires an Authorization: Bearer access token for this exact account, and the account must be an active Professional.")
-            .RequireAccountAccess()
             .Produces<ScheduledSessionResponse>(StatusCodes.Status201Created)
             .Produces<LimmiarProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")
@@ -28,7 +27,6 @@ public static class SchedulingEndpoints
             .WithName("PatchScheduledSession")
             .WithSummary("Move a session to a new slot")
             .WithDescription("Rejected with 409 agenda.recording_active if the session's recording is active, and 409 agenda.session_cancelled if it was already cancelled. Requires an Authorization: Bearer access token for this exact account.")
-            .RequireAccountAccess()
             .Produces<ScheduledSessionResponse>(StatusCodes.Status200OK)
             .Produces<LimmiarProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")
@@ -38,7 +36,6 @@ public static class SchedulingEndpoints
             .WithName("ListScheduledSessions")
             .WithSummary("List sessions inside a window")
             .WithDescription("Half-open [from,to), max 7 days, cancelled sessions excluded. from/to are ISO-8601 instants. Requires an Authorization: Bearer access token for this exact account: no/invalid token -> 401, a valid token for a different account -> 403 (same body whether or not that account exists).")
-            .RequireAccountAccess()
             .Produces<ListScheduledSessionsResponse>(StatusCodes.Status200OK)
             .Produces<LimmiarProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json");
 
@@ -46,7 +43,6 @@ public static class SchedulingEndpoints
             .WithName("DeleteScheduledSession")
             .WithSummary("Cancel a session (soft delete)")
             .WithDescription("Writes cancelled_at; the row is never removed. Rejected with 409 agenda.recording_active if the session's recording is active. Requires an Authorization: Bearer access token for this exact account.")
-            .RequireAccountAccess()
             .Produces(StatusCodes.Status204NoContent)
             .Produces<LimmiarProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json");

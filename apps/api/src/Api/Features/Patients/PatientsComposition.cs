@@ -18,7 +18,7 @@ public static class PatientsComposition
         });
     }
 
-    public static void MapPatients(this WebApplication app)
+    public static void MapPatients(this IEndpointRouteBuilder app)
     {
         app.MapPatientEndpoints();
     }

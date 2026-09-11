@@ -7,13 +7,12 @@ namespace Api.Accounts;
 
 public static class VoiceEnrollmentEndpoints
 {
-    public static void MapVoiceEnrollmentEndpoints(this WebApplication app)
+    public static void MapVoiceEnrollmentEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapPut("/accounts/{accountId:guid}/voice-enrollment", HandlePutAsync)
             .WithName("PutVoiceEnrollment")
             .WithSummary("Register (or replace) the account's voice cadastro")
-            .WithDescription("Idempotent: re-enrollment overwrites the previous wrapped DEK and sealed embedding, 204, never 409 -- there is exactly one voice cadastro per account, not a history. Requires an Authorization: Bearer access token for this exact account -- gated by account ownership only (RequireAccountAccess), not AccountAuthorizationGuard.CanCreatePatientRecords, since this is the professional's own account, not a patient record.")
-            .RequireAccountAccess()
+            .WithDescription("Idempotent: re-enrollment overwrites the previous wrapped DEK and sealed embedding, 204, never 409 -- there is exactly one voice cadastro per account, not a history. Requires an Authorization: Bearer access token for this exact account -- gated by account ownership only, not AccountAuthorizationGuard.CanCreatePatientRecords, since this is the professional's own account, not a patient record.")
             .Produces(StatusCodes.Status204NoContent)
             .Produces<LimmiarProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json");
@@ -22,7 +21,6 @@ public static class VoiceEnrollmentEndpoints
             .WithName("GetVoiceEnrollment")
             .WithSummary("Read the account's voice cadastro")
             .WithDescription("404 if the account has no voice cadastro registered yet. Requires an Authorization: Bearer access token for this exact account.")
-            .RequireAccountAccess()
             .Produces<VoiceEnrollmentResponse>(StatusCodes.Status200OK)
             .Produces<LimmiarProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json");
 
@@ -30,7 +28,6 @@ public static class VoiceEnrollmentEndpoints
             .WithName("DeleteVoiceEnrollment")
             .WithSummary("Remove the account's voice cadastro")
             .WithDescription("404 if there is no cadastro to remove -- deleting a non-existent cadastro is not a silent no-op 204. Requires an Authorization: Bearer access token for this exact account.")
-            .RequireAccountAccess()
             .Produces(StatusCodes.Status204NoContent)
             .Produces<LimmiarProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json");
     }

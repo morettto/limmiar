@@ -63,17 +63,22 @@ public partial class Program
 
         app.UseCors();
 
-        // Runs after routing has selected an endpoint (so RequireAccountAccessMetadata is
-        // already resolvable) and before that endpoint's own request delegate -- including its
-        // parameter binding -- ever executes. See Accounts.Sessions/README.md.
+        // Runs after routing has selected an endpoint and before that endpoint's own request
+        // delegate -- including its parameter binding -- ever executes. See
+        // Accounts.Sessions/README.md.
         app.UseMiddleware<RequireAccountAccessMiddleware>();
 
-        app.MapHealthEndpoints();
-        app.MapAccounts();
-        app.MapPatients();
-        app.MapScheduling();
-        app.MapNotes();
-        app.MapConsent();
+        // Every Map*Endpoints call below funnels through this one root group so the 401/403
+        // OpenAPI responses get declared on every {accountId} route exactly once, with no
+        // per-route call to forget.
+        var routes = app.MapGroup("").DeclareAccountAccessOpenApiResponses();
+
+        routes.MapHealthEndpoints();
+        routes.MapAccounts();
+        routes.MapPatients();
+        routes.MapScheduling();
+        routes.MapNotes();
+        routes.MapConsent();
 
         return app;
     }

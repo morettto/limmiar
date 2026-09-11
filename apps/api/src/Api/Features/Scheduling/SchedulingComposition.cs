@@ -18,7 +18,7 @@ public static class SchedulingComposition
         });
     }
 
-    public static void MapScheduling(this WebApplication app)
+    public static void MapScheduling(this IEndpointRouteBuilder app)
     {
         app.MapSchedulingEndpoints();
     }

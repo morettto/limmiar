@@ -7,7 +7,7 @@ public static class VoiceEnrollmentComposition
         services.AddSingleton(sp => new VoiceEnrollmentService(sp.GetRequiredService<IAccountStore>()));
     }
 
-    public static void MapVoiceEnrollment(this WebApplication app)
+    public static void MapVoiceEnrollment(this IEndpointRouteBuilder app)
     {
         app.MapVoiceEnrollmentEndpoints();
     }

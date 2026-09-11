@@ -8,13 +8,12 @@ namespace Api.Accounts;
 
 public static class DevicePairingEndpoints
 {
-    public static void MapDevicePairingEndpoints(this WebApplication app)
+    public static void MapDevicePairingEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapPost("/accounts/{accountId:guid}/devices/pairing-sessions", HandleCreate)
             .WithName("PostDevicePairingSession")
             .WithSummary("Open a device-pairing session")
             .WithDescription("Called by the already-authorized device; the returned sessionId is what it encodes into the QR code. Requires an Authorization: Bearer access token for this exact account.")
-            .RequireAccountAccess()
             .Produces<CreatePairingSessionResponse>(StatusCodes.Status201Created);
 
         app.MapPost("/devices/pairing-sessions/{sessionId}/claim", HandleClaim)
@@ -28,7 +27,6 @@ public static class DevicePairingEndpoints
             .WithName("GetDevicePairingSessionClaimStatus")
             .WithSummary("Poll whether a device has scanned the QR code yet")
             .WithDescription("Consumes nothing, so the primary device can poll it as often as it likes. Requires an Authorization: Bearer access token for this exact account; a session belonging to another account is reported as if it did not exist.")
-            .RequireAccountAccess()
             .Produces<PairingClaimStatusResponse>(StatusCodes.Status200OK)
             .Produces<LimmiarProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json");
 
@@ -36,7 +34,6 @@ public static class DevicePairingEndpoints
             .WithName("PostDevicePairingSessionPayload")
             .WithSummary("Hand over the KEK encrypted to the claiming device")
             .WithDescription("Valid exactly once, and only after a device has claimed the session. The ciphertext is opaque to this backend. Requires an Authorization: Bearer access token for this exact account.")
-            .RequireAccountAccess()
             .Produces(StatusCodes.Status204NoContent)
             .Produces<LimmiarProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json");
