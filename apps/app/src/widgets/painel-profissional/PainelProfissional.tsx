@@ -1,27 +1,33 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { AdaptivePanel, KpiStrip } from '@limmiar/ui'
 import type { CryptoKey } from '@limmiar/crypto'
-import { listarSessoesDaSemana } from '../../entities/agenda/api'
+import { listarSessoes } from '../../entities/agenda/api'
 import { contarPorComecar, horaDaSessao, proximaSessao, type SessaoAgendada } from '../../entities/agenda/sessao'
 import { obterConsentimentos } from '../../entities/consentimento/api'
 import type { Nota } from '../../entities/nota/nota'
 import { listPatients } from '../../entities/patient/api'
 import type { SealedSummary, SummaryResult } from '../../entities/patient/patient-summary'
 import { openSummariesInWorker } from '../../entities/patient/worker-client'
-import { translateProblemCode } from '../../shared/api'
+import { translateProblemCode, type ProblemResult } from '../../shared/api'
 import { itensDeAssinatura, itensDeConsentimento, itensDeRisco, juntarRequerVoce, type ConsentimentosPorPaciente } from './requer-voce'
 
-type ResultadoFonte<T> = { ok: true; dados: T } | { ok: false; motivo: string }
+const SETE_DIAS_MS = 7 * 24 * 60 * 60 * 1000
+
+// Uma fonte falha por `ProblemResult` (código de negócio, traduzível) ou `null` (exceção
+// lançada -- sem código nenhum do backend). Cru aqui, só o render traduz -- ver README.
+type FalhaFonte = ProblemResult | null
+
+type ResultadoFonte<T> = { ok: true; dados: T } | { ok: false; falha: FalhaFonte }
 
 type DadosPacientes = { sumarios: readonly SummaryResult[]; consentimentos: readonly ConsentimentosPorPaciente[] }
 
+type Chaveiro = { kek: CryptoKey; accountId: string; accessToken: string }
+
 export interface PainelProfissionalProps {
   baseUrl: string
-  accountId: string | null
-  accessToken: string | null
   /** null = the keychain is locked; the panel shows no names and makes no request. */
-  kek: CryptoKey | null
+  chaveiro: Chaveiro | null
   notas: readonly Nota[]
   /** Test seam; defaults to the real Web Worker decrypt path. */
   openSummaries?: (kek: CryptoKey, items: SealedSummary[], signal?: AbortSignal) => Promise<SummaryResult[]>
@@ -35,52 +41,44 @@ type EstadoPainel =
       sessoes: ResultadoFonte<readonly SessaoAgendada[]>
     }
 
-// Fonte única da guarda: o render decide "bloqueado" a partir das props, o efeito usa a
-// mesma função para decidir se busca. tsc -b (build) exige que a guarda estreite os três
-// valores -- um boolean compilava no tsc --noEmit e caía no build.
-type Chaveiro = { kek: CryptoKey | null; accountId: string | null; accessToken: string | null }
-type ChaveiroDestrancado = { kek: CryptoKey; accountId: string; accessToken: string }
-
-function chaveiroDestrancado(chaveiro: Chaveiro): chaveiro is ChaveiroDestrancado {
-  return chaveiro.kek !== null && chaveiro.accountId !== null && chaveiro.accessToken !== null
-}
-
-export function PainelProfissional({
-  baseUrl,
-  accountId,
-  accessToken,
-  kek,
-  notas,
-  openSummaries = openSummariesInWorker,
-}: PainelProfissionalProps) {
+export function PainelProfissional({ baseUrl, chaveiro, notas, openSummaries = openSummariesInWorker }: PainelProfissionalProps) {
   const { i18n, t } = useLingui()
   const [estado, setEstado] = useState<EstadoPainel>({ status: 'a-carregar' })
 
+  // Sempre a última prop, sem entrar nas deps do efeito -- é assim que uma renovação de
+  // accessToken em voo (kek/accountId iguais) chega ao próximo pedido sem recarregar o
+  // painel nem redecifrar (ver README, "accessToken via ref").
+  const chaveiroRef = useRef(chaveiro)
+  chaveiroRef.current = chaveiro
+
   useEffect(() => {
-    const chaveiro = { kek, accountId, accessToken }
-    if (!chaveiroDestrancado(chaveiro)) {
+    if (chaveiro === null) {
       return
     }
+    const { kek: unlockedKek, accountId: accId, accessToken: tokenAoEntrar } = chaveiro
 
     let cancelled = false
     const abortController = new AbortController()
 
-    async function carregarPacientes(unlockedKek: CryptoKey, accId: string, token: string): Promise<ResultadoFonte<DadosPacientes>> {
-      const listados = await listPatients(baseUrl, accId, token)
+    function tokenAtual(): string {
+      return chaveiroRef.current?.accessToken ?? tokenAoEntrar
+    }
+
+    async function carregarPacientes(): Promise<ResultadoFonte<DadosPacientes>> {
+      const listados = await listPatients(baseUrl, accId, tokenAtual())
       if (!listados.ok) {
-        return { ok: false, motivo: translateProblemCode(listados.code, listados.params, i18n) }
+        return { ok: false, falha: listados }
       }
 
-      // `cancelled` verificado no ponto de consumo, não lançado -- ver README, "cancelamento".
       // ponytail: `signal` só chega até aqui, não a `listPatients`/`obterConsentimentos` -- ver README.
-      const decifrados = cancelled ? [] : await openSummaries(unlockedKek, listados.patients, abortController.signal)
+      const decifrados = await openSummaries(unlockedKek, listados.patients, abortController.signal)
 
       // ponytail: `obterConsentimentos` por paciente (fan-out N+1) -- endpoint em lote é o
       // upgrade quando isso virar gargalo. Uma rejeição genuína (rede) e um `ProblemResult`
       // (`{ok:false}`) caem ambos fora da lista -- nenhum dos dois é exceção de domínio.
       const resultados = await Promise.all(
         decifrados.map(async (resumo): Promise<ConsentimentosPorPaciente[]> => {
-          const resultado = await obterConsentimentos(baseUrl, accId, token, resumo.patientId).catch(() => null)
+          const resultado = await obterConsentimentos(baseUrl, accId, tokenAtual(), resumo.patientId).catch(() => null)
           return resultado?.ok ? [{ patientId: resumo.patientId, consentimentos: resultado.consentimentos }] : []
         }),
       )
@@ -88,27 +86,21 @@ export function PainelProfissional({
       return { ok: true, dados: { sumarios: decifrados, consentimentos: resultados.flat() } }
     }
 
-    async function carregarSessoes(accId: string, token: string): Promise<ResultadoFonte<readonly SessaoAgendada[]>> {
-      const resultado = await listarSessoesDaSemana(baseUrl, accId, token, new Date())
+    async function carregarSessoes(): Promise<ResultadoFonte<readonly SessaoAgendada[]>> {
+      const agora = new Date()
+      const resultado = await listarSessoes(baseUrl, accId, tokenAtual(), agora, new Date(agora.getTime() + SETE_DIAS_MS))
       if (!resultado.ok) {
-        return { ok: false, motivo: translateProblemCode(resultado.code, resultado.params, i18n) }
+        return { ok: false, falha: resultado }
       }
       return { ok: true, dados: resultado.sessoes }
     }
 
-    async function carregar(unlockedKek: CryptoKey, accId: string, token: string) {
+    async function carregar() {
       // As duas fontes nunca rejeitam para o `Promise.all` -- cada uma tem o seu próprio
       // `.catch`, senão uma falha de rede na agenda derrubaria também os pacientes (e vice-versa).
       const [pacientes, sessoes] = await Promise.all([
-        carregarPacientes(unlockedKek, accId, token).catch(
-          (): ResultadoFonte<DadosPacientes> => ({ ok: false, motivo: t`Não foi possível carregar o painel. Tente novamente.` }),
-        ),
-        carregarSessoes(accId, token).catch(
-          (): ResultadoFonte<readonly SessaoAgendada[]> => ({
-            ok: false,
-            motivo: t`Não foi possível carregar a agenda.`,
-          }),
-        ),
+        carregarPacientes().catch((): ResultadoFonte<DadosPacientes> => ({ ok: false, falha: null })),
+        carregarSessoes().catch((): ResultadoFonte<readonly SessaoAgendada[]> => ({ ok: false, falha: null })),
       ])
       if (cancelled) return
 
@@ -117,7 +109,7 @@ export function PainelProfissional({
 
     // Sem `.catch()` aqui (ao contrário de `PatientWallet`): `carregar` em si não rejeita --
     // as duas fontes já absorvem a própria falha acima -- um `.catch` só ficaria morto.
-    void carregar(chaveiro.kek, chaveiro.accountId, chaveiro.accessToken)
+    void carregar()
 
     return () => {
       cancelled = true
@@ -125,9 +117,12 @@ export function PainelProfissional({
       // Repõe "a-carregar" para a próxima conta nunca herdar os dados desta -- ver README.
       setEstado({ status: 'a-carregar' })
     }
-  }, [kek, accountId, accessToken, baseUrl, openSummaries, i18n, t])
+    // `i18n`/`t` de propósito fora daqui -- eles só traduzem no render (ver `traduzirFalha*`
+    // abaixo); `chaveiro.accessToken` também fica fora -- lido via ref em `tokenAtual` (ver
+    // README).
+  }, [chaveiro?.kek, chaveiro?.accountId, baseUrl, openSummaries])
 
-  if (!chaveiroDestrancado({ kek, accountId, accessToken })) {
+  if (chaveiro === null) {
     return (
       <div className="mx-auto max-w-sm p-4">
         <p role="status">
@@ -148,6 +143,10 @@ export function PainelProfissional({
   }
 
   const { pacientes, sessoes } = estado
+
+  function traduzirFalha(falha: FalhaFonte, mensagemRede: string): string {
+    return falha === null ? mensagemRede : translateProblemCode(falha.code, falha.params, i18n)
+  }
 
   function nomeDoPaciente(patientId: string): string | null {
     if (!pacientes.ok) {
@@ -190,12 +189,12 @@ export function PainelProfissional({
       </KpiStrip>
       {!pacientes.ok && (
         <p role="alert" className="text-sm text-red-700">
-          {pacientes.motivo}
+          {traduzirFalha(pacientes.falha, t`Não foi possível carregar o painel. Tente novamente.`)}
         </p>
       )}
       {!sessoes.ok && (
         <p role="alert" className="text-sm text-red-700">
-          {sessoes.motivo}
+          {traduzirFalha(sessoes.falha, t`Não foi possível carregar a agenda.`)}
         </p>
       )}
       <AdaptivePanel label={t`Requer você`}>

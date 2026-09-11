@@ -17,15 +17,7 @@ function renderHomePage(
 ) {
   return render(
     <I18nProvider i18n={i18n}>
-      <HomePage
-        email={email}
-        onSair={onSair}
-        accountId={null}
-        accessToken={null}
-        kek={null}
-        notas={[]}
-        {...props}
-      />
+      <HomePage email={email} onSair={onSair} chaveiro={null} notas={[]} {...props} />
     </I18nProvider>,
   )
 }

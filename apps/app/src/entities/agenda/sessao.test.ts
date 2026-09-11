@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { contarPorComecar, horaDaSessao, proximaSessao, type SessaoAgendada } from './sessao'
 
 function sessao(overrides: Partial<SessaoAgendada> = {}): SessaoAgendada {
@@ -51,16 +51,10 @@ describe('contarPorComecar', () => {
 })
 
 describe('horaDaSessao', () => {
-  afterEach(() => {
-    vi.unstubAllEnvs()
-  })
-
-  // TZ pinada (Brasil não observa DST desde 2019 -- UTC-3 o ano inteiro) para o valor
-  // esperado não depender do fuso da máquina que corre o teste. Hora E minuto de um só
-  // dígito (08:05, não 15:30): só assim `'2-digit'` -> `'numeric'` muda a string de saída.
+  // `timeZone` explícito, não `TZ` de ambiente (cacheia entre mutantes do Stryker --
+  // ver README). Hora e minuto de um só dígito: só assim `'2-digit'` -> `'numeric'`
+  // muda a string de saída.
   it('formata só hora:minuto no locale pedido', () => {
-    vi.stubEnv('TZ', 'America/Sao_Paulo')
-
-    expect(horaDaSessao('2026-09-10T11:05:00Z', 'pt-BR')).toBe('08:05')
+    expect(horaDaSessao('2026-09-10T11:05:00Z', 'pt-BR', 'America/Sao_Paulo')).toBe('08:05')
   })
 })

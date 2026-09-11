@@ -12,16 +12,14 @@ const BASE_URL_FIXTURE = ''
 export interface HomePageProps {
   email: string | null
   onSair: () => void
-  accountId: string | null
-  accessToken: string | null
   /** null = sem KeychainProvider ainda -- o painel monta em "chaveiro bloqueado". */
-  kek: CryptoKey | null
+  chaveiro: { kek: CryptoKey; accountId: string; accessToken: string } | null
   notas: readonly Nota[]
 }
 
 // ponytail: this <div id="app-shell"> is a navigation stub, not a real landing page --
 // replace it together with the real landing page, not as a standalone cleanup.
-export function HomePage({ email, onSair, accountId, accessToken, kek, notas }: HomePageProps) {
+export function HomePage({ email, onSair, chaveiro, notas }: HomePageProps) {
   return (
     <div id="app-shell">
       Limmiar
@@ -36,13 +34,7 @@ export function HomePage({ email, onSair, accountId, accessToken, kek, notas }: 
           </button>
         </>
       ) : null}
-      <PainelProfissional
-        baseUrl={BASE_URL_FIXTURE}
-        accountId={accountId}
-        accessToken={accessToken}
-        kek={kek}
-        notas={notas}
-      />
+      <PainelProfissional baseUrl={BASE_URL_FIXTURE} chaveiro={chaveiro} notas={notas} />
     </div>
   )
 }

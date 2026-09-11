@@ -1,8 +1,6 @@
 import { request, type ProblemResult } from '../../shared/api'
 import type { SessaoAgendada } from './sessao'
 
-const SETE_DIAS_MS = 7 * 24 * 60 * 60 * 1000
-
 export type ListarSessoesResult = { ok: true; sessoes: SessaoAgendada[] } | ProblemResult
 
 // de/ate viram `from`/`to` via toISOString + encodeURIComponent -- o backend faz parse
@@ -40,14 +38,4 @@ export async function listarSessoes(
       duracaoMinutos: sessao.durationMinutes,
     })),
   }
-}
-
-/** `listarSessoes` com a janela fixa `[agora, agora + 7 dias)` já montada. */
-export function listarSessoesDaSemana(
-  baseUrl: string,
-  accountId: string,
-  accessToken: string,
-  agora: Date,
-): Promise<ListarSessoesResult> {
-  return listarSessoes(baseUrl, accountId, accessToken, agora, new Date(agora.getTime() + SETE_DIAS_MS))
 }

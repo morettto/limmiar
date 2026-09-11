@@ -1,6 +1,6 @@
 import '@vitest/web-worker'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { I18nProvider } from '@lingui/react'
 import { dynamicActivate, i18n } from '../../shared/i18n'
 import { encodeBase64 } from '../../shared/lib/base64'
@@ -10,6 +10,7 @@ import { horaDaSessao, type SessaoAgendada } from '../../entities/agenda/sessao'
 import { ESTADO_PENDENTE, ORDEM_SECOES, type Nota } from '../../entities/nota/nota'
 
 const FAKE_KEK = {} as unknown as CryptoKey
+const CHAVEIRO_PADRAO = { kek: FAKE_KEK, accountId: 'acc-1', accessToken: 'token-1' }
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -34,14 +35,7 @@ function stubMatchMedia() {
 function elementoPainel(props: Partial<React.ComponentProps<typeof PainelProfissional>> = {}) {
   return (
     <I18nProvider i18n={i18n}>
-      <PainelProfissional
-        baseUrl="http://api.test"
-        accountId="acc-1"
-        accessToken="token-1"
-        kek={FAKE_KEK}
-        notas={[]}
-        {...props}
-      />
+      <PainelProfissional baseUrl="http://api.test" chaveiro={CHAVEIRO_PADRAO} notas={[]} {...props} />
     </I18nProvider>
   )
 }
@@ -130,22 +124,11 @@ describe('PainelProfissional', () => {
     vi.unstubAllGlobals()
   })
 
-  it('kek=null: mostra o texto de chaveiro bloqueado (não "carregando"), não chama fetch', async () => {
+  it('chaveiro=null: mostra o texto de chaveiro bloqueado (não "carregando"), não chama fetch', async () => {
     const fetchMock = vi.fn()
     vi.stubGlobal('fetch', fetchMock)
 
-    renderPainel({ kek: null })
-
-    expect(await screen.findByText('Chaveiro bloqueado. Desbloqueie para ver o painel.')).toBeTruthy()
-    expect(screen.queryByText('Carregando painel...')).toBeNull()
-    expect(fetchMock).not.toHaveBeenCalled()
-  })
-
-  it('accountId=null (mesmo com kek presente): mostra o mesmo texto de bloqueado, não chama fetch', async () => {
-    const fetchMock = vi.fn()
-    vi.stubGlobal('fetch', fetchMock)
-
-    renderPainel({ accountId: null })
+    renderPainel({ chaveiro: null })
 
     expect(await screen.findByText('Chaveiro bloqueado. Desbloqueie para ver o painel.')).toBeTruthy()
     expect(screen.queryByText('Carregando painel...')).toBeNull()
@@ -199,6 +182,97 @@ describe('PainelProfissional', () => {
     const kpiPacientes = await screen.findByText('Pacientes ativos')
     expect(kpiPacientes.parentElement?.textContent).toMatch(/\d/)
     expect(screen.getByRole('button', { name: /Iniciar próxima/ })).toBeTruthy()
+  })
+
+  // A1: a falha crua (`ProblemResult`) fica no estado; quem traduz é o render, com o `i18n`
+  // atual -- não o `i18n` de quando o pedido saiu. Trocar de idioma depois de já ter falhado
+  // muda o texto do alert sem refazer nenhum pedido.
+  it('A1: trocar de idioma depois de falhar traduz de novo, sem recarregar nem refazer o pedido', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/agenda/sessions')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ code: 'unexpected_error', params: {} }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/problem+json' },
+          }),
+        )
+      }
+      if (url.includes('/consents')) {
+        return Promise.resolve(consentimentosResponse())
+      }
+      return Promise.resolve(patientsResponse(['p-1']))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const openSummaries = vi.fn().mockResolvedValue([
+      { patientId: 'p-1', ok: true, name: 'Amelia', risk: 'baixo' },
+    ] satisfies SummaryResult[])
+
+    renderPainel({ openSummaries })
+
+    expect(await screen.findByText('Ocorreu um erro inesperado no servidor.')).toBeTruthy()
+    const chamadasAntes = fetchMock.mock.calls.length
+
+    await act(async () => {
+      await dynamicActivate('en-US')
+    })
+
+    expect(await screen.findByText('An unexpected server error occurred.')).toBeTruthy()
+    expect(screen.queryByText('Carregando painel...')).toBeNull()
+    expect(fetchMock.mock.calls).toHaveLength(chamadasAntes)
+
+    await dynamicActivate('pt-BR')
+  })
+
+  // A1: `accessToken` sai das deps do efeito -- lido via ref a cada pedido (worker-client.ts).
+  // Renovar o token (kek/accountId iguais) não é motivo para recarregar o painel.
+  it('A1: renovar o accessToken não recarrega o painel nem refaz o pedido', async () => {
+    const fetchMock = fetchMockPadrao(['p-1'])
+    vi.stubGlobal('fetch', fetchMock)
+    const openSummaries = vi.fn().mockResolvedValue([
+      { patientId: 'p-1', ok: true, name: 'Amelia', risk: 'baixo' },
+    ] satisfies SummaryResult[])
+
+    const { rerender } = renderPainel({ openSummaries })
+    await screen.findByText('Pacientes ativos')
+    const chamadasAntes = fetchMock.mock.calls.length
+    const decifradasAntes = openSummaries.mock.calls.length
+
+    rerender(elementoPainel({ chaveiro: { ...CHAVEIRO_PADRAO, accessToken: 'token-2' }, openSummaries }))
+
+    expect(screen.queryByText('Carregando painel...')).toBeNull()
+    expect(screen.getByText('Pacientes ativos')).toBeTruthy()
+    expect(fetchMock.mock.calls).toHaveLength(chamadasAntes)
+    expect(openSummaries.mock.calls).toHaveLength(decifradasAntes)
+  })
+
+  // A1: trancar o chaveiro no meio de um pedido em voo zera o ref antes desse pedido acabar --
+  // `tokenAtual` cai no token capturado no início do efeito, não crasha.
+  it('A1: trancar o chaveiro com um pedido em voo ainda completa esse pedido com o token de origem', async () => {
+    const summariesCall = deferred<SummaryResult[]>()
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/agenda/sessions')) {
+        return Promise.resolve(agendaResponse([]))
+      }
+      if (url.includes('/consents')) {
+        return Promise.resolve(consentimentosResponse())
+      }
+      return Promise.resolve(patientsResponse(['p-1']))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const openSummaries = vi.fn().mockReturnValue(summariesCall.promise)
+
+    const { rerender } = renderPainel({ openSummaries })
+    await waitFor(() => expect(openSummaries).toHaveBeenCalled())
+
+    rerender(elementoPainel({ chaveiro: null, openSummaries }))
+    summariesCall.resolve([{ patientId: 'p-1', ok: true, name: 'Amelia', risk: 'baixo' }])
+    await summariesCall.promise
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/p-1/consents'),
+      expect.objectContaining({ headers: { Authorization: `Bearer ${CHAVEIRO_PADRAO.accessToken}` } }),
+    )
   })
 
   it('sem sessão seguinte: a ação principal não nomeia ninguém', async () => {
@@ -269,11 +343,11 @@ describe('PainelProfissional', () => {
       { patientId: 'p-1', ok: true, name: 'Amelia', risk: 'baixo' },
     ] satisfies SummaryResult[])
 
-    const { rerender } = renderPainel({ accountId: 'acc-1', openSummaries })
+    const { rerender } = renderPainel({ openSummaries })
     const kpiPacientes = await screen.findByText('Pacientes ativos')
     await waitFor(() => expect(kpiPacientes.parentElement?.textContent).toContain('1'))
 
-    rerender(elementoPainel({ accountId: 'acc-2', openSummaries }))
+    rerender(elementoPainel({ chaveiro: { ...CHAVEIRO_PADRAO, accountId: 'acc-2' }, openSummaries }))
 
     expect(screen.getByText('Carregando painel...')).toBeTruthy()
     expect(screen.queryByText('Pacientes ativos')).toBeNull()
@@ -298,12 +372,12 @@ describe('PainelProfissional', () => {
       Promise.resolve(items.map((item) => ({ patientId: item.patientId, ok: true, name: 'Vazamento', risk: 'baixo' }))),
     )
 
-    const { rerender } = renderPainel({ accountId: 'acc-1', openSummaries })
+    const { rerender } = renderPainel({ openSummaries })
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/accounts/acc-1/patients'), expect.anything()),
     )
 
-    rerender(elementoPainel({ accountId: 'acc-2', openSummaries }))
+    rerender(elementoPainel({ chaveiro: { ...CHAVEIRO_PADRAO, accountId: 'acc-2' }, openSummaries }))
     const kpi = await screen.findByText('Pacientes ativos')
     await waitFor(() => expect(kpi.parentElement?.textContent).toContain('1'))
 
@@ -316,10 +390,13 @@ describe('PainelProfissional', () => {
 
     expect(kpi.parentElement?.textContent).toContain('1')
     expect(screen.queryByRole('alert')).toBeNull()
-    expect(openSummaries).not.toHaveBeenCalledWith(
+    // N2: chamado mesmo para o dado tardio (quem rejeita é o worker-client real, por
+    // `signal.aborted` -- ver worker-client.test.ts); o freio aqui é o `if (cancelled)
+    // return`, já provado pelo KPI e pela ausência de alert acima.
+    expect(openSummaries).toHaveBeenCalledWith(
       expect.anything(),
       expect.arrayContaining([expect.objectContaining({ patientId: 'p-antigo' })]),
-      expect.anything(),
+      expect.objectContaining({ aborted: true }),
     )
   })
 
@@ -419,19 +496,26 @@ describe('PainelProfissional', () => {
     await Promise.resolve()
   })
 
-  it('desmontar antes de listPatients resolver cancela antes do worker decifrar', async () => {
+  // N2: `carregarPacientes` não pula mais `openSummaries` por `cancelled` (ver
+  // entities/patient/worker-client.test.ts para quem barra o worker de verdade) -- aqui só
+  // prova que o `signal` chega já abortado, o freio real vive lá.
+  it('desmontar antes de listPatients resolver ainda chama openSummaries, com o signal já abortado', async () => {
     const fetchCall = deferred<Response>()
     vi.stubGlobal('fetch', vi.fn().mockReturnValue(fetchCall.promise))
-    const openSummaries = vi.fn()
+    const openSummaries = vi.fn().mockResolvedValue([])
 
     const { unmount } = renderPainel({ openSummaries })
     unmount()
 
     fetchCall.resolve(patientsResponse(['p-1']))
     await fetchCall.promise
-    await Promise.resolve()
+    await new Promise((resolve) => setTimeout(resolve, 0))
 
-    expect(openSummaries).not.toHaveBeenCalled()
+    expect(openSummaries).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({ aborted: true }),
+    )
   })
 
   it('desmontar enquanto openSummaries está pendente ignora o resultado quando chega', async () => {

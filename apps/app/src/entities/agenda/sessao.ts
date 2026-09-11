@@ -25,6 +25,6 @@ export function contarPorComecar(sessoes: readonly SessaoAgendada[], agora: Date
 
 // Fora de um `.tsx` (`entities/agenda/sessao.ts` é `.ts` puro), como `entities/nota/nota.ts` --
 // os literais `'2-digit'` disparariam lingui/no-unlocalized-strings se vivessem no widget.
-export function horaDaSessao(inicioEm: string, locale: string): string {
-  return new Date(inicioEm).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })
+export function horaDaSessao(inicioEm: string, locale: string, timeZone?: string): string {
+  return new Date(inicioEm).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', timeZone })
 }
