@@ -61,7 +61,9 @@ async function debugLastToken(page: Page, email: string): Promise<string> {
 }
 
 function magicLinkUrl(token: string): string {
-  return `/auth/magic-link?${new URLSearchParams({ baseUrl: API_BASE_URL, token }).toString()}`
+  // Sem baseUrl na query string desde o S18-17: o host da API desta rota já entra pelo
+  // VITE_API_BASE_URL do build (playwright.config.ts), não por aqui.
+  return `/auth/magic-link?${new URLSearchParams({ token }).toString()}`
 }
 
 async function readPersistedAccount(page: Page): Promise<{ id: string; email: string; role: string } | null> {

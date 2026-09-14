@@ -99,6 +99,20 @@ describe('CopilotKeySetup', () => {
     expect(screen.queryByRole('button', { name: 'Salvar' })).toBeNull()
   })
 
+  it('shows the locked state and no form when accountId is null, even with kek unlocked', async () => {
+    const kek = await makeKek()
+    render(
+      <I18nProvider i18n={i18n}>
+        <CopilotKeySetup accountId={null} kek={kek} onDone={vi.fn()} />
+      </I18nProvider>,
+    )
+
+    expect(screen.getByRole('status').textContent).toBe(
+      'Chaveiro bloqueado. Desbloqueie para cadastrar sua chave de API.',
+    )
+    expect(screen.queryByRole('button', { name: 'Salvar' })).toBeNull()
+  })
+
   it('the locked state still offers "Pular", which calls onDone without ever calling saveApiKey', () => {
     const onDone = vi.fn()
     renderSetup({ kek: null, onDone })

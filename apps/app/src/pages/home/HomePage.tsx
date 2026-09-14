@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import { Trans } from '@lingui/react/macro'
 import type { CryptoKey } from '@limmiar/crypto'
+import { useSession } from '../../entities/account/session-context'
 import type { Nota } from '../../entities/nota/nota'
 import { PainelProfissional } from '../../widgets/painel-profissional/PainelProfissional'
 
@@ -10,8 +11,6 @@ import { PainelProfissional } from '../../widgets/painel-profissional/PainelProf
 const BASE_URL_FIXTURE = ''
 
 export interface HomePageProps {
-  email: string | null
-  onSair: () => void
   /** null = sem KeychainProvider ainda -- o painel monta em "chaveiro bloqueado". */
   chaveiro: { kek: CryptoKey; accountId: string; accessToken: string } | null
   notas: readonly Nota[]
@@ -19,7 +18,9 @@ export interface HomePageProps {
 
 // ponytail: this <div id="app-shell"> is a navigation stub, not a real landing page --
 // replace it together with the real landing page, not as a standalone cleanup.
-export function HomePage({ email, onSair, chaveiro, notas }: HomePageProps) {
+export function HomePage({ chaveiro, notas }: HomePageProps) {
+  const { sessao, terminarSessao } = useSession()
+  const email = sessao?.email ?? null
   return (
     <div id="app-shell">
       Limmiar
@@ -29,7 +30,7 @@ export function HomePage({ email, onSair, chaveiro, notas }: HomePageProps) {
       {email !== null ? (
         <>
           <span data-testid="conta-sessao">{email}</span>
-          <button type="button" onClick={onSair}>
+          <button type="button" onClick={terminarSessao}>
             <Trans>Sair</Trans>
           </button>
         </>
