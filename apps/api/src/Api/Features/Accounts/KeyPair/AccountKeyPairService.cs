@@ -18,22 +18,38 @@ public enum PublishKeyPairFailure
 /// </summary>
 public sealed class AccountKeyPairService(IAccountStore accounts)
 {
+    // ponytail: one process-wide lock serializes find+check+update for ALL accounts, not just
+    // the one being published -- fine at this volume (a publish is a rare, one-off event per
+    // device), teto is throughput if publishes ever get frequent; upgrade to a per-account lock
+    // (or a DB unique/CAS constraint once accounts leave memory) if that ever matters. Mirrors
+    // PatientLinkStore's single _lock for the same reason. SemaphoreSlim, not `lock`, because the
+    // critical section awaits.
+    private readonly SemaphoreSlim _publishGate = new(1, 1);
+
     public async Task<Result<AccountKeyPair, PublishKeyPairFailure>> PublishAsync(
         Guid accountId, AccountKeyPair pair, CancellationToken cancellationToken)
     {
-        var account = await accounts.FindByIdAsync(accountId, cancellationToken);
-        if (account is null)
+        await _publishGate.WaitAsync(cancellationToken);
+        try
         {
-            return PublishKeyPairFailure.AccountNotFound;
-        }
+            var account = await accounts.FindByIdAsync(accountId, cancellationToken);
+            if (account is null)
+            {
+                return PublishKeyPairFailure.AccountNotFound;
+            }
 
-        if (account.KeyPair is { } existing && !existing.PublicKey.SequenceEqual(pair.PublicKey))
+            if (account.KeyPair is { } existing && !existing.PublicKey.SequenceEqual(pair.PublicKey))
+            {
+                return PublishKeyPairFailure.PublicKeyConflict;
+            }
+
+            await accounts.UpdateAsync(account with { KeyPair = pair }, cancellationToken);
+            return pair;
+        }
+        finally
         {
-            return PublishKeyPairFailure.PublicKeyConflict;
+            _publishGate.Release();
         }
-
-        await accounts.UpdateAsync(account with { KeyPair = pair }, cancellationToken);
-        return pair;
     }
 
     /// <summary>Null covers both "unknown account" and "account exists but never published a key pair" -- same as VoiceEnrollmentService.GetAsync.</summary>

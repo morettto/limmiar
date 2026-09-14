@@ -32,7 +32,10 @@ tentar arrancar o container, não passam silenciosamente. Os testes puramente un
     (`AccountKeyPair(PublicKey, WrappedDek, SealedPrivateKey)`, mesmo molde de envelope
     DEK/KEK que `VoiceEnrollment`). A pública é imutável: publicar de novo a MESMA `publicKey`
     substitui o envelope (204, serve rotação de KEK); uma `publicKey` DIFERENTE é `409
-    key_pair.public_key_conflict` -- a primeira publicação vence. `PUT`/`GET
+    key_pair.public_key_conflict` -- a primeira publicação vence, garantido contra corrida por um
+    `SemaphoreSlim` de instância em `AccountKeyPairService` que serializa find+check+update
+    (mesma forma que `PatientLinkStore.Redeem` usa `lock`, mas aqui a secção crítica faz
+    `await`). `PUT`/`GET
     /accounts/{accountId}/key-pair` usam `SessionTokenIssuerAuthorization.AccountAccessProblem`
     (cópia literal do helper do S09-03, `401`/`403` por RFC 9110), não o `IsAuthorizedForAccount`
     mais antigo que os outros sete ficheiros de endpoints ainda usam -- os dois convivem até o
