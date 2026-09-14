@@ -54,6 +54,10 @@ OPFS (`createWritable`/`write` de `FileSystemFileHandle`). Nenhum outro
 módulo deve chamar `getFileHandle`/`createWritable` diretamente -- quem
 precisa de persistir um chunk passa por `persistChunk`.
 
+Os chunks morrem com a árvore OPFS da conta no logout (`purgarOpfsDaConta`,
+`entities/account/opfs-conta.ts`, S18-15) -- sem registo de purga próprio
+neste módulo.
+
 ## Fluxo -- porta do microfone (`microfone.ts`, S10-02 fatia 4)
 
 `abrirMicrofone(consentimentoGravacao, midia = navigator.mediaDevices)` é a
