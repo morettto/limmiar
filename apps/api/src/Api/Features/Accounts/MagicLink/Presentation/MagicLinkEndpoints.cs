@@ -9,7 +9,7 @@ namespace Api.Accounts;
 
 public static class MagicLinkEndpoints
 {
-    public static void MapMagicLinkEndpoints(this WebApplication app)
+    public static void MapMagicLinkEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapPost("/auth/magic-link/request", HandleMagicLinkRequestAsync)
             .WithName("PostAuthMagicLinkRequest")
@@ -36,7 +36,7 @@ public static class MagicLinkEndpoints
     }
 
     // Only mapped by MagicLinkComposition.MapMagicLink when MagicLink:TestCaptureEndpoint=true.
-    public static void MapMagicLinkDebugEndpoints(this WebApplication app)
+    public static void MapMagicLinkDebugEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapGet("/auth/magic-link/_debug-last", HandleMagicLinkDebugLastAsync)
             .WithName("GetAuthMagicLinkDebugLast")

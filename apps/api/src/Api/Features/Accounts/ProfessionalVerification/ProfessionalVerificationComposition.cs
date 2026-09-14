@@ -16,7 +16,7 @@ public static class ProfessionalVerificationComposition
         services.AddSingleton<IStaffAccessGuard>(new StaffAccessGuard(staffApiKey));
     }
 
-    public static void MapProfessionalVerification(this WebApplication app)
+    public static void MapProfessionalVerification(this IEndpointRouteBuilder app)
     {
         app.MapProfessionalVerificationEndpoints();
     }

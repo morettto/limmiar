@@ -23,7 +23,7 @@ public static class ConsentComposition
         });
     }
 
-    public static void MapConsent(this WebApplication app)
+    public static void MapConsent(this IEndpointRouteBuilder app)
     {
         app.MapConsentEndpoints();
     }

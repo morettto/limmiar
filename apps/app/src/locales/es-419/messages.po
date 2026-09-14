@@ -83,7 +83,7 @@ msgstr "Bienvenido a Limmiar"
 msgid "Buscar notas"
 msgstr "Buscar notas"
 
-#: src/features/copilot-byok/CopilotKeySetup.tsx:57
+#: src/features/copilot-byok/CopilotKeySetup.tsx:59
 msgid "Cadastrar chave de API de IA"
 msgstr "Registrar clave de API de IA"
 
@@ -96,15 +96,19 @@ msgstr "Campo inválido: {field}."
 msgid "Carregando pacientes..."
 msgstr "Cargando pacientes..."
 
+#: src/widgets/painel-profissional/PainelProfissional.tsx:139
+msgid "Carregando painel..."
+msgstr "Cargando panel..."
+
 #: src/features/vinculo/DesvincularVinculo.tsx:53
 msgid "Carregando vínculos..."
 msgstr "Cargando vínculos..."
 
-#: src/features/copilot-byok/CopilotKeySetup.tsx:81
+#: src/features/copilot-byok/CopilotKeySetup.tsx:83
 msgid "Chave de API"
 msgstr "Clave de API"
 
-#: src/features/copilot-byok/CopilotKeySetup.tsx:30
+#: src/features/copilot-byok/CopilotKeySetup.tsx:31
 msgid "Chaveiro bloqueado. Desbloqueie para cadastrar sua chave de API."
 msgstr "Llavero bloqueado. Desbloquéalo para registrar tu clave de API."
 
@@ -115,6 +119,10 @@ msgstr "Llavero bloqueado. Desbloquéalo para registrar el check-in de hoy."
 #: src/widgets/patient-wallet/PatientWallet.tsx:85
 msgid "Chaveiro bloqueado. Desbloqueie para ver a carteira de pacientes."
 msgstr "Llavero bloqueado. Desbloquéalo para ver la cartera de pacientes."
+
+#: src/widgets/painel-profissional/PainelProfissional.tsx:129
+msgid "Chaveiro bloqueado. Desbloqueie para ver o painel."
+msgstr "Llavero bloqueado. Desbloquéalo para ver el panel."
 
 #: src/features/totp-enrollment/TotpSetup.tsx:158
 msgid "Código de 6 dígitos do aplicativo autenticador"
@@ -172,7 +180,7 @@ msgstr "¿Cómo vas a usar Limmiar?"
 msgid "Concluindo o pareamento..."
 msgstr "Completando la vinculación..."
 
-#: src/pages/home/HomePage.tsx:16
+#: src/pages/home/HomePage.tsx:28
 msgid "Configurar copiloto de IA"
 msgstr "Configurar copiloto de IA"
 
@@ -351,7 +359,7 @@ msgstr "No se pudo firmar la nota. Intente de nuevo."
 msgid "Fila de assinatura"
 msgstr "Cola de firma"
 
-#: src/features/copilot-byok/CopilotKeySetup.tsx:66
+#: src/features/copilot-byok/CopilotKeySetup.tsx:68
 msgid "Fornecedor"
 msgstr "Proveedor"
 
@@ -403,12 +411,28 @@ msgstr "Guardé mi frase"
 msgid "Hoje: como você está agora?"
 msgstr "Hoy: ¿cómo te sientes ahora?"
 
+#: src/widgets/painel-profissional/PainelProfissional.tsx:180
+msgid "Indicadores"
+msgstr "Indicadores"
+
+#: src/widgets/painel-profissional/PainelProfissional.tsx:164
+msgid "Iniciar próxima sessão"
+msgstr "Iniciar próxima sesión"
+
+#: src/widgets/painel-profissional/PainelProfissional.tsx:168
+msgid "Iniciar próxima sessão às {hora}"
+msgstr "Iniciar próxima sesión a las {hora}"
+
+#: src/widgets/painel-profissional/PainelProfissional.tsx:168
+msgid "Iniciar próxima: {nome} {hora}"
+msgstr "Iniciar próxima: {nome} {hora}"
+
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:144
 msgid "agenda.slot_taken"
 msgstr "Ya existe una sesión en este horario."
 
-#: src/features/copilot-byok/CopilotKeySetup.tsx:103
+#: src/features/copilot-byok/CopilotKeySetup.tsx:105
 msgid "Lembrar neste dispositivo"
 msgstr "Recordar en este dispositivo"
 
@@ -429,9 +453,17 @@ msgstr "No se puede enviar la acreditación con la cuenta en su estado actual."
 msgid "Não foi possível acessar a câmera para escanear o código."
 msgstr "No se pudo acceder a la cámara para escanear el código."
 
+#: src/widgets/painel-profissional/PainelProfissional.tsx:197
+msgid "Não foi possível carregar a agenda."
+msgstr "No se pudo cargar la agenda."
+
 #: src/widgets/patient-wallet/PatientWallet.tsx:68
 msgid "Não foi possível carregar a carteira de pacientes. Tente novamente."
 msgstr "No se pudo cargar la cartera de pacientes. Intenta de nuevo."
+
+#: src/widgets/painel-profissional/PainelProfissional.tsx:192
+msgid "Não foi possível carregar o painel. Tente novamente."
+msgstr "No se pudo cargar el panel. Intenta de nuevo."
 
 #: src/features/device-pairing-primary/PairPrimaryDevice.tsx:57
 msgid "Não foi possível concluir o pareamento com segurança. Tente novamente."
@@ -455,11 +487,11 @@ msgstr "No se pudo descifrar la clave recibida. Intenta vincular de nuevo."
 msgid "Não foi possível ler"
 msgstr "No se pudo leer"
 
-#: src/pages/biblioteca/BibliotecaPage.tsx:34
+#: src/pages/biblioteca/BibliotecaPage.tsx:36
 msgid "Não foi possível preparar a busca. Tente novamente."
 msgstr "No se pudo preparar la búsqueda. Intenta de nuevo."
 
-#: src/features/copilot-byok/CopilotKeySetup.tsx:61
+#: src/features/copilot-byok/CopilotKeySetup.tsx:63
 msgid "Não foi possível salvar a chave. Tente novamente."
 msgstr "No se pudo guardar la clave. Intenta de nuevo."
 
@@ -523,6 +555,7 @@ msgid "errors.generic"
 msgstr "Ocurrió un error inesperado. Inténtalo de nuevo."
 
 #: src/widgets/auth-screen/AuthScreen.tsx:174
+#: src/widgets/painel-profissional/PainelProfissional.tsx:203
 #: src/widgets/patient-wallet/PatientWallet.tsx:120
 msgid "Paciente"
 msgstr "Paciente"
@@ -530,6 +563,10 @@ msgstr "Paciente"
 #: src/widgets/patient-wallet/PatientWallet.tsx:118
 msgid "Pacientes"
 msgstr "Pacientes"
+
+#: src/widgets/painel-profissional/PainelProfissional.tsx:182
+msgid "Pacientes ativos"
+msgstr "Pacientes activos"
 
 #: src/features/device-pairing-primary/PairingQr.tsx:149
 msgid "Parear novo dispositivo"
@@ -564,8 +601,8 @@ msgstr "Profesional"
 msgid "patients.not_found"
 msgstr "Expediente no encontrado."
 
-#: src/features/copilot-byok/CopilotKeySetup.tsx:33
-#: src/features/copilot-byok/CopilotKeySetup.tsx:115
+#: src/features/copilot-byok/CopilotKeySetup.tsx:34
+#: src/features/copilot-byok/CopilotKeySetup.tsx:117
 msgid "Pular"
 msgstr "Omitir"
 
@@ -577,15 +614,20 @@ msgstr "Recuperar acceso"
 msgid "Recuperar acesso à conta"
 msgstr "Recuperar acceso a la cuenta"
 
+#: src/widgets/painel-profissional/PainelProfissional.tsx:200
+#: src/widgets/painel-profissional/PainelProfissional.tsx:201
+msgid "Requer você"
+msgstr "Te necesita"
+
 #: src/widgets/patient-wallet/PatientWallet.tsx:121
 msgid "Risco"
 msgstr "Riesgo"
 
-#: src/pages/home/HomePage.tsx:22
+#: src/pages/home/HomePage.tsx:34
 msgid "Sair"
 msgstr "Cerrar sesión"
 
-#: src/features/copilot-byok/CopilotKeySetup.tsx:112
+#: src/features/copilot-byok/CopilotKeySetup.tsx:114
 msgid "Salvar"
 msgstr "Guardar"
 
@@ -613,6 +655,10 @@ msgstr "Contraseña"
 #: src/shared/api/problem-messages.ts:148
 msgid "agenda.session_not_found"
 msgstr "Sesión no encontrada."
+
+#: src/widgets/painel-profissional/PainelProfissional.tsx:186
+msgid "Sessões na semana"
+msgstr "Sesiones esta semana"
 
 #: src/pages/paciente-hoje/PacienteHojePage.tsx:110
 msgid "Sono"
@@ -644,12 +690,12 @@ msgid "link.not_authorized"
 msgstr "Tu cuenta no puede participar en este vínculo."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:101
+#: src/shared/api/problem-messages.ts:95
 msgid "auth.refresh_token_invalid"
 msgstr "Tu sesión expiró. Inicia sesión de nuevo."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:105
+#: src/shared/api/problem-messages.ts:99
 msgid "auth.access_token_invalid"
 msgstr "Tu sesión expiró. Inicia sesión de nuevo."
 
@@ -695,9 +741,9 @@ msgid "Vincular"
 msgstr "Vincular"
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:95
+#: src/shared/api/problem-messages.ts:105
 msgid "auth.forbidden"
-msgstr "No tienes permiso para esta acción."
+msgstr "No tienes acceso a esta cuenta."
 
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:194

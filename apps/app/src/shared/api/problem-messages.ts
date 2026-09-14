@@ -90,12 +90,6 @@ const knownProblemMessages: Record<ProblemCode, MessageDescriptor> = {
     id: 'staff.unauthorized',
     message: 'Acesso não autorizado.',
   }),
-  // S11-04: token válido, mas de outra conta -- distinto de auth.access_token_invalid (ausência ou
-  // invalidez do próprio token).
-  'auth.forbidden': msg({
-    id: 'auth.forbidden',
-    message: 'Você não tem permissão para esta ação.',
-  }),
   // The backend returns this same code for a never-issued, an expired, and a
   // reuse-detected refresh token. Keep the text generic; it must not hint at which.
   'auth.refresh_token_invalid': msg({
@@ -105,6 +99,12 @@ const knownProblemMessages: Record<ProblemCode, MessageDescriptor> = {
   'auth.access_token_invalid': msg({
     id: 'auth.access_token_invalid',
     message: 'Sua sessão expirou. Entre novamente.',
+  }),
+  // Same body whether the account in the URL exists or not, so this alone never
+  // discloses account existence.
+  'auth.forbidden': msg({
+    id: 'auth.forbidden',
+    message: 'Você não tem acesso a esta conta.',
   }),
   // The backend returns this same code for an expired, an already-claimed, and a
   // wrong-account pairing session, so a stolen QR code cannot be told apart from a live

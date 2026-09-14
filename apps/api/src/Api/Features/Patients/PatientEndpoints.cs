@@ -1,9 +1,6 @@
 using Api.Accounts;
 using Api.Problems;
 using Microsoft.AspNetCore.Http.HttpResults;
-using Microsoft.AspNetCore.Mvc;
-using static Api.Accounts.AccountsProblemResults;
-using static Api.Accounts.SessionTokenIssuerAuthorization;
 using static Api.Problems.ProblemResults;
 using static Api.Problems.SealedBlobShape;
 
@@ -11,7 +8,7 @@ namespace Api.Patients;
 
 public static class PatientEndpoints
 {
-    public static void MapPatientEndpoints(this WebApplication app)
+    public static void MapPatientEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapPost("/accounts/{accountId:guid}/patients", HandleCreatePatientAsync)
             .WithName("PostPatient")
@@ -19,8 +16,6 @@ public static class PatientEndpoints
             .WithDescription("Creates the sequence-1 entry, which carries the wrapped DEK for the patient. Every clinical field lives inside the opaque ciphertext blob. Requires an Authorization: Bearer access token for this exact account, and the account must be an active Professional (AccountAuthorizationGuard.CanCreatePatientRecords).")
             .Produces<CreatePatientResponse>(StatusCodes.Status201Created)
             .Produces<LimmiarProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")
-            .Produces<LimmiarProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")
-            .Produces<LimmiarProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json");
 
@@ -30,8 +25,6 @@ public static class PatientEndpoints
             .WithDescription("Append-only: there is no PUT/PATCH/DELETE for this resource, and re-using a sequence number is a 409 conflict, never a silent overwrite. Sequence must be exactly the current last sequence + 1 -- gaps and reorders are rejected, not just literal overwrites. Requires an Authorization: Bearer access token for this exact account, and the account must be an active Professional (same guard as create).")
             .Produces<AppendPatientEntryResponse>(StatusCodes.Status201Created)
             .Produces<LimmiarProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")
-            .Produces<LimmiarProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")
-            .Produces<LimmiarProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json");
 
@@ -40,30 +33,21 @@ public static class PatientEndpoints
             .WithSummary("Read a patient's projected record")
             .WithDescription("Returns the append-only entries projected into one record. RLS scopes this to the calling professional's own tenant -- another professional's patient is reported as 404, indistinguishable from an unknown patientId. Requires an Authorization: Bearer access token for this exact account. Deliberately does NOT require AccountAuthorizationGuard.CanCreatePatientRecords: a professional keeps read access to records they already created even if their verification status later changes, since revoking read access to a legal clinical document they authored is a separate, bigger decision than gating new writes.")
             .Produces<PatientRecordResponse>(StatusCodes.Status200OK)
-            .Produces<LimmiarProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json");
 
         app.MapGet("/accounts/{accountId:guid}/patients", HandleListPatientsAsync)
             .WithName("ListPatients")
             .WithSummary("List the calling professional's patients (carteira)")
             .WithDescription("Returns one row per patient -- the sequence-1 (creation) entry only, never subsequent entries. No pagination, filter, or server-side ordering: the client sorts by risk. RLS scopes this to the calling professional's own tenant. Requires an Authorization: Bearer access token for this exact account. Always 200, even with zero patients (empty array) -- there is no 404 for the account itself, the token already ties accountId to a real account. Same read-access decision as GetPatient: does NOT require AccountAuthorizationGuard.CanCreatePatientRecords.")
-            .Produces<ListPatientsResponse>(StatusCodes.Status200OK)
-            .Produces<LimmiarProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json");
+            .Produces<ListPatientsResponse>(StatusCodes.Status200OK);
     }
 
     private static async Task<Results<Created<CreatePatientResponse>, JsonHttpResult<LimmiarProblemDetails>>> HandleCreatePatientAsync(
         Guid accountId,
         CreatePatientRequest request,
-        [FromHeader(Name = "Authorization")] string? authorization,
-        ISessionTokenIssuer sessionTokenIssuer,
         PatientService patientService,
         CancellationToken cancellationToken)
     {
-        if (!IsAuthorizedForAccount(authorization, accountId, sessionTokenIssuer))
-        {
-            return AccessTokenUnauthorizedProblem();
-        }
-
         if (!TryValidateSealedBlobShape(request.WrappedDek, "wrappedDek", out var wrappedDekProblem))
         {
             return wrappedDekProblem;
@@ -87,16 +71,9 @@ public static class PatientEndpoints
         Guid accountId,
         Guid patientId,
         AppendPatientEntryRequest request,
-        [FromHeader(Name = "Authorization")] string? authorization,
-        ISessionTokenIssuer sessionTokenIssuer,
         PatientService patientService,
         CancellationToken cancellationToken)
     {
-        if (!IsAuthorizedForAccount(authorization, accountId, sessionTokenIssuer))
-        {
-            return AccessTokenUnauthorizedProblem();
-        }
-
         if (!TryValidateSealedBlobShape(request.Ciphertext, "ciphertext", out var ciphertextProblem))
         {
             return ciphertextProblem;
@@ -114,16 +91,9 @@ public static class PatientEndpoints
     private static async Task<Results<Ok<PatientRecordResponse>, JsonHttpResult<LimmiarProblemDetails>>> HandleGetPatientAsync(
         Guid accountId,
         Guid patientId,
-        [FromHeader(Name = "Authorization")] string? authorization,
-        ISessionTokenIssuer sessionTokenIssuer,
         PatientService patientService,
         CancellationToken cancellationToken)
     {
-        if (!IsAuthorizedForAccount(authorization, accountId, sessionTokenIssuer))
-        {
-            return AccessTokenUnauthorizedProblem();
-        }
-
         var record = await patientService.GetPatientAsync(accountId, patientId, cancellationToken);
         if (record is null)
         {
@@ -140,16 +110,9 @@ public static class PatientEndpoints
 
     private static async Task<Results<Ok<ListPatientsResponse>, JsonHttpResult<LimmiarProblemDetails>>> HandleListPatientsAsync(
         Guid accountId,
-        [FromHeader(Name = "Authorization")] string? authorization,
-        ISessionTokenIssuer sessionTokenIssuer,
         PatientService patientService,
         CancellationToken cancellationToken)
     {
-        if (!IsAuthorizedForAccount(authorization, accountId, sessionTokenIssuer))
-        {
-            return AccessTokenUnauthorizedProblem();
-        }
-
         var entries = await patientService.ListPatientsAsync(accountId, cancellationToken);
 
         // WrappedDek is null-forgiven, not null-checked: entries here only ever come from

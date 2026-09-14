@@ -1,0 +1,211 @@
+# S09-01 — par vermelho/verde por fatia TDD
+
+## Fatia 1 — entities/agenda/sessao.test.ts (proximaSessao, sessoesNaSemana)
+
+VERMELHO:
+$ pnpm exec vitest run src/entities/agenda/sessao.test.ts --coverage
+Error: Failed to resolve import "./sessao" from "src/entities/agenda/sessao.test.ts". Does the file exist?
+
+VERDE:
+$ pnpm exec vitest run src/entities/agenda/sessao.test.ts --coverage
+Test Files  1 passed (1)
+      Tests  7 passed (7)
+(sem ERROR de cobertura para sessao.ts — 100% statements/branches/functions/lines)
+
+## Fatia 2 — widgets/painel-profissional/requer-voce.test.ts (3 construtores + juntarRequerVoce)
+
+VERMELHO:
+$ pnpm exec vitest run src/widgets/painel-profissional/requer-voce.test.ts --coverage
+Error: Failed to resolve import "./requer-voce" from "src/widgets/painel-profissional/requer-voce.test.ts". Does the file exist?
+
+VERDE:
+$ pnpm exec vitest run src/widgets/painel-profissional/requer-voce.test.ts --coverage
+Test Files  1 passed (1)
+      Tests  8 passed (8)
+(sem ERROR de cobertura para requer-voce.ts — 100%)
+
+## Fatia 3 — widgets/painel-profissional/PainelProfissional.test.tsx (critério 1: ação principal nomeia o paciente certo)
+
+VERMELHO:
+$ pnpm exec vitest run src/widgets/painel-profissional/PainelProfissional.test.tsx --coverage
+Error: Failed to resolve import "./PainelProfissional" from "src/widgets/painel-profissional/PainelProfissional.test.tsx". Does the file exist?
+
+VERDE:
+$ pnpm exec vitest run src/widgets/painel-profissional/PainelProfissional.test.tsx --coverage
+Test Files  1 passed (1)
+      Tests  4 passed (4)
+(cobertura do ficheiro ainda parcial nesta fatia -- completa-se nas fatias 4 e 5, que acrescentam
+ testes ao mesmo ficheiro; ver fatia 5 para o número final)
+
+## Fatia 4 — PainelProfissional.test.tsx (critério 4: falha isolada por fonte)
+
+Antes de escrever os 2 novos testes, a implementação foi reduzida ao mínimo que a fatia 3
+precisava (sem KpiStrip/AdaptivePanel/alert/consentimentos) -- para não haver teste escrito
+depois de código que ele já não precisava provar.
+
+VERMELHO:
+$ pnpm exec vitest run src/widgets/painel-profissional/PainelProfissional.test.tsx --coverage
+TestingLibraryElementError: Unable to find role="alert"
+AssertionError: expected "vi.fn()" to be called with arguments: [ StringContaining "/p-ok/consents" ]
+
+VERDE:
+$ pnpm exec vitest run src/widgets/painel-profissional/PainelProfissional.test.tsx --coverage
+Test Files  1 passed (1)
+      Tests  6 passed (6)
+(cobertura ainda parcial -- fatia 5 fecha o ficheiro)
+
+## Fatia 5 — PainelProfissional.test.tsx (critério 3: sem métrica de vaidade) + fecho de cobertura do ficheiro
+
+VERMELHO (parte funcional -- os testes de cobertura-só passaram de imediato por travarem comportamento
+já correto herdado do molde PatientWallet; o vermelho genuíno desta fatia foi no fetch mock inválido
+do teste de consentimento, apanhado ao medir cobertura):
+$ pnpm exec vitest run src/widgets/painel-profissional/PainelProfissional.test.tsx --coverage
+ERROR: Coverage for branches (95.45%) does not meet global threshold (100%) for .../PainelProfissional.tsx
+(html: "if path not taken" em obterConsentimentos -- o mock do teste de fatia 4 devolvia corpo
+vazio em vez de problem+json válido, então `readProblem` rebentava antes do `if (!resultado.ok)`
+correr; "else path not taken" no catch externo -- faltava o caso cancelled=true nesse catch)
+
+VERDE:
+$ pnpm exec vitest run src/widgets/painel-profissional/PainelProfissional.test.tsx --coverage
+Test Files  1 passed (1)
+      Tests  13 passed (13)
+(sem ERROR de cobertura para PainelProfissional.tsx -- 100% statements/branches/functions/lines)
+
+## Fatia 6 — pages/home/HomePage.test.tsx (monta o painel; os 3 casos atuais continuam verdes)
+
+VERMELHO:
+$ pnpm exec vitest run src/pages/home/HomePage.test.tsx --coverage
+TestingLibraryElementError: Unable to find an element with the text: Chaveiro bloqueado. Desbloqueie para ver o painel.
+
+VERDE:
+$ pnpm exec vitest run src/pages/home/HomePage.test.tsx --coverage
+Test Files  1 passed (1)
+      Tests  4 passed (4)
+(sem ERROR de cobertura para HomePage.tsx -- 100%; os 3 testes pré-existentes continuam verdes)
+
+## Nota honesta fora das 6 fatias
+
+Depois da fatia 5, `pnpm lint:i18n` (eslint) apanhou `lingui/no-unlocalized-strings` nos
+literais `'2-digit'` do `toLocaleTimeString(...)` inline em `PainelProfissional.tsx` (um
+`.tsx` é varrido pelo lint; um `.ts` puro não -- mesmo motivo já documentado em
+`entities/nota/nota.ts`). Extraí `horaDaSessao(inicioEm, locale)` para
+`entities/agenda/sessao.ts` e escrevi o teste direto para essa função depois de já ter
+escrito a função (não red-then-green nessa extração pontual, ao contrário das 6 fatias
+acima) -- é um refactor mecânico de 3 linhas movidas de ficheiro para escapar ao scanner
+do lint, sem mudar comportamento nenhum testado pelas fatias 3-6, que continuaram verdes
+sem alteração. Reportado aqui em vez de escondido.
+
+## Ronda 2 — cadeia de review, eixo linguagem: 2 bloqueantes + 3 notas
+
+### Bloqueante 1 — `PainelProfissional.tsx`, guarda de bloqueio duplicada e divergente
+
+`estadoInicial` só olhava `kek`; o `useEffect` bloqueava por `kek === null || accountId === null
+|| accessToken === null`. Com `kek` presente e `accountId`/`accessToken` ainda `null`, o
+primeiro paint mostrava "Carregando painel..." até o efeito corrigir.
+
+Confirmado por sonda manual (script descartável, não commitado) que `render()` do RTL já
+resolve o `useEffect` (via `act()`) antes de devolver o controlo neste ambiente de teste --
+uma asserção de texto pós-`render()` já veria o estado corrigido, mascarando a divergência.
+Por isso o vermelho genuíno é direto na função `estadoInicial`, exportada para o efeito, não
+no render.
+
+VERMELHO (passo 1 -- exporta a função tal como estava, sem corrigir a lógica, para provar que
+a falha é de lógica e não de "função não exportada"):
+$ pnpm exec vitest run src/widgets/painel-profissional/PainelProfissional.test.tsx -t estadoInicial
+AssertionError: expected { status: 'a-carregar' } to deeply equal { status: 'bloqueado' }
+(exatamente os 2 casos do bug -- accountId=null e accessToken=null -- falham; os outros 2
+casos já passavam por coincidência, kek=null e tudo-presente não dependiam da guarda tripla)
+
+VERDE (depois de fatorizar `chaveiroBloqueado(kek, accountId, accessToken)` como fonte única,
+usada por `estadoInicial` e pelo `useEffect`):
+$ pnpm exec vitest run src/widgets/painel-profissional/PainelProfissional.test.tsx --coverage
+Tests  17 passed (17)
+
+Reforço adicional (não é o vermelho que fecha o bloqueante, é defesa em profundidade pedida
+pelo review): os dois testes de render "kek=null"/"accountId=null" passaram a assertar o
+**texto** exato ("Chaveiro bloqueado...") e a ausência de "Carregando painel...", em vez de só
+`role="status"`.
+
+### Bloqueante 2 — `entities/agenda/sessao.test.ts`, teste tautológico de `horaDaSessao`
+
+**Primeira tentativa (revista e invalidada pelo eixo linguagem, ronda 2 de verificação):**
+usei `'2026-09-10T18:30:00Z'` -> `'15:30'`. 15 e 30 já têm dois dígitos com ou sem `'2-digit'`,
+então a asserção não distinguia `'2-digit'` de `'numeric'` em nenhum dos dois campos -- a
+minha alegação de que "a mutação prova o teste" era falsa, o revisor mutou e os 8 testes
+continuaram verdes. Corrigido para hora **e** minuto de um dígito em UTC-3:
+`'2026-09-10T11:05:00Z'` -> `'08:05'`.
+
+Prova mecânica, mutante a mutante, com a implementação revertida entre cada um:
+
+1. VERMELHO -- `hour: '2-digit'` -> `'numeric'`:
+   $ pnpm exec vitest run src/entities/agenda/sessao.test.ts -t horaDaSessao
+   AssertionError: expected '8:05' to be '08:05'
+   (mutante morto -- revertido a seguir)
+
+2. `minute: '2-digit'` -> `'numeric'`:
+   $ pnpm exec vitest run src/entities/agenda/sessao.test.ts -t horaDaSessao
+   Tests  1 passed | 7 skipped (8)
+   **Mutante sobrevive.** Não fechou. Verificado que não é falha de escolha de valor: testei
+   `minute:'numeric'` vs `minute:'2-digit'` com `hour:'2-digit'` presente para os minutos
+   0,1,5,9,15,30,59 e para as 4 locales do projeto (pt-BR/en-US/es-419/it-IT) -- a saída é
+   byte-a-byte idêntica em todos os casos. É mutante equivalente do Intl/ICU deste Node: uma
+   vez que `hour` também é formatado, o padrão de tempo escolhido para estas locales sempre
+   preenche o minuto com dois dígitos, independentemente da opção pedida para `minute`. Não
+   há valor de entrada nem locale das quatro suportadas que distinga os dois. Registo aqui,
+   não escondo: o teste como está prova o campo `hour`, não prova o campo `minute`
+   isoladamente -- essa lacuna fica para quem decidir se vale a pena (ex.: remover a opção
+   `minute` do código por ser comprovadamente inerte, ou aceitar a lacuna).
+   (revertido a seguir, sem ficar no diff)
+
+3. VERDE -- implementação intacta:
+   $ pnpm exec vitest run src/entities/agenda/sessao.test.ts --coverage
+   Tests  8 passed (8)
+   (sem ERROR de cobertura para sessao.ts)
+
+### Nota 1 — `throw resultado` (ProblemResult, não Error) dentro do `Promise.allSettled`
+
+Sem mudança de comportamento observável: o filtro final (`consentimentosOk`) continua a
+excluir exatamente os mesmos pacientes, agora por um `{ok:false}` resolvido em vez de uma
+rejeição. Confirmado pelos testes existentes de fatia 4 (falha isolada de um paciente)
+continuarem verdes sem qualquer alteração nas suas asserções.
+
+### Nota 2 — dois `new Date()` no mesmo render (`:144` e `:171`)
+
+Sem mudança de comportamento observável nos testes (nenhum atravessa uma fronteira de
+segundo real): `agora` passou a ser capturado uma vez e partilhado pelas duas chamadas
+(`proximaSessao`/`sessoesNaSemana`). Testes de fatia 3/4/5 continuam verdes sem alteração.
+
+### Nota 3 — `PainelProfissional.test.tsx`, `horaFormatada()` duplicava `horaDaSessao`
+
+Removida a reimplementação local; o teste de critério 1 passou a importar `horaDaSessao` de
+`entities/agenda/sessao` para montar a hora esperada -- reuso, não tautologia, porque o SUT
+aqui é a integração nome+hora no rótulo, não a formatação da hora em si (essa já tem teste
+próprio, determinístico, na nota do bloqueante 2). Testes de fatia 3 continuam verdes.
+
+## Fecho do portão da etapa 6 (2026-09-10, sessão de retoma)
+
+### Build -- `chaveiroBloqueado` devolvia boolean e não estreitava `kek`
+
+1. VERMELHO (sessão anterior):
+   $ pnpm --filter @limmiar/app build
+   src/widgets/painel-profissional/PainelProfissional.tsx:115
+   Argument of type 'CryptoKey | null' is not assignable to parameter of type 'CryptoKey'
+
+2. VERDE -- guarda passou a type predicate `chaveiroDestrancado(chaveiro): chaveiro is ChaveiroDestrancado`,
+   fonte única para `estadoInicial` e `useEffect`, sem `!` nem `as`:
+   $ pnpm --filter @limmiar/app build
+   ✓ built in 502ms
+
+### Lint -- comments(no-long-comments) no comentário da guarda
+
+1. VERMELHO:
+   $ pnpm --filter @limmiar/app lint
+   PainelProfissional.tsx:37:1: error comments(no-long-comments)
+
+2. VERDE -- comentário reduzido a duas linhas; o porquê vive no README ("guarda unificada"):
+   $ pnpm --filter @limmiar/app lint
+   sem erros
+
+### Portão inteiro, verde
+   test:unit   76 ficheiros, 627 testes, 100% statements/branches/functions/lines (perFile)
+   tsc --noEmit, lint, lint:i18n, lint:arch (249 módulos, zero violações), build -- todos PASS

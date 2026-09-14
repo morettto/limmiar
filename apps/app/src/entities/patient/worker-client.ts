@@ -9,6 +9,11 @@ export function openSummariesInWorker(
   items: SealedSummary[],
   signal?: AbortSignal,
 ): Promise<SummaryResult[]> {
+  // Já abortado (não só "abortará depois"): o listener de 'abort' abaixo nunca dispararia
+  // para um evento que já passou -- sem isto o worker subiria para decifrar à toa.
+  if (signal?.aborted) {
+    return Promise.reject(new DOMException('aborted', 'AbortError'))
+  }
   return new Promise((resolve, reject) => {
     const worker = new Worker(new URL('./patient-summary.worker.ts', import.meta.url), { type: 'module' })
 

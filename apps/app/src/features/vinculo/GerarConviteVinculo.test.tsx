@@ -74,7 +74,7 @@ describe('GerarConviteVinculo', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Gerar código de vínculo' }))
 
     const alert = await screen.findByRole('alert')
-    expect(alert.textContent).toBe('Você não tem permissão para esta ação.')
+    expect(alert.textContent).toBe('Você não tem acesso a esta conta.')
     expect(screen.queryByRole('status')).toBeNull()
   })
 

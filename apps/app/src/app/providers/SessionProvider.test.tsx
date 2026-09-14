@@ -7,8 +7,10 @@ import { COPILOT_KEY_STORAGE_KEY } from '../../features/copilot-byok/key-store'
 import { chaveIndiceDaConta, type ChaveIndiceBusca } from '../../features/nota-biblioteca/indice-crypto'
 import { construirIndice } from '../../features/nota-biblioteca/indice'
 import { opfsIndice, persistirIndice } from '../../features/nota-biblioteca/indice-store'
+import { opfsWriter } from '../../features/live-session/chunk-store'
 import { FakeDirectoryHandle, stubOpfsRoot } from '../../test-support/fake-opfs'
-import { SessionProvider, useSession } from './SessionProvider'
+import { useSession } from '../../entities/account/session-context'
+import { SessionProvider } from './SessionProvider'
 
 const ACCOUNT: Account = {
   id: '11111111-1111-1111-1111-111111111111',
@@ -55,14 +57,17 @@ async function makeChave(): Promise<ChaveIndiceBusca> {
   return chaveIndiceDaConta(kek)
 }
 
-// Semeia `raiz/<accountId>/indice-busca` via opfsIndice (mesmo trio de produção), devolvendo
-// o diretório da conta para inspecionar `.files` depois da purga.
-async function seedIndiceBusca(raiz: FakeDirectoryHandle, accountId: string): Promise<FakeDirectoryHandle> {
+// Semeia `raiz/<accountId>/indice-busca` (via opfsIndice) e `raiz/<accountId>/0` (via
+// opfsWriter, um chunk de sessão ao vivo) -- os dois trios de produção que escrevem sob o
+// diretório da conta. Devolve o diretório para quem ainda precisa de inspecionar `.files`.
+async function seedContaOpfs(raiz: FakeDirectoryHandle, accountId: string): Promise<FakeDirectoryHandle> {
   const chave = await makeChave()
   const dir = await raiz.getDirectoryHandle(accountId, { create: true })
-  const { gravar } = opfsIndice(dir as unknown as FileSystemDirectoryHandle)
+  const dirHandle = dir as unknown as FileSystemDirectoryHandle
+  const { gravar } = opfsIndice(dirHandle)
   const indice = construirIndice([{ id: '1', patientId: 'p1', texto: 'febre' }])
   await persistirIndice(gravar, chave, accountId, indice, '1:0')
+  await opfsWriter(dirHandle)('sessao-1', 0, new Uint8Array([1, 2, 3]))
   return dir
 }
 
@@ -97,6 +102,35 @@ function ValueCapturer({ onValue }: { onValue: (value: ReturnType<typeof useSess
   return null
 }
 
+const KEY_STORE = '../../features/copilot-byok/key-store'
+
+// Monta o provider com `clearApiKey` mockado. Pegadinha de `renderRouter` em router.test.tsx:
+// `SessionContext` fresco tem de vir do mesmo registo de módulos que o `SessionProvider`
+// fresco, daí os dois virem de import dinâmico depois do mesmo `vi.resetModules()`.
+async function montarComPurgaMockada(clearApiKey: (accountId: string) => unknown): Promise<void> {
+  vi.doMock(KEY_STORE, () => ({ clearApiKey: vi.fn(clearApiKey) }))
+  vi.resetModules()
+  const { SessionProvider: SessionProviderComMockDePurga } = await import('./SessionProvider')
+  const { useSession: useSessionFresco } = await import('../../entities/account/session-context')
+
+  function ConsumerFresco() {
+    const { sessao, terminarSessao } = useSessionFresco()
+    return (
+      <div>
+        <p data-testid="sessao">{sessao === null ? 'sem-sessao' : sessao.id}</p>
+        <button onClick={() => terminarSessao()}>terminar</button>
+      </div>
+    )
+  }
+
+  seedStoredAccount(ACCOUNT)
+  render(
+    <SessionProviderComMockDePurga>
+      <ConsumerFresco />
+    </SessionProviderComMockDePurga>,
+  )
+}
+
 let restoreOpfsRoot: (() => void) | null = null
 
 describe('SessionProvider', () => {
@@ -105,6 +139,8 @@ describe('SessionProvider', () => {
     window.sessionStorage.clear()
     window.localStorage.clear()
     vi.restoreAllMocks()
+    vi.doUnmock(KEY_STORE)
+    vi.resetModules()
     restoreOpfsRoot?.()
     restoreOpfsRoot = null
   })
@@ -154,9 +190,12 @@ describe('SessionProvider', () => {
     })
   })
 
-  it('terminarSessao purga o indice da conta que sai', async () => {
+  // Vermelho do S18-15: `chunk-store.ts` nunca escreve `indice-busca`, só a árvore inteira
+  // apanha os dois. As asserções pré-purga provam que os artefactos existem mesmo -- sem
+  // elas, um `seedContaOpfs` partido passava por vazio.
+  it('terminarSessao apaga toda a arvore OPFS da conta que sai (indice e chunk)', async () => {
     const raiz = new FakeDirectoryHandle()
-    const dirA = await seedIndiceBusca(raiz, ACCOUNT.id)
+    const dirConta = await seedContaOpfs(raiz, ACCOUNT.id)
     restoreOpfsRoot = stubOpfsRoot(raiz)
     seedStoredAccount(ACCOUNT)
     render(
@@ -165,12 +204,16 @@ describe('SessionProvider', () => {
       </SessionProvider>,
     )
     expect(screen.getByTestId('sessao').textContent).toBe(ACCOUNT.id)
+    expect(dirConta.files.has('indice-busca')).toBe(true)
+    expect(dirConta.files.has('0')).toBe(true)
 
     fireEvent.click(screen.getByRole('button', { name: 'terminar' }))
 
     await waitFor(() => {
-      expect(dirA.files.has('indice-busca')).toBe(false)
+      expect(raiz.dirs.has(ACCOUNT.id)).toBe(false)
     })
+    expect(dirConta.files.has('indice-busca')).toBe(false)
+    expect(dirConta.files.has('0')).toBe(false)
   })
 
   it('terminarSessao with no session is a no-op: no purge, nothing to clear', () => {
@@ -226,8 +269,8 @@ describe('SessionProvider', () => {
 
   it('trocar de conta (A -> B) apaga o indice de A e deixa o de B intacto', async () => {
     const raiz = new FakeDirectoryHandle()
-    const dirA = await seedIndiceBusca(raiz, ACCOUNT.id)
-    const dirB = await seedIndiceBusca(raiz, OUTRA_CONTA.id)
+    await seedContaOpfs(raiz, ACCOUNT.id)
+    const dirB = await seedContaOpfs(raiz, OUTRA_CONTA.id)
     restoreOpfsRoot = stubOpfsRoot(raiz)
     seedStoredAccount(ACCOUNT)
     render(
@@ -240,8 +283,9 @@ describe('SessionProvider', () => {
     fireEvent.click(screen.getByRole('button', { name: 'iniciar-outra' }))
 
     await waitFor(() => {
-      expect(dirA.files.has('indice-busca')).toBe(false)
+      expect(raiz.dirs.has(ACCOUNT.id)).toBe(false)
     })
+    expect(raiz.dirs.has(OUTRA_CONTA.id)).toBe(true)
     expect(dirB.files.has('indice-busca')).toBe(true)
   })
 
@@ -261,37 +305,13 @@ describe('SessionProvider', () => {
   it('a purge that throws synchronously does not stop terminarSessao from clearing the session, nor the next purge in the list (o indice ainda e apagado)', async () => {
     // Prova que purgarConta não deixa um throw síncrono de clearApiKey escapar para terminarSessao
     // (que chama purgarConta em fire-and-forget, sem esperar por ela), e que a purga seguinte
-    // na lista (purgarIndiceBusca) ainda corre -- README `app/providers`, linhas 19-20.
-    vi.doMock('../../features/copilot-byok/key-store', () => ({
-      clearApiKey: vi.fn(() => {
-        throw new Error('purge boom')
-      }),
-    }))
-    vi.resetModules()
+    // na lista (purgarOpfsDaConta) ainda corre -- README `app/providers`, "Fluxo principal".
     const raiz = new FakeDirectoryHandle()
-    const dirA = await seedIndiceBusca(raiz, ACCOUNT.id)
+    await seedContaOpfs(raiz, ACCOUNT.id)
     restoreOpfsRoot = stubOpfsRoot(raiz)
-    // Mesma pegadinha de `renderRouter` em router.test.tsx: `useSession` também tem de vir fresco.
-    const { SessionProvider: SessionProviderComMockDePurga, useSession: useSessionFresco } = await import(
-      './SessionProvider'
-    )
-
-    function ConsumerFresco() {
-      const { sessao, terminarSessao } = useSessionFresco()
-      return (
-        <div>
-          <p data-testid="sessao">{sessao === null ? 'sem-sessao' : sessao.id}</p>
-          <button onClick={() => terminarSessao()}>terminar</button>
-        </div>
-      )
-    }
-
-    seedStoredAccount(ACCOUNT)
-    render(
-      <SessionProviderComMockDePurga>
-        <ConsumerFresco />
-      </SessionProviderComMockDePurga>,
-    )
+    await montarComPurgaMockada(() => {
+      throw new Error('purge boom')
+    })
     expect(screen.getByTestId('sessao').textContent).toBe(ACCOUNT.id)
 
     expect(() => fireEvent.click(screen.getByRole('button', { name: 'terminar' }))).not.toThrow()
@@ -299,42 +319,15 @@ describe('SessionProvider', () => {
     expect(screen.getByTestId('sessao').textContent).toBe('sem-sessao')
     expect(window.sessionStorage.getItem('limmiar:account')).toBeNull()
     await waitFor(() => {
-      expect(dirA.files.has('indice-busca')).toBe(false)
+      expect(raiz.dirs.has(ACCOUNT.id)).toBe(false)
     })
-
-    vi.doUnmock('../../features/copilot-byok/key-store')
-    vi.resetModules()
   })
 
   it('uma purga que rejeita deixa rasto no console com o nome da purga e o accountId, sem conteudo do blob nem chave', async () => {
-    vi.doMock('../../features/copilot-byok/key-store', () => ({
-      clearApiKey: vi.fn(() => Promise.reject(new Error('purge boom'))),
-    }))
-    vi.resetModules()
     const raiz = new FakeDirectoryHandle()
     restoreOpfsRoot = stubOpfsRoot(raiz)
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
-    // Mesma pegadinha de `renderRouter`: `useSession` também tem de vir fresco.
-    const { SessionProvider: SessionProviderComMockDePurga, useSession: useSessionFresco } = await import(
-      './SessionProvider'
-    )
-
-    function ConsumerFresco() {
-      const { sessao, terminarSessao } = useSessionFresco()
-      return (
-        <div>
-          <p data-testid="sessao">{sessao === null ? 'sem-sessao' : sessao.id}</p>
-          <button onClick={() => terminarSessao()}>terminar</button>
-        </div>
-      )
-    }
-
-    seedStoredAccount(ACCOUNT)
-    render(
-      <SessionProviderComMockDePurga>
-        <ConsumerFresco />
-      </SessionProviderComMockDePurga>,
-    )
+    await montarComPurgaMockada(() => Promise.reject(new Error('purge boom')))
 
     fireEvent.click(screen.getByRole('button', { name: 'terminar' }))
 
@@ -345,19 +338,6 @@ describe('SessionProvider', () => {
       )
     })
     expect(consoleError).toHaveBeenCalledWith(expect.stringContaining(ACCOUNT.id), expect.any(Error))
-
-    consoleError.mockRestore()
-    vi.doUnmock('../../features/copilot-byok/key-store')
-    vi.resetModules()
-  })
-
-  it('useSession outside a SessionProvider throws instead of returning a silent default', () => {
-    // Suprime o console.error do React sobre o erro não apanhado durante o render.
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
-
-    expect(() => render(<Consumer />)).toThrow('useSession: nenhum <SessionProvider> ancestral')
-
-    consoleError.mockRestore()
   })
 
   it('the context value keeps the same reference across a re-render that does not change `sessao`', () => {

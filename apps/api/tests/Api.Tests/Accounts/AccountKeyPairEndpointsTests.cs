@@ -121,7 +121,7 @@ public sealed class AccountKeyPairEndpointsTests
         Assert.Equal("auth.access_token_invalid", doc.RootElement.GetProperty("code").GetString());
     }
 
-    /// <summary>A "Bearer " prefix with a token that fails ValidateAccess (malformed/unknown) is 401 -- AccountAccessProblem's own branch, distinct from "no header at all".</summary>
+    /// <summary>A "Bearer " prefix with a token that fails ValidateAccess (malformed/unknown) is 401 -- RequireAccountAccessMiddleware's invalid-token branch, distinct from "no header at all".</summary>
     [Fact]
     public async Task PutKeyPair_WithMalformedBearerToken_Returns401WithProblemDetails()
     {
@@ -140,7 +140,7 @@ public sealed class AccountKeyPairEndpointsTests
         Assert.Equal("auth.access_token_invalid", doc.RootElement.GetProperty("code").GetString());
     }
 
-    /// <summary>A valid bearer token for a DIFFERENT account than the one in the route is 403, not 401 (RFC 9110) -- AccountAccessProblem, not the older IsAuthorizedForAccount.</summary>
+    /// <summary>A valid bearer token for a DIFFERENT account than the one in the route is 403, not 401 (RFC 9110) -- RequireAccountAccessMiddleware.</summary>
     [Fact]
     public async Task PutKeyPair_WithTokenForDifferentAccount_Returns403WithProblemDetails()
     {
@@ -345,6 +345,7 @@ public sealed class AccountKeyPairEndpointsTests
                 builder.UseSetting("StaffAccess:ApiKey", "test-staff-api-key");
                 builder.UseSetting("WebAuthn:RelyingPartyId", "limmiar.test");
                 builder.UseSetting("WebAuthn:ExpectedOrigin", "https://limmiar.test");
+                builder.UseSetting("AbacatePay:WebhookSecret", "whsec_test123");
                 builder.ConfigureTestServices(services => services.AddSingleton<ITotpProvider>(new StubTotpProvider()));
             });
 

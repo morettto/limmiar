@@ -66,7 +66,7 @@ describe('DesvincularVinculo', () => {
 
     renderComponent()
 
-    expect((await screen.findByRole('alert')).textContent).toBe('Você não tem permissão para esta ação.')
+    expect((await screen.findByRole('alert')).textContent).toBe('Você não tem acesso a esta conta.')
   })
 
   it('resolves the peer account id from whichever side is not accountId, on both sides of the link', async () => {

@@ -69,7 +69,7 @@ para o porquê do consentimento viver em claro no servidor.
   resultado por `Match`, nunca por `!`.
 - `ConsentEndpoints.cs` (fatia 3) --
   `POST /accounts/{accountId:guid}/patients/{patientId:guid}/consents` (`201`/`400`/`401`/
-  `403`/`404`) e `GET` na mesma rota (`200`/`401`). Sem `DELETE` nem `PUT`: revogar é o
+  `403`/`404`) e `GET` na mesma rota (`200`/`401`/`403`). Sem `DELETE` nem `PUT`: revogar é o
   mesmo `POST` com `decision: "revogado"` -- um `DELETE` sugeriria apagar, exatamente o que
   a decisão 2 do ticket proíbe. `purpose`/`decision` **no pedido** viajam como strings no
   corpo (`"gravacao"|"analiseIa"`, `"concedido"|"revogado"`), desserializadas com
@@ -139,10 +139,10 @@ para o porquê do consentimento viver em claro no servidor.
   resposta do `GET` e nunca é desserializado de um pedido, usa exatamente esse conversor
   (overload genérico fechado, seguro para AOT) para satisfazer o wire format que o desenho
   documenta; ver `ConsentComposition.cs` acima.
-- **`SnapshotAsync` não valida a conta.** Ao contrário de `RecordAsync`, o `GET` só devolve
-  `200`/`401` no desenho do ticket -- a prova de que `professionalId` é a própria conta já
-  veio do bearer token em `IsAuthorizedForAccount`, então uma segunda validação em
-  `IAccountStore` seria redundante para essa rota.
+- **`SnapshotAsync` não valida a conta.** A prova de que `professionalId` é a própria conta já
+  veio do bearer token em `RequireAccountAccessMiddleware`
+  (`Accounts.Sessions/README.md`), então uma segunda validação em `IAccountStore` seria
+  redundante para essa rota.
 - **`ConsentEndpoints.MapFailureToProblem`** segue o mesmo padrão de
   `NoteEndpoints.MapFailureToProblem`/`PatientEndpoints.MapCreateFailureToProblem`: cada
   ramo nomeado (`AccountNotFound` -> `404`, `NotAuthorizedToCreateRecords` -> `403`) tem

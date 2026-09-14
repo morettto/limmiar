@@ -19,8 +19,8 @@ memória, como as contas de que dependem (abordagem (c), `.harness/abordagem/S11
 - `DELETE /accounts/{accountId}/links/{peerAccountId}` -- qualquer das partes desvincula. `204`;
   `404 link.not_found` se não havia vínculo entre as duas contas.
 
-Autorização: `SessionTokenIssuerAuthorization.AccountAccessProblem` em todas -- `401` sem
-token/token inválido, `403 auth.forbidden` com token de outra conta (RFC 9110). `403
+Autorização: `RequireAccountAccessMiddleware` em todas (rota `{accountId}`, sem guarda no
+handler) -- `401` sem token/token inválido, `403 auth.forbidden` com token de outra conta (RFC 9110). `403
 link.not_authorized` cobre tanto "não é profissional ativa" (convite) quanto "não é paciente"
 (resgate) -- o mesmo código para as duas, para um chamador não distinguir qual falhou.
 

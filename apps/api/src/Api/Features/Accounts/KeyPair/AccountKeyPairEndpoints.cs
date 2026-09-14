@@ -1,7 +1,5 @@
 using Api.Problems;
 using Microsoft.AspNetCore.Http.HttpResults;
-using Microsoft.AspNetCore.Mvc;
-using static Api.Accounts.SessionTokenIssuerAuthorization;
 using static Api.Problems.ProblemResults;
 using static Api.Problems.SealedBlobShape;
 
@@ -11,42 +9,31 @@ public static class AccountKeyPairEndpoints
 {
     private const int PublicKeyLength = 32;
 
-    public static void MapAccountKeyPairEndpoints(this WebApplication app)
+    public static void MapAccountKeyPairEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapPut("/accounts/{accountId:guid}/key-pair", HandlePutAsync)
             .WithName("PutAccountKeyPair")
             .WithSummary("Publish (or replace) the account's X25519 key pair envelope")
-            .WithDescription("The public key is immutable once published: republishing the SAME public key replaces wrappedDek/sealedPrivateKey (204, serves KEK rotation); a DIFFERENT public key is 409 (the first publication wins). Requires an Authorization: Bearer access token for this exact account -- 401 without/invalid token, 403 for a valid token of another account (RFC 9110, AccountAccessProblem).")
+            .WithDescription("The public key is immutable once published: republishing the SAME public key replaces wrappedDek/sealedPrivateKey (204, serves KEK rotation); a DIFFERENT public key is 409 (the first publication wins). Requires an Authorization: Bearer access token for this exact account. 401 without/invalid token, 403 for a valid token of another account (RFC 9110, RequireAccountAccessMiddleware).")
             .Produces(StatusCodes.Status204NoContent)
             .Produces<LimmiarProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")
-            .Produces<LimmiarProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")
-            .Produces<LimmiarProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json");
 
         app.MapGet("/accounts/{accountId:guid}/key-pair", HandleGetAsync)
             .WithName("GetAccountKeyPair")
             .WithSummary("Read the account's own X25519 key pair envelope")
-            .WithDescription("404 if the account never published a key pair. Requires an Authorization: Bearer access token for this exact account -- 401 without/invalid token, 403 for a valid token of another account.")
+            .WithDescription("404 if the account never published a key pair. Requires an Authorization: Bearer access token for this exact account. 401 without/invalid token, 403 for a valid token of another account (RequireAccountAccessMiddleware).")
             .Produces<AccountKeyPairResponse>(StatusCodes.Status200OK)
-            .Produces<LimmiarProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")
-            .Produces<LimmiarProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json");
     }
 
     private static async Task<Results<NoContent, JsonHttpResult<LimmiarProblemDetails>>> HandlePutAsync(
         Guid accountId,
         AccountKeyPairRequest request,
-        [FromHeader(Name = "Authorization")] string? authorization,
-        ISessionTokenIssuer sessionTokenIssuer,
         AccountKeyPairService keyPairService,
         CancellationToken cancellationToken)
     {
-        if (AccountAccessProblem(authorization, accountId, sessionTokenIssuer) is { } accessProblem)
-        {
-            return accessProblem;
-        }
-
         if (request.PublicKey.Length != PublicKeyLength)
         {
             return ValidationProblem("publicKey");
@@ -71,16 +58,9 @@ public static class AccountKeyPairEndpoints
 
     private static async Task<Results<Ok<AccountKeyPairResponse>, JsonHttpResult<LimmiarProblemDetails>>> HandleGetAsync(
         Guid accountId,
-        [FromHeader(Name = "Authorization")] string? authorization,
-        ISessionTokenIssuer sessionTokenIssuer,
         AccountKeyPairService keyPairService,
         CancellationToken cancellationToken)
     {
-        if (AccountAccessProblem(authorization, accountId, sessionTokenIssuer) is { } accessProblem)
-        {
-            return accessProblem;
-        }
-
         var pair = await keyPairService.GetAsync(accountId, cancellationToken);
         if (pair is null)
         {

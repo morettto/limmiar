@@ -1,23 +1,19 @@
 using Api.Accounts;
 using Api.Problems;
 using Microsoft.AspNetCore.Http.HttpResults;
-using Microsoft.AspNetCore.Mvc;
-using static Api.Accounts.SessionTokenIssuerAuthorization;
 using static Api.Problems.ProblemResults;
 
 namespace Api.PatientLinks;
 
 public static class PatientLinkEndpoints
 {
-    public static void MapPatientLinkEndpoints(this WebApplication app)
+    public static void MapPatientLinkEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapPost("/accounts/{accountId:guid}/patients/{patientId:guid}/link-invites", HandleCreateInviteAsync)
             .WithName("CreateLinkInvite")
             .WithSummary("Generate a single-use code linking a patientId to a paciente account")
             .WithDescription("The code is 12 Crockford-Base32 characters (60 bits), single use, expires after 7 days (PatientLinkStore.InviteLifetime). Requires an Authorization: Bearer access token for this exact account, and the account must be an active Professional (same guard as Consent/Notes).")
             .Produces<CreateLinkInviteResponse>(StatusCodes.Status201Created)
-            .Produces<LimmiarProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")
-            .Produces<LimmiarProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json");
 
         app.MapPost("/accounts/{accountId:guid}/links", HandleRedeemAsync)
@@ -26,8 +22,6 @@ public static class PatientLinkEndpoints
             .WithDescription("Consumes the invite on success only. 409 if this professional-patient pair (by account or by patientId) is already linked. Requires an Authorization: Bearer access token for this exact account, and the account must be a Patient.")
             .Produces<LinkView>(StatusCodes.Status201Created)
             .Produces<LimmiarProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")
-            .Produces<LimmiarProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")
-            .Produces<LimmiarProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json");
 
@@ -35,33 +29,22 @@ public static class PatientLinkEndpoints
             .WithName("ListLinks")
             .WithSummary("List this account's links, each with the peer's public key")
             .WithDescription("The only response in this API that carries another account's public key -- always the caller's own links, never a third party's. peerPublicKey is null if the peer never published a key pair yet.")
-            .Produces<IReadOnlyList<LinkView>>(StatusCodes.Status200OK)
-            .Produces<LimmiarProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")
-            .Produces<LimmiarProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json");
+            .Produces<IReadOnlyList<LinkView>>(StatusCodes.Status200OK);
 
         app.MapDelete("/accounts/{accountId:guid}/links/{peerAccountId:guid}", HandleUnlink)
             .WithName("Unlink")
             .WithSummary("Remove the link between this account and the peer")
             .WithDescription("Either party may unlink. Does not touch key pairs or anything already shared. 404 if no link exists between the two accounts -- not a silent no-op 204.")
             .Produces(StatusCodes.Status204NoContent)
-            .Produces<LimmiarProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")
-            .Produces<LimmiarProblemDetails>(StatusCodes.Status403Forbidden, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json");
     }
 
     private static async Task<Results<Created<CreateLinkInviteResponse>, JsonHttpResult<LimmiarProblemDetails>>> HandleCreateInviteAsync(
         Guid accountId,
         Guid patientId,
-        [FromHeader(Name = "Authorization")] string? authorization,
-        ISessionTokenIssuer sessionTokenIssuer,
         PatientLinkService linkService,
         CancellationToken cancellationToken)
     {
-        if (AccountAccessProblem(authorization, accountId, sessionTokenIssuer) is { } accessProblem)
-        {
-            return accessProblem;
-        }
-
         var result = await linkService.CreateInviteAsync(accountId, patientId, cancellationToken);
         return result.Match<Results<Created<CreateLinkInviteResponse>, JsonHttpResult<LimmiarProblemDetails>>>(
             invite => TypedResults.Created(
@@ -73,16 +56,9 @@ public static class PatientLinkEndpoints
     private static async Task<Results<Created<LinkView>, JsonHttpResult<LimmiarProblemDetails>>> HandleRedeemAsync(
         Guid accountId,
         RedeemLinkRequest request,
-        [FromHeader(Name = "Authorization")] string? authorization,
-        ISessionTokenIssuer sessionTokenIssuer,
         PatientLinkService linkService,
         CancellationToken cancellationToken)
     {
-        if (AccountAccessProblem(authorization, accountId, sessionTokenIssuer) is { } accessProblem)
-        {
-            return accessProblem;
-        }
-
         if (string.IsNullOrEmpty(request.Code))
         {
             return ValidationProblem("code");
@@ -96,16 +72,9 @@ public static class PatientLinkEndpoints
 
     private static async Task<Results<Ok<IReadOnlyList<LinkView>>, JsonHttpResult<LimmiarProblemDetails>>> HandleListAsync(
         Guid accountId,
-        [FromHeader(Name = "Authorization")] string? authorization,
-        ISessionTokenIssuer sessionTokenIssuer,
         PatientLinkService linkService,
         CancellationToken cancellationToken)
     {
-        if (AccountAccessProblem(authorization, accountId, sessionTokenIssuer) is { } accessProblem)
-        {
-            return accessProblem;
-        }
-
         var links = await linkService.ListAsync(accountId, cancellationToken);
         return TypedResults.Ok(links);
     }
@@ -113,15 +82,8 @@ public static class PatientLinkEndpoints
     private static Results<NoContent, JsonHttpResult<LimmiarProblemDetails>> HandleUnlink(
         Guid accountId,
         Guid peerAccountId,
-        [FromHeader(Name = "Authorization")] string? authorization,
-        ISessionTokenIssuer sessionTokenIssuer,
         PatientLinkService linkService)
     {
-        if (AccountAccessProblem(authorization, accountId, sessionTokenIssuer) is { } accessProblem)
-        {
-            return accessProblem;
-        }
-
         if (!linkService.Unlink(accountId, peerAccountId))
         {
             return ProblemJson(StatusCodes.Status404NotFound, "Link not found", PatientLinksProblemCodes.LinkNotFound);

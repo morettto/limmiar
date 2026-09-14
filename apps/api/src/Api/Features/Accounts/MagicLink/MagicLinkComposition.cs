@@ -22,11 +22,12 @@ public static class MagicLinkComposition
         }
     }
 
-    public static void MapMagicLink(this WebApplication app)
+    public static void MapMagicLink(this IEndpointRouteBuilder app)
     {
         app.MapMagicLinkEndpoints();
 
-        if (app.Configuration.GetValue<bool>("MagicLink:TestCaptureEndpoint"))
+        var configuration = app.ServiceProvider.GetRequiredService<IConfiguration>();
+        if (configuration.GetValue<bool>("MagicLink:TestCaptureEndpoint"))
         {
             app.MapMagicLinkDebugEndpoints();
         }

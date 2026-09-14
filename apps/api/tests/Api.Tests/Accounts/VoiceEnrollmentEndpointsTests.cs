@@ -86,7 +86,7 @@ public sealed class VoiceEnrollmentEndpointsTests
 
     /// <summary>A valid bearer token for a DIFFERENT account than the one in the route must not authorize -- same wrong-owner shape as PatientEndpointsTests's equivalent test.</summary>
     [Fact]
-    public async Task PutVoiceEnrollment_WithTokenForDifferentAccount_Returns401WithProblemDetails()
+    public async Task PutVoiceEnrollment_WithTokenForDifferentAccount_Returns403WithProblemDetails()
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
@@ -100,10 +100,29 @@ public sealed class VoiceEnrollmentEndpointsTests
             new VoiceEnrollmentRequest(SomeSealedBlob(0x01), SomeSealedBlob(0x02)),
             AccountsJsonContext.Default.VoiceEnrollmentRequest);
 
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
         using var doc = JsonDocument.Parse(body);
-        Assert.Equal("auth.access_token_invalid", doc.RootElement.GetProperty("code").GetString());
+        Assert.Equal("auth.forbidden", doc.RootElement.GetProperty("code").GetString());
+    }
+
+    /// <summary>Same wrong-owner shape as Put above, exercised on the GET half so both handlers are proven to separate 401 from 403 through RequireAccountAccess().</summary>
+    [Fact]
+    public async Task GetVoiceEnrollment_WithTokenForDifferentAccount_Returns403WithProblemDetails()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        await RegisterProfessionalAsync(client, "voice-get-wrong-owner@example.com");
+
+        using var otherClient = factory.CreateClient();
+        var otherAccountId = await RegisterProfessionalAsync(otherClient, "voice-get-wrong-owner-target@example.com");
+
+        var response = await client.GetAsync($"/accounts/{otherAccountId}/voice-enrollment");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(body);
+        Assert.Equal("auth.forbidden", doc.RootElement.GetProperty("code").GetString());
     }
 
     [Fact]
@@ -241,7 +260,7 @@ public sealed class VoiceEnrollmentEndpointsTests
         Assert.Equal("auth.account_not_found", doc.RootElement.GetProperty("code").GetString());
     }
 
-    /// <summary>Same bypass technique as the PUT test above, reaching VoiceEnrollmentService.GetAsync with an account that does not exist -- regression test for the account! null-dereference that used to throw instead of returning 404 (ronda 2, B2).</summary>
+    /// <summary>Same bypass technique as the PUT test above, reaching VoiceEnrollmentService.GetAsync's AccountNotFound branch specifically -- distinct from the NotEnrolled branch (GetVoiceEnrollment_WithoutPriorEnrollment_Returns404WithProblemDetails), which fires for a real account that just has no cadastro. Same symmetry PUT/DELETE already had.</summary>
     [Fact]
     public async Task GetVoiceEnrollment_WithUnknownAccountId_Returns404WithProblemDetails()
     {
@@ -255,7 +274,7 @@ public sealed class VoiceEnrollmentEndpointsTests
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
         using var doc = JsonDocument.Parse(body);
-        Assert.Equal("voice.enrollment_not_found", doc.RootElement.GetProperty("code").GetString());
+        Assert.Equal("auth.account_not_found", doc.RootElement.GetProperty("code").GetString());
     }
 
     /// <summary>Same bypass technique as the PUT test above, reaching VoiceEnrollmentService.DeleteAsync's AccountNotFound branch specifically -- distinct from the NotEnrolled branch (DeleteVoiceEnrollment_WithoutPriorEnrollment_Returns404WithProblemDetails), which fires for a real account that just has no cadastro.</summary>
@@ -275,7 +294,7 @@ public sealed class VoiceEnrollmentEndpointsTests
         Assert.Equal("auth.account_not_found", doc.RootElement.GetProperty("code").GetString());
     }
 
-    /// <summary>Registers a Professional and completes mandatory TOTP enrollment (ADR-S02-03), leaving client carrying the real access token as its default Bearer header. Verification status doesn't matter here -- voice enrollment is gated by account ownership only (EndpointHelpers.IsAuthorizedForAccount), not AccountAuthorizationGuard.CanCreatePatientRecords.</summary>
+    /// <summary>Registers a Professional and completes mandatory TOTP enrollment (ADR-S02-03), leaving client carrying the real access token as its default Bearer header. Verification status doesn't matter here -- voice enrollment is gated by account ownership only (RequireAccountAccess()), not AccountAuthorizationGuard.CanCreatePatientRecords.</summary>
     private static async Task<Guid> RegisterProfessionalAsync(HttpClient client, string email)
     {
         var registerResponse = await client.PostAsJsonAsync(
@@ -323,6 +342,7 @@ public sealed class VoiceEnrollmentEndpointsTests
                 builder.UseSetting("StaffAccess:ApiKey", "test-staff-api-key");
                 builder.UseSetting("WebAuthn:RelyingPartyId", "limmiar.test");
                 builder.UseSetting("WebAuthn:ExpectedOrigin", "https://limmiar.test");
+                builder.UseSetting("AbacatePay:WebhookSecret", "whsec_test123");
                 builder.ConfigureTestServices(services => services.AddSingleton<ITotpProvider>(new StubTotpProvider()));
             });
 

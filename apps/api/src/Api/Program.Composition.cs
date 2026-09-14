@@ -1,4 +1,5 @@
 using Api.Accounts;
+using Api.Billing;
 using Api.Consent;
 using Api.Data;
 using Api.Health;
@@ -53,6 +54,7 @@ public partial class Program
         builder.Services.AddNotes();
         builder.Services.AddConsent();
         builder.Services.AddPatientLinks();
+        builder.Services.AddBilling(builder.Configuration);
 
         var app = builder.Build();
 
@@ -65,13 +67,24 @@ public partial class Program
 
         app.UseCors();
 
-        app.MapHealthEndpoints();
-        app.MapAccounts();
-        app.MapPatients();
-        app.MapScheduling();
-        app.MapNotes();
-        app.MapConsent();
-        app.MapPatientLinks();
+        // Runs after routing has selected an endpoint and before that endpoint's own request
+        // delegate -- including its parameter binding -- ever executes. See
+        // Accounts.Sessions/README.md.
+        app.UseMiddleware<RequireAccountAccessMiddleware>();
+
+        // Every Map*Endpoints call below funnels through this one root group so the 401/403
+        // OpenAPI responses get declared on every {accountId} route exactly once, with no
+        // per-route call to forget.
+        var routes = app.MapGroup("").DeclareAccountAccessOpenApiResponses();
+
+        routes.MapHealthEndpoints();
+        routes.MapAccounts();
+        routes.MapPatients();
+        routes.MapScheduling();
+        routes.MapNotes();
+        routes.MapConsent();
+        routes.MapBilling();
+        routes.MapPatientLinks();
 
         return app;
     }

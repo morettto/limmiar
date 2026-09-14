@@ -13,7 +13,7 @@ import { CopilotKeyPage } from '../../pages/settings/CopilotKeyPage'
 import { NotaPage } from '../../pages/notas/NotaPage'
 import { BibliotecaPage } from '../../pages/biblioteca/BibliotecaPage'
 import { parseEstadoConsentimento, type EstadoConsentimento } from '../../entities/consentimento/api'
-import { useSession } from '../providers/SessionProvider'
+import { useSession } from '../../entities/account/session-context'
 import { E2eMicrofoneScaffold } from './E2eMicrofoneScaffold'
 import { E2eVinculoScaffold } from './E2eVinculoScaffold'
 
@@ -22,6 +22,12 @@ function readSearchString(search: Record<string, unknown>, key: string): string 
   return typeof value === 'string' ? value : ''
 }
 
+const E2E_ROUTES_LIGADAS = import.meta.env.VITE_ENABLE_E2E_TEST_ROUTES === 'true'
+
+// O host da API de /auth/magic-link é sempre constante de build (S18-17, ver README), em todos os
+// builds, incluindo e2e (playwright.config.ts passa VITE_API_BASE_URL): nenhum `?baseUrl=` de
+// terceiros num link de magic link chega a escolher o servidor.
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 
 // The root route's component is deliberately unset: TanStack Router's default root already
 // renders an <Outlet/> for the matched child, which is exactly this app's shell, so an explicit
@@ -29,13 +35,15 @@ function readSearchString(search: Record<string, unknown>, key: string): string 
 
 const rootRoute = createRootRoute()
 
+// ponytail: sem KeychainProvider ainda, `chaveiro` fica sempre `null` -- painel em "chaveiro
+// bloqueado", falha fechada por decisão humana. `notas` vazia pelo mesmo motivo (sem GET de nota).
 function IndexRouteComponent() {
-  const { sessao, terminarSessao } = useSession()
+  const { sessao } = useSession()
   // S11-01: o role já chega em produção (validado em entities/account/session.ts), redirect real.
   if (sessao?.role === 'Patient') {
     return <Navigate to="/hoje" />
   }
-  return <HomePage email={sessao?.email ?? null} onSair={terminarSessao} />
+  return <HomePage chaveiro={null} notas={[]} />
 }
 
 const indexRoute = createRoute({
@@ -45,7 +53,6 @@ const indexRoute = createRoute({
 })
 
 interface MagicLinkCallbackSearch {
-  baseUrl: string
   token: string
 }
 
@@ -53,16 +60,15 @@ const magicLinkCallbackRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/auth/magic-link',
   validateSearch: (search: Record<string, unknown>): MagicLinkCallbackSearch => ({
-    baseUrl: readSearchString(search, 'baseUrl'),
     token: readSearchString(search, 'token'),
   }),
   component: MagicLinkCallbackRouteComponent,
 })
 
 function MagicLinkCallbackRouteComponent() {
-  const { baseUrl, token } = magicLinkCallbackRoute.useSearch()
+  const { token } = magicLinkCallbackRoute.useSearch()
   const { iniciarSessao } = useSession()
-  return <MagicLinkCallback baseUrl={baseUrl} token={token} onAuthenticated={iniciarSessao} />
+  return <MagicLinkCallback baseUrl={API_BASE_URL} token={token} onAuthenticated={iniciarSessao} />
 }
 
 // S02-04 fatia 7 / S02-05 — E2E scaffolding, not production UI: these screens have no navigation
@@ -248,26 +254,17 @@ function E2eVinculoRouteComponent() {
 // playwright.config.ts exercises a real `vite build`, not `vite dev`.
 
 
-// useSession() only works under app/routing (fsd-pages-no-app forbids pages from importing app),
-// so this thin wrapper is the one place that can read `sessao` and hand CopilotKeyPage a real
-// accountId -- reintroduced after S07-04 follow-up B3 removed it, for that reason.
-function CopilotKeyRouteComponent() {
-  const { sessao } = useSession()
-  return <CopilotKeyPage accountId={sessao?.id ?? null} />
-}
-
 const copilotSettingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/settings/copilot',
-  component: CopilotKeyRouteComponent,
+  component: CopilotKeyPage,
 })
 
 // ponytail: mesma situação, mesmo motivo do `dek={null}` de BibliotecaRouteComponent --
-// sem KeychainProvider ainda. `accountId` já vem da sessão real (S08-27, mesmo padrão do
-// S18-01); `kek`/`accessToken` continuam `null` até existir Keychain -- fora de âmbito.
+// sem KeychainProvider ainda. `kek`/`accessToken` continuam `null` até existir Keychain --
+// fora de âmbito; a página lê a própria sessão via useSession() (S18-18).
 function NotaRouteComponent() {
-  const { sessao } = useSession()
-  return <NotaPage kek={null} accountId={sessao?.id ?? null} accessToken={null} />
+  return <NotaPage kek={null} accessToken={null} />
 }
 
 // Ticket S08-01, fatia 2/5: Tela P4.1 (fila de assinatura + editor SOAP). Monta com uma
@@ -279,13 +276,12 @@ const notaRoute = createRoute({
 })
 
 // ponytail: mesma situação do `kek={null}` de CopilotKeyPage/NotaPage -- sem KeychainProvider
-// ainda. `chaveIndice={null}` deixa BibliotecaPage em `a-preparar` sem abrir OPFS. `accountId` já
-// vem da sessão real (S18-01); só falta o chaveiro, fora de âmbito desta spec.
+// ainda. `chaveIndice={null}` deixa BibliotecaPage em `a-preparar` sem abrir OPFS; a página lê a
+// própria sessão via useSession() (S18-10). Só falta o chaveiro, fora de âmbito desta spec.
 const BIBLIOTECA_STORE_FIXTURE = { ler: async () => null, gravar: async () => {}, apagar: async () => {} }
 
 function BibliotecaRouteComponent() {
-  const { sessao } = useSession()
-  return <BibliotecaPage notas={[]} accountId={sessao?.id ?? null} chaveIndice={null} store={BIBLIOTECA_STORE_FIXTURE} />
+  return <BibliotecaPage notas={[]} chaveIndice={null} store={BIBLIOTECA_STORE_FIXTURE} />
 }
 
 // Ticket S08-02, fatias 4-5: biblioteca de notas com busca cifrada no cliente. Rota normal
@@ -356,7 +352,7 @@ const pacienteLayoutWithChildren =
     : pacienteLayoutRoute.addChildren([pacienteHojeRoute])
 
 const routeTree =
-  import.meta.env.VITE_ENABLE_E2E_TEST_ROUTES === 'true'
+  E2E_ROUTES_LIGADAS
     ? rootRoute.addChildren([
         indexRoute,
         magicLinkCallbackRoute,

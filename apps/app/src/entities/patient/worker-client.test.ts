@@ -83,4 +83,18 @@ describe('openSummariesInWorker', () => {
 
     await expect(promise).rejects.toThrow('aborted')
   })
+
+  // Já abortado ANTES da chamada (não durante): o listener de 'abort' nunca dispararia
+  // (o evento já passou), então sem esta guarda o worker subiria e o decifrado real
+  // rodaria à toa num resultado que o chamador já descarta (PainelProfissional).
+  it('rejects immediately, without creating a Worker, when the signal is already aborted', async () => {
+    const workerCtor = vi.fn()
+    vi.stubGlobal('Worker', workerCtor)
+    const kek = await makeKek()
+    const controller = new AbortController()
+    controller.abort()
+
+    await expect(openSummariesInWorker(kek, [], controller.signal)).rejects.toThrow('aborted')
+    expect(workerCtor).not.toHaveBeenCalled()
+  })
 })
