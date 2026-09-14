@@ -68,12 +68,15 @@ ser chamado direto de qualquer `pages/` -- este módulo deixou de ser o único s
   módulo, mas lê dele") e já tem o seu próprio ponytail a marcar que `'self'` só cobre a API .NET
   enquanto ela partilhar esta origem; sem esse diff em conjunto, o browser bloqueia as chamadas de
   `/auth/magic-link` para o novo host.
-- **`IndexRouteComponent`/`CopilotKeyRouteComponent` foram apagados (S18-10).** Existiam só
+- **`IndexRouteComponent`/`CopilotKeyRouteComponent` foram apagados (S18-10); `IndexRouteComponent`
+  voltou no S09 só com `chaveiro`/`notas`.** Existiam só
   para converter `sessao` em props porque `useSession()` vivia em `app/providers`, atrás da
   fronteira `fsd-pages-no-app`. Descer `useSession()` para `entities/account/session-context.tsx`
   (camada que `pages` já podia importar) tornou os dois wrappers desnecessários -- `HomePage` e
-  `CopilotKeyPage` chamam `useSession()` diretamente e `router.tsx` aponta `component` para elas
-  sem intermediário. `BibliotecaRouteComponent` fica porque a rota ainda fixa fixtures de
+  `CopilotKeyPage` chamam `useSession()` diretamente. O S09 reintroduziu `IndexRouteComponent`
+  sem `useSession()`: passa a `HomePage` só `chaveiro` (sempre `null` enquanto não existe
+  `KeychainProvider` -- falha fechada, decisão humana) e `notas` (vazia, sem GET de nota); ver
+  `pages/home/README.md` e `widgets/painel-profissional/README.md`. `BibliotecaRouteComponent` fica porque a rota ainda fixa fixtures de
   produto (`chaveIndice`, `store`) que não fazem sentido dentro da página; deixou só de chamar
   `useSession()`, já que `BibliotecaPage` passou a ler a própria sessão.
 - **`BibliotecaPage` já não recebe `accountId` por prop (S18-10).** A página lê

@@ -33,7 +33,7 @@ public static class BillingComposition
         });
     }
 
-    public static void MapBilling(this WebApplication app)
+    public static void MapBilling(this IEndpointRouteBuilder app)
     {
         app.MapBillingEndpoints();
     }

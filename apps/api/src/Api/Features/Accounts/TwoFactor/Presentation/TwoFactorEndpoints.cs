@@ -10,12 +10,14 @@ namespace Api.Accounts;
 // No reset/disable-2FA endpoint by design (ADR-S02-04) -- lost-authenticator recovery is the single-use backup code only. Every handler validates the ITwoFactorTicketIssuer ticket against accountId before dispatching.
 public static class TwoFactorEndpoints
 {
-    public static void MapTwoFactorEndpoints(this WebApplication app)
+    public static void MapTwoFactorEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapPost("/accounts/{accountId:guid}/totp", HandleBeginAsync)
             .WithName("PostAccountTotp")
             .WithSummary("Start (or restart) a mandatory TOTP enrollment")
             .WithDescription("Only for AccountRole.Professional accounts. Calling this again before confirmation replaces the pending secret. Requires a two-factor ticket from register/login/google for this account.")
+            // Gated by the two-factor ticket (HandleBeginAsync validates it against accountId), not a Bearer access token -- there is no session yet at this point in the flow.
+            .AllowWithoutAccountToken()
             .Produces<BeginTotpEnrollmentResponse>(StatusCodes.Status200OK)
             .Produces<LimmiarProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")
@@ -25,6 +27,8 @@ public static class TwoFactorEndpoints
             .WithName("PostAccountTotpConfirm")
             .WithSummary("Confirm a pending TOTP enrollment")
             .WithDescription("Returns the 10 single-use backup codes in clear text -- the only response that ever exposes them (ADR-S02-04). Requires a two-factor ticket for this account.")
+            // Gated by the two-factor ticket, not a Bearer access token -- same reason as PostAccountTotp above.
+            .AllowWithoutAccountToken()
             .Produces<ConfirmTotpEnrollmentResponse>(StatusCodes.Status200OK)
             .Produces<LimmiarProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")
@@ -35,6 +39,8 @@ public static class TwoFactorEndpoints
             .WithName("PostAccountTotpChallenge")
             .WithSummary("Verify a TOTP code or single-use backup code")
             .WithDescription("Required on every login once 2FA is enabled. Accepts exactly one of code or backupCode. Requires a two-factor ticket for this account.")
+            // Gated by the two-factor ticket, not a Bearer access token -- same reason as PostAccountTotp above.
+            .AllowWithoutAccountToken()
             .Produces<LoginResponse>(StatusCodes.Status200OK)
             .Produces<LimmiarProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")

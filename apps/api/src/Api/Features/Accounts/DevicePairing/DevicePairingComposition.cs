@@ -14,7 +14,7 @@ public static class DevicePairingComposition
         services.AddSingleton<NewDeviceAlertNotifier>();
     }
 
-    public static void MapDevicePairing(this WebApplication app)
+    public static void MapDevicePairing(this IEndpointRouteBuilder app)
     {
         app.MapDevicePairingEndpoints();
     }

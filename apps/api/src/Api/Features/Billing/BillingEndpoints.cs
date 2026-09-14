@@ -10,7 +10,7 @@ public static class BillingEndpoints
     /// leitura do corpo antes de chegar a IsAuthentic ou ao parse JSON.</summary>
     private const long MaxBodyBytes = 64 * 1024;
 
-    public static void MapBillingEndpoints(this WebApplication app)
+    public static void MapBillingEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapPost("/webhooks/abacatepay", HandleWebhookAsync)
             .WithName("PostAbacatePayWebhook")

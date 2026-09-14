@@ -20,12 +20,16 @@ const ACCOUNT: Account = {
   twoFactorTicket: null,
 }
 
-function renderHomePage(sessao: Account | null, terminarSessao: () => void = vi.fn()) {
+function renderHomePage(
+  sessao: Account | null,
+  terminarSessao: () => void = vi.fn(),
+  props: Partial<React.ComponentProps<typeof HomePage>> = {},
+) {
   const value: ContextoSessao = { sessao, iniciarSessao: vi.fn(), terminarSessao }
   return render(
     <I18nProvider i18n={i18n}>
       <SessionContext.Provider value={value}>
-        <HomePage />
+        <HomePage chaveiro={null} notas={[]} {...props} />
       </SessionContext.Provider>
     </I18nProvider>,
   )
@@ -64,5 +68,11 @@ describe('HomePage', () => {
 
     expect(screen.queryByTestId('conta-sessao')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Sair' })).toBeNull()
+  })
+
+  it('monta o painel profissional com as props da sessão (chaveiro bloqueado por omissão)', async () => {
+    renderHomePage(ACCOUNT)
+
+    expect(await screen.findByText('Chaveiro bloqueado. Desbloqueie para ver o painel.')).toBeTruthy()
   })
 })

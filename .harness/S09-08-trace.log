@@ -1,0 +1,155 @@
+S09-08 — trace vermelho/verde
+==============================
+
+0) TZ do teste de horaDaSessao (CI vermelho, Stryker/UTC)
+------------------------------------------------------------------------------
+Vermelho — teste novo, terceiro parâmetro (`timeZone`) que `horaDaSessao`
+ainda não aceita, corrido com TZ=UTC (reproduz o CI):
+$ TZ=UTC pnpm vitest run src/entities/agenda/sessao.test.ts
+  1 failed | 5 passed
+  AssertionError: expected '11:05' to be '08:05'
+  -> mesma falha do CI: sem `timeZone` explícito, o `toLocaleTimeString`
+     segue o fuso do processo (UTC), não o de Brasília.
+
+Verde — `horaDaSessao(inicioEm, locale, timeZone?)`, o teste passa
+`'America/Sao_Paulo'` em vez de `vi.stubEnv('TZ', ...)`:
+$ TZ=UTC pnpm vitest run src/entities/agenda/sessao.test.ts
+  6 passed
+$ TZ=America/Sao_Paulo pnpm vitest run src/entities/agenda/sessao.test.ts
+  6 passed
+  -> um `timeZone` passado à própria chamada da Intl não depende de nenhum
+     `TZ` de processo, logo não depende de o Stryker ter reaproveitado o
+     worker entre mutantes.
+
+Prova adicional (o ponto exato que falhava em CI): Stryker incremental com
+TZ=UTC, até ao fim da corrida inicial (coverage `perTest`, que é o mesmo
+"dry run" citado no critério):
+$ TZ=UTC pnpm --filter app test:mutation:incremental
+  ProjectReader: Found 91 of 427 file(s) to be mutated.
+  Instrumenter: Instrumented 91 source file(s) with 2658 mutant(s)
+  DryRunExecutor: Initial test run succeeded. Ran 626 tests in 1m34s.
+  -> essa run inicial é exatamente onde o CI relatava
+     "expected '11:05' to be '08:05'"; passou. Corrida completa dos 2658
+     mutantes (~1h50) não é necessária para provar o critério 0 e foi
+     interrompida depois da run inicial (o `--incremental` grava
+     `.stryker-tmp/incremental.json`, apagado — não fazia sentido cachear uma
+     corrida parcial).
+
+Outros testes dependentes de TZ verificados (grep por
+toLocaleTimeString|toLocaleDateString|stubEnv('TZ'|Intl.DateTimeFormat em
+todo `src/`): só o de `horaDaSessao` existia. Nenhum outro achado.
+
+1) A1 — falha crua no estado, traduzida no render; accessToken via ref
+------------------------------------------------------------------------------
+Baseline (antes de qualquer edição, módulos que o ticket toca):
+$ pnpm vitest run src/widgets/painel-profissional src/entities/agenda src/entities/patient/worker-client.test.ts src/pages/home src/app/routing
+  7 passed (7) / 67 passed (67)
+
+Dois testes escritos primeiro (mensagem traduzida no render, accessToken via
+ref); vermelhos por mutação — devolvi as deps do efeito para
+`[chaveiro?.kek, chaveiro?.accountId, chaveiro?.accessToken, baseUrl,
+openSummaries, i18n, t]` (a forma antiga, de três props separadas):
+$ pnpm vitest run src/widgets/painel-profissional/PainelProfissional.test.tsx -t "A1:"
+  2 failed
+  -> "trocar de idioma": o alert nunca chega a mostrar o texto em inglês (o
+     efeito recarrega e o teste trava em "Carregando painel...").
+  -> "renovar o accessToken": trava em `findByText('Pacientes ativos')` --
+     o `rerender` com token novo faz o efeito recarregar do zero.
+
+Verde (deps restauradas a `[chaveiro?.kek, chaveiro?.accountId, baseUrl,
+openSummaries]`, `i18n`/`t` só usados no render via `traduzirFalha`,
+`accessToken` lido por `tokenAtual()` via `chaveiroRef`):
+$ pnpm vitest run src/widgets/painel-profissional/PainelProfissional.test.tsx -t "A1:"
+  2 passed
+
+Terceiro teste A1 (cobertura de ramo): o fallback `tokenAoEntrar` de
+`tokenAtual()` (quando `chaveiroRef.current` já é `null` por um lock com
+pedido em voo) não tinha teste nenhum — `pnpm vitest run --coverage`
+acusava branch 97.77% em PainelProfissional.tsx. Teste novo tranca o
+chaveiro com `openSummaries` ainda pendente; verde direto (o ramo já existia,
+só faltava o teste):
+$ pnpm vitest run src/widgets/painel-profissional/PainelProfissional.test.tsx -t "trancar o chaveiro"
+  1 passed
+$ pnpm vitest run --coverage src/widgets/painel-profissional
+  branch 100% em PainelProfissional.tsx
+
+2) A2 — chaveiro numa prop só
+------------------------------------------------------------------------------
+Refactor mecânico (tipo `Chaveiro`/`ChaveiroDestrancado` + guard
+`chaveiroDestrancado` apagados — sem uso depois de `chaveiro: {...} | null`
+substituir as três props `kek`/`accountId`/`accessToken`). `HomePage` e
+`IndexRouteComponent` repassam/montam a prop sem lógica nova. Sem "vermelho"
+funcional (mudança de forma, não de comportamento) — a prova é
+`tsc -b`, que aponta cada call-site desatualizado:
+$ pnpm --filter app exec tsc -b
+  (antes do ajuste de PainelProfissional.test.tsx/HomePage.test.tsx/router.tsx)
+  8 erros TS2322/TS2353 -- cada um um call-site com `accountId`/`accessToken`/
+  `kek` soltos, que já não existem em `PainelProfissionalProps`/`HomePageProps`.
+$ pnpm --filter app exec tsc -b
+  (depois) 0 erros
+
+Teste "kek=null" e "accountId=null" (que testavam a mesma coisa por dois
+lados de um guard que a nova prop torna impossível de meio-preencher) viram
+um só teste "chaveiro=null".
+
+3) N2 — worker-client rejeita se `signal.aborted` na entrada
+------------------------------------------------------------------------------
+Vermelho — teste novo, `signal` já abortado antes da chamada:
+$ pnpm vitest run src/entities/patient/worker-client.test.ts -t "já abortado"
+  1 failed
+  AssertionError: expected [Function] to throw error including 'aborted' but
+  got 'worker.postMessage is not a function'
+  -> sem a guarda de entrada, cria o `Worker` mesmo abortado; o listener de
+     'abort' nunca dispara (o evento já passou).
+
+Verde (guarda `if (signal?.aborted) return Promise.reject(...)` antes de
+criar o `Worker`):
+$ pnpm vitest run src/entities/patient/worker-client.test.ts
+  4 passed (4)
+
+PainelProfissional.tsx:76 volta a `await openSummaries(...)` sem o ternário
+`cancelled ? [] : ...`. Dois testes existentes ajustados para a nova forma
+observável (o mock de teste, ao contrário do worker real, não olha para
+`signal.aborted` sozinho -- ver README "worker-client.ts"):
+- "acc-1 ainda em voo...": a asserção virou `toHaveBeenCalledWith(...,
+  expect.objectContaining({patientId:'p-antigo'}), expect.objectContaining({
+  aborted:true}))` -- prova que o dado tardio chega a `openSummaries`, mas o
+  KPI/alert continuam a provar que nunca aparece na tela (freio real é o
+  `if (cancelled) return` de `carregar`).
+- "desmontar antes de listPatients resolver...": idem, `toHaveBeenCalledWith`
+  em vez de `not.toHaveBeenCalled()`.
+$ pnpm vitest run src/widgets/painel-profissional/PainelProfissional.test.tsx
+  16 passed (16) -- inclui as duas asserções acima e as três "A1:"
+
+4) N3 — listarSessoesDaSemana apagada, janela passa para o widget
+------------------------------------------------------------------------------
+Rename/mecânico: `SETE_DIAS_MS` + a montagem da janela saem de
+`entities/agenda/api.ts` para `carregarSessoes` em PainelProfissional.tsx
+(`listarSessoes(..., agora, new Date(agora.getTime()+SETE_DIAS_MS))`); o
+teste do wrapper (`describe('listarSessoesDaSemana', ...)`) sai de
+`api.test.ts` sem substituto -- o comportamento que ele provava (a URL com
+`to` = `from` + 7 dias) já está coberto pelos testes de
+PainelProfissional.test.tsx que verificam a chamada a `/agenda/sessions`.
+$ pnpm vitest run src/entities/agenda/api.test.ts
+  2 passed (2) -- só `listarSessoes` continua a existir
+
+5) 100% cobertura, ficheiros tocados
+------------------------------------------------------------------------------
+$ pnpm --filter app test:unit
+  Test Files  77 passed (77)
+  Tests  630 passed (630)
+  Statements 100% (1473/1473) / Branches 100% (580/580) /
+  Functions 100% (427/427) / Lines 100% (1413/1413)
+
+$ pnpm --filter app exec tsc -b        -> 0 erros
+$ pnpm --filter app lint               -> 0 erros (oxlint; avisos
+  pré-existentes noutros ficheiros, nenhum novo em PainelProfissional.tsx)
+$ pnpm --filter app lint:i18n          -> 0 erros (eslint; só os 4 avisos
+  pré-existentes "unused eslint-disable" dos catálogos gerados)
+$ pnpm --filter app lint:arch          -> "no dependency violations found"
+  (251 modules, 745 dependencies)
+$ pnpm --filter app run check:i18n-extract  -> catálogos re-extraídos, só
+  comentários `#:` de linha mudaram (código/refs), nenhum msgid/msgstr novo
+  ou removido -- commitados junto.
+$ pnpm --filter app run build          -> build ok (aviso de chunk >500kB é
+  pré-existente, `dist/assets/index-*.js` 591kB, mesmo antes desta fatia)

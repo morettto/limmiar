@@ -228,6 +228,28 @@ public sealed class SchedulingEndpointsTests : IAsyncLifetime
         Assert.Equal("auth.access_token_invalid", doc.RootElement.GetProperty("code").GetString());
     }
 
+    /// <summary>A real, valid bearer token -- just for a different account than the one in the route -- must not authorize. Same wrong-owner shape as PatientEndpointsTests.PostPatient_WithValidTokenForDifferentAccount_Returns403WithProblemDetails.</summary>
+    [Fact]
+    public async Task PostScheduledSession_WithValidTokenForDifferentAccount_Returns403WithProblemDetails()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        await RegisterActiveProfessionalAsync(client, "sched-schedule-wrong-owner@example.com");
+
+        using var otherClient = factory.CreateClient();
+        var otherAccountId = await RegisterProfessionalWithoutVerificationAsync(otherClient, "sched-schedule-wrong-owner-target@example.com");
+
+        var response = await client.PostAsJsonAsync(
+            $"/accounts/{otherAccountId}/agenda/sessions",
+            new ScheduleSessionRequest(Guid.NewGuid(), SomeStart, 50),
+            SchedulingJsonContext.Default.ScheduleSessionRequest);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(body);
+        Assert.Equal("auth.forbidden", doc.RootElement.GetProperty("code").GetString());
+    }
+
     [Fact]
     public async Task PostScheduledSession_WithUnverifiedProfessional_Returns403WithProblemDetails()
     {
@@ -581,6 +603,207 @@ public sealed class SchedulingEndpointsTests : IAsyncLifetime
         var cancelledAt = await command.ExecuteScalarAsync();
         Assert.False(cancelledAt is null or DBNull);
     }
+
+    /// <summary>Own live sessions inside [from,to) only, ordered by startsAt -- proves the window, cancelled exclusion, and RLS tenant isolation together (S09-02 B1).</summary>
+    [Fact]
+    public async Task ListSessions_ReturnsOnlyOwnLiveSessionsInsideWindow_OrderedByStartsAt()
+    {
+        using var factory = CreateFactory();
+        using var clientA = factory.CreateClient();
+        var accountIdA = await RegisterActiveProfessionalAsync(clientA, "sched-list-a@example.com");
+
+        var from = SomeStart;
+        var to = from.AddDays(7);
+
+        var secondId = await ScheduleSessionAsync(clientA, accountIdA, from.AddHours(2), 50);
+        var firstId = await ScheduleSessionAsync(clientA, accountIdA, from.AddMinutes(30), 40);
+        var thirdId = await ScheduleSessionAsync(clientA, accountIdA, to.AddDays(-1), 30);
+
+        await ScheduleSessionAsync(clientA, accountIdA, from.AddMinutes(-1), 20);
+        await ScheduleSessionAsync(clientA, accountIdA, to, 20);
+
+        var cancelledId = await ScheduleSessionAsync(clientA, accountIdA, from.AddHours(5), 20);
+        await clientA.DeleteAsync($"/accounts/{accountIdA}/agenda/sessions/{cancelledId}");
+
+        using var clientB = factory.CreateClient();
+        var accountIdB = await RegisterActiveProfessionalAsync(clientB, "sched-list-b@example.com");
+        await ScheduleSessionAsync(clientB, accountIdB, from.AddHours(1), 50);
+
+        var response = await ListSessionsAsync(clientA, accountIdA, from, to);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync(SchedulingJsonContext.Default.ListScheduledSessionsResponse);
+        Assert.NotNull(body);
+        Assert.Equal(new[] { firstId, secondId, thirdId }, body!.Sessions.Select(s => s.SessionId));
+    }
+
+    /// <summary>A cancelled session never reaches this endpoint, so the wire item has no reason
+    /// to carry cancelledAt at all -- reading the raw JSON (not the deserialized record) is the
+    /// only way to prove the property itself is gone, not just always null (S09-04 B1).</summary>
+    [Fact]
+    public async Task ListSessions_ItemsNeverCarryCancelledAtProperty()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        var accountId = await RegisterActiveProfessionalAsync(client, "sched-list-no-cancelledat@example.com");
+        var from = SomeStart;
+        var to = from.AddDays(7);
+        await ScheduleSessionAsync(client, accountId, from.AddMinutes(30), 40);
+
+        var response = await ListSessionsAsync(client, accountId, from, to);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(body);
+        var items = doc.RootElement.GetProperty("sessions").EnumerateArray().ToList();
+        Assert.NotEmpty(items);
+        Assert.All(items, item => Assert.False(item.TryGetProperty("cancelledAt", out _)));
+    }
+
+    /// <summary>Covers every branch of TryParseWindow -- missing/unparseable from or to, an empty or inverted window, and one second past the 7-day cap (S09-02 B2).</summary>
+    public static IEnumerable<object?[]> InvalidWindowCases()
+    {
+        var from = SomeStart.ToString("O");
+        var toAtSevenDays = SomeStart.AddDays(7).ToString("O");
+        var toBeforeFrom = SomeStart.AddMinutes(-1).ToString("O");
+        var toPastSevenDayCap = SomeStart.AddDays(7).AddSeconds(1).ToString("O");
+
+        return new[]
+        {
+            new object?[] { null, toAtSevenDays, "from" },
+            new object?[] { from, null, "to" },
+            new object?[] { "amanha", toAtSevenDays, "from" },
+            new object?[] { from, from, "to" },
+            new object?[] { from, toBeforeFrom, "to" },
+            new object?[] { from, toPastSevenDayCap, "to" },
+        };
+    }
+
+    [Theory]
+    [MemberData(nameof(InvalidWindowCases))]
+    public async Task ListSessions_WithInvalidWindow_Returns400WithProblemDetails(string? from, string? to, string expectedField)
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        var accountId = await RegisterActiveProfessionalAsync(client, $"sched-invalid-window-{Guid.NewGuid():N}@example.com");
+
+        var query = new List<string>();
+        if (from is not null)
+        {
+            query.Add($"from={Uri.EscapeDataString(from)}");
+        }
+
+        if (to is not null)
+        {
+            query.Add($"to={Uri.EscapeDataString(to)}");
+        }
+
+        var url = $"/accounts/{accountId}/agenda/sessions" + (query.Count > 0 ? "?" + string.Join("&", query) : string.Empty);
+
+        var response = await client.GetAsync(url);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        var body = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(body);
+        Assert.Equal("validation.invalid_field", doc.RootElement.GetProperty("code").GetString());
+        Assert.Equal(expectedField, doc.RootElement.GetProperty("params").GetProperty("field").GetString());
+    }
+
+    /// <summary>No token at all -- 401 auth.access_token_invalid, same as every other endpoint (RFC 9110 §15.5.2).</summary>
+    [Fact]
+    public async Task ListSessions_WithoutToken_Returns401()
+    {
+        using var factory = CreateFactory();
+        using var clientA = factory.CreateClient();
+        var accountIdA = await RegisterActiveProfessionalAsync(clientA, "sched-list-401-a@example.com");
+
+        using var anonymousClient = factory.CreateClient();
+        var from = SomeStart;
+        var to = from.AddDays(7);
+
+        var response = await ListSessionsAsync(anonymousClient, accountIdA, from, to);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(body);
+        Assert.Equal("auth.access_token_invalid", doc.RootElement.GetProperty("code").GetString());
+    }
+
+    /// <summary>An Authorization header present but not Bearer is rejected exactly like a missing one (same case DevicePairingEndpointsTests covers for PostPairingSession; S09-02 B4 coverage closure).</summary>
+    [Fact]
+    public async Task ListSessions_WithNonBearerAuthorizationHeader_Returns401()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        var accountId = await RegisterActiveProfessionalAsync(client, "sched-list-401-nonbearer@example.com");
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", "not-a-bearer-token");
+        var from = SomeStart;
+        var to = from.AddDays(7);
+
+        var response = await ListSessionsAsync(client, accountId, from, to);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(body);
+        Assert.Equal("auth.access_token_invalid", doc.RootElement.GetProperty("code").GetString());
+    }
+
+    /// <summary>A header present but not a token this issuer ever handed out (as opposed to no header at all) -- also 401 auth.access_token_invalid (S09-02 B4 coverage closure).</summary>
+    [Fact]
+    public async Task ListSessions_WithInvalidToken_Returns401()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        var accountId = await RegisterActiveProfessionalAsync(client, "sched-list-401-invalid@example.com");
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "not-a-valid-token");
+        var from = SomeStart;
+        var to = from.AddDays(7);
+
+        var response = await ListSessionsAsync(client, accountId, from, to);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(body);
+        Assert.Equal("auth.access_token_invalid", doc.RootElement.GetProperty("code").GetString());
+    }
+
+    /// <summary>A valid token for a different account gets 403 (RFC 9110 §15.5.4) -- and the same body whether the URL's accountId exists (B's token on A's URL) or not (A's token on a random guid), so the 403 alone never discloses account existence (S09-02 B4).</summary>
+    [Fact]
+    public async Task ListSessions_WithOtherAccountsToken_Returns403WithSameProblemRegardlessOfAccountExistence()
+    {
+        using var factory = CreateFactory();
+        using var clientA = factory.CreateClient();
+        var accountIdA = await RegisterActiveProfessionalAsync(clientA, "sched-list-403-a@example.com");
+
+        using var clientB = factory.CreateClient();
+        await RegisterActiveProfessionalAsync(clientB, "sched-list-403-b@example.com");
+
+        var from = SomeStart;
+        var to = from.AddDays(7);
+
+        var responses = new[]
+        {
+            await ListSessionsAsync(clientB, accountIdA, from, to),
+            await ListSessionsAsync(clientA, Guid.NewGuid(), from, to),
+        };
+
+        var bodies = new string[responses.Length];
+        for (var i = 0; i < responses.Length; i++)
+        {
+            Assert.Equal(HttpStatusCode.Forbidden, responses[i].StatusCode);
+            bodies[i] = await responses[i].Content.ReadAsStringAsync();
+        }
+
+        Assert.Equal(bodies[0], bodies[1]);
+        using var doc = JsonDocument.Parse(bodies[0]);
+        Assert.Equal("auth.forbidden", doc.RootElement.GetProperty("code").GetString());
+    }
+
+    private static Task<HttpResponseMessage> ListSessionsAsync(HttpClient client, Guid accountId, DateTimeOffset from, DateTimeOffset to) =>
+        client.GetAsync($"/accounts/{accountId}/agenda/sessions?from={Uri.EscapeDataString(from.ToString("O"))}&to={Uri.EscapeDataString(to.ToString("O"))}");
 
     private static async Task<Guid> ScheduleSessionAsync(HttpClient client, Guid accountId, DateTimeOffset startsAt, int durationMinutes)
     {

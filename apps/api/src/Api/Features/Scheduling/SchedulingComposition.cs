@@ -18,7 +18,7 @@ public static class SchedulingComposition
         });
     }
 
-    public static void MapScheduling(this WebApplication app)
+    public static void MapScheduling(this IEndpointRouteBuilder app)
     {
         app.MapSchedulingEndpoints();
     }
@@ -28,6 +28,8 @@ public static class SchedulingComposition
 [JsonSerializable(typeof(ScheduleSessionRequest))]
 [JsonSerializable(typeof(MoveSessionRequest))]
 [JsonSerializable(typeof(ScheduledSessionResponse))]
+[JsonSerializable(typeof(ScheduledSessionListItem))]
+[JsonSerializable(typeof(ListScheduledSessionsResponse))]
 public partial class SchedulingJsonContext : JsonSerializerContext
 {
 }

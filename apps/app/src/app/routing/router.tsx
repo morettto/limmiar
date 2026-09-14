@@ -31,10 +31,16 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 
 const rootRoute = createRootRoute()
 
+// ponytail: sem KeychainProvider ainda, `chaveiro` fica sempre `null` -- painel em "chaveiro
+// bloqueado", falha fechada por decisão humana. `notas` vazia pelo mesmo motivo (sem GET de nota).
+function IndexRouteComponent() {
+  return <HomePage chaveiro={null} notas={[]} />
+}
+
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
-  component: HomePage,
+  component: IndexRouteComponent,
 })
 
 interface MagicLinkCallbackSearch {

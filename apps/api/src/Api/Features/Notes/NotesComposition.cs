@@ -18,7 +18,7 @@ public static class NotesComposition
         });
     }
 
-    public static void MapNotes(this WebApplication app)
+    public static void MapNotes(this IEndpointRouteBuilder app)
     {
         app.MapNoteEndpoints();
     }

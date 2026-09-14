@@ -34,6 +34,10 @@ public static class AccountsProblemCodes
 
     public const string AuthAccessTokenInvalid = "auth.access_token_invalid";
 
+    // A valid access token for a different account; body is identical whether or not the
+    // URL's account exists, so this alone never leaks account existence (RFC 9110 §15.5.4).
+    public const string AuthForbidden = "auth.forbidden";
+
     // Same code for expired/claimed/wrong-account, so a stolen QR code can't be told apart from a live one.
     public const string DevicePairingSessionNotFound = "auth.device_pairing_session_not_found";
 

@@ -9,7 +9,7 @@ public static class HealthEndpoints
 {
     private static readonly TimeSpan DatabaseProbeTimeout = TimeSpan.FromSeconds(2);
 
-    public static void MapHealthEndpoints(this WebApplication app)
+    public static void MapHealthEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapGet("/health", () => TypedResults.Ok())
             .WithName("GetHealth")

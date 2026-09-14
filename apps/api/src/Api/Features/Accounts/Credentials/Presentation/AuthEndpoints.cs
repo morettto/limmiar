@@ -9,7 +9,7 @@ namespace Api.Accounts;
 
 public static class AuthEndpoints
 {
-    public static void MapAuthEndpoints(this WebApplication app)
+    public static void MapAuthEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapPost("/auth/register", HandleRegisterAsync)
             .WithName("PostAuthRegister")

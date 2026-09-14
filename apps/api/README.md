@@ -48,34 +48,37 @@ tentar arrancar o container, não passam silenciosamente. Os testes puramente un
   assinada, e o instante da assinatura -- ver
   `docs/adr/ADR-S08-01-assinatura-visivel-ao-servidor.md` e o README do módulo
   (`src/Api/Features/Notes/README.md`). O blob de assinatura em si continua opaco.
-- `src/Api/Endpoints` -- Minimal API, um ficheiro por área (`AuthEndpoints`,
-  `DevicePairingEndpoints`, `PatientEndpoints`, `ProfessionalVerificationEndpoints`,
-  `RecoveryEndpoints`, `SchedulingEndpoints`, `TwoFactorEndpoints`, `VoiceEnrollmentEndpoints`).
-  Todos os oito ficheiros de endpoints partilham a única cópia de `IsAuthorizedForAccount`,
-  `ProblemJson`, `ValidationProblem` e `AccessTokenUnauthorizedProblem` em `EndpointHelpers.cs`
-  (`internal static class`, só usado dentro deste assembly) -- não há cópia local de nenhum
-  destes em nenhum ficheiro de endpoints; cada ficheiro só mantém o helper que de facto é só
-  seu (ex. `TwoFactorEndpoints.TicketInvalidProblem`,
-  `ProfessionalVerificationEndpoints.StaffUnauthorizedProblem`). `TryValidateSealedBlobShape`
-  (piso de 28 bytes para um blob AES-256-GCM selado) também mora em `EndpointHelpers.cs` desde
-  o S06-02 -- `PatientEndpoints` e `VoiceEnrollmentEndpoints` chamam a mesma cópia, nenhum dos
-  dois mantém a sua própria. `PUT /accounts/{accountId}/voice-enrollment` é idempotente
-  (re-cadastro substitui, `204`, nunca `409`); `DELETE` é `404` (não `204` silencioso) quando
-  não há cadastro para remover. Os três verbos distinguem o mesmo par de causas com o mesmo
-  `code`: `auth.account_not_found` para conta desconhecida, `voice.enrollment_not_found` para
-  conta real sem cadastro. `EnrollAsync`/`DeleteAsync` devolvem `Task<VoiceEnrollmentFailureReason?>`
-  (`null` = sucesso); `GetAsync` devolve `Result<VoiceEnrollment, VoiceEnrollmentFailureReason>`
-  (S06-04) por ser o caso com valor. `MapFailureToProblem` (`Presentation/VoiceEnrollmentEndpoints.cs`)
-  é o único mapeador de falha, partilhado pelos três verbos -- desde o S06-07 não há mais um
-  segundo molde de falha (`VoiceEnrollmentResult` com `Succeeded`/`FailureReason?` nullable,
-  que deixava `{ Succeeded = false, FailureReason = null }` construível e sem significado, e
-  obrigava o `PUT` a reconstruir o problem à mão em vez de chamar `MapFailureToProblem`); o
-  ficheiro que tinha essa classe foi renomeado de `VoiceEnrollmentResult.cs` para
-  `VoiceEnrollment.cs` (só ficam lá o `record VoiceEnrollment` e o `enum
-  VoiceEnrollmentFailureReason`). Nenhuma das três rotas usa
-  `AccountAuthorizationGuard.CanCreatePatientRecords` -- cadastro de voz é a própria conta do
-  profissional, não um registo de paciente, então a única guarda é
-  `IsAuthorizedForAccount` (o token pertence a esta conta).
+- Minimal API, um ficheiro por área dentro de `src/Api/Features/<Módulo>` (ex.
+  `Scheduling/SchedulingEndpoints.cs`, `Notes/NoteEndpoints.cs`, `Patients/PatientEndpoints.cs`)
+  ou de `src/Api/Features/Accounts/<Fatia>/Presentation` (ex.
+  `DevicePairing/Presentation/DevicePairingEndpoints.cs`). Toda rota `{accountId}` nasce
+  protegida por `RequireAccountAccessMiddleware`
+  (`Accounts/Sessions/Presentation/RequireAccountAccessMiddleware.cs`, ver
+  `Accounts.Sessions/README.md`) sem nenhuma chamada por rota -- fechado por omissão: o
+  middleware decide direto do `RoutePattern` do `RouteEndpoint`, registado uma única vez em
+  `Program.Composition.cs`, correndo depois do routing e antes de qualquer endpoint, logo antes
+  do binding do corpo/query desse endpoint (um `IEndpointFilter` corre depois desse binding,
+  tarde demais). As 4 rotas que autorizam de outra forma -- as 3 de TOTP (ticket de dois
+  fatores) e `professional-verification/decision` (`X-Staff-Api-Key`) -- optam por fora com
+  `.AllowWithoutAccountToken()`, com o porquê no comentário da própria rota.
+  `ProblemJson`/`ValidationProblem` vivem em `Api.Problems.ProblemResults`;
+  `TryValidateSealedBlobShape` (piso de 28 bytes para um blob AES-256-GCM selado) vive em
+  `Api.Problems.SealedBlobShape` -- `PatientEndpoints`, `NoteEndpoints` e
+  `VoiceEnrollmentEndpoints` chamam a mesma cópia, nenhum mantém a sua própria. `PUT
+  /accounts/{accountId}/voice-enrollment` é idempotente (re-cadastro substitui, `204`, nunca
+  `409`); `DELETE` é `404` (não `204` silencioso) quando não há cadastro para remover. Os três
+  verbos distinguem o mesmo par de causas com o mesmo `code`: `auth.account_not_found` para
+  conta desconhecida, `voice.enrollment_not_found` para conta real sem cadastro.
+  `EnrollAsync`/`DeleteAsync` devolvem `Task<VoiceEnrollmentFailureReason?>` (`null` = sucesso);
+  `GetAsync` devolve `Result<VoiceEnrollment, VoiceEnrollmentFailureReason>` (S06-04) por ser o
+  caso com valor. `MapFailureToProblem` (`Presentation/VoiceEnrollmentEndpoints.cs`) é o único
+  mapeador de falha, partilhado pelos três verbos -- desde o S06-07 não há segundo molde de
+  falha (`VoiceEnrollmentResult` com `Succeeded`/`FailureReason?` nullable, que deixava
+  `{ Succeeded = false, FailureReason = null }` construível e sem significado); o ficheiro dessa
+  classe foi renomeado para `VoiceEnrollment.cs` (só ficam o `record VoiceEnrollment` e o `enum
+  VoiceEnrollmentFailureReason`). Nenhuma das três rotas de voice-enrollment usa `AccountAuthorizationGuard.CanCreatePatientRecords` --
+  cadastro de voz é a própria conta do profissional, não um registo de paciente, então a única
+  guarda é a de conta.
 - `src/Api/Features/Audit` -- trilha de auditoria encadeada por hash (`audit_entries` e
   `audit_anchors`, migração `0006_create_audit_trail.sql`): `AuditChain.ComputeHash`/`Verify`
   são puros (zero I/O, zero DI); a imposição de não-fork da cadeia é

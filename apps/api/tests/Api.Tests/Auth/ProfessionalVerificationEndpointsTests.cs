@@ -216,7 +216,7 @@ public sealed class ProfessionalVerificationEndpointsTests
 
     /// <summary>Core account-scoping regression: a real, valid, unexpired access token for a DIFFERENT account must not authorize this call.</summary>
     [Fact]
-    public async Task PostSubmit_WithAccessTokenForAnotherAccount_Returns401WithProblemDetails()
+    public async Task PostSubmit_WithAccessTokenForAnotherAccount_Returns403WithProblemDetails()
     {
         using var factory = CreateFactory(new StubCouncilRegistryVerifier(verified: true));
         using var client = factory.CreateClient();
@@ -229,13 +229,13 @@ public sealed class ProfessionalVerificationEndpointsTests
             new SubmitProfessionalCredentialRequest(ProfessionalCredentialType.Document, null, null, "forged-doc-ref"),
             AccountsJsonContext.Default.SubmitProfessionalCredentialRequest);
 
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
         using var doc = JsonDocument.Parse(body);
-        Assert.Equal("auth.access_token_invalid", doc.RootElement.GetProperty("code").GetString());
+        Assert.Equal("auth.forbidden", doc.RootElement.GetProperty("code").GetString());
     }
 
-    /// <summary>A syntactically well-formed but never-issued Bearer token must resolve to no account -- the other half of IsAuthorizedForAccount's equality check from PostSubmit_WithAccessTokenForAnotherAccount_Returns401WithProblemDetails, where ValidateAccess instead resolves to a real, different account.</summary>
+    /// <summary>A syntactically well-formed but never-issued Bearer token must resolve to no account -- the other half of RequireAccountAccess()'s equality check from PostSubmit_WithAccessTokenForAnotherAccount_Returns403WithProblemDetails, where ValidateAccess instead resolves to a real, different account.</summary>
     [Fact]
     public async Task PostSubmit_WithInvalidAccessToken_Returns401WithProblemDetails()
     {

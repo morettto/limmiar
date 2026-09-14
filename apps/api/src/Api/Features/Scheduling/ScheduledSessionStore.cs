@@ -183,4 +183,36 @@ public sealed class ScheduledSessionStore(NpgsqlDataSource dataSource)
         reader.GetBoolean(5),
         reader.IsDBNull(6) ? null : reader.GetFieldValue<DateTimeOffset>(6),
         reader.GetFieldValue<DateTimeOffset>(7));
+
+    /// <summary>Live sessions with starts_at in [fromUtc, toUtc), earliest first. Isolation from RLS, no WHERE tenant_id.</summary>
+    public async Task<IReadOnlyList<ScheduledSession>> ListLiveAsync(
+        Guid tenantId, DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken cancellationToken)
+    {
+        await using var scope = await dataSource.OpenTenantScopedTransactionAsync(tenantId, cancellationToken);
+
+        await using var selectCommand = scope.Connection.CreateCommand();
+        selectCommand.Transaction = scope.Transaction;
+        selectCommand.CommandText = $"""
+            SELECT {SelectColumns}
+            FROM scheduled_sessions
+            WHERE cancelled_at IS NULL
+              AND starts_at >= @from
+              AND starts_at <  @to
+            ORDER BY starts_at
+            """;
+        selectCommand.Parameters.AddWithValue("from", fromUtc);
+        selectCommand.Parameters.AddWithValue("to", toUtc);
+
+        var sessions = new List<ScheduledSession>();
+        await using (var reader = await selectCommand.ExecuteReaderAsync(cancellationToken))
+        {
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                sessions.Add(ReadSession(reader));
+            }
+        }
+
+        await scope.Transaction.CommitAsync(cancellationToken);
+        return sessions;
+    }
 }

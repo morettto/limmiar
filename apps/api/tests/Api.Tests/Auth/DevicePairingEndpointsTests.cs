@@ -70,7 +70,7 @@ public sealed class DevicePairingEndpointsTests
 
     /// <summary>Core account-scoping regression: a valid token for a DIFFERENT account must not open a pairing session here, or any authenticated user could mint a QR code exposing someone else's KEK.</summary>
     [Fact]
-    public async Task PostPairingSession_ForAnotherAccountId_Returns401()
+    public async Task PostPairingSession_ForAnotherAccountId_Returns403WithProblemDetails()
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
@@ -81,8 +81,8 @@ public sealed class DevicePairingEndpointsTests
 
         var response = await PostCreateAsync(client, victimAccountId);
 
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-        Assert.Equal("auth.access_token_invalid", await ReadCodeAsync(response));
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal("auth.forbidden", await ReadCodeAsync(response));
     }
 
     [Fact]
