@@ -125,8 +125,10 @@ tentar arrancar o container, não passam silenciosamente. Os testes puramente un
   carrega a pública do par (`Accounts/KeyPair`) do OUTRO lado -- a única resposta desta API com a
   pública de outra conta, e só para quem é parte do vínculo. `DELETE
   /accounts/{accountId}/links/{peerAccountId}` desvincula por qualquer das partes, `404
-  link.not_found` se não havia vínculo. Ver o README do módulo
-  (`src/Api/Features/PatientLinks/README.md`).
+  link.not_found` se não havia vínculo. Desde S11-02 (fatias 1-2), o mesmo store também guarda
+  envelopes de `shared-items` e o blob opaco de `sharing-preferences` (CAS por `version`, `409
+  sharing.version_conflict`) -- o servidor nunca vê o tipo do item nem o estado do
+  compartilhamento. Ver o README do módulo (`src/Api/Features/PatientLinks/README.md`).
 - `src/Api/Features/Billing` -- cliente AbacatePay e dedupe de webhooks (S12-01,
   `abacatepay_webhook_events`, migração `0009_...`), a única tabela sem RLS -- ver
   `docs/adr/ADR-S12-01-dedupe-de-webhook-sem-rls.md` e o README do módulo

@@ -132,6 +132,9 @@ importers:
       eslint-plugin-lingui:
         specifier: ^0.14.0
         version: 0.14.0(eslint@10.8.0(jiti@2.7.0))(typescript@6.0.3)
+      fast-check:
+        specifier: ^4.9.0
+        version: 4.9.0
       jsdom:
         specifier: ^30.0.1
         version: 30.0.1(@noble/hashes@2.2.0)

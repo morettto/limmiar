@@ -11,4 +11,8 @@ public static class PatientLinksProblemCodes
     // Same code for "not an active Professional" (create invite) and "not a Patient" (redeem) --
     // both are "this account cannot perform this side of the link", a caller cannot probe which.
     public const string LinkNotAuthorized = "link.not_authorized";
+
+    public const string SharingPreferencesNotFound = "sharing.preferences_not_found";
+
+    public const string SharingVersionConflict = "sharing.version_conflict";
 }

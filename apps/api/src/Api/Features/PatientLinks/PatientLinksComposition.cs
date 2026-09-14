@@ -21,6 +21,7 @@ public static class PatientLinksComposition
     public static void MapPatientLinks(this IEndpointRouteBuilder app)
     {
         app.MapPatientLinkEndpoints();
+        app.MapSharedItemEndpoints();
     }
 }
 
@@ -29,6 +30,11 @@ public static class PatientLinksComposition
 [JsonSerializable(typeof(RedeemLinkRequest))]
 [JsonSerializable(typeof(LinkView))]
 [JsonSerializable(typeof(IReadOnlyList<LinkView>))]
+[JsonSerializable(typeof(ShareItemRequest))]
+[JsonSerializable(typeof(SharedItemView))]
+[JsonSerializable(typeof(IReadOnlyList<SharedItemView>))]
+[JsonSerializable(typeof(PutSharingPreferencesRequest))]
+[JsonSerializable(typeof(SharingPreferencesView))]
 public partial class PatientLinksJsonContext : JsonSerializerContext
 {
 }

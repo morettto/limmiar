@@ -40,6 +40,8 @@ export const problemCodes = [
   'patients.entry_sequence_conflict',
   'patients.not_authorized_to_create_records',
   'patients.not_found',
+  'sharing.preferences_not_found',
+  'sharing.version_conflict',
   'staff.unauthorized',
   'unexpected_error',
   'validation.invalid_field',

@@ -205,6 +205,14 @@ const knownProblemMessages: Record<ProblemCode, MessageDescriptor> = {
     id: 'link.not_found',
     message: 'Não há vínculo com esta conta.',
   }),
+  'sharing.preferences_not_found': msg({
+    id: 'sharing.preferences_not_found',
+    message: 'Nenhuma preferência de compartilhamento salva.',
+  }),
+  'sharing.version_conflict': msg({
+    id: 'sharing.version_conflict',
+    message: 'Suas preferências mudaram em outro dispositivo. Tente novamente.',
+  }),
 }
 
 // Fallback for a backend `code` not in the registry above. The raw code string must

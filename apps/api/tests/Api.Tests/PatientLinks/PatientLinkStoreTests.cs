@@ -231,4 +231,138 @@ public sealed class PatientLinkStoreTests
 
         Assert.False(unlinked);
     }
+
+    [Fact]
+    public void Share_WhenNoLinkExists_ReturnsFalse()
+    {
+        var store = new PatientLinkStore();
+
+        Assert.False(store.Share(PatientAccountId, ProfessionalId, SomeCiphertext()));
+    }
+
+    [Fact]
+    public void ListShared_WhenNoLinkExists_ReturnsNull()
+    {
+        var store = new PatientLinkStore();
+
+        Assert.Null(store.ListShared(ProfessionalId, PatientAccountId));
+    }
+
+    [Fact]
+    public void ListShared_WhenLinkedButNothingShared_ReturnsEmpty()
+    {
+        var store = LinkedStore();
+
+        Assert.Empty(store.ListShared(ProfessionalId, PatientAccountId)!);
+    }
+
+    [Fact]
+    public void Share_ThenListShared_ReturnsItemsInArrivalOrder()
+    {
+        var store = LinkedStore();
+        var first = SomeCiphertext(0x01);
+        var second = SomeCiphertext(0x02);
+
+        Assert.True(store.Share(PatientAccountId, ProfessionalId, first));
+        Assert.True(store.Share(PatientAccountId, ProfessionalId, second));
+        var items = store.ListShared(ProfessionalId, PatientAccountId);
+
+        Assert.Equal(2, items!.Count);
+        Assert.Equal(first, items[0].Ciphertext);
+        Assert.Equal(second, items[1].Ciphertext);
+    }
+
+    /// <summary>Direction matters: Share only succeeds with accountId as the patient side. A professional cannot Share into her own inbox.</summary>
+    [Fact]
+    public void Share_WithSidesSwapped_ReturnsFalse()
+    {
+        var store = LinkedStore();
+
+        Assert.False(store.Share(ProfessionalId, PatientAccountId, SomeCiphertext()));
+    }
+
+    [Fact]
+    public void Unlink_KeepsSharedItems_RelinkListsThem()
+    {
+        var store = LinkedStore();
+        store.Share(PatientAccountId, ProfessionalId, SomeCiphertext());
+
+        store.Unlink(PatientAccountId, ProfessionalId);
+        Assert.Null(store.ListShared(ProfessionalId, PatientAccountId));
+
+        var newInvite = store.CreateInvite(ProfessionalId, PatientId);
+        store.Redeem(newInvite.Code, PatientAccountId);
+
+        Assert.Single(store.ListShared(ProfessionalId, PatientAccountId)!);
+    }
+
+    [Fact]
+    public void GetPreferences_WhenNeverSaved_ReturnsNull()
+    {
+        var store = new PatientLinkStore();
+
+        Assert.Null(store.GetPreferences(Guid.NewGuid()));
+    }
+
+    [Fact]
+    public void PutPreferences_WithExpectedVersionZero_CreatesVersion1()
+    {
+        var store = new PatientLinkStore();
+        var accountId = Guid.NewGuid();
+
+        var result = store.PutPreferences(accountId, 0, SomeCiphertext(0xA0), SomeCiphertext(0xA1));
+
+        Assert.True(result.TryGetValue(out var preferences));
+        Assert.Equal(1, preferences!.Version);
+        Assert.Equal(preferences, store.GetPreferences(accountId));
+    }
+
+    [Fact]
+    public void PutPreferences_WithStaleExpectedVersion_ReturnsCurrentVersionAsFailure()
+    {
+        var store = new PatientLinkStore();
+        var accountId = Guid.NewGuid();
+        store.PutPreferences(accountId, 0, SomeCiphertext(0xA0), SomeCiphertext(0xA1));
+
+        var result = store.PutPreferences(accountId, 0, SomeCiphertext(0xB0), SomeCiphertext(0xB1));
+
+        var failure = result.Match(_ => (long?)null, currentVersion => currentVersion);
+        Assert.Equal(1, failure);
+        Assert.Equal(1, store.GetPreferences(accountId)!.Version);
+    }
+
+    [Fact]
+    public void PutPreferences_ConcurrentSameExpectedVersion_ExactlyOneWins()
+    {
+        var store = new PatientLinkStore();
+        var accountId = Guid.NewGuid();
+        var successCount = 0;
+
+        Parallel.For(0, 20, i =>
+        {
+            var result = store.PutPreferences(accountId, 0, SomeCiphertext((byte)i), SomeCiphertext((byte)i));
+            if (result.TryGetValue(out _))
+            {
+                Interlocked.Increment(ref successCount);
+            }
+        });
+
+        Assert.Equal(1, successCount);
+        Assert.Equal(1, store.GetPreferences(accountId)!.Version);
+    }
+
+    private static PatientLinkStore LinkedStore()
+    {
+        var store = new PatientLinkStore();
+        var invite = store.CreateInvite(ProfessionalId, PatientId);
+        store.Redeem(invite.Code, PatientAccountId);
+        return store;
+    }
+
+    private static byte[] SomeCiphertext(byte fill = 0x01)
+    {
+        var blob = new byte[28];
+        Array.Fill(blob, fill);
+        return blob;
+    }
 }

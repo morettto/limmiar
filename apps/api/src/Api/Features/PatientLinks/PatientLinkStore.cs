@@ -34,6 +34,11 @@ public sealed class PatientLinkStore(Func<DateTimeOffset>? clock = null)
     private readonly Dictionary<string, LinkInvite> _invites = new(StringComparer.Ordinal);
     private readonly List<PatientLink> _links = [];
 
+    // ponytail: sem teto de itens por vínculo, além da memória do processo. Upgrade: tabela
+    // junto com patient_links quando as contas saírem de InMemoryAccountStore.
+    private readonly Dictionary<(Guid PatientAccountId, Guid ProfessionalAccountId), List<SharedItem>> _sharedItems = new();
+    private readonly Dictionary<Guid, SharingPreferences> _preferences = new();
+
     public LinkInvite CreateInvite(Guid professionalAccountId, Guid patientId)
     {
         var invite = new LinkInvite(
@@ -107,4 +112,77 @@ public sealed class PatientLinkStore(Func<DateTimeOffset>? clock = null)
             return true;
         }
     }
+
+    /// <summary>False if no link exists between the two accounts in this direction -- share only travels along a real (patient, professional) link. Unlink does not remove what was already appended here (README invariant: revoking is a preferences-blob change, never a delete of past envelopes).</summary>
+    public bool Share(Guid patientAccountId, Guid professionalAccountId, byte[] ciphertext)
+    {
+        lock (_lock)
+        {
+            if (!IsLinked(patientAccountId, professionalAccountId))
+            {
+                return false;
+            }
+
+            var key = (patientAccountId, professionalAccountId);
+            if (!_sharedItems.TryGetValue(key, out var items))
+            {
+                items = [];
+                _sharedItems[key] = items;
+            }
+
+            items.Add(new SharedItem(professionalAccountId, patientAccountId, _clock(), ciphertext));
+            return true;
+        }
+    }
+
+    /// <summary>Null if no link exists between the two accounts in this direction; otherwise the items in arrival order, possibly empty. Re-linking after Unlink surfaces whatever was shared before -- the list is keyed by account pair, not by link instance.</summary>
+    public IReadOnlyList<SharedItem>? ListShared(Guid professionalAccountId, Guid patientAccountId)
+    {
+        lock (_lock)
+        {
+            if (!IsLinked(patientAccountId, professionalAccountId))
+            {
+                return null;
+            }
+
+            return _sharedItems.TryGetValue((patientAccountId, professionalAccountId), out var items)
+                ? items.ToArray()
+                : [];
+        }
+    }
+
+    /// <summary>Null if the account never saved sharing preferences.</summary>
+    public SharingPreferences? GetPreferences(Guid accountId)
+    {
+        lock (_lock)
+        {
+            return _preferences.TryGetValue(accountId, out var preferences) ? preferences : null;
+        }
+    }
+
+    /// <summary>
+    /// Optimistic concurrency, same lock as the read: succeeds only if <paramref name="expectedVersion"/>
+    /// matches the account's current version (0 = never saved), and always advances by exactly 1
+    /// on success. On mismatch, returns the current version so the caller can re-read and retry --
+    /// proven under concurrent callers racing the same expectedVersion by
+    /// PatientLinkStoreTests.PutPreferences_ConcurrentSameExpectedVersion_ExactlyOneWins.
+    /// </summary>
+    public Result<SharingPreferences, long> PutPreferences(Guid accountId, long expectedVersion, byte[] wrappedDek, byte[] ciphertext)
+    {
+        lock (_lock)
+        {
+            var currentVersion = _preferences.TryGetValue(accountId, out var current) ? current.Version : 0;
+            if (currentVersion != expectedVersion)
+            {
+                return Result<SharingPreferences, long>.Failure(currentVersion);
+            }
+
+            var updated = new SharingPreferences(expectedVersion + 1, wrappedDek, ciphertext);
+            _preferences[accountId] = updated;
+            return updated;
+        }
+    }
+
+    private bool IsLinked(Guid patientAccountId, Guid professionalAccountId) =>
+        _links.Exists(link => link.ProfessionalAccountId == professionalAccountId && link.PatientAccountId == patientAccountId);
 }
