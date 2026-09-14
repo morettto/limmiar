@@ -1,17 +1,151 @@
 {
-  ".ts": "review-typescript-react",
-  ".tsx": "review-typescript-react",
-  ".js": "review-typescript-react",
-  ".jsx": "review-typescript-react",
-  ".mjs": "review-typescript-react",
-  ".cjs": "review-typescript-react",
-  ".css": "review-typescript-react",
-  ".html": "review-typescript-react",
-  ".cs": "review-dotnet-csharp",
-  ".csproj": "review-dotnet-csharp",
-  ".razor": "review-dotnet-csharp",
-  ".sql": "review-sql-data",
-  ".po": null,
-  ".sh": null,
-  ".ps1": null
+  "versao": 2,
+  "sem_dominio": [
+    "apps/app/src/locales/**/messages.po",
+    "apps/app/src/locales/**/messages.js",
+    "**/*.snap",
+    "test.log"
+  ],
+  "_nota_sem_dominio": "Gerados por ferramenta e verificados por CI (check:i18n-extract, check:i18n-complete). Acrescentam-se aos defaults do harness, não os substituem.",
+
+  "_comentario": "Domínio resolvido por CAMINHO, primeira regra que casa ganha — por isso as específicas vêm antes das genéricas. Três papéis por domínio: quem decide a abordagem, quem constrói, quem revê. null = declarado como não precisando de especialista nesse papel (decisão escrita, não silêncio). 'find:<query>' = não há skill local; a cascata tem de correr e o resultado tem de ficar no ledger. exige_abordagem = decisão de tecnologia, precisa de .harness/abordagem/<ticket>.md com alternativas comparadas antes da etapa 5.",
+
+  "regras": [
+    {
+      "caminho": ".github/workflows/**",
+      "dominio": "ci-cd",
+      "exige_abordagem": true,
+      "abordagem": "find:github actions ci",
+      "construcao": "find:github actions",
+      "review": "find:github actions security",
+      "nivel_review": 2,
+      "nota": "Era exatamente este o buraco: toda a extensão do diff caía em IGNORED_EXT e o portão aprovava um ticket de CI sem especialista nenhum."
+    },
+    {
+      "caminho": "**/{Dockerfile,Dockerfile.*,compose*.y?ml,docker-compose*.y?ml,.dockerignore}",
+      "dominio": "containers",
+      "exige_abordagem": true,
+      "abordagem": "find:docker",
+      "construcao": "find:docker",
+      "review": "find:container security",
+      "nivel_review": 2
+    },
+    {
+      "caminho": "**/*.{tf,tfvars,hcl}",
+      "dominio": "iac",
+      "exige_abordagem": true,
+      "abordagem": "find:terraform",
+      "construcao": "find:terraform",
+      "review": "find:terraform security",
+      "nivel_review": 2
+    },
+    {
+      "caminho": "apps/api/migrations/**",
+      "dominio": "db-migration",
+      "exige_abordagem": true,
+      "abordagem": "migration",
+      "construcao": "migration",
+      "review": "review-sql-data",
+      "nivel_review": 2,
+      "nota": "Expand–contract. Migração destrutiva não passa: o pipeline abre PR e para (D10)."
+    },
+    {
+      "caminho": "packages/crypto/**",
+      "dominio": "cripto",
+      "exige_abordagem": true,
+      "abordagem": "codebase-design",
+      "construcao": "lean-build",
+      "review": "review-typescript-react",
+      "nivel_review": 2,
+      "nota": "Mutação a 100% aqui, não a 90%. Ver coverage-gate."
+    },
+    {
+      "caminho": "apps/api/src/Api/Features/{Accounts,Consent,Billing}/**",
+      "dominio": "dotnet-sensivel",
+      "exige_abordagem": true,
+      "abordagem": "codebase-design",
+      "construcao": "lean-build",
+      "review": "review-dotnet-csharp",
+      "nivel_review": 2
+    },
+    {
+      "caminho": "**/*.sql",
+      "dominio": "sql",
+      "abordagem": null,
+      "construcao": "lean-build",
+      "review": "review-sql-data"
+    },
+    {
+      "caminho": "**/*.{cs,csproj,razor,sln,props}",
+      "dominio": "dotnet",
+      "abordagem": null,
+      "construcao": "lean-build",
+      "review": "review-dotnet-csharp"
+    },
+    {
+      "caminho": "tools/**/*.{mjs,js,cjs}",
+      "dominio": "tooling",
+      "abordagem": null,
+      "construcao": "lean-build",
+      "review": "review-typescript-react",
+      "nota": "oxlint-plugin-comments, comment-guard, branch-sync-guard. São portões — partem em silêncio."
+    },
+    {
+      "caminho": "**/{.oxlintrc.json,.dependency-cruiser.cjs,vitest.config.*,stryker.conf.*,playwright.config.*,tsconfig*.json}",
+      "dominio": "quality-tooling",
+      "exige_abordagem": true,
+      "abordagem": "find:test tooling config",
+      "construcao": "lean-build",
+      "review": "review-typescript-react",
+      "nivel_review": 2,
+      "nota": "Baixar um piso aqui é a forma silenciosa de contornar coverage-gate. Mudança aqui é sempre nível 2."
+    },
+    {
+      "caminho": "**/{.gitleaks.toml,.zap/**,*.zap.*}",
+      "dominio": "security-tooling",
+      "exige_abordagem": true,
+      "abordagem": "find:sast dast config",
+      "construcao": "lean-build",
+      "review": "security-review",
+      "nivel_review": 2
+    },
+    {
+      "caminho": "pacts/**",
+      "dominio": "contract-testing",
+      "abordagem": null,
+      "construcao": "find:pact contract testing",
+      "review": "find:pact contract testing"
+    },
+    {
+      "caminho": "**/{package.json,pnpm-workspace.yaml,.npmrc}",
+      "dominio": "build-config",
+      "abordagem": null,
+      "construcao": "lean-build",
+      "review": "review-typescript-react",
+      "nota": "Dependência nova entra por /build:deps, não por aqui."
+    },
+    {
+      "caminho": "**/*.{sh,ps1,bat}",
+      "dominio": "shell",
+      "abordagem": null,
+      "construcao": null,
+      "review": "find:shellcheck bash review"
+    },
+    {
+      "caminho": "**/*.{ts,tsx,js,jsx,mjs,cjs,css,html}",
+      "dominio": "typescript",
+      "abordagem": null,
+      "construcao": "lean-build",
+      "review": "review-typescript-react"
+    },
+    {
+      "caminho": "**/*.{yml,yaml,json,toml}",
+      "dominio": "config",
+      "exige_abordagem": false,
+      "abordagem": null,
+      "construcao": null,
+      "review": "find:config review",
+      "nota": "Rede de apanha: config que não casou com nenhuma regra acima. Continua a exigir um revisor — 'config não tem domínio de engenharia' foi a premissa que abriu o buraco do CI/CD."
+    }
+  ]
 }
