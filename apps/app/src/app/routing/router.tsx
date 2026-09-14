@@ -15,6 +15,7 @@ import { BibliotecaPage } from '../../pages/biblioteca/BibliotecaPage'
 import { parseEstadoConsentimento, type EstadoConsentimento } from '../../entities/consentimento/api'
 import { useSession } from '../providers/SessionProvider'
 import { E2eMicrofoneScaffold } from './E2eMicrofoneScaffold'
+import { E2eVinculoScaffold } from './E2eVinculoScaffold'
 
 function readSearchString(search: Record<string, unknown>, key: string): string {
   const value = search[key]
@@ -200,6 +201,45 @@ function E2eMicrofoneRouteComponent() {
   return <E2eMicrofoneScaffold consentimento={consentimento} />
 }
 
+// S11-04 fatia 5: sem KeychainProvider ainda (mesmo motivo de e2ePacienteHojeRoute) -- o cenário
+// E2E semeia conta, token e KEK pela query string para alcançar os ecrãs de vínculo.
+interface E2eVinculoSearch {
+  baseUrl: string
+  accountId: string
+  accessToken: string
+  kek: string
+  papel: string
+  patientId: string
+}
+
+const e2eVinculoRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/e2e/vinculo',
+  validateSearch: (search: Record<string, unknown>): E2eVinculoSearch => ({
+    baseUrl: readSearchString(search, 'baseUrl'),
+    accountId: readSearchString(search, 'accountId'),
+    accessToken: readSearchString(search, 'accessToken'),
+    kek: readSearchString(search, 'kek'),
+    papel: readSearchString(search, 'papel'),
+    patientId: readSearchString(search, 'patientId'),
+  }),
+  component: E2eVinculoRouteComponent,
+})
+
+function E2eVinculoRouteComponent() {
+  const { baseUrl, accountId, accessToken, kek, papel, patientId } = e2eVinculoRoute.useSearch()
+  return (
+    <E2eVinculoScaffold
+      baseUrl={baseUrl}
+      accountId={accountId}
+      accessToken={accessToken}
+      kek={kek}
+      papel={papel}
+      patientId={patientId}
+    />
+  )
+}
+
 // These routes are E2E-only scaffolding and must not ship: each mounts a screen with no guard or
 // reads an accessToken/raw KEK off the query string, and a registered route is shipped and
 // linkable even when unusable.
@@ -330,6 +370,7 @@ const routeTree =
         recoveryScreenE2ERoute,
         recoveryPhraseSetupE2ERoute,
         e2eMicrofoneRoute,
+        e2eVinculoRoute,
       ])
     : rootRoute.addChildren([
         indexRoute,

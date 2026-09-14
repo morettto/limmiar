@@ -50,4 +50,12 @@ public static class AccountsProblemCodes
     public const string AuthInvalidRecoveryPhrase = "auth.invalid_recovery_phrase";
 
     public const string VoiceEnrollmentNotFound = "voice.enrollment_not_found";
+
+    // S09-03: token válido de outra conta (distinto de AuthAccessTokenInvalid, que cobre
+    // ausência/invalidez do próprio token) -- ver AccountAccessProblem.
+    public const string AuthForbidden = "auth.forbidden";
+
+    public const string KeyPairNotFound = "key_pair.not_found";
+
+    public const string KeyPairPublicKeyConflict = "key_pair.public_key_conflict";
 }

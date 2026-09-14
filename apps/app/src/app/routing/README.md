@@ -23,12 +23,15 @@ página real, incluindo o único sítio autorizado a chamar `useSession()` fora 
    `AccountRole` de `AuthPage.tsx`); não há regra `.dependency-cruiser.cjs` a proibir `app -> features`
    (só `pages -> app`), e `SessionProvider` já importava direto de `features/copilot-byok`.
 2. `routeTree` regista as rotas E2E-only (`/auth/screen`, `/devices/pair-*`, `/auth/recover`,
-   `/auth/recovery-phrase-setup`, `/e2e/microfone`) só quando `VITE_ENABLE_E2E_TEST_ROUTES ===
-   'true'` -- gate de build-time, não `import.meta.env.DEV`, porque `playwright.config.ts` corre
-   um `vite build` real, não `vite dev`.
+   `/auth/recovery-phrase-setup`, `/e2e/microfone`, `/e2e/vinculo`) só quando
+   `VITE_ENABLE_E2E_TEST_ROUTES === 'true'` -- gate de build-time, não `import.meta.env.DEV`,
+   porque `playwright.config.ts` corre um `vite build` real, não `vite dev`.
 3. `E2eMicrofoneScaffold.tsx` é andaime de E2E puro (sem equivalente de produção): fica fora de
    `router.tsx` para o router continuar só tabela de rotas e a sua copy ficar fora do portão de
-   i18n.
+   i18n. `E2eVinculoScaffold.tsx` (S11-04, `/e2e/vinculo`) segue o mesmo molde: sem
+   `KeychainProvider` ainda, semeia `accountId`/`accessToken`/`kek`/`papel`/`patientId` pela query
+   string para `vinculo-chave-publica.spec.ts` alcançar `GerarConviteVinculo`/
+   `ResgatarConviteVinculo`/`DesvincularVinculo` sem um chaveiro real.
 4. **S11-01: layout pathless `paciente`** (`id: 'paciente'`, sem `path`) monta
    `<ContactoEmergencia/>` como irmão do `<Outlet/>`, uma única vez, para todo ecrã de paciente
    herdar o caminho de emergência sem repeti-lo (invariante do ticket S11-01: emergência visível em
@@ -42,6 +45,8 @@ página real, incluindo o único sítio autorizado a chamar `useSession()` fora 
 
 - `router` (`router.tsx`) -- exportado e montado por `App.tsx` via `<RouterProvider>`.
 - `E2eMicrofoneScaffold({ consentimento })` (`E2eMicrofoneScaffold.tsx`).
+- `E2eVinculoScaffold({ baseUrl, accountId, accessToken, kek, papel, patientId })`
+  (`E2eVinculoScaffold.tsx`).
 
 ## Decisões relevantes
 

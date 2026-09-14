@@ -90,6 +90,12 @@ const knownProblemMessages: Record<ProblemCode, MessageDescriptor> = {
     id: 'staff.unauthorized',
     message: 'Acesso não autorizado.',
   }),
+  // S11-04: token válido, mas de outra conta -- distinto de auth.access_token_invalid (ausência ou
+  // invalidez do próprio token).
+  'auth.forbidden': msg({
+    id: 'auth.forbidden',
+    message: 'Você não tem permissão para esta ação.',
+  }),
   // The backend returns this same code for a never-issued, an expired, and a
   // reuse-detected refresh token. Keep the text generic; it must not hint at which.
   'auth.refresh_token_invalid': msg({
@@ -170,6 +176,34 @@ const knownProblemMessages: Record<ProblemCode, MessageDescriptor> = {
   'consent.not_authorized_to_record': msg({
     id: 'consent.not_authorized_to_record',
     message: 'Sua conta ainda não pode registrar consentimento.',
+  }),
+  'key_pair.not_found': msg({
+    id: 'key_pair.not_found',
+    message: 'Nenhum par de chaves publicado para esta conta.',
+  }),
+  'key_pair.public_key_conflict': msg({
+    id: 'key_pair.public_key_conflict',
+    message: 'Esta conta já tem uma chave pública publicada diferente desta.',
+  }),
+  'link.invite_not_found': msg({
+    id: 'link.invite_not_found',
+    message: 'Código inválido ou expirado.',
+  }),
+  // Mesma técnica de "um código para dois motivos": inválido, expirado e já usado devolvem o
+  // mesmo texto, para não dar a quem tenta um código roubado uma pista de qual dos três é.
+  'link.already_linked': msg({
+    id: 'link.already_linked',
+    message: 'Vocês já estão vinculados.',
+  }),
+  // Mesmo código para "não é profissional ativa" (criar convite) e "não é paciente" (resgatar) --
+  // ver PatientLinksProblemCodes.LinkNotAuthorized na API.
+  'link.not_authorized': msg({
+    id: 'link.not_authorized',
+    message: 'Sua conta não pode participar deste vínculo.',
+  }),
+  'link.not_found': msg({
+    id: 'link.not_found',
+    message: 'Não há vínculo com esta conta.',
   }),
 }
 

@@ -18,6 +18,7 @@ public static class AccountsComposition
         services.AddDevicePairing(configuration);
         services.AddProfessionalVerification(configuration);
         services.AddVoiceEnrollment();
+        services.AddSingleton(sp => new AccountKeyPairService(sp.GetRequiredService<IAccountStore>()));
 
         services.ConfigureHttpJsonOptions(options =>
         {
@@ -34,5 +35,6 @@ public static class AccountsComposition
         app.MapProfessionalVerification();
         app.MapRecovery();
         app.MapVoiceEnrollment();
+        app.MapAccountKeyPairEndpoints();
     }
 }

@@ -5,6 +5,7 @@ using Api.Health;
 using Api.ExceptionHandling;
 using Api.Notes;
 using Api.Patients;
+using Api.PatientLinks;
 using Api.Scheduling;
 using Api.Serialization;
 using Mediator;
@@ -51,6 +52,7 @@ public partial class Program
         builder.Services.AddScheduling();
         builder.Services.AddNotes();
         builder.Services.AddConsent();
+        builder.Services.AddPatientLinks();
 
         var app = builder.Build();
 
@@ -69,6 +71,7 @@ public partial class Program
         app.MapScheduling();
         app.MapNotes();
         app.MapConsent();
+        app.MapPatientLinks();
 
         return app;
     }

@@ -27,6 +27,16 @@ tentar arrancar o container, não passam silenciosamente. Os testes puramente un
   agrupa `WrappedDek`/`SealedEmbedding` -- o compilador, não uma invariante em prosa, é quem
   garante que os dois campos viajam sempre juntos). Armazenamento em memória
   (`InMemoryAccountStore`) -- ainda não persistido em Postgres.
+  - `Features/Accounts/KeyPair` (S11-04 fatia 1) -- o par X25519 estático por conta
+    (ADR-S11-06): `AccountKeyPairService.PublishAsync`/`GetAsync` sobre `Account.KeyPair`
+    (`AccountKeyPair(PublicKey, WrappedDek, SealedPrivateKey)`, mesmo molde de envelope
+    DEK/KEK que `VoiceEnrollment`). A pública é imutável: publicar de novo a MESMA `publicKey`
+    substitui o envelope (204, serve rotação de KEK); uma `publicKey` DIFERENTE é `409
+    key_pair.public_key_conflict` -- a primeira publicação vence. `PUT`/`GET
+    /accounts/{accountId}/key-pair` usam `SessionTokenIssuerAuthorization.AccountAccessProblem`
+    (cópia literal do helper do S09-03, `401`/`403` por RFC 9110), não o `IsAuthorizedForAccount`
+    mais antigo que os outros sete ficheiros de endpoints ainda usam -- os dois convivem até o
+    S09-03 migrar o resto.
 - `src/Api/Patients` -- prontuário do paciente: modelo append-only cifrado sobre Postgres
   (`patient_record_entries`, migração `0002_create_patient_record_entries.sql`), RLS por
   tenant, sem UPDATE/DELETE possível (nem por grant de DB, nem por rota HTTP). É a primeira
@@ -92,6 +102,16 @@ tentar arrancar o container, não passam silenciosamente. Os testes puramente un
   como `"pendente"|"concedido"|"revogado"`. Fatia 3 de seis do ticket S10-02: ainda sem
   consumidor real (o portão do microfone e a máquina de sessão são as fatias 4 e 5). Ver o
   README do módulo (`src/Api/Features/Consent/README.md`).
+- `src/Api/Features/PatientLinks` (S11-04 fatias 2-3) -- vínculo 1:1 profissional-paciente por
+  código de uso único (`PatientLinkStore`, singleton em memória, sem migração -- as contas de
+  que depende também vivem em memória): 12 caracteres Crockford-Base32, TTL de 7 dias, uso
+  único; `409 link.already_linked` por `(profissional, conta da paciente)` OU `(profissional,
+  patientId)`. `PatientLinkService` cruza papel/autorização com `IAccountStore`; `LinkView`
+  carrega a pública do par (`Accounts/KeyPair`) do OUTRO lado -- a única resposta desta API com a
+  pública de outra conta, e só para quem é parte do vínculo. `DELETE
+  /accounts/{accountId}/links/{peerAccountId}` desvincula por qualquer das partes, `404
+  link.not_found` se não havia vínculo. Ver o README do módulo
+  (`src/Api/Features/PatientLinks/README.md`).
 - `src/Api/Platform` -- (S08-14, S08-26) `Result<TValue, TFailure>`, o molde partilhado de
   resultado store/service do repositório: um valor de sucesso ou uma razão de falha (`enum`),
   nunca os dois nem nenhum (contrato completo no doc comment do próprio `Result.cs`). Usado

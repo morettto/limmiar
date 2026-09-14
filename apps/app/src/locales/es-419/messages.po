@@ -14,7 +14,7 @@ msgstr ""
 "Plural-Forms: \n"
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:150
+#: src/shared/api/problem-messages.ts:156
 msgid "agenda.recording_active"
 msgstr "La sesión está grabando y no se puede modificar ahora."
 
@@ -50,7 +50,7 @@ msgid "Aguardando o outro dispositivo enviar a chave..."
 msgstr "Esperando a que el otro dispositivo envíe la clave..."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:112
+#: src/shared/api/problem-messages.ts:118
 msgid "auth.device_pairing_payload_not_ready"
 msgstr "Espera a que el otro dispositivo lea el código antes de liberar el acceso."
 
@@ -96,6 +96,10 @@ msgstr "Campo inválido: {field}."
 msgid "Carregando pacientes..."
 msgstr "Cargando pacientes..."
 
+#: src/features/vinculo/DesvincularVinculo.tsx:53
+msgid "Carregando vínculos..."
+msgstr "Cargando vínculos..."
+
 #: src/features/copilot-byok/CopilotKeySetup.tsx:81
 msgid "Chave de API"
 msgstr "Clave de API"
@@ -119,6 +123,25 @@ msgstr "Código de 6 dígitos de tu app autenticadora"
 #: src/features/totp-challenge/TotpChallenge.tsx:53
 msgid "Código de verificação"
 msgstr "Código de verificación"
+
+#: src/features/vinculo/ResgatarConviteVinculo.tsx:66
+msgid "Código de vínculo"
+msgstr "Código de vínculo"
+
+#. placeholder {0}: convite.codigo
+#. placeholder {1}: convite.validade
+#: src/features/vinculo/GerarConviteVinculo.tsx:48
+msgid "Código de vínculo: {0}. Válido até {1}."
+msgstr "Código de vínculo: {0}. Válido hasta {1}."
+
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:188
+msgid "link.invite_not_found"
+msgstr "Código inválido o expirado."
+
+#: src/features/vinculo/ResgatarConviteVinculo.tsx:54
+#~ msgid "Código inválido ou expirado."
+#~ msgstr "Código inválido o vencido."
 
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:47
@@ -194,6 +217,15 @@ msgstr "Crear cuenta"
 msgid "CVV 188 · apoio emocional 24 h"
 msgstr "CVV 188 · apoyo emocional 24 h"
 
+#: src/features/vinculo/DesvincularVinculo.tsx:94
+msgid "Desvincular"
+msgstr "Desvincular"
+
+#. placeholder {0}: vinculo.patientId
+#: src/features/vinculo/DesvincularVinculo.tsx:91
+msgid "Desvincular vínculo com {0}"
+msgstr "Desvincular de {0}"
+
 #: src/features/totp-challenge/TotpChallenge.tsx:47
 msgid "Digite o código de 6 dígitos do seu aplicativo autenticador ou um dos seus códigos de backup."
 msgstr "Ingresa el código de 6 dígitos de tu app autenticadora o uno de tus códigos de respaldo."
@@ -242,6 +274,11 @@ msgid "auth.not_a_professional_account"
 msgstr "Esta acción solo está disponible para cuentas de profesional."
 
 #. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:184
+msgid "key_pair.public_key_conflict"
+msgstr "Esta cuenta ya tiene publicada una clave pública diferente."
+
+#. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:81
 msgid "auth.not_in_review"
 msgstr "Esta cuenta no está esperando revisión."
@@ -251,7 +288,7 @@ msgid "Esta frase não será exibida novamente. Guarde-a em um local seguro: ela
 msgstr "Esta frase no se mostrará de nuevo. Guárdala en un lugar seguro: es la única forma de recuperar el acceso a tu cuenta si pierdes todos tus dispositivos."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:162
+#: src/shared/api/problem-messages.ts:168
 msgid "notes.signature_not_found"
 msgstr "Esta nota aún no ha sido firmada."
 
@@ -260,7 +297,7 @@ msgid "Esta nota já está assinada."
 msgstr "Esta nota ya está firmada."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:158
+#: src/shared/api/problem-messages.ts:164
 msgid "notes.already_signed"
 msgstr "Esta nota ya fue firmada."
 
@@ -269,7 +306,7 @@ msgid "Esta nota já tinha sido assinada. As alterações feitas depois não est
 msgstr "Esta nota ya había sido firmada. Los cambios realizados después no están cubiertos por esa firma."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:146
+#: src/shared/api/problem-messages.ts:152
 msgid "agenda.session_cancelled"
 msgstr "Esta sesión fue cancelada."
 
@@ -278,7 +315,7 @@ msgid "Estado da nota"
 msgstr "Estado de la nota"
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:106
+#: src/shared/api/problem-messages.ts:112
 msgid "auth.device_pairing_session_not_found"
 msgstr "Este código de vinculación ya no es válido. Genera uno nuevo."
 
@@ -297,7 +334,7 @@ msgid "auth.magic_link_invalid"
 msgstr "Este enlace de acceso ya no es válido. Solicita uno nuevo."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:130
+#: src/shared/api/problem-messages.ts:136
 msgid "patients.entry_sequence_conflict"
 msgstr "Este expediente cambió en otro dispositivo. Recarga e intenta de nuevo."
 
@@ -329,6 +366,10 @@ msgstr "Frase de recuperación inválida. Verifica que hayas escrito todas las p
 #: src/features/recovery/RecoveryPhraseSetup.tsx:59
 msgid "Gerando sua frase de recuperação..."
 msgstr "Generando tu frase de recuperación..."
+
+#: src/features/vinculo/GerarConviteVinculo.tsx:66
+msgid "Gerar código de vínculo"
+msgstr "Generar código de vínculo"
 
 #: src/widgets/auth-screen/AuthScreen.tsx:179
 msgid "Gerencie pacientes, prontuários e agenda em um só lugar."
@@ -363,7 +404,7 @@ msgid "Hoje: como você está agora?"
 msgstr "Hoy: ¿cómo te sientes ahora?"
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:138
+#: src/shared/api/problem-messages.ts:144
 msgid "agenda.slot_taken"
 msgstr "Ya existe una sesión en este horario."
 
@@ -432,9 +473,23 @@ msgid "auth.totp_not_pending"
 msgstr "No hay una configuración de verificación en dos pasos pendiente para esta cuenta."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:154
+#: src/shared/api/problem-messages.ts:204
+msgid "link.not_found"
+msgstr "No hay vínculo con esta cuenta."
+
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:160
 msgid "voice.enrollment_not_found"
 msgstr "No se encontró registro de voz para esta cuenta."
+
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:180
+msgid "key_pair.not_found"
+msgstr "No hay un par de claves publicado para esta cuenta."
+
+#: src/features/vinculo/DesvincularVinculo.tsx:73
+msgid "Nenhum vínculo."
+msgstr "Sin vínculos."
 
 #: src/widgets/biblioteca/BibliotecaNotas.tsx:53
 msgid "Nenhuma nota encontrada."
@@ -449,7 +504,7 @@ msgid "Nota assinada em {dataAssinatura}."
 msgstr "Nota firmada el {dataAssinatura}."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:118
+#: src/shared/api/problem-messages.ts:124
 msgid "auth.device_pairing_payload_not_delivered"
 msgstr "El dispositivo principal aún no ha liberado el acceso. Espera."
 
@@ -463,7 +518,7 @@ msgid "unexpected_error"
 msgstr "Ocurrió un error inesperado en el servidor."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:178
+#: src/shared/api/problem-messages.ts:212
 msgid "errors.generic"
 msgstr "Ocurrió un error inesperado. Inténtalo de nuevo."
 
@@ -505,7 +560,7 @@ msgid "Profissional"
 msgstr "Profesional"
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:122
+#: src/shared/api/problem-messages.ts:128
 msgid "patients.not_found"
 msgstr "Expediente no encontrado."
 
@@ -555,7 +610,7 @@ msgid "Senha"
 msgstr "Contraseña"
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:142
+#: src/shared/api/problem-messages.ts:148
 msgid "agenda.session_not_found"
 msgstr "Sesión no encontrada."
 
@@ -564,32 +619,37 @@ msgid "Sono"
 msgstr "Sueño"
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:134
+#: src/shared/api/problem-messages.ts:140
 msgid "agenda.not_authorized_to_schedule"
 msgstr "Tu cuenta todavía no puede agendar sesiones."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:166
+#: src/shared/api/problem-messages.ts:172
 msgid "notes.not_authorized_to_sign"
 msgstr "Su cuenta todavía no puede firmar notas."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:126
+#: src/shared/api/problem-messages.ts:132
 msgid "patients.not_authorized_to_create_records"
 msgstr "Tu cuenta todavía no puede crear expedientes."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:170
+#: src/shared/api/problem-messages.ts:176
 msgid "consent.not_authorized_to_record"
 msgstr "Su cuenta todavía no puede registrar consentimiento."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:95
+#: src/shared/api/problem-messages.ts:200
+msgid "link.not_authorized"
+msgstr "Tu cuenta no puede participar en este vínculo."
+
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:101
 msgid "auth.refresh_token_invalid"
 msgstr "Tu sesión expiró. Inicia sesión de nuevo."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:99
+#: src/shared/api/problem-messages.ts:105
 msgid "auth.access_token_invalid"
 msgstr "Tu sesión expiró. Inicia sesión de nuevo."
 
@@ -625,3 +685,21 @@ msgstr "Verificar"
 #: src/widgets/auth-screen/AuthScreen.tsx:131
 msgid "Verifique seu e-mail para continuar. Enviamos um link de acesso, se este e-mail existir."
 msgstr "Revisa tu correo electrónico para continuar. Enviamos un enlace de acceso, si este correo existe."
+
+#: src/features/vinculo/ResgatarConviteVinculo.tsx:56
+msgid "Vinculada."
+msgstr "Vinculada."
+
+#: src/features/vinculo/ResgatarConviteVinculo.tsx:88
+msgid "Vincular"
+msgstr "Vincular"
+
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:95
+msgid "auth.forbidden"
+msgstr "No tienes permiso para esta acción."
+
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:194
+msgid "link.already_linked"
+msgstr "Ya están vinculados."

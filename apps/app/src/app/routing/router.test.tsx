@@ -64,6 +64,13 @@ vi.mock('../../widgets/contacto-emergencia/ContactoEmergencia', () => ({
 vi.mock('../../pages/paciente-hoje/PacienteHojePage', () => ({
   PacienteHojePage: vi.fn(() => <div data-testid="paciente-hoje-page" />),
 }))
+vi.mock('./E2eVinculoScaffold', () => ({
+  E2eVinculoScaffold: vi.fn(
+    ({ papel, patientId }: { papel: string; patientId: string }) => (
+      <div data-testid="e2e-vinculo-scaffold" data-papel={papel} data-patient-id={patientId} />
+    ),
+  ),
+}))
 
 const PATIENT_ACCOUNT: Account = {
   id: '88888888-8888-8888-8888-888888888888',
@@ -515,6 +522,33 @@ describe('router', () => {
 
     expect(abrirMicrofone).toHaveBeenCalledWith('pendente')
     await screen.findByRole('alert')
+  })
+
+  it('resolves /e2e/vinculo (E2E-only): forwards baseUrl, accountId, accessToken, kek, papel and patientId', async () => {
+    const kekBase64 = encodeBase64(new Uint8Array(32).fill(7))
+    const query = new URLSearchParams({
+      baseUrl: 'http://api.test',
+      accountId: 'conta-marta',
+      accessToken: 'token-marta',
+      kek: kekBase64,
+      papel: 'Professional',
+      patientId: 'paciente-ana',
+    })
+
+    const router = await loadRouterAt(`/e2e/vinculo?${query.toString()}`, true)
+    await renderRouter(router)
+
+    const scaffold = await screen.findByTestId('e2e-vinculo-scaffold')
+    expect(scaffold.dataset.papel).toBe('Professional')
+    expect(scaffold.dataset.patientId).toBe('paciente-ana')
+
+    const { E2eVinculoScaffold } = await import('./E2eVinculoScaffold')
+    expect(vi.mocked(E2eVinculoScaffold).mock.calls[0]![0]).toMatchObject({
+      baseUrl: 'http://api.test',
+      accountId: 'conta-marta',
+      accessToken: 'token-marta',
+      kek: kekBase64,
+    })
   })
 
   it('redirects a Patient session from "/" to "/hoje", never rendering HomePage', async () => {
