@@ -76,6 +76,22 @@ public sealed class PatientLinkEndpointsTests
         Assert.Equal("link.not_authorized", doc.RootElement.GetProperty("code").GetString());
     }
 
+    /// <summary>A Patient account has no patient records of its own to invite into -- same not_authorized code as the unverified-professional case.</summary>
+    [Fact]
+    public async Task CreateInvite_ByPatientAccount_Returns403WithProblemDetails()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        var accountId = await RegisterPatientAsync(client, "link-invite-patient@example.com");
+
+        var response = await client.PostAsync($"/accounts/{accountId}/patients/{Guid.NewGuid()}/link-invites", null);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(body);
+        Assert.Equal("link.not_authorized", doc.RootElement.GetProperty("code").GetString());
+    }
+
     [Fact]
     public async Task CreateInvite_WithTokenForDifferentAccount_Returns403WithProblemDetails()
     {

@@ -1,7 +1,7 @@
 import { test, expect, type APIRequestContext } from '@playwright/test'
 import { webcrypto, getPublicKey } from '@limmiar/crypto'
 import { API_BASE_URL } from '../playwright.config'
-import { contaTestKek, registrarPaciente, registrarProfissionalVerificada, type ContaPaciente, type ContaProfissional } from './fixtures/contas'
+import { contaTestKek, registrarPaciente, registrarProfissionalVerificada, type ContaTeste } from './fixtures/contas'
 
 // S11-04: um teste por passo do Cenário E2E (Specs/S11 Partilha e espelho P6.md), com o nome
 // exato de cada "Teste:". Os passos 6-8 (partilha/revogação) são do S11-02. O par de chaves
@@ -57,10 +57,10 @@ async function getLinks(request: APIRequestContext, accountId: string, accessTok
 
 // Estado partilhado entre os passos, na mesma ordem narrativa do cenário -- mode: 'serial'
 // garante que corre por esta ordem, no mesmo worker.
-let marta: ContaProfissional
-let rui: ContaProfissional
-let ana: ContaPaciente
-let beatriz: ContaPaciente
+let marta: ContaTeste
+let rui: ContaTeste
+let ana: ContaTeste
+let beatriz: ContaTeste
 let martaKek: Uint8Array
 let anaKek: Uint8Array
 let patientIdAna: string
@@ -129,6 +129,9 @@ test.describe('S11-04 · Vínculo profissional-paciente + chave pública da cont
     const links = await getLinks(request, ana.accountId, ana.accessToken)
     expect(links.ok()).toBe(true)
     expect(await links.json()).toEqual([])
+
+    const martaLinksViaAna = await getLinks(request, marta.accountId, ana.accessToken)
+    expect(martaLinksViaAna.status()).toBe(403)
 
     const martaKeyPairViaAna = await getKeyPair(request, marta.accountId, ana.accessToken)
     expect(martaKeyPairViaAna.status()).toBe(403)
@@ -206,6 +209,9 @@ test.describe('S11-04 · Vínculo profissional-paciente + chave pública da cont
   test('outra profissional não vê a chave da paciente, porque não há equipa', async ({ request }) => {
     const ruiLinks = await getLinks(request, rui.accountId, rui.accessToken)
     expect(await ruiLinks.json()).toEqual([])
+
+    const anaLinksViaRui = await getLinks(request, ana.accountId, rui.accessToken)
+    expect(anaLinksViaRui.status()).toBe(403)
 
     const anaKeyPairViaRui = await getKeyPair(request, ana.accountId, rui.accessToken)
     expect(anaKeyPairViaRui.status()).toBe(403)

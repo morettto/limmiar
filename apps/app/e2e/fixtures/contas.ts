@@ -19,20 +19,15 @@ export function contaTestKek(seed: number): Uint8Array {
   return Uint8Array.from({ length: 32 }, (_, i) => (i * 7 + seed) % 256)
 }
 
-export interface ContaPaciente {
-  accountId: string
-  accessToken: string
-  email: string
-}
-
-export interface ContaProfissional {
+/** A registered account plus the session to act as it -- same shape for Patient and Professional, only the registration path differs. */
+export interface ContaTeste {
   accountId: string
   accessToken: string
   email: string
 }
 
 /** POST /auth/register (Patient role) -- a Patient account never needs TOTP enrollment (ADR-S02-03/S02-04), so registration alone returns a real session. */
-export async function registrarPaciente(request: APIRequestContext, label: string): Promise<ContaPaciente> {
+export async function registrarPaciente(request: APIRequestContext, label: string): Promise<ContaTeste> {
   const email = `vinculo-e2e-${label}-${crypto.randomUUID()}@example.com`
   const response = await request.post(`${API_BASE_URL}/auth/register`, {
     data: {
@@ -52,7 +47,7 @@ export async function registrarPaciente(request: APIRequestContext, label: strin
 // Document + staff approval, not CRP/CRM: against the real webServer,
 // CouncilRegistryVerifier.VerifyAsync throws NotSupportedException (no contracted provider), so
 // this is the only path this suite can drive to an Active professional account.
-export async function registrarProfissionalVerificada(request: APIRequestContext, label: string): Promise<ContaProfissional> {
+export async function registrarProfissionalVerificada(request: APIRequestContext, label: string): Promise<ContaTeste> {
   const email = `vinculo-e2e-${label}-${crypto.randomUUID()}@example.com`
   const registerResponse = await request.post(`${API_BASE_URL}/auth/register`, {
     data: { email, passwordVerifier: toBase64(new Uint8Array(32)), role: 'Professional' },

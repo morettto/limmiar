@@ -63,13 +63,14 @@ public sealed class PatientLinkService(IAccountStore accounts, PatientLinkStore 
         }
 
         return await links.Redeem(code, patientAccountId).Match(
-            link => ToRedeemedViewAsync(link, patientAccountId, cancellationToken),
+            async link =>
+            {
+                Result<LinkView, RedeemLinkFailure> view = await ToViewAsync(link, patientAccountId, cancellationToken);
+                return view;
+            },
             failure => Task.FromResult<Result<LinkView, RedeemLinkFailure>>(
                 failure == RedeemFailure.InviteNotFound ? RedeemLinkFailure.InviteNotFound : RedeemLinkFailure.AlreadyLinked));
     }
-
-    private async Task<Result<LinkView, RedeemLinkFailure>> ToRedeemedViewAsync(PatientLink link, Guid viewerAccountId, CancellationToken cancellationToken) =>
-        await ToViewAsync(link, viewerAccountId, cancellationToken);
 
     public async Task<IReadOnlyList<LinkView>> ListAsync(Guid accountId, CancellationToken cancellationToken)
     {
