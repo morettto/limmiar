@@ -1,4 +1,5 @@
 using Api.Accounts;
+using Api.Billing;
 using Api.Consent;
 using Api.Data;
 using Api.Health;
@@ -51,6 +52,7 @@ public partial class Program
         builder.Services.AddScheduling();
         builder.Services.AddNotes();
         builder.Services.AddConsent();
+        builder.Services.AddBilling(builder.Configuration);
 
         var app = builder.Build();
 
@@ -79,6 +81,7 @@ public partial class Program
         routes.MapScheduling();
         routes.MapNotes();
         routes.MapConsent();
+        routes.MapBilling();
 
         return app;
     }

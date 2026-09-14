@@ -8,17 +8,19 @@ Esta fatia (S06-02, fatia D) é deliberadamente só o cliente: o `.tsx` de captu
 
 ## Fluxo principal
 
-1. `cadastrarVoz(baseUrl, accountId, token, kek, embedding)` -- gera uma DEK nova (`webcrypto.generateWrappedDek(kek, voiceDekAad(accountId))`), serializa `embedding: readonly number[]` como `Float32Array` e cifra (`webcrypto.encrypt(dek, plaintext, voiceEmbeddingAad(accountId))`), depois `PUT /accounts/{accountId}/voice-enrollment` com `{ wrappedDek, sealedEmbedding }` (ambos base64, mesma convenção de `createPatient`). As duas AADs vêm de `voice-crypto.ts`, cada uma com o seu prefixo versionado (`limmiar/voice-dek/v1|` e `limmiar/voice-embedding/v1|`) -- mesmo padrão de `patient-crypto.ts`/`copilot-crypto.ts`: o wrap da DEK e o encrypt do embedding nunca partilham a mesma AAD, então um envelope e um embedding cifrado não são intercambiáveis entre si mesmo dentro da mesma conta, e um blob trocado ou reproduzido de outra conta falha ao decifrar em vez de abrir silenciosamente.
+1. `cadastrarVoz(baseUrl, accountId, token, kek, embedding)` -- chama `selarEmbedding(kek, accountId, embedding)` (em `voice-crypto.ts`) e codifica os dois blobs devolvidos em base64, depois `PUT /accounts/{accountId}/voice-enrollment` com `{ wrappedDek, sealedEmbedding }` (mesma convenção de `createPatient`). A selagem em si -- gerar a DEK nova (`webcrypto.generateWrappedDek(kek, voiceDekAad(accountId))`), serializar `embedding: readonly number[]` como `Float32Array` e cifrar (`webcrypto.encrypt(dek, plaintext, voiceEmbeddingAad(accountId))`) -- vive inteira em `voice-crypto.ts`, ao lado das duas AADs; `cadastrarVoz` não toca em bytes de cripto, só chama a função e fala HTTP. Cada AAD tem o seu prefixo versionado (`limmiar/voice-dek/v1|` e `limmiar/voice-embedding/v1|`) -- mesmo padrão de `patient-crypto.ts`/`copilot-crypto.ts`: o wrap da DEK e o encrypt do embedding nunca partilham a mesma AAD, então um envelope e um embedding cifrado não são intercambiáveis entre si mesmo dentro da mesma conta, e um blob trocado ou reproduzido de outra conta falha ao decifrar em vez de abrir silenciosamente. O layout do `plaintext` selado é float32 na ordem de bytes da plataforma, elementos na ordem de entrada, sem header -- documentado como comentário curto acima de `selarEmbedding` em `voice-crypto.ts`; o descodificador (`abrirEmbedding`) ainda não existe, entra no S06-05 quando o primeiro consumidor aparecer, no mesmo ficheiro.
 2. `obterCadastroVoz(baseUrl, accountId, token)` -- `GET` no mesmo endpoint, devolve `{ ok: true, wrappedDek, sealedEmbedding }` (bytes decodificados de base64) ou o `ProblemResult` (`{ ok: false, code, params }`) vindo do corpo `problem+json` (ex.: 404 quando ainda não há cadastro).
 3. `removerCadastroVoz(baseUrl, accountId, token)` -- `DELETE`, mapeia `204` para `{ ok: true }`.
 4. As três funções reusam `getJson`/`putJson`/`deleteRequest`/`readProblem`/`ProblemResult` exportados de `../api/client.ts` -- nenhuma lógica de fetch/erro é duplicada aqui, e os três `return` de erro devolvem `readProblem(response)` inteiro (com `params`), não um subconjunto `{ ok: false, code }` local.
 
 ## Pontos de entrada
 
-- `cadastrarVoz`, `obterCadastroVoz`, `removerCadastroVoz`, tipo `ObterCadastroVozResult` (`voice-enrollment.ts`).
-- `voiceDekAad`, `voiceEmbeddingAad` (`voice-crypto.ts`).
+- `cadastrarVoz`, `obterCadastroVoz`, `removerCadastroVoz`, tipo `ObterCadastroVozResult` (`voice-enrollment.ts`) -- módulo HTTP puro, sem cripto inline.
+- `selarEmbedding`, `voiceDekAad`, `voiceEmbeddingAad` (`voice-crypto.ts`) -- toda a selagem do embedding vive aqui.
 
 ## Decisões relevantes
+
+**S06-08**: `generateWrappedDek`/o empacotamento `Float32Array`/`encrypt` viviam dentro de `cadastrarVoz`, a única função HTTP do repo a fazer isso -- os módulos irmãos (`patient-crypto.ts`, `copilot-byok/key-store.ts`, `nota-biblioteca/indice-crypto.ts`, `gravacao/audio-crypto.ts`) já selam no ficheiro `*-crypto.ts`. Extraído para `selarEmbedding` em `voice-crypto.ts`, à imagem de `sealNewPatient`; `cadastrarVoz` passou a só chamar e a codificar base64. `abrirEmbedding` fica de fora deste ticket (entra no S06-05, no mesmo ficheiro).
 
 `putJson`/`deleteRequest` foram acrescentados a `api/client.ts` (junto de `getJson`/`readProblem`, agora exportados) em vez de reimplementados aqui -- o repo já centraliza o wrapper de fetch/erro em `client.ts`; nenhum outro módulo do app faz sua própria chamada de rede com parsing de `problem+json`. `postJson` continua privada de `client.ts`: este módulo nunca faz POST.
 

@@ -5,6 +5,11 @@ using System.Text.Json;
 using Api.Accounts;
 using Api.Serialization;
 using Api.Tests.Accounts;
+// Api.Accounts also has an internal CapturingMagicLinkEmailSender (production fixture),
+// invisible here until S12-01 added InternalsVisibleTo to Api.csproj for AbacatePayClient's
+// internal seam. That IVT made both types resolvable, so the unqualified name became
+// ambiguous; this alias pins it back to the test fake this file always meant.
+using CapturingMagicLinkEmailSender = Api.Tests.Accounts.CapturingMagicLinkEmailSender;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
@@ -927,6 +932,7 @@ public sealed class AuthEndpointsTests
                 builder.UseSetting("StaffAccess:ApiKey", "test-staff-api-key");
                 builder.UseSetting("WebAuthn:RelyingPartyId", WebAuthnRelyingPartyId);
                 builder.UseSetting("WebAuthn:ExpectedOrigin", WebAuthnOrigin);
+                builder.UseSetting("AbacatePay:WebhookSecret", "whsec_test123");
             });
 
     /// <summary>Overrides the production IMagicLinkEmailSender registration with a capturing fake so a test can read back the token a request "sent".</summary>

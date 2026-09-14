@@ -1,0 +1,27 @@
+{
+  "data": {
+    "id": "bill_abc123xyz",
+    "externalId": "pedido-123",
+    "url": "https://app.abacatepay.com/pay/bill_abc123xyz",
+    "amount": 10000,
+    "paidAmount": 10000,
+    "items": [{ "id": "prod_456", "quantity": 2 }],
+    "status": "PAID",
+    "coupons": [],
+    "devMode": false,
+    "customerId": "cust_abc123xyz",
+    "returnUrl": null,
+    "completionUrl": null,
+    "receiptUrl": "https://app.abacatepay.com/receipt/bill_abc123xyz",
+    "upSellProductId": null,
+    "installmentsCount": null,
+    "dueDate": null,
+    "interest": null,
+    "fine": null,
+    "metadata": {},
+    "createdAt": "2024-11-04T18:38:28.573Z",
+    "updatedAt": "2024-11-04T18:40:12.000Z"
+  },
+  "error": null,
+  "success": true
+}
