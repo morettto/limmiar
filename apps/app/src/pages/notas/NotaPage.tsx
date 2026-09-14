@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useLingui } from '@lingui/react/macro'
 import type { Ancora } from '@limmiar/copilot'
 import type { CryptoKey } from '@limmiar/crypto'
+import { useSession } from '../../entities/account/session-context'
 import { assinarNota, obterAssinatura } from '../../entities/nota/api'
 import { notaParaEntrada, selarAssinatura } from '../../entities/nota/nota-crypto'
 import { ESTADO_ASSINADA, ESTADO_PENDENTE, ORDEM_SECOES, type Nota } from '../../entities/nota/nota'
@@ -37,9 +38,6 @@ export interface NotaPageProps {
   // `BibliotecaPage`. `router.tsx` monta com `kek={null}` enquanto não há KeychainProvider;
   // os testes injetam uma chave real para exercitar o caminho pós-guarda.
   kek: CryptoKey | null
-  // Vem da sessão real desde o S08-27, mesmo padrão do `accountId` de `BibliotecaPage`
-  // (S18-01). `null` sem sessão -- guarda o mount e `aoAssinar` (ver README).
-  accountId: string | null
   // Prop desde o S08-27 (era constante fixture) -- mesmo motivo do `kek: CryptoKey | null`:
   // sem Keychain montado ainda, `router.tsx` passa `null`. Guarda o mount e `aoAssinar`.
   accessToken: string | null
@@ -47,7 +45,9 @@ export interface NotaPageProps {
 
 // ponytail: fila com um único item fixo -- a fila real continua fora desta fatia. `aoAssinar`
 // já grava no prontuário e assina de facto, e marca só o item de `nota.id`.
-export function NotaPage({ kek, accountId, accessToken }: NotaPageProps) {
+export function NotaPage({ kek, accessToken }: NotaPageProps) {
+  const { sessao } = useSession()
+  const accountId = sessao?.id ?? null
   const { t, i18n } = useLingui()
   const [notas, setNotas] = useState<Record<string, Nota>>(() => ({ [NOTA_FIXTURE_ID]: notaFixture() }))
   const [mensagem, setMensagem] = useState<Mensagem | null>(null)

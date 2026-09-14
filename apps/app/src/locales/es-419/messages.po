@@ -79,7 +79,7 @@ msgstr "Bienvenido a Limmiar"
 msgid "Buscar notas"
 msgstr "Buscar notas"
 
-#: src/features/copilot-byok/CopilotKeySetup.tsx:57
+#: src/features/copilot-byok/CopilotKeySetup.tsx:59
 msgid "Cadastrar chave de API de IA"
 msgstr "Registrar clave de API de IA"
 
@@ -92,11 +92,11 @@ msgstr "Campo inválido: {field}."
 msgid "Carregando pacientes..."
 msgstr "Cargando pacientes..."
 
-#: src/features/copilot-byok/CopilotKeySetup.tsx:81
+#: src/features/copilot-byok/CopilotKeySetup.tsx:83
 msgid "Chave de API"
 msgstr "Clave de API"
 
-#: src/features/copilot-byok/CopilotKeySetup.tsx:30
+#: src/features/copilot-byok/CopilotKeySetup.tsx:31
 msgid "Chaveiro bloqueado. Desbloqueie para cadastrar sua chave de API."
 msgstr "Llavero bloqueado. Desbloquéalo para registrar tu clave de API."
 
@@ -141,7 +141,7 @@ msgstr "¿Cómo vas a usar Limmiar?"
 msgid "Concluindo o pareamento..."
 msgstr "Completando la vinculación..."
 
-#: src/pages/home/HomePage.tsx:16
+#: src/pages/home/HomePage.tsx:14
 msgid "Configurar copiloto de IA"
 msgstr "Configurar copiloto de IA"
 
@@ -298,7 +298,7 @@ msgstr "No se pudo firmar la nota. Intente de nuevo."
 msgid "Fila de assinatura"
 msgstr "Cola de firma"
 
-#: src/features/copilot-byok/CopilotKeySetup.tsx:66
+#: src/features/copilot-byok/CopilotKeySetup.tsx:68
 msgid "Fornecedor"
 msgstr "Proveedor"
 
@@ -339,7 +339,7 @@ msgstr "Guardé mi frase"
 msgid "agenda.slot_taken"
 msgstr "Ya existe una sesión en este horario."
 
-#: src/features/copilot-byok/CopilotKeySetup.tsx:103
+#: src/features/copilot-byok/CopilotKeySetup.tsx:105
 msgid "Lembrar neste dispositivo"
 msgstr "Recordar en este dispositivo"
 
@@ -386,11 +386,11 @@ msgstr "No se pudo descifrar la clave recibida. Intenta vincular de nuevo."
 msgid "Não foi possível ler"
 msgstr "No se pudo leer"
 
-#: src/pages/biblioteca/BibliotecaPage.tsx:34
+#: src/pages/biblioteca/BibliotecaPage.tsx:36
 msgid "Não foi possível preparar a busca. Tente novamente."
 msgstr "No se pudo preparar la búsqueda. Intenta de nuevo."
 
-#: src/features/copilot-byok/CopilotKeySetup.tsx:61
+#: src/features/copilot-byok/CopilotKeySetup.tsx:63
 msgid "Não foi possível salvar a chave. Tente novamente."
 msgstr "No se pudo guardar la clave. Intenta de nuevo."
 
@@ -477,8 +477,8 @@ msgstr "Profesional"
 msgid "patients.not_found"
 msgstr "Expediente no encontrado."
 
-#: src/features/copilot-byok/CopilotKeySetup.tsx:33
-#: src/features/copilot-byok/CopilotKeySetup.tsx:115
+#: src/features/copilot-byok/CopilotKeySetup.tsx:34
+#: src/features/copilot-byok/CopilotKeySetup.tsx:117
 msgid "Pular"
 msgstr "Omitir"
 
@@ -494,11 +494,11 @@ msgstr "Recuperar acceso a la cuenta"
 msgid "Risco"
 msgstr "Riesgo"
 
-#: src/pages/home/HomePage.tsx:22
+#: src/pages/home/HomePage.tsx:20
 msgid "Sair"
 msgstr "Cerrar sesión"
 
-#: src/features/copilot-byok/CopilotKeySetup.tsx:112
+#: src/features/copilot-byok/CopilotKeySetup.tsx:114
 msgid "Salvar"
 msgstr "Guardar"
 

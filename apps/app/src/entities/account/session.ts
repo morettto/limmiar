@@ -53,10 +53,14 @@ export function criarSessaoDeConta(storage: KeyValueStorage): SessaoDeConta {
         return null
       }
 
-      // twoFactorTicket nunca sobrevive ao round-trip (S18-07): mesmo que `registar` já não o
-      // grave, uma sessão gravada antes deste fix ainda pode ter um ticket no sessionStorage --
-      // `ler()` força null para não devolver um segredo de 2FA a quem restaura a sessão.
-      return ehConta(parsed) ? { ...parsed, twoFactorTicket: null } : null
+      if (!ehConta(parsed)) {
+        return null
+      }
+      // Campo a campo, não `{ ...parsed }`: o spread deixaria entrar num `Account` o que o
+      // DevTools escrevesse a mais no storage (S18-11). `twoFactorTicket` sai sempre null --
+      // uma sessão gravada antes do S18-07 ainda pode ter um ticket lá. Ver README.
+      const { id, email, role, twoFactorRequirement } = parsed
+      return { id, email, role, twoFactorRequirement, twoFactorTicket: null }
     },
     registar(account) {
       const { twoFactorTicket: _twoFactorTicket, ...semTicket } = account

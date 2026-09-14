@@ -5,11 +5,14 @@
 Dono único da identidade da conta autenticada, do login/recuperação até qualquer leitor da
 sessão em toda a app (spec S18, ticket S18-01). `session.ts` (`criarSessaoDeConta(storage)`,
 `sessaoDaConta`) é a única fonte de verdade de "quem está logado agora" -- ninguém mais grava
-ou lê `sessionStorage['limmiar:account']` diretamente. Esta slice não conhece purgas: apagar a
-sessão no logout/troca de conta e disparar limpeza de outros dados (chaveiro, índice de busca
-em OPFS...) é orquestração de fora, não responsabilidade de `entities` -- a regra
-`fsd-no-cross-slice` (`.dependency-cruiser.cjs`) já impede `entities/account` de conhecer
-`entities/nota`/`features/*` para forçar essa fronteira em compilação, não só em prosa.
+ou lê `sessionStorage['limmiar:account']` diretamente. `session-context.tsx` (S18-10) é o React
+`Context`/hook (`SessionContext`, `useSession()`) que expõe essa sessão à árvore -- React puro,
+zero imports de `features`, para que qualquer `pages/`/`features/` possa chamá-lo sem violar
+`fsd-pages-no-app`. Esta slice não conhece purgas: apagar a sessão no logout/troca de conta e
+disparar limpeza de outros dados (chaveiro, índice de busca em OPFS...) é orquestração de fora,
+não responsabilidade de `entities` -- a regra `fsd-no-cross-slice` (`.dependency-cruiser.cjs`) já
+impede `entities/account` de conhecer `entities/nota`/`features/*` para forçar essa fronteira em
+compilação, não só em prosa.
 
 ## Fluxo principal
 
@@ -17,9 +20,10 @@ em OPFS...) é orquestração de fora, não responsabilidade de `entities` -- a 
    `features/magic-link-auth/MagicLinkCallback`) autentica a conta e chama o próprio
    `onAuthenticated`/`onRecovered` -- eles não gravam a sessão sozinhos desde o S18-01 (antes,
    cada um chamava `recordSession` direto; ver Decisões).
-2. Só `app/routing/router.tsx` liga esse callback a `iniciarSessao` de
-   `app/providers/SessionProvider.tsx`, que por sua vez chama `sessaoDaConta.registar(account)`
-   -- grava em `window.sessionStorage` e atualiza o estado React do provider na mesma chamada.
+2. `app/routing/router.tsx` liga esse callback a `iniciarSessao` de
+   `app/providers/SessionProvider.tsx` (via `useSession()`, `session-context.tsx`), que por sua
+   vez chama `sessaoDaConta.registar(account)` -- grava em `window.sessionStorage` e atualiza o
+   estado React do provider na mesma chamada.
 3. No mount do `SessionProvider` (qualquer navegação/reload da SPA), `sessaoDaConta.ler()`
    tenta restaurar a sessão gravada. Quatro ramos degradam para `null`, nunca lançam: nada
    gravado; JSON corrompido; valor parseado que não é um objeto não-nulo (array e o literal
@@ -36,22 +40,42 @@ em OPFS...) é orquestração de fora, não responsabilidade de `entities` -- a 
 - `sessaoDaConta: SessaoDeConta` (`session.ts`) -- a instância real, fechada sobre
   `window.sessionStorage`. Import direto do ficheiro (`entities/account/session`), não pelo
   barrel `index.ts` -- mesma disciplina de isolamento do antigo `recordSession` (S08-08).
-- Consumido só por `app/providers/SessionProvider.tsx` (`useSession()` expõe `sessao`,
-  `iniciarSessao`, `terminarSessao` a toda a árvore React). Nenhuma página em `src/pages/` pode
-  importar `SessionProvider` diretamente -- a regra `fsd-pages-no-app` proíbe `pages` → `app`;
-  quem precisa da conta recebe `accountId`/callback como prop, ligada por um route component em
-  `app/routing/router.tsx`.
+- `SessionContext`, `useSession(): ContextoSessao` (`session-context.tsx`, S18-10) -- expõe
+  `sessao`, `iniciarSessao`, `terminarSessao` a toda a árvore React. Qualquer `pages/`/`features/`
+  pode chamar `useSession()` diretamente (React puro, nenhuma dependência de `app`), sem precisar
+  de um route component intermédio a converter sessão em props -- `app/providers/SessionProvider.tsx`
+  é quem monta `<SessionContext.Provider>` com o estado real.
 - `Account`, `AccountRole`, `TwoFactorRequirement` (`account.ts`); `register`, `login`,
   `continueWithGoogle`, `requestMagicLink`, `verifyMagicLink`, `recoverAccess`... (`api.ts`) --
   ver `index.ts` para a lista completa; não mudaram nesta fatia.
+- `purgarOpfsDaConta(accountId): Promise<void>` (`opfs-conta.ts`, S18-15) -- a conta é dona da
+  árvore `<raiz OPFS>/<accountId>`; esta é a única definição dessa convenção. Import por
+  caminho profundo (`entities/account/opfs-conta`), fora do barrel `index.ts` -- mesma
+  disciplina de `session-context.tsx` acima. Único chamador: `PURGAS` em
+  `app/providers/purgar-conta.ts` (ver `app/providers/README.md`).
 
 ## Decisões desta fatia
 
+- **`SessionContext`/`useSession()` desceram de `app/providers/SessionProvider.tsx` para
+  `session-context.tsx` nesta slice (S18-10).** Viviam em `app/providers` porque nasceram junto
+  com `SessionProvider`; `fsd-pages-no-app` (`.dependency-cruiser.cjs`) proíbe `pages` de importar
+  `app`, então três route components (`IndexRouteComponent`, `CopilotKeyRouteComponent`,
+  `BibliotecaRouteComponent`) existiam só para chamar `useSession()` em `app/routing` e passar o
+  resultado como prop. `entities` já é camada que `pages` pode importar -- descer o contexto
+  (React puro, sem `clearApiKey`/`purgarOpfsDaConta` -- então `purgarIndiceBusca`, ver
+  Decisões, "purgarOpfsDaConta" -- que ficaram em `SessionProvider.tsx`) apagou
+  os três wrappers sem mudar nenhum comportamento observável.
 - **`ler()` valida `id`, `email`, `role` e `twoFactorRequirement` (S18-02, review de segurança).**
   Um `sessionStorage` editável no DevTools não deve conseguir forjar um `role` ou um
   `twoFactorRequirement` que o predicado `valor is Account` depois trata como garantido para
   quem ler `sessao` do contexto -- mesmo que hoje nenhum consumidor leia esses dois campos.
   `twoFactorTicket` continua sem validação própria (`string | null` aceita qualquer coisa).
+- **`ler()` constrói o `Account` campo a campo, não por spread do que estiver no storage
+  (S18-11).** `ehConta` valida quatro campos, mas `{ ...parsed, twoFactorTicket: null }`
+  preservava qualquer propriedade a mais que alguém escrevesse no `sessionStorage` pelo DevTools,
+  dentro de um objeto que o resto da app trata como `Account` garantido -- o predicado prometia
+  uma forma e o valor devolvido não era essa forma. Agora `ler()` desestrutura os quatro campos
+  validados e devolve só esses mais `twoFactorTicket: null`.
 - **`twoFactorTicket` nunca persiste em `sessionStorage` (S18-07).** É um segredo do fluxo 2FA
   que o servidor já invalida ao consumir (~10 min, `TwoFactorEndpoints.cs`) -- não há razão para
   o gravar. `registar()` grava a conta sem esse campo; `ler()` força-o sempre a `null` (defesa em
@@ -61,6 +85,11 @@ em OPFS...) é orquestração de fora, não responsabilidade de `entities` -- a 
   `RecoveryScreen`, páginas de rota...) sem ganho: quem lê `state.account.twoFactorTicket` fá-lo
   sempre a partir da resposta fresca da API (`AuthScreen.tsx`, `RecoveryScreen.tsx`), nunca de
   `useSession().sessao`.
+- **`purgarOpfsDaConta` apaga `<raiz OPFS>/<accountId>` inteira, recursivamente (S18-15).**
+  Substitui o guarda estático que cruzava quem abre a raiz OPFS com o literal `PURGAS`
+  (`arch.test.ts`, S18-12) -- ver `app/providers/README.md` para o porquê de o guarda ter sido
+  apagado em vez de estendido. Diretório ausente é no-op (`NotFoundError`); qualquer outro
+  erro propaga para o `catch` de `purgarConta`.
 - **`recordSession`/`createSessionRecorder` foram apagados, não mantidos como alias.** Zero
   chamadores depois do S18-01: os três ecrãs de entrada pararam de gravar a sessão sozinhos, e
   `criarSessaoDeConta`/`sessaoDaConta` (com `ler`/`terminar` novos) tomaram o lugar por inteiro.
