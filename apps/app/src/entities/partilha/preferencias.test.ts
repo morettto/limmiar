@@ -1,7 +1,6 @@
 import { webcrypto, type CryptoKey } from '@limmiar/crypto'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { encodeBase64 } from '../../shared/lib/base64'
-import type { Vinculo } from '../vinculo/api'
 import { comPartilha, type EstadoPartilha } from './partilha'
 import { RollbackDePreferencias, definirPartilha, lerEstadoPartilha } from './preferencias'
 
@@ -9,6 +8,7 @@ const ACCOUNT_ID = '11111111-1111-1111-1111-111111111111'
 const BASE_URL = 'http://api.test'
 const ACCESS_TOKEN = 'access-token-abc'
 const ULTIMA_VISTA_KEY = `limmiar:partilha-versao:${ACCOUNT_ID}`
+const CHAVE = '22222222-2222-2222-2222-222222222222|2026-09-14T10:00:00Z'
 
 async function criarKek(): Promise<CryptoKey> {
   return webcrypto.importKek(crypto.getRandomValues(new Uint8Array(32)))
@@ -37,17 +37,6 @@ function respostaProblema(status: number, code: string): Response {
   })
 }
 
-function vinculo(overrides: Partial<Vinculo> = {}): Vinculo {
-  return {
-    profissionalAccountId: '22222222-2222-2222-2222-222222222222',
-    pacienteAccountId: ACCOUNT_ID,
-    patientId: 'patient-1',
-    vinculadoEm: '2026-09-14T10:00:00Z',
-    chavePublicaDoPar: new Uint8Array(32).fill(7),
-    ...overrides,
-  }
-}
-
 describe('lerEstadoPartilha', () => {
   beforeEach(() => {
     window.localStorage.clear()
@@ -70,7 +59,7 @@ describe('lerEstadoPartilha', () => {
 
   it('200 decifra o blob e sobe a última versão vista', async () => {
     const kek = await criarKek()
-    const estado = comPartilha({}, vinculo(), 'checkin', true)
+    const estado = comPartilha({}, CHAVE, 'checkin', true)
     const { wrappedDek, ciphertext } = await cifrarBlob(kek, 1, estado)
     vi.stubGlobal(
       'fetch',
@@ -91,7 +80,7 @@ describe('lerEstadoPartilha', () => {
 
   it('ler duas vezes seguidas com a mesma versão não regride a última vista', async () => {
     const kek = await criarKek()
-    const estado = comPartilha({}, vinculo(), 'checkin', true)
+    const estado = comPartilha({}, CHAVE, 'checkin', true)
     const { wrappedDek, ciphertext } = await cifrarBlob(kek, 1, estado)
     vi.stubGlobal(
       'fetch',
@@ -115,7 +104,7 @@ describe('lerEstadoPartilha', () => {
 
   it('versão interna diferente da versão do fio lança RollbackDePreferencias', async () => {
     const kek = await criarKek()
-    const estado = comPartilha({}, vinculo(), 'checkin', true)
+    const estado = comPartilha({}, CHAVE, 'checkin', true)
     const { wrappedDek, ciphertext } = await cifrarBlob(kek, 2, estado)
     vi.stubGlobal(
       'fetch',
@@ -138,7 +127,7 @@ describe('lerEstadoPartilha', () => {
   it('blob mais antigo do que a última versão vista lança RollbackDePreferencias', async () => {
     const kek = await criarKek()
     window.localStorage.setItem(ULTIMA_VISTA_KEY, '5')
-    const estado = comPartilha({}, vinculo(), 'checkin', true)
+    const estado = comPartilha({}, CHAVE, 'checkin', true)
     const { wrappedDek, ciphertext } = await cifrarBlob(kek, 2, estado)
     vi.stubGlobal(
       'fetch',
@@ -169,7 +158,7 @@ describe('lerEstadoPartilha', () => {
 
   it('ler a mesma versão duas vezes não escreve em localStorage na segunda leitura', async () => {
     const kek = await criarKek()
-    const estado = comPartilha({}, vinculo(), 'checkin', true)
+    const estado = comPartilha({}, CHAVE, 'checkin', true)
     const { wrappedDek, ciphertext } = await cifrarBlob(kek, 1, estado)
     vi.stubGlobal(
       'fetch',
@@ -199,7 +188,6 @@ describe('definirPartilha', () => {
 
   it('lê, aplica a mudança e grava com expectedVersion = versão lida', async () => {
     const kek = await criarKek()
-    const v = vinculo()
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(respostaProblema(404, 'sharing.preferences_not_found'))
@@ -211,12 +199,12 @@ describe('definirPartilha', () => {
       accountId: ACCOUNT_ID,
       accessToken: ACCESS_TOKEN,
       kek,
-      vinculo: v,
+      chave: CHAVE,
       tipo: 'checkin',
       ativa: true,
     })
 
-    expect(resultado).toEqual(comPartilha({}, v, 'checkin', true))
+    expect(resultado).toEqual(comPartilha({}, CHAVE, 'checkin', true))
     const putCall = fetchMock.mock.calls[1] as [string, RequestInit]
     expect(putCall[0]).toBe(`${BASE_URL}/accounts/${ACCOUNT_ID}/sharing-preferences`)
     const putBody = JSON.parse(putCall[1].body as string) as { expectedVersion: number }
@@ -225,8 +213,8 @@ describe('definirPartilha', () => {
 
   it('409 relê, reaplica a mesma mudança e tenta uma vez mais', async () => {
     const kek = await criarKek()
-    const v = vinculo()
-    const estadoServidor = comPartilha({}, vinculo({ profissionalAccountId: 'outra-profissional' }), 'checkin', true)
+    const OUTRA_CHAVE = 'outra-profissional|2026-09-14T10:00:00Z'
+    const estadoServidor = comPartilha({}, OUTRA_CHAVE, 'checkin', true)
     const { wrappedDek, ciphertext } = await cifrarBlob(kek, 1, estadoServidor)
     const fetchMock = vi
       .fn()
@@ -247,12 +235,12 @@ describe('definirPartilha', () => {
       accountId: ACCOUNT_ID,
       accessToken: ACCESS_TOKEN,
       kek,
-      vinculo: v,
+      chave: CHAVE,
       tipo: 'checkin',
       ativa: true,
     })
 
-    expect(resultado).toEqual(comPartilha(estadoServidor, v, 'checkin', true))
+    expect(resultado).toEqual(comPartilha(estadoServidor, CHAVE, 'checkin', true))
     expect(fetchMock).toHaveBeenCalledTimes(4)
     const segundoPut = fetchMock.mock.calls[3] as [string, RequestInit]
     const putBody = JSON.parse(segundoPut[1].body as string) as { expectedVersion: number }
@@ -261,7 +249,6 @@ describe('definirPartilha', () => {
 
   it('um segundo 409 seguido lança', async () => {
     const kek = await criarKek()
-    const v = vinculo()
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(respostaProblema(404, 'sharing.preferences_not_found'))
@@ -276,7 +263,7 @@ describe('definirPartilha', () => {
         accountId: ACCOUNT_ID,
         accessToken: ACCESS_TOKEN,
         kek,
-        vinculo: v,
+        chave: CHAVE,
         tipo: 'checkin',
         ativa: true,
       }),
@@ -286,7 +273,6 @@ describe('definirPartilha', () => {
 
   it('uma falha de gravação que não é 409 lança sem tentar outra vez', async () => {
     const kek = await criarKek()
-    const v = vinculo()
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(respostaProblema(404, 'sharing.preferences_not_found'))
@@ -299,7 +285,7 @@ describe('definirPartilha', () => {
         accountId: ACCOUNT_ID,
         accessToken: ACCESS_TOKEN,
         kek,
-        vinculo: v,
+        chave: CHAVE,
         tipo: 'checkin',
         ativa: true,
       }),

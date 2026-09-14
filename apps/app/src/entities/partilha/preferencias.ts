@@ -1,5 +1,4 @@
 import { webcrypto, type CryptoKey } from '@limmiar/crypto'
-import type { Vinculo } from '../vinculo/api'
 import { gravarPreferenciasPartilha, obterPreferenciasPartilha } from './api'
 import { comPartilha, type EstadoPartilha, type TipoPartilhavel } from './partilha'
 
@@ -85,12 +84,12 @@ async function tentarGravar(p: {
   accountId: string
   accessToken: string
   kek: CryptoKey
-  vinculo: Vinculo
+  chave: string
   tipo: TipoPartilhavel
   ativa: boolean
 }): Promise<{ ok: true; estado: EstadoPartilha } | { ok: false; code: string }> {
   const lido = await lerEstadoPartilha(p)
-  const proximoEstado = comPartilha(lido.estado, p.vinculo, p.tipo, p.ativa)
+  const proximoEstado = comPartilha(lido.estado, p.chave, p.tipo, p.ativa)
   const { wrappedDek, ciphertext } = await cifrarPreferencias(p.kek, p.accountId, lido.versao + 1, proximoEstado)
   const gravado = await gravarPreferenciasPartilha(p.baseUrl, p.accountId, p.accessToken, {
     versaoEsperada: lido.versao,
@@ -105,7 +104,7 @@ async function tentarGravar(p: {
 }
 
 /**
- * Lê, aplica `(vínculo, tipo, ativa)` e grava com `expectedVersion` = versão lida. Um
+ * Lê, aplica `(chave, tipo, ativa)` e grava com `expectedVersion` = versão lida. Um
  * `sharing.version_conflict` relê e reaplica a mesma mudança idempotente uma única vez; um
  * segundo conflito, ou qualquer outra falha de leitura/gravação, lança.
  */
@@ -114,7 +113,7 @@ export async function definirPartilha(p: {
   accountId: string
   accessToken: string
   kek: CryptoKey
-  vinculo: Vinculo
+  chave: string
   tipo: TipoPartilhavel
   ativa: boolean
 }): Promise<EstadoPartilha> {

@@ -1,8 +1,9 @@
 import { generateKeyPair, webcrypto, type CryptoKey } from '@limmiar/crypto'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { encodeBase64 } from '../../shared/lib/base64'
-import { decifrarItem } from './cifra'
-import { comPartilha, type EstadoPartilha } from './partilha'
+import { decifrarItem } from '../../entities/partilha/cifra'
+import { comPartilha, type EstadoPartilha } from '../../entities/partilha/partilha'
+import { chaveDoVinculo } from './partilha'
 import { partilharCheckIn } from './partilhar-checkin'
 
 const ACCOUNT_ID = '11111111-1111-1111-1111-111111111111'
@@ -87,7 +88,7 @@ describe('partilharCheckIn', () => {
       vinculadoEm: '2026-09-14T10:00:00Z',
       chavePublicaDoPar: profissional.publicKey,
     }
-    const estado = comPartilha({}, vinculoAtivo, 'checkin', true)
+    const estado = comPartilha({}, chaveDoVinculo(vinculoAtivo), 'checkin', true)
     const { wrappedDek, ciphertext } = await cifrarBlobPreferencias(kek, 1, estado)
 
     let publicaPacientePublicada: Uint8Array | null = null
@@ -169,13 +170,13 @@ describe('partilharCheckIn', () => {
       if (url.endsWith('/sharing-preferences')) {
         const estado = comPartilha(
           {},
-          {
+          chaveDoVinculo({
             profissionalAccountId: PROFISSIONAL_ACCOUNT_ID,
             pacienteAccountId: ACCOUNT_ID,
             patientId: 'patient-1',
             vinculadoEm: '2026-09-14T10:00:00Z',
             chavePublicaDoPar: profissional.publicKey,
-          },
+          }),
           'checkin',
           true,
         )

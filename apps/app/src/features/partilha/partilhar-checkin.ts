@@ -1,11 +1,11 @@
 import type { CryptoKey } from '@limmiar/crypto'
-import type { CheckIn } from '../checkin/checkin'
-import { listarVinculos } from '../vinculo/api'
-import { garantirParDeChaves } from '../vinculo/par-de-chaves'
-import { enviarItemPartilhado } from './api'
-import { cifrarItem } from './cifra'
+import type { CheckIn } from '../../entities/checkin/checkin'
+import { listarVinculos } from '../../entities/vinculo/api'
+import { garantirParDeChaves } from '../../entities/vinculo/par-de-chaves'
+import { enviarItemPartilhado } from '../../entities/partilha/api'
+import { cifrarItem } from '../../entities/partilha/cifra'
+import { lerEstadoPartilha } from '../../entities/partilha/preferencias'
 import { destinatarios, type ItemPartilhado } from './partilha'
-import { lerEstadoPartilha } from './preferencias'
 
 /**
  * O único módulo que decide "cifrar para a profissional". Falha fechada, sem retentativa: qualquer

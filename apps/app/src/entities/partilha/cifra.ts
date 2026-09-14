@@ -1,5 +1,4 @@
 import { decrypt, deriveChannelKey, encrypt, getSharedSecret } from '@limmiar/crypto'
-import type { ItemPartilhado } from './partilha'
 
 const SALT_PREFIX = 'limmiar/partilha/v1|'
 
@@ -14,7 +13,7 @@ export function cifrarItem(p: {
   publicaProfissional: Uint8Array
   pacienteAccountId: string
   profissionalAccountId: string
-  item: ItemPartilhado
+  item: unknown
 }): Uint8Array {
   const salt = saltPartilha(p.pacienteAccountId, p.profissionalAccountId)
   const sharedSecret = getSharedSecret(p.privadaPaciente, p.publicaProfissional)
@@ -29,10 +28,10 @@ export function decifrarItem(p: {
   pacienteAccountId: string
   profissionalAccountId: string
   ciphertext: Uint8Array
-}): ItemPartilhado {
+}): unknown {
   const salt = saltPartilha(p.pacienteAccountId, p.profissionalAccountId)
   const sharedSecret = getSharedSecret(p.privadaProfissional, p.publicaPaciente)
   const key = deriveChannelKey(sharedSecret, salt)
   const plaintext = decrypt(key, p.ciphertext, salt)
-  return JSON.parse(new TextDecoder().decode(plaintext)) as ItemPartilhado
+  return JSON.parse(new TextDecoder().decode(plaintext)) as unknown
 }

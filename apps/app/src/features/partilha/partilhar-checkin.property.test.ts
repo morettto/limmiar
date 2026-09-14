@@ -2,9 +2,10 @@ import { generateKeyPair, webcrypto } from '@limmiar/crypto'
 import fc from 'fast-check'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { decodeBase64, encodeBase64 } from '../../shared/lib/base64'
-import type { Vinculo } from '../vinculo/api'
-import { decifrarItem } from './cifra'
-import { definirPartilha } from './preferencias'
+import type { Vinculo } from '../../entities/vinculo/api'
+import { decifrarItem } from '../../entities/partilha/cifra'
+import { definirPartilha } from '../../entities/partilha/preferencias'
+import { chaveDoVinculo } from './partilha'
 import { partilharCheckIn } from './partilhar-checkin'
 
 const ACCOUNT_ID = '11111111-1111-1111-1111-111111111111'
@@ -148,7 +149,7 @@ describe('partilharCheckIn — sequência de ativar/revogar/gravar/repor', () =>
                     accountId: ACCOUNT_ID,
                     accessToken: ACCESS_TOKEN,
                     kek,
-                    vinculo,
+                    chave: chaveDoVinculo(vinculo),
                     tipo: 'checkin',
                     ativa: comando === 'ativar',
                   }),
@@ -162,7 +163,7 @@ describe('partilharCheckIn — sequência de ativar/revogar/gravar/repor', () =>
               accountId: ACCOUNT_ID,
               accessToken: ACCESS_TOKEN,
               kek,
-              vinculo,
+              chave: chaveDoVinculo(vinculo),
               tipo: 'checkin',
               ativa: comando === 'ativar',
             })

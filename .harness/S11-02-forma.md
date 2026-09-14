@@ -52,27 +52,29 @@ PUT  preferences  ── middleware ─401/403 ── expectedVersion≥0, shape
 
 ## 2. App · contrato
 
+Decisão pós-forma (S11-02, slice "refactor lint:arch"): `entities/partilha` não pode importar
+`Vinculo`/`CheckIn` de outras entidades (`fsd-no-cross-slice`). O orquestrador e tudo o que precisa
+de conhecer `Vinculo`/`CheckIn` ao mesmo tempo que o estado de partilha subiu para
+`features/partilha`; `entities/partilha` ficou só com cifra, preferências e o cliente HTTP, sobre
+uma chave opaca (`string`).
+
 ```ts
-// entities/partilha/partilha.ts   (puro)
+// entities/partilha/partilha.ts   (puro; cego a Vinculo/CheckIn)
 export type TipoPartilhavel = 'checkin'
-export type ItemPartilhado = { tipo: 'checkin'; checkin: CheckIn }
-export type EstadoPartilha = Readonly<Record<string, Readonly<Partial<Record<TipoPartilhavel, true>>>>>  // chave = chaveDoVinculo
-export function chaveDoVinculo(v: Vinculo): string                       // `${profissionalAccountId}|${vinculadoEm}`: um vínculo novo nunca herda partilha
-export function comPartilha(estado: EstadoPartilha, vinculo: Vinculo, tipo: TipoPartilhavel, ativa: boolean): EstadoPartilha
-export function destinatarios(estado: EstadoPartilha, vinculos: readonly Vinculo[], pacienteAccountId: string, tipo: TipoPartilhavel): Vinculo[]
-//   = vínculos com pacienteAccountId === eu, toggle ativo e chavePublicaDoPar !== null
+export type EstadoPartilha = Readonly<Record<string, Readonly<Partial<Record<TipoPartilhavel, true>>>>>  // chave = string opaca
+export function comPartilha(estado: EstadoPartilha, chave: string, tipo: TipoPartilhavel, ativa: boolean): EstadoPartilha
 
 // entities/partilha/preferencias.ts   (blob no servidor; AAD `limmiar/partilha-estado/v1|<accountId>`; plaintext { versao, estado })
 // última versão vista: localStorage `limmiar:partilha-versao:<accountId>` (inteiro, só sobe)
 export class RollbackDePreferencias extends Error {}
 export function lerEstadoPartilha(p: { baseUrl: string; accountId: string; accessToken: string; kek: CryptoKey }): Promise<{ versao: number; estado: EstadoPartilha }>
 //   404 → { versao: 0, estado: {} } │ 200 → decifra; versao interna ≠ version do fio ou < última vista → lança RollbackDePreferencias │ senão sobe a última vista
-export function definirPartilha(p: { baseUrl; accountId; accessToken; kek; vinculo: Vinculo; tipo: TipoPartilhavel; ativa: boolean }): Promise<EstadoPartilha>
+export function definirPartilha(p: { baseUrl; accountId; accessToken; kek; chave: string; tipo: TipoPartilhavel; ativa: boolean }): Promise<EstadoPartilha>
 //   ler → comPartilha → cifra { versao: v+1 } → PUT expectedVersion v → 409: uma nova tentativa (ler → reaplicar), segundo 409 lança │ 200 → sobe a última vista
 
-// entities/partilha/cifra.ts   (getSharedSecret → deriveChannelKey(ss, salt) → aes-gcm encrypt/decrypt; salt = aad = `limmiar/partilha/v1|<paciente>|<profissional>`)
-export function cifrarItem(p: { privadaPaciente: Uint8Array; publicaProfissional: Uint8Array; pacienteAccountId: string; profissionalAccountId: string; item: ItemPartilhado }): Uint8Array
-export function decifrarItem(p: { privadaProfissional: Uint8Array; publicaPaciente: Uint8Array; pacienteAccountId: string; profissionalAccountId: string; ciphertext: Uint8Array }): ItemPartilhado
+// entities/partilha/cifra.ts   (getSharedSecret → deriveChannelKey(ss, salt) → aes-gcm encrypt/decrypt; salt = aad = `limmiar/partilha/v1|<paciente>|<profissional>`; payload opaco)
+export function cifrarItem(p: { privadaPaciente: Uint8Array; publicaProfissional: Uint8Array; pacienteAccountId: string; profissionalAccountId: string; item: unknown }): Uint8Array
+export function decifrarItem(p: { privadaProfissional: Uint8Array; publicaPaciente: Uint8Array; pacienteAccountId: string; profissionalAccountId: string; ciphertext: Uint8Array }): unknown
 
 // entities/partilha/api.ts
 export function enviarItemPartilhado(baseUrl, accountId, accessToken, profissionalAccountId, ciphertext: Uint8Array): Promise<{ ok: true } | ProblemResult>
@@ -80,7 +82,13 @@ export function listarItensPartilhados(baseUrl, accountId, accessToken, paciente
 export function obterPreferenciasPartilha(baseUrl, accountId, accessToken): Promise<{ ok: true; versao: number; wrappedDek: Uint8Array<ArrayBuffer>; ciphertext: Uint8Array<ArrayBuffer> } | ProblemResult>
 export function gravarPreferenciasPartilha(baseUrl, accountId, accessToken, b: { versaoEsperada: number; wrappedDek: Uint8Array; ciphertext: Uint8Array }): Promise<{ ok: true; versao: number } | ProblemResult>
 
-// entities/partilha/partilhar-checkin.ts   (o módulo profundo; a única porta de "cifrar para a profissional")
+// features/partilha/partilha.ts   (orquestrador; conhece Vinculo/CheckIn)
+export type ItemPartilhado = { tipo: 'checkin'; checkin: CheckIn }
+export function chaveDoVinculo(v: Vinculo): string                       // `${profissionalAccountId}|${vinculadoEm}`: um vínculo novo nunca herda partilha
+export function destinatarios(estado: EstadoPartilha, vinculos: readonly Vinculo[], pacienteAccountId: string, tipo: TipoPartilhavel): Vinculo[]
+//   = vínculos com pacienteAccountId === eu, toggle ativo (estado[chaveDoVinculo(v)]) e chavePublicaDoPar !== null
+
+// features/partilha/partilhar-checkin.ts   (o módulo profundo; a única porta de "cifrar para a profissional")
 export function partilharCheckIn(p: { baseUrl: string; accountId: string; accessToken: string; kek: CryptoKey; checkin: CheckIn }): Promise<{ partilhadoCom: string[] }>
 //   lança se ler preferências/listar/enviar falhar (falha fechada); NUNCA pede a privada nem cifra se destinatarios = []
 
@@ -180,9 +188,11 @@ apps/api/tests/Api.Tests/PatientLinks/SharingPreferencesEndpointsTests.cs
 apps/api/tests/Api.Tests/PatientLinks/PatientLinkStoreTests.cs
 apps/app/package.json                                                  + devDependency fast-check ^4.9.0 (e lockfile)
 apps/app/src/shared/api/problem-codes.ts (gerado) · problem-messages.ts
-apps/app/src/entities/partilha/{partilha,preferencias,cifra,api,partilhar-checkin}.ts
-apps/app/src/entities/partilha/{partilha,preferencias,cifra,api,partilhar-checkin,partilhar-checkin.property}.test.ts
+apps/app/src/entities/partilha/{partilha,preferencias,cifra,api}.ts
+apps/app/src/entities/partilha/{partilha,preferencias,cifra,api}.test.ts
 apps/app/src/entities/partilha/README.md
+apps/app/src/features/partilha/{partilha,partilhar-checkin}.ts             (orquestrador; movido de entities/partilha no refactor lint:arch)
+apps/app/src/features/partilha/{partilha,partilhar-checkin,partilhar-checkin.property}.test.ts
 apps/app/src/features/partilha/{PartilhaCheckIns,CheckInsPartilhados}{,.test}.tsx
 apps/app/src/features/partilha/README.md
 apps/app/src/pages/paciente-hoje/{PacienteHojePage,PacienteHojePage.test}.tsx
