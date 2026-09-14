@@ -1,6 +1,9 @@
-import { createRootRoute, createRoute, createRouter } from '@tanstack/react-router'
+import { createRootRoute, createRoute, createRouter, Navigate, Outlet } from '@tanstack/react-router'
 import { AuthPage } from '../../pages/auth/AuthPage'
 import { HomePage } from '../../pages/home/HomePage'
+import { PacienteHojePage } from '../../pages/paciente-hoje/PacienteHojePage'
+import { ContactoEmergencia } from '../../widgets/contacto-emergencia/ContactoEmergencia'
+import { E2ePacienteHojeScaffold } from './E2ePacienteHojeScaffold'
 import { MagicLinkCallback } from '../../features/magic-link-auth/MagicLinkCallback'
 import { RecoveryScreen } from '../../features/recovery/RecoveryScreen'
 import { RecoveryPhraseSetupPage } from '../../pages/recovery/RecoveryPhraseSetupPage'
@@ -27,6 +30,10 @@ const rootRoute = createRootRoute()
 
 function IndexRouteComponent() {
   const { sessao, terminarSessao } = useSession()
+  // S11-01: o role já chega em produção (validado em entities/account/session.ts), redirect real.
+  if (sessao?.role === 'Patient') {
+    return <Navigate to="/hoje" />
+  }
   return <HomePage email={sessao?.email ?? null} onSair={terminarSessao} />
 }
 
@@ -250,6 +257,64 @@ const bibliotecaRoute = createRoute({
   component: BibliotecaRouteComponent,
 })
 
+// S11-01: layout pathless (`id`, sem `path`) -- ContactoEmergencia fica montado em TODO ecrã de
+// paciente por ser irmão do `<Outlet/>`, não por repeti-lo em cada página (invariante do ticket:
+// caminho de emergência em todos os ecrãs). Ecrã de paciente futuro entra como filho daqui.
+const pacienteLayoutRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  id: 'paciente',
+  component: PacienteLayoutComponent,
+})
+
+function PacienteLayoutComponent() {
+  return (
+    <>
+      <ContactoEmergencia />
+      <Outlet />
+    </>
+  )
+}
+
+function PacienteHojeRouteComponent() {
+  const { sessao } = useSession()
+  return <PacienteHojePage accountId={sessao?.id ?? null} kek={null} />
+}
+
+// ponytail: `kek` fixo em `null`, mesma situação do `kek={null}` de CopilotKeyPage/NotaPage --
+// sem KeychainProvider ainda. O critério "3 toques" só é provado em E2E (/e2e/paciente-hoje, com
+// uma KEK de teste pela query string), o mesmo precedente de pairPrimaryRoute.
+const pacienteHojeRoute = createRoute({
+  getParentRoute: () => pacienteLayoutRoute,
+  path: '/hoje',
+  component: PacienteHojeRouteComponent,
+})
+
+interface E2ePacienteHojeSearch {
+  accountId: string
+  // Base64 de uma KEK de teste de 32 bytes -- mesmo precedente de pairPrimaryRoute.
+  kek: string
+}
+
+const e2ePacienteHojeRoute = createRoute({
+  getParentRoute: () => pacienteLayoutRoute,
+  path: '/e2e/paciente-hoje',
+  validateSearch: (search: Record<string, unknown>): E2ePacienteHojeSearch => ({
+    accountId: readSearchString(search, 'accountId'),
+    kek: readSearchString(search, 'kek'),
+  }),
+  component: E2ePacienteHojeRouteComponent,
+})
+
+function E2ePacienteHojeRouteComponent() {
+  const { accountId, kek } = e2ePacienteHojeRoute.useSearch()
+  return <E2ePacienteHojeScaffold accountId={accountId} kek={kek} />
+}
+
+const pacienteLayoutWithChildren =
+  import.meta.env.VITE_ENABLE_E2E_TEST_ROUTES === 'true'
+    ? pacienteLayoutRoute.addChildren([pacienteHojeRoute, e2ePacienteHojeRoute])
+    : pacienteLayoutRoute.addChildren([pacienteHojeRoute])
+
 const routeTree =
   import.meta.env.VITE_ENABLE_E2E_TEST_ROUTES === 'true'
     ? rootRoute.addChildren([
@@ -258,6 +323,7 @@ const routeTree =
         copilotSettingsRoute,
         notaRoute,
         bibliotecaRoute,
+        pacienteLayoutWithChildren,
         authScreenE2ERoute,
         pairPrimaryRoute,
         pairNewRoute,
@@ -265,7 +331,14 @@ const routeTree =
         recoveryPhraseSetupE2ERoute,
         e2eMicrofoneRoute,
       ])
-    : rootRoute.addChildren([indexRoute, magicLinkCallbackRoute, copilotSettingsRoute, notaRoute, bibliotecaRoute])
+    : rootRoute.addChildren([
+        indexRoute,
+        magicLinkCallbackRoute,
+        copilotSettingsRoute,
+        notaRoute,
+        bibliotecaRoute,
+        pacienteLayoutWithChildren,
+      ])
 
 export const router = createRouter({ routeTree })
 

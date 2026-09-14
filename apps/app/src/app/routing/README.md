@@ -29,6 +29,14 @@ página real, incluindo o único sítio autorizado a chamar `useSession()` fora 
 3. `E2eMicrofoneScaffold.tsx` é andaime de E2E puro (sem equivalente de produção): fica fora de
    `router.tsx` para o router continuar só tabela de rotas e a sua copy ficar fora do portão de
    i18n.
+4. **S11-01: layout pathless `paciente`** (`id: 'paciente'`, sem `path`) monta
+   `<ContactoEmergencia/>` como irmão do `<Outlet/>`, uma única vez, para todo ecrã de paciente
+   herdar o caminho de emergência sem repeti-lo (invariante do ticket S11-01: emergência visível em
+   todo ecrã de paciente). `/hoje` (produto) e `/e2e/paciente-hoje` (E2E-only, decodifica uma KEK de
+   teste via `E2ePacienteHojeScaffold.tsx`) são filhos desse layout. Ecrã de paciente novo que não
+   entrar como filho deste layout perde a emergência -- não é opcional.
+5. `IndexRouteComponent` redireciona `sessao?.role === 'Patient'` para `/hoje` via `<Navigate/>`,
+   antes de montar `HomePage` (S11-01).
 
 ## Pontos de entrada
 

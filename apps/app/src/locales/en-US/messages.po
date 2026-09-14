@@ -54,6 +54,10 @@ msgstr "Waiting for the other device to send the key..."
 msgid "auth.device_pairing_payload_not_ready"
 msgstr "Wait for the other device to read the code before releasing access."
 
+#: src/pages/paciente-hoje/PacienteHojePage.tsx:111
+msgid "Ansiedade"
+msgstr "Anxiety"
+
 #: src/features/qr-scan/PairingScan.tsx:115
 msgid "Aponte a câmera para o código QR exibido no outro dispositivo."
 msgstr "Point the camera at the QR code shown on the other device."
@@ -99,6 +103,10 @@ msgstr "API key"
 #: src/features/copilot-byok/CopilotKeySetup.tsx:30
 msgid "Chaveiro bloqueado. Desbloqueie para cadastrar sua chave de API."
 msgstr "Keychain locked. Unlock it to register your API key."
+
+#: src/pages/paciente-hoje/PacienteHojePage.tsx:77
+msgid "Chaveiro bloqueado. Desbloqueie para registrar o check-in de hoje."
+msgstr "Keychain locked. Unlock it to record today's check-in."
 
 #: src/widgets/patient-wallet/PatientWallet.tsx:85
 msgid "Chaveiro bloqueado. Desbloqueie para ver a carteira de pacientes."
@@ -170,6 +178,10 @@ msgstr "Account created. You are registered as a professional."
 msgid "auth.account_not_found"
 msgstr "Account not found."
 
+#: src/widgets/contacto-emergencia/ContactoEmergencia.tsx:9
+msgid "Contacto de emergência"
+msgstr "Emergency contact"
+
 #: src/widgets/auth-screen/AuthScreen.tsx:233
 msgid "Continuar com o Google"
 msgstr "Continue with Google"
@@ -177,6 +189,10 @@ msgstr "Continue with Google"
 #: src/widgets/auth-screen/AuthScreen.tsx:225
 msgid "Criar conta"
 msgstr "Create account"
+
+#: src/widgets/contacto-emergencia/ContactoEmergencia.tsx:11
+msgid "CVV 188 · apoio emocional 24 h"
+msgstr "CVV 188 · emotional support 24 h"
 
 #: src/features/totp-challenge/TotpChallenge.tsx:47
 msgid "Digite o código de 6 dígitos do seu aplicativo autenticador ou um dos seus códigos de backup."
@@ -318,6 +334,14 @@ msgstr "Generating your recovery phrase..."
 msgid "Gerencie pacientes, prontuários e agenda em um só lugar."
 msgstr "Manage patients, records, and schedule in one place."
 
+#: src/pages/paciente-hoje/PacienteHojePage.tsx:119
+msgid "Guardado"
+msgstr "Saved"
+
+#: src/pages/paciente-hoje/PacienteHojePage.tsx:117
+msgid "Guardar"
+msgstr "Save"
+
 #: src/features/totp-enrollment/TotpSetup.tsx:98
 msgid "Guarde seus códigos de backup"
 msgstr "Save your backup codes"
@@ -333,6 +357,10 @@ msgstr "I've saved my codes"
 #: src/features/recovery/RecoveryPhraseSetup.tsx:97
 msgid "Guardei minha frase"
 msgstr "I've saved my phrase"
+
+#: src/pages/paciente-hoje/PacienteHojePage.tsx:103
+msgid "Hoje: como você está agora?"
+msgstr "Today: how are you feeling right now?"
 
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:138
@@ -393,6 +421,10 @@ msgstr "Could not prepare the search. Try again."
 #: src/features/copilot-byok/CopilotKeySetup.tsx:61
 msgid "Não foi possível salvar a chave. Tente novamente."
 msgstr "Could not save the key. Try again."
+
+#: src/pages/paciente-hoje/PacienteHojePage.tsx:107
+msgid "Não foi possível salvar o check-in. Tente novamente."
+msgstr "Could not save the check-in. Please try again."
 
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:41
@@ -502,9 +534,17 @@ msgstr "Log out"
 msgid "Salvar"
 msgstr "Save"
 
+#: src/widgets/contacto-emergencia/ContactoEmergencia.tsx:14
+msgid "SAMU 192"
+msgstr "SAMU 192"
+
 #: src/widgets/soap-editor/FilaEEditor.tsx:39
 msgid "Selecione uma nota na fila."
 msgstr "Select a note from the queue."
+
+#: src/pages/paciente-hoje/PacienteHojePage.tsx:123
+msgid "sem registo"
+msgstr "no record"
 
 #: src/pages/notas/NotaPage.tsx:95
 msgid "Sem sessão ativa. Não é possível assinar."
@@ -518,6 +558,10 @@ msgstr "Password"
 #: src/shared/api/problem-messages.ts:142
 msgid "agenda.session_not_found"
 msgstr "Session not found."
+
+#: src/pages/paciente-hoje/PacienteHojePage.tsx:110
+msgid "Sono"
+msgstr "Sleep"
 
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:134
@@ -565,6 +609,10 @@ msgstr "Account type"
 #: src/features/nota-editor/Citacao.tsx:31
 msgid "Tocar áudio de {inicio} a {fim}"
 msgstr "Play audio from {inicio} to {fim}"
+
+#: src/pages/paciente-hoje/PacienteHojePage.tsx:113
+msgid "Uma frase (opcional)"
+msgstr "A sentence (optional)"
 
 #: src/features/totp-challenge/TotpChallenge.tsx:44
 msgid "Verificação em duas etapas"

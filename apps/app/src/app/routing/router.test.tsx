@@ -58,6 +58,20 @@ vi.mock('../../pages/biblioteca/BibliotecaPage', () => ({
 vi.mock('../../features/live-session/microfone', () => ({
   abrirMicrofone: vi.fn(),
 }))
+vi.mock('../../widgets/contacto-emergencia/ContactoEmergencia', () => ({
+  ContactoEmergencia: vi.fn(() => <div data-testid="contacto-emergencia" />),
+}))
+vi.mock('../../pages/paciente-hoje/PacienteHojePage', () => ({
+  PacienteHojePage: vi.fn(() => <div data-testid="paciente-hoje-page" />),
+}))
+
+const PATIENT_ACCOUNT: Account = {
+  id: '88888888-8888-8888-8888-888888888888',
+  email: 'paciente@example.com',
+  role: 'Patient',
+  twoFactorRequirement: 'NotApplicable',
+  twoFactorTicket: null,
+}
 
 // Route construction runs once at module top level, so each test needs its own fresh evaluation —
 // both to pick up window.history's current URL as the initial match and to choose either branch of
@@ -501,6 +515,63 @@ describe('router', () => {
 
     expect(abrirMicrofone).toHaveBeenCalledWith('pendente')
     await screen.findByRole('alert')
+  })
+
+  it('redirects a Patient session from "/" to "/hoje", never rendering HomePage', async () => {
+    seedStoredAccount(PATIENT_ACCOUNT)
+    const router = await loadRouterAt('/')
+
+    await renderRouter(router)
+    await screen.findByTestId('paciente-hoje-page')
+
+    expect(screen.queryByTestId('home-page')).toBeNull()
+    expect(router.state.location.pathname).toBe('/hoje')
+  })
+
+  it('/hoje renders ContactoEmergencia alongside PacienteHojePage, with accountId/kek from the session', async () => {
+    seedStoredAccount(PATIENT_ACCOUNT)
+    const router = await loadRouterAt('/hoje')
+
+    await renderRouter(router)
+    await screen.findByTestId('paciente-hoje-page')
+
+    expect(screen.getByTestId('contacto-emergencia')).toBeTruthy()
+    const { PacienteHojePage } = await import('../../pages/paciente-hoje/PacienteHojePage')
+    const props = vi.mocked(PacienteHojePage).mock.calls[0]![0]
+    expect(props.accountId).toBe(PATIENT_ACCOUNT.id)
+    expect(props.kek).toBeNull()
+  })
+
+  it('/hoje with no live session: accountId is null', async () => {
+    const router = await loadRouterAt('/hoje')
+
+    await renderRouter(router)
+    await screen.findByTestId('paciente-hoje-page')
+
+    const { PacienteHojePage } = await import('../../pages/paciente-hoje/PacienteHojePage')
+    const props = vi.mocked(PacienteHojePage).mock.calls[0]![0]
+    expect(props.accountId).toBeNull()
+  })
+
+  it('resolves /e2e/paciente-hoje (E2E-only) with ContactoEmergencia present and accountId/kek forwarded to PacienteHojePage', async () => {
+    const kek = new Uint8Array(32).fill(9)
+    const router = await loadRouterAt(
+      `/e2e/paciente-hoje?accountId=acc-e2e&kek=${encodeURIComponent(encodeBase64(kek))}`,
+      true,
+    )
+
+    await renderRouter(router)
+    await screen.findByTestId('paciente-hoje-page')
+
+    expect(screen.getByTestId('contacto-emergencia')).toBeTruthy()
+    const { PacienteHojePage } = await import('../../pages/paciente-hoje/PacienteHojePage')
+    const props = await vi.waitFor(() => {
+      const call = vi.mocked(PacienteHojePage).mock.calls.at(-1)![0]
+      if (call.kek === null) throw new Error('kek not imported yet')
+      return call
+    })
+    expect(props.accountId).toBe('acc-e2e')
+    expect(props.kek).not.toBeNull()
   })
 
   it('/e2e/microfone shows a status when abrirMicrofone succeeds', async () => {
