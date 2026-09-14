@@ -152,6 +152,9 @@ describe('PainelProfissional', () => {
       expect.stringContaining('/accounts/acc-1/agenda/sessions?from='),
       expect.anything(),
     )
+    const urlAgenda = new URL(fetchMock.mock.calls.map(([url]) => url as string).find((url) => url.includes('/agenda/sessions'))!)
+    const janelaMs = Date.parse(urlAgenda.searchParams.get('to')!) - Date.parse(urlAgenda.searchParams.get('from')!)
+    expect(janelaMs).toBe(7 * 24 * 60 * 60 * 1000)
   })
 
   it('critério: /agenda/sessions falha (500) — KPI "Sessões na semana" = "—", role="alert" com o motivo, "Pacientes ativos" continua numérico, botão sem nome', async () => {
@@ -288,6 +291,20 @@ describe('PainelProfissional', () => {
     expect(screen.getByRole('button', { name: /Iniciar próxima/ })).toBeTruthy()
   })
 
+  it('paciente da sessão seguinte sem sumário: a ação principal não pega no nome de outro paciente', async () => {
+    const sessao = sessaoEm1h('p-2')
+    vi.stubGlobal('fetch', fetchMockPadrao(['p-1'], [sessao]))
+    const openSummaries = vi.fn().mockResolvedValue([
+      { patientId: 'p-1', ok: true, name: 'Amelia', risk: 'baixo' },
+    ] satisfies SummaryResult[])
+
+    renderPainel({ openSummaries })
+
+    const hora = horaDaSessao(sessao.inicioEm, 'pt-BR')
+    const botao = await screen.findByRole('button', { name: `▶ Iniciar próxima sessão às ${hora}` })
+    expect(botao.textContent).not.toContain('Amelia')
+  })
+
   it('sumário não decifrado (ok:false): a ação principal nunca mostra o uuid do paciente', async () => {
     const sessao = sessaoEm1h('p-1')
     vi.stubGlobal('fetch', fetchMockPadrao(['p-1'], [sessao]))
@@ -298,6 +315,8 @@ describe('PainelProfissional', () => {
     await waitFor(() => expect(openSummaries).toHaveBeenCalled())
     const botao = screen.getByRole('button', { name: /Iniciar próxima/ })
     expect(botao.textContent).not.toContain('p-1')
+    // Sumário por decifrar não conta como paciente ativo.
+    expect(screen.getByText('Pacientes ativos').parentElement?.textContent).toContain('0')
   })
 
   it('critério 4: listPatients falha (500) — role="alert", KPI "Pacientes ativos" = "—", assinatura continua na fila', async () => {
@@ -322,7 +341,7 @@ describe('PainelProfissional', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Requer você' }))
     const itens = screen.getAllByRole('listitem')
     expect(itens).toHaveLength(1)
-    expect(itens[0].textContent).not.toContain('p-sem-sumario')
+    expect(itens[0].textContent).toBe('Paciente')
   })
 
   it('critério 2: trocar de conta nunca mostra os dados da conta anterior', async () => {
