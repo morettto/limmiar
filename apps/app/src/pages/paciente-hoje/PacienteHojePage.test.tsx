@@ -4,7 +4,12 @@ import { I18nProvider } from '@lingui/react'
 import { webcrypto as limmiarWebcrypto } from '@limmiar/crypto'
 import { i18n, dynamicActivate } from '../../shared/i18n'
 import { guardarCheckIn, lerCheckIns } from '../../entities/checkin/checkin-store'
+import { partilharCheckIn } from '../../features/partilha/partilhar-checkin'
 import { PacienteHojePage } from './PacienteHojePage'
+
+vi.mock('../../features/partilha/partilhar-checkin', () => ({
+  partilharCheckIn: vi.fn(),
+}))
 
 const ACCOUNT_ID = '11111111-1111-1111-1111-111111111111'
 const AGORA = new Date(2026, 0, 15, 10, 0)
@@ -14,13 +19,20 @@ async function makeKek(): Promise<CryptoKey> {
   return limmiarWebcrypto.importKek(raw)
 }
 
-function renderPage(props: { accountId: string | null; kek: CryptoKey | null; agora?: Date }) {
+function renderPage(props: {
+  accountId: string | null
+  kek: CryptoKey | null
+  agora?: Date
+  partilha?: { baseUrl: string; accessToken: string }
+}) {
   return render(
     <I18nProvider i18n={i18n}>
       <PacienteHojePage agora={AGORA} {...props} />
     </I18nProvider>,
   )
 }
+
+const PARTILHA_PROP = { baseUrl: 'http://api.test', accessToken: 'token-ana' }
 
 describe('PacienteHojePage', () => {
   beforeAll(async () => {
@@ -30,6 +42,7 @@ describe('PacienteHojePage', () => {
   afterEach(() => {
     cleanup()
     localStorage.clear()
+    vi.mocked(partilharCheckIn).mockReset()
   })
 
   it('shows a locked status and no form when kek is null', () => {
@@ -151,5 +164,55 @@ describe('PacienteHojePage', () => {
     unmount()
 
     await new Promise((resolve) => setTimeout(resolve, 0))
+  })
+
+  it('without the partilha prop, guardar never calls partilharCheckIn', async () => {
+    const kek = await makeKek()
+    renderPage({ accountId: ACCOUNT_ID, kek })
+
+    const sonoGroup = screen.getByRole('group', { name: 'Sono' })
+    const ansiedadeGroup = screen.getByRole('group', { name: 'Ansiedade' })
+    fireEvent.click(within(sonoGroup).getByRole('radio', { name: '3' }))
+    fireEvent.click(within(ansiedadeGroup).getByRole('radio', { name: '2' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+
+    await screen.findByText('Guardado')
+    expect(partilharCheckIn).not.toHaveBeenCalled()
+  })
+
+  it('with the partilha prop, guardar calls partilharCheckIn and still shows "Guardado" on success', async () => {
+    vi.mocked(partilharCheckIn).mockResolvedValue({ partilhadoCom: ['conta-marta'] })
+    const kek = await makeKek()
+    renderPage({ accountId: ACCOUNT_ID, kek, partilha: PARTILHA_PROP })
+
+    const sonoGroup = screen.getByRole('group', { name: 'Sono' })
+    const ansiedadeGroup = screen.getByRole('group', { name: 'Ansiedade' })
+    fireEvent.click(within(sonoGroup).getByRole('radio', { name: '3' }))
+    fireEvent.click(within(ansiedadeGroup).getByRole('radio', { name: '2' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+
+    await screen.findByText('Guardado')
+    expect(partilharCheckIn).toHaveBeenCalledWith({
+      baseUrl: PARTILHA_PROP.baseUrl,
+      accountId: ACCOUNT_ID,
+      accessToken: PARTILHA_PROP.accessToken,
+      kek,
+      checkin: { dia: '2026-01-15', sono: 3, ansiedade: 2, frase: null },
+    })
+  })
+
+  it('with the partilha prop, when partilharCheckIn throws, shows "salvo-sem-partilha" and keeps the local check-in', async () => {
+    vi.mocked(partilharCheckIn).mockRejectedValue(new Error('partilharCheckIn: falha ao enviar item partilhado'))
+    const kek = await makeKek()
+    renderPage({ accountId: ACCOUNT_ID, kek, partilha: PARTILHA_PROP })
+
+    const sonoGroup = screen.getByRole('group', { name: 'Sono' })
+    const ansiedadeGroup = screen.getByRole('group', { name: 'Ansiedade' })
+    fireEvent.click(within(sonoGroup).getByRole('radio', { name: '3' }))
+    fireEvent.click(within(ansiedadeGroup).getByRole('radio', { name: '2' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+
+    await screen.findByText('Check-in salvo neste dispositivo, mas não foi compartilhado.')
+    expect(await lerCheckIns(kek, ACCOUNT_ID)).toEqual([{ dia: '2026-01-15', sono: 3, ansiedade: 2, frase: null }])
   })
 })

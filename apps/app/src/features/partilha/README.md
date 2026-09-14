@@ -22,6 +22,15 @@ de propósito (ver `entities/partilha/README.md`).
   string[] }>` (`partilhar-checkin.ts`) -- **a única porta** de "cifrar um check-in para a
   profissional". Fail-closed, sem retentativa: falhar a ler preferências, listar vínculos ou
   enviar lança, e o chamador decide o que mostrar.
+- `PartilhaCheckIns` (`PartilhaCheckIns.tsx`, S11-02 fatia 6) -- ecrã da **paciente**: um checkbox
+  por vínculo em que ela é a paciente ("Compartilhar check-ins com esta profissional"), ligado a
+  `lerEstadoPartilha`/`definirPartilha` de `entities/partilha/preferencias.ts` via
+  `chaveDoVinculo`. Props `{ baseUrl; accountId; accessToken; kek }`.
+- `CheckInsPartilhados` (`CheckInsPartilhados.tsx`, S11-02 fatia 6) -- ecrã da **profissional**: um
+  grupo por vínculo em que ela é a profissional, com os check-ins que a paciente partilhou,
+  decifrados no dispositivo (`garantirParDeChaves` + `decifrarItem`). Props `{ baseUrl; accountId;
+  accessToken; kek }`. Nenhum dos dois ecrãs tem montagem de produção ainda -- sem
+  `KeychainProvider`, só alcançáveis por `/e2e/partilha` (`app/routing/E2ePartilhaScaffold.tsx`).
 
 ## Invariantes
 
@@ -33,6 +42,11 @@ de propósito (ver `entities/partilha/README.md`).
   tarde.
 - `destinatarios` só devolve vínculos com `chavePublicaDoPar !== null`: sem a pública da
   profissional, `cifrarItem` não tem para quem cifrar.
+- **Texto da revogação é invariante, não estilo.** Quando o toggle de `PartilhaCheckIns` fica
+  desativado, o texto (`role="status"`) tem de dizer as duas coisas: o que muda (nada novo
+  partilhado a partir de agora) e o que não muda (o que já foi partilhado continua com a
+  profissional, que pode já tê-lo lido, e a Limmiar não consegue apagá-lo). Reduzir isso a "Parou
+  de compartilhar." prometeria um apagamento que o sistema não faz.
 
 ## Armadilhas
 

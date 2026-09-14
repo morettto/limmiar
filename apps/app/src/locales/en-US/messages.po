@@ -54,7 +54,7 @@ msgstr "Waiting for the other device to send the key..."
 msgid "auth.device_pairing_payload_not_ready"
 msgstr "Wait for the other device to read the code before releasing access."
 
-#: src/pages/paciente-hoje/PacienteHojePage.tsx:111
+#: src/pages/paciente-hoje/PacienteHojePage.tsx:125
 msgid "Ansiedade"
 msgstr "Anxiety"
 
@@ -112,7 +112,7 @@ msgstr "API key"
 msgid "Chaveiro bloqueado. Desbloqueie para cadastrar sua chave de API."
 msgstr "Keychain locked. Unlock it to register your API key."
 
-#: src/pages/paciente-hoje/PacienteHojePage.tsx:77
+#: src/pages/paciente-hoje/PacienteHojePage.tsx:80
 msgid "Chaveiro bloqueado. Desbloqueie para registrar o check-in de hoje."
 msgstr "Keychain locked. Unlock it to record today's check-in."
 
@@ -123,6 +123,10 @@ msgstr "Keychain locked. Unlock it to see the patient wallet."
 #: src/widgets/painel-profissional/PainelProfissional.tsx:129
 msgid "Chaveiro bloqueado. Desbloqueie para ver o painel."
 msgstr "Keychain locked. Unlock it to see the panel."
+
+#: src/pages/paciente-hoje/PacienteHojePage.tsx:136
+msgid "Check-in salvo neste dispositivo, mas não foi compartilhado."
+msgstr "Check-in saved on this device, but not shared."
 
 #: src/features/totp-enrollment/TotpSetup.tsx:158
 msgid "Código de 6 dígitos do aplicativo autenticador"
@@ -175,6 +179,14 @@ msgstr "Secret code"
 #: src/widgets/auth-screen/AuthScreen.tsx:153
 msgid "Como você vai usar o Limmiar?"
 msgstr "How will you use Limmiar?"
+
+#: src/features/partilha/PartilhaCheckIns.tsx:53
+msgid "Compartilhamento de check-ins desativado. O que muda: os check-ins que você registrar a partir de agora não são compartilhados. O que não muda: os check-ins já compartilhados continuam com a profissional, que pode já tê-los lido, e a Limmiar não consegue apagá-los. O vínculo continua ativo."
+msgstr "Check-in sharing turned off. What changes: check-ins you record from now on are not shared. What does not change: check-ins already shared remain with the professional, who may have already read them, and Limmiar cannot delete them. The link stays active."
+
+#: src/features/partilha/PartilhaCheckIns.tsx:123
+msgid "Compartilhar check-ins com esta profissional"
+msgstr "Share check-ins with this professional"
 
 #: src/features/qr-scan/PairingScan.tsx:113
 msgid "Concluindo o pareamento..."
@@ -383,11 +395,11 @@ msgstr "Generate link code"
 msgid "Gerencie pacientes, prontuários e agenda em um só lugar."
 msgstr "Manage patients, records, and schedule in one place."
 
-#: src/pages/paciente-hoje/PacienteHojePage.tsx:119
+#: src/pages/paciente-hoje/PacienteHojePage.tsx:133
 msgid "Guardado"
 msgstr "Saved"
 
-#: src/pages/paciente-hoje/PacienteHojePage.tsx:117
+#: src/pages/paciente-hoje/PacienteHojePage.tsx:131
 msgid "Guardar"
 msgstr "Save"
 
@@ -407,7 +419,7 @@ msgstr "I've saved my codes"
 msgid "Guardei minha frase"
 msgstr "I've saved my phrase"
 
-#: src/pages/paciente-hoje/PacienteHojePage.tsx:103
+#: src/pages/paciente-hoje/PacienteHojePage.tsx:117
 msgid "Hoje: como você está agora?"
 msgstr "Today: how are you feeling right now?"
 
@@ -465,6 +477,14 @@ msgstr "Could not load the patient wallet. Try again."
 msgid "Não foi possível carregar o painel. Tente novamente."
 msgstr "Could not load the panel. Try again."
 
+#: src/features/partilha/CheckInsPartilhados.tsx:111
+msgid "Não foi possível carregar os check-ins compartilhados."
+msgstr "We could not load the shared check-ins."
+
+#: src/features/partilha/PartilhaCheckIns.tsx:104
+msgid "Não foi possível carregar suas preferências de compartilhamento. Nada novo será compartilhado até que elas carreguem."
+msgstr "We could not load your sharing preferences. Nothing new will be shared until they load."
+
 #: src/features/device-pairing-primary/PairPrimaryDevice.tsx:57
 msgid "Não foi possível concluir o pareamento com segurança. Tente novamente."
 msgstr "Could not securely complete the pairing. Try again."
@@ -495,9 +515,13 @@ msgstr "Could not prepare the search. Try again."
 msgid "Não foi possível salvar a chave. Tente novamente."
 msgstr "Could not save the key. Try again."
 
-#: src/pages/paciente-hoje/PacienteHojePage.tsx:107
+#: src/pages/paciente-hoje/PacienteHojePage.tsx:121
 msgid "Não foi possível salvar o check-in. Tente novamente."
 msgstr "Could not save the check-in. Please try again."
+
+#: src/features/partilha/PartilhaCheckIns.tsx:128
+msgid "Não foi possível salvar sua preferência de compartilhamento. Tente novamente."
+msgstr "We could not save your sharing preference. Please try again."
 
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:41
@@ -513,6 +537,11 @@ msgstr "There is no link with this account."
 #: src/shared/api/problem-messages.ts:160
 msgid "voice.enrollment_not_found"
 msgstr "No voice enrollment found for this account."
+
+#: src/features/partilha/CheckInsPartilhados.tsx:119
+#: src/features/partilha/CheckInsPartilhados.tsx:131
+msgid "Nenhum check-in compartilhado."
+msgstr "No shared check-ins."
 
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:180
@@ -530,6 +559,11 @@ msgstr "No notes found."
 #: src/features/nota-fila/FilaAssinatura.tsx:94
 msgid "Nenhuma nota nesta aba."
 msgstr "No notes in this tab."
+
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:208
+msgid "sharing.preferences_not_found"
+msgstr "No sharing preference saved."
 
 #: src/pages/notas/NotaPage.tsx:125
 msgid "Nota assinada em {dataAssinatura}."
@@ -550,9 +584,13 @@ msgid "unexpected_error"
 msgstr "An unexpected server error occurred."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:212
+#: src/shared/api/problem-messages.ts:220
 msgid "errors.generic"
 msgstr "An unexpected error occurred. Please try again."
+
+#: src/features/partilha/PartilhaCheckIns.tsx:47
+msgid "Os check-ins que você registrar a partir de agora são compartilhados com esta profissional."
+msgstr "Check-ins you record from now on are shared with this professional."
 
 #: src/widgets/auth-screen/AuthScreen.tsx:174
 #: src/widgets/painel-profissional/PainelProfissional.tsx:203
@@ -639,7 +677,7 @@ msgstr "SAMU 192"
 msgid "Selecione uma nota na fila."
 msgstr "Select a note from the queue."
 
-#: src/pages/paciente-hoje/PacienteHojePage.tsx:123
+#: src/pages/paciente-hoje/PacienteHojePage.tsx:142
 msgid "sem registo"
 msgstr "no record"
 
@@ -660,7 +698,7 @@ msgstr "Session not found."
 msgid "Sessões na semana"
 msgstr "Sessions this week"
 
-#: src/pages/paciente-hoje/PacienteHojePage.tsx:110
+#: src/pages/paciente-hoje/PacienteHojePage.tsx:124
 msgid "Sono"
 msgstr "Sleep"
 
@@ -704,6 +742,11 @@ msgstr "Your session has expired. Sign in again."
 msgid "auth.totp_ticket_invalid"
 msgstr "Your two-factor verification has expired. Sign in again."
 
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:212
+msgid "sharing.version_conflict"
+msgstr "Your preferences changed on another device. Please try again."
+
 #: src/features/nota-editor/EditorSoap.tsx:28
 msgid "Subjetivo"
 msgstr "Subjective"
@@ -716,7 +759,7 @@ msgstr "Account type"
 msgid "Tocar áudio de {inicio} a {fim}"
 msgstr "Play audio from {inicio} to {fim}"
 
-#: src/pages/paciente-hoje/PacienteHojePage.tsx:113
+#: src/pages/paciente-hoje/PacienteHojePage.tsx:127
 msgid "Uma frase (opcional)"
 msgstr "A sentence (optional)"
 

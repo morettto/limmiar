@@ -25,7 +25,7 @@ ser chamado direto de qualquer `pages/` -- este módulo deixou de ser o único s
    proibir `app -> features` (só `pages -> app`), e `SessionProvider` já importava direto de
    `features/copilot-byok`.
 2. `routeTree` regista as rotas E2E-only (`/auth/screen`, `/devices/pair-*`, `/auth/recover`,
-   `/auth/recovery-phrase-setup`, `/e2e/microfone`, `/e2e/vinculo`) só quando
+   `/auth/recovery-phrase-setup`, `/e2e/microfone`, `/e2e/vinculo`, `/e2e/partilha`) só quando
    `VITE_ENABLE_E2E_TEST_ROUTES === 'true'` -- gate de build-time, não `import.meta.env.DEV`,
    porque `playwright.config.ts` corre um `vite build` real, não `vite dev`.
 3. `magicLinkCallbackRoute` passa sempre `baseUrl={API_BASE_URL}`
@@ -37,7 +37,10 @@ ser chamado direto de qualquer `pages/` -- este módulo deixou de ser o único s
    i18n. `E2eVinculoScaffold.tsx` (S11-04, `/e2e/vinculo`) segue o mesmo molde: sem
    `KeychainProvider` ainda, semeia `accountId`/`accessToken`/`kek`/`papel`/`patientId` pela query
    string para `vinculo-chave-publica.spec.ts` alcançar `GerarConviteVinculo`/
-   `ResgatarConviteVinculo`/`DesvincularVinculo` sem um chaveiro real.
+   `ResgatarConviteVinculo`/`DesvincularVinculo` sem um chaveiro real. `E2ePartilhaScaffold.tsx`
+   (S11-02 fatia 6, `/e2e/partilha`) segue o mesmo molde, mais `agora` (ISO 8601, `''` = relógio
+   real) para o E2E fixar "hoje" nos dois lados da cena: `papel=paciente` monta `PacienteHojePage`
+   com a prop `partilha` + `PartilhaCheckIns`; `papel=profissional` monta `CheckInsPartilhados`.
 5. **S11-01: layout pathless `paciente`** (`id: 'paciente'`, sem `path`) monta
    `<ContactoEmergencia/>` como irmão do `<Outlet/>`, uma única vez, para todo ecrã de paciente
    herdar o caminho de emergência sem repeti-lo (invariante do ticket S11-01: emergência visível em
@@ -53,6 +56,8 @@ ser chamado direto de qualquer `pages/` -- este módulo deixou de ser o único s
 - `E2eMicrofoneScaffold({ consentimento })` (`E2eMicrofoneScaffold.tsx`).
 - `E2eVinculoScaffold({ baseUrl, accountId, accessToken, kek, papel, patientId })`
   (`E2eVinculoScaffold.tsx`).
+- `E2ePartilhaScaffold({ baseUrl, accountId, accessToken, kek, papel, agora })`
+  (`E2ePartilhaScaffold.tsx`).
 
 ## Decisões relevantes
 

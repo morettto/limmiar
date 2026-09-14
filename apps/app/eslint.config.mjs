@@ -80,6 +80,9 @@ export default tseslint.config(
             'twoFactorRequirement',
             // TanStack Router route config key (router.tsx) -- a URL path, not copy.
             'path',
+            // entities/partilha's TipoPartilhavel discriminator (e.g. PartilhaCheckIns.tsx's
+            // `tipo: 'checkin'`) -- same kind of internal tag as `status` above.
+            'tipo',
           ],
           // DOM/browser APIs whose string argument is an element id/selector,
           // never user-visible copy.

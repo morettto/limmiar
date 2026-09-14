@@ -7,9 +7,11 @@ opcional) e a série de 7 dias, dentro do layout `paciente` (que já fornece `Co
 
 ## Contrato público
 
-- `PacienteHojePage({ accountId, kek, agora? })` -- `accountId`/`kek` `null` mostra o estado
-  bloqueado, sem formulário nem leitura; `agora` (default `new Date()`) é o seam de teste para o
-  dia de hoje.
+- `PacienteHojePage({ accountId, kek, agora?, partilha? })` -- `accountId`/`kek` `null` mostra o
+  estado bloqueado, sem formulário nem leitura; `agora` (default `new Date()`) é o seam de teste
+  para o dia de hoje. `partilha?: { baseUrl; accessToken }` (S11-02, fatia 6) é opcional: ausente,
+  o comportamento é o mesmo de sempre (S11-01); presente, `guardar()` chama
+  `features/partilha/partilharCheckIn` depois do check-in local ter sido salvo.
 
 ## Invariantes
 
@@ -17,7 +19,11 @@ opcional) e a série de 7 dias, dentro do layout `paciente` (que já fornece `Co
   1 rádio de ansiedade, 1 clique em "Guardar". A frase fica fora da contagem.
 - Dia sem check-in aparece como lacuna na série (`entities/checkin/serieComLacunas`), nunca
   interpolado nem escondido.
-- Nenhum pedido de rede sai daqui: `guardarCheckIn`/`lerCheckIns` só tocam `localStorage`.
+- Nenhum pedido de rede sai daqui **sem a prop `partilha`**: `guardarCheckIn`/`lerCheckIns` só
+  tocam `localStorage`. Com `partilha`, `guardar()` chama `partilharCheckIn` (rede) depois do
+  check-in local já ter sido salvo; se isso falhar, o estado vira `'salvo-sem-partilha'` ("Check-in
+  salvo neste dispositivo, mas não foi compartilhado.") e o check-in local não se desfaz -- sem
+  retentativa, a decisão de partilhar é a do momento da gravação.
 - `kek === null` (chaveiro bloqueado, sem `KeychainProvider` ainda) é o estado real de produção
   hoje -- mesmo precedente de `CopilotKeyPage`/`NotaPage`. O caminho de 3 toques só é exercido em
   E2E (`/e2e/paciente-hoje`, `app/routing/E2ePacienteHojeScaffold.tsx`).

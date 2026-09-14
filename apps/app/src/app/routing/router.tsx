@@ -16,6 +16,7 @@ import { parseEstadoConsentimento, type EstadoConsentimento } from '../../entiti
 import { useSession } from '../../entities/account/session-context'
 import { E2eMicrofoneScaffold } from './E2eMicrofoneScaffold'
 import { E2eVinculoScaffold } from './E2eVinculoScaffold'
+import { E2ePartilhaScaffold } from './E2ePartilhaScaffold'
 
 function readSearchString(search: Record<string, unknown>, key: string): string {
   const value = search[key]
@@ -246,6 +247,45 @@ function E2eVinculoRouteComponent() {
   )
 }
 
+// S11-02 fatia 6: mesma situação de e2eVinculoRoute -- sem KeychainProvider ainda, o cenário
+// E2E semeia conta, token, KEK e o "agora" dos dois lados pela query string.
+interface E2ePartilhaSearch {
+  baseUrl: string
+  accountId: string
+  accessToken: string
+  kek: string
+  papel: string
+  agora: string
+}
+
+const e2ePartilhaRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/e2e/partilha',
+  validateSearch: (search: Record<string, unknown>): E2ePartilhaSearch => ({
+    baseUrl: readSearchString(search, 'baseUrl'),
+    accountId: readSearchString(search, 'accountId'),
+    accessToken: readSearchString(search, 'accessToken'),
+    kek: readSearchString(search, 'kek'),
+    papel: readSearchString(search, 'papel'),
+    agora: readSearchString(search, 'agora'),
+  }),
+  component: E2ePartilhaRouteComponent,
+})
+
+function E2ePartilhaRouteComponent() {
+  const { baseUrl, accountId, accessToken, kek, papel, agora } = e2ePartilhaRoute.useSearch()
+  return (
+    <E2ePartilhaScaffold
+      baseUrl={baseUrl}
+      accountId={accountId}
+      accessToken={accessToken}
+      kek={kek}
+      papel={papel}
+      agora={agora}
+    />
+  )
+}
+
 // These routes are E2E-only scaffolding and must not ship: each mounts a screen with no guard or
 // reads an accessToken/raw KEK off the query string, and a registered route is shipped and
 // linkable even when unusable.
@@ -367,6 +407,7 @@ const routeTree =
         recoveryPhraseSetupE2ERoute,
         e2eMicrofoneRoute,
         e2eVinculoRoute,
+        e2ePartilhaRoute,
       ])
     : rootRoute.addChildren([
         indexRoute,

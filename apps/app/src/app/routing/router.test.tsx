@@ -71,6 +71,11 @@ vi.mock('./E2eVinculoScaffold', () => ({
     ),
   ),
 }))
+vi.mock('./E2ePartilhaScaffold', () => ({
+  E2ePartilhaScaffold: vi.fn(({ papel, agora }: { papel: string; agora: string }) => (
+    <div data-testid="e2e-partilha-scaffold" data-papel={papel} data-agora={agora} />
+  )),
+}))
 
 const PATIENT_ACCOUNT: Account = {
   id: '88888888-8888-8888-8888-888888888888',
@@ -545,6 +550,51 @@ describe('router', () => {
       accessToken: 'token-marta',
       kek: kekBase64,
     })
+  })
+
+  it('resolves /e2e/partilha (E2E-only): forwards baseUrl, accountId, accessToken, kek, papel and agora', async () => {
+    const kekBase64 = encodeBase64(new Uint8Array(32).fill(7))
+    const query = new URLSearchParams({
+      baseUrl: 'http://api.test',
+      accountId: 'conta-ana',
+      accessToken: 'token-ana',
+      kek: kekBase64,
+      papel: 'paciente',
+      agora: '2026-01-15T10:00:00.000Z',
+    })
+
+    const router = await loadRouterAt(`/e2e/partilha?${query.toString()}`, true)
+    await renderRouter(router)
+
+    const scaffold = await screen.findByTestId('e2e-partilha-scaffold')
+    expect(scaffold.dataset.papel).toBe('paciente')
+    expect(scaffold.dataset.agora).toBe('2026-01-15T10:00:00.000Z')
+
+    const { E2ePartilhaScaffold } = await import('./E2ePartilhaScaffold')
+    expect(vi.mocked(E2ePartilhaScaffold).mock.calls[0]![0]).toMatchObject({
+      baseUrl: 'http://api.test',
+      accountId: 'conta-ana',
+      accessToken: 'token-ana',
+      kek: kekBase64,
+    })
+  })
+
+  it('resolves /e2e/partilha with an empty agora when the search param is omitted', async () => {
+    const kekBase64 = encodeBase64(new Uint8Array(32).fill(7))
+    const query = new URLSearchParams({
+      baseUrl: 'http://api.test',
+      accountId: 'conta-marta',
+      accessToken: 'token-marta',
+      kek: kekBase64,
+      papel: 'profissional',
+    })
+
+    const router = await loadRouterAt(`/e2e/partilha?${query.toString()}`, true)
+    await renderRouter(router)
+
+    const scaffold = await screen.findByTestId('e2e-partilha-scaffold')
+    expect(scaffold.dataset.papel).toBe('profissional')
+    expect(scaffold.dataset.agora).toBe('')
   })
 
   it('redirects a Patient session from "/" to "/hoje", never rendering HomePage', async () => {
