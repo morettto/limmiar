@@ -416,8 +416,12 @@ jobs:
 
       # ubuntu-latest already has Docker available — Testcontainers needs no
       # extra setup (Ryuk resource reaper works out of the box on this runner).
+      # Category!=Drift: the live AbacatePay probe (S12-01 slice 9) needs the
+      # sandbox secret and must never run here — its own nightly workflow
+      # owns it. Coverage stays on: the drift test only re-exercises lines
+      # the unit tests already cover.
       - name: Build + test + coverage (api)
-        run: dotnet test apps/api/Api.sln -c Release
+        run: dotnet test apps/api/Api.sln -c Release --filter "Category!=Drift"
 
   # S00-04 gate 2 / AC1: proves apps/api actually publishes as Native AOT with
   # zero reflection at runtime. `dotnet test`/`build`/`run` always JIT, even

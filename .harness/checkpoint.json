@@ -1,18 +1,9 @@
 {
   "turno_iniciado": "2026-09-08",
-  "tickets_planejados": [
-    "S18-15",
-    "S18-16",
-    "S18-17",
-    "S18-18"
-  ],
-  "tickets_concluidos": [
-    "S18-15",
-    "S18-16",
-    "S18-17"
-  ],
-  "ticket_atual": "S18-18",
-  "spec_fechada": "S18",
-  "branch_da_mr": "feat/S18-10-sessao-em-entities",
-  "worktree": "S18-17 FECHADO em bec0cec: cadeia de review por ticket verde (lang sem achado, lean duas notas nao bloqueantes, spec um bloqueante no AC3 resolvido por prova), receipt em Receipts/2026-09-08-S18-17.md, ticket e board em Concluido. O e2e do magic link CORRE nesta maquina: 4 testes verdes em 24,9 s. O que o travava era public/models/sherpa-onnx-wasm-main-asr.data (651 MiB, gitignored) contra o limite de 25 MiB por asset dos Workers; parquear o diretorio durante a corrida e repor no fim resolve. Dois buracos do projeto descobertos e por virar ticket: a suite e2e de apps/app nao corre em nenhum job de CI (quality-gates.yml:391 so corre pnpm --filter site test:e2e), e apps/app/e2e/ mais apps/app/playwright.config.ts estao fora dos dois tsconfig, logo tsc -b nao os cobre. A seguir: S18-18 (colide com S18-17 em router.tsx, ja comitado, sem conflito), depois portao de maquina, depois o check vermelho do PR 18 (i18n extract: referencias de linha dos .po desatualizadas, corrige-se com pnpm --filter app check:i18n-extract), depois ronda 2 dos eixos de spec, corpo do PR e gh pr ready 18."
+  "tickets_planejados": ["S12-01"],
+  "tickets_concluidos": ["S12-01"],
+  "ticket_atual": "",
+  "spec_fechada": "S08",
+  "branch_da_mr": "feat/S12-01-cliente-abacatepay",
+  "worktree": "sem worktree separado nesta sessao -- trabalho direto em C:/Users/m0retto/Documents/projects/limmiar, branch feat/S12-01-cliente-abacatepay, 0 atras de origin/main. Etapa 5 a meio: fatias 1 a 4 das nove verdes, confirmadas por corrida independente em 2026-09-09 (592 testes, 100% de linhas, condicoes e metodos, exit code 0), nada commitado. Faltam as fatias 5 a 9: migracao 0009, AbacatePayWebhookStore, RowLevelSecurityCoverageTests, BillingEndpoints ponta a ponta, MissingConfigurationTests, job de drift, mais o ADR e as entradas em apps/api/README.md e ARCHITECTURE.md. A etapa 2 (scout) ja esta feita: a tabela de ancoras file:line vive no handoff. A janela 2026-09-09T0100 abriu em zona AMARELA e fechou sem abrir fatia nova, por regra do context-relay. Trace TDD em Tickets/S12-01-trace.log. Relay em Handoffs/2026-09-09T0130 S12-01 dev-dev. A MR da S08 continua aberta em https://github.com/morettto/limmiar/pull/17 a espera de aceitacao humana."
 }

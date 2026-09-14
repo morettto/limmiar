@@ -10,3 +10,4 @@ export {
   type LocutorCandidato,
 } from './classify'
 export { montarTranscricaoCanonica, type TrechoCanonico } from './canonico'
+export { processarDiarizacao } from './pipeline'

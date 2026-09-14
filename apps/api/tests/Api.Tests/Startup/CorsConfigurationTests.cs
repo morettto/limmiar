@@ -17,6 +17,7 @@ public sealed class CorsConfigurationTests
                 builder.UseSetting("StaffAccess:ApiKey", "test-staff-api-key");
                 builder.UseSetting("WebAuthn:RelyingPartyId", "limmiar.test");
                 builder.UseSetting("WebAuthn:ExpectedOrigin", "https://limmiar.test");
+                builder.UseSetting("AbacatePay:WebhookSecret", "whsec_test123");
                 builder.UseSetting("Cors:AllowedOrigins:0", AllowedOrigin);
             });
         using var client = factory.CreateClient();
@@ -41,6 +42,7 @@ public sealed class CorsConfigurationTests
                 builder.UseSetting("StaffAccess:ApiKey", "test-staff-api-key");
                 builder.UseSetting("WebAuthn:RelyingPartyId", "limmiar.test");
                 builder.UseSetting("WebAuthn:ExpectedOrigin", "https://limmiar.test");
+                builder.UseSetting("AbacatePay:WebhookSecret", "whsec_test123");
                 builder.UseSetting("Cors:AllowedOrigins:0", AllowedOrigin);
             });
         using var client = factory.CreateClient();
