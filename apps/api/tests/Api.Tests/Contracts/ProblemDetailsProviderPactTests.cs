@@ -97,6 +97,7 @@ public sealed class ProblemDetailsProviderPactTests : IAsyncLifetime
         builder.Configuration["WebAuthn:RelyingPartyId"] = "limmiar.test";
         builder.Configuration["WebAuthn:ExpectedOrigin"] = "https://limmiar.test";
         builder.Configuration["AbacatePay:WebhookSecret"] = "whsec_test123";
+        builder.Configuration["Totp:EncryptionKey"] = TotpTestEncryptionKey.Base64;
 
         await using var app = Program.BuildApp(builder);
 

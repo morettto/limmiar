@@ -15,6 +15,8 @@ namespace Api.Tests.Accounts;
 [Collection("Database")]
 public sealed class PostgresAccountStoreTests : IAsyncLifetime
 {
+    private static readonly TotpSecretCipher SomeTotpSecretCipher = new(new byte[32]);
+
     private readonly PostgresContainerFixture _fixture;
     private Respawner _respawner = null!;
     private NpgsqlDataSource _dataSource = null!;
@@ -63,7 +65,7 @@ public sealed class PostgresAccountStoreTests : IAsyncLifetime
             RecoveryVerifier: SomeBytes(32, 0x04),
             VoiceEnrollment: new VoiceEnrollment(SomeBytes(28, 0x05), SomeBytes(28, 0x06)));
 
-        var store = new PostgresAccountStore(_dataSource);
+        var store = new PostgresAccountStore(_dataSource, SomeTotpSecretCipher);
         await store.InsertAsync(account, CancellationToken.None);
 
         var found = await store.FindByEmailAsync(account.Email, CancellationToken.None);
@@ -75,7 +77,7 @@ public sealed class PostgresAccountStoreTests : IAsyncLifetime
     public async Task InsertThenFindById_ReturnsTheSameAccount()
     {
         var account = MinimalAccount("postgres-store-by-id@example.com");
-        var store = new PostgresAccountStore(_dataSource);
+        var store = new PostgresAccountStore(_dataSource, SomeTotpSecretCipher);
         await store.InsertAsync(account, CancellationToken.None);
 
         var found = await store.FindByIdAsync(account.Id, CancellationToken.None);
@@ -86,7 +88,7 @@ public sealed class PostgresAccountStoreTests : IAsyncLifetime
     [Fact]
     public async Task FindByEmailAsync_WithUnknownEmail_ReturnsNull()
     {
-        var store = new PostgresAccountStore(_dataSource);
+        var store = new PostgresAccountStore(_dataSource, SomeTotpSecretCipher);
 
         var found = await store.FindByEmailAsync("nobody-in-postgres@example.com", CancellationToken.None);
 
@@ -96,7 +98,7 @@ public sealed class PostgresAccountStoreTests : IAsyncLifetime
     [Fact]
     public async Task FindByIdAsync_WithUnknownId_ReturnsNull()
     {
-        var store = new PostgresAccountStore(_dataSource);
+        var store = new PostgresAccountStore(_dataSource, SomeTotpSecretCipher);
 
         var found = await store.FindByIdAsync(Guid.NewGuid(), CancellationToken.None);
 
@@ -107,7 +109,7 @@ public sealed class PostgresAccountStoreTests : IAsyncLifetime
     public async Task UpdateAsync_PersistsChangedFields()
     {
         var account = MinimalAccount("postgres-store-update@example.com");
-        var store = new PostgresAccountStore(_dataSource);
+        var store = new PostgresAccountStore(_dataSource, SomeTotpSecretCipher);
         await store.InsertAsync(account, CancellationToken.None);
 
         var updated = account with { VerificationStatus = AccountVerificationStatus.Active, RejectionReason = null };
@@ -120,7 +122,7 @@ public sealed class PostgresAccountStoreTests : IAsyncLifetime
     [Fact]
     public async Task ListPendingDocumentReviewAsync_ReturnsOnlyInReviewProfessionals_OrderedByOldestSubmissionFirst()
     {
-        var store = new PostgresAccountStore(_dataSource);
+        var store = new PostgresAccountStore(_dataSource, SomeTotpSecretCipher);
         var newer = MinimalAccount("pg-review-newer@example.com") with
         {
             VerificationStatus = AccountVerificationStatus.InReview,

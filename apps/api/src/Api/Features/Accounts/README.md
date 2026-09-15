@@ -35,11 +35,20 @@ desta conta.
   substitui o registo inteiro (TOTP, WebAuthn, voz), e o par de chaves precisa sobreviver a isso
   mesmo sob concorrência com outro `PUT` na mesma conta -- ver `KeyPair/README` (se/quando
   existir) ou o XML doc de `AccountKeyPairService`.
+- **`totp_secret` nunca em claro em repouso.** `accounts.totp_secret_encrypted` (migração
+  `0011_encrypt_totp_secret.sql`) guarda `nonce(12) || ciphertext || tag(16)` via AES-256-GCM
+  (`TotpSecretCipher`, `TwoFactor/Infrastructure/`). A chave vem de `Totp:EncryptionKey`
+  (configuração, base64 de 32 bytes) -- `TwoFactorComposition.AddTwoFactor` lê-a no arranque e
+  falha fechado (`InvalidOperationException`) se faltar, não for base64 válido, ou não tiver
+  32 bytes, sem exceção para testes (mesma disciplina de `WebAuthn:RelyingPartyId`/
+  `StaffAccess:ApiKey`/`AbacatePay:WebhookSecret` -- ver `Features/Billing/README.md`). Só
+  `PostgresAccountStore` cifra/decifra; `TotpProvider` e os handlers de `TwoFactor` continuam a
+  ver `Account.TotpSecret` em claro, sem saber que a persistência cifra por baixo. A coluna
+  antiga `accounts.totp_secret` (texto, claro) fica sem `GRANT UPDATE` mas não é apagada --
+  migração é expand, nunca destrutiva.
 
 ## Armadilhas
 
-- `totp_secret` continua em claro em repouso nesta fatia. Ver `.harness/S11-03-forma.md` §8 --
-  cifrar com uma chave da aplicação é uma fatia própria deste mesmo ticket (S11-03, depois da 6).
 - `Program.Composition.cs` regista `NpgsqlDataSource` via delegate de fábrica
   (`AddSingleton(_ => ...)`), não uma instância pronta -- só assim o container liberta as ligações
   ao fim de cada `WebApplicationFactory` de teste. Ver `apps/api/README.md` (Platform/Data).

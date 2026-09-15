@@ -205,12 +205,16 @@ fica para o fecho -- ver `.harness/S12-01-forma.md` para o desenho completo já 
 - **A lista real dos "14 ficheiros" divergiu num item da lista prevista no handoff, confirmado
   por corrida completa da suíte após a fatia 7.** `MissingConfigurationTests.cs` não precisou
   da linha nova: os seus quatro testes existentes falham todos num guard anterior a
-  `AbacatePay:WebhookSecret` (ordem: `ConnectionStrings:AppDb` → `WebAuthn:RelyingPartyId` →
-  `WebAuthn:ExpectedOrigin` → `StaffAccess:ApiKey` → ... → `AbacatePay:WebhookSecret`), logo
-  nunca chegam a `AddBilling`. Quem precisou, e não estava na lista, foi
-  `Contracts/ProblemDetailsProviderPactTests.cs` -- constrói `Program.BuildApp` diretamente
-  (não passa por `WebApplicationFactory`) para o ligar a um Kestrel real que o verificador Pact
-  consegue atingir por socket, e por isso também constrói o host inteiro.
+  `AbacatePay:WebhookSecret` (ordem completa desde S11-03: `ConnectionStrings:AppDb` →
+  `WebAuthn:RelyingPartyId` → `WebAuthn:ExpectedOrigin` → `StaffAccess:ApiKey` →
+  `Totp:EncryptionKey` → `AbacatePay:WebhookSecret`), logo nunca chegam a `AddBilling`. Quem
+  precisou, e não estava na lista, foi `Contracts/ProblemDetailsProviderPactTests.cs` -- constrói
+  `Program.BuildApp` diretamente (não passa por `WebApplicationFactory`) para o ligar a um Kestrel
+  real que o verificador Pact consegue atingir por socket, e por isso também constrói o host
+  inteiro. `Totp:EncryptionKey` (S11-03, cifra AES-GCM do `totp_secret`, ver
+  `Features/Accounts/TwoFactor/TwoFactorComposition.cs`) juntou-se a este mesmo padrão de guard
+  fail-closed, entre `StaffAccess:ApiKey` e `AbacatePay:WebhookSecret` -- todo ficheiro que sobe
+  a app inteira ganhou `UseSetting("Totp:EncryptionKey", TotpTestEncryptionKey.Base64)`.
 - **`ReadBoundedBodyAsync`: o teto manda sobre o que foi lido, não sobre o declarado.**
   O `(request.ContentLength ?? 0) > MaxBodyBytes` inicial é só o caminho rápido; com
   `Content-Length` nulo (chunked) ou mentiroso, o laço limitado a 64 KiB+1 é quem rejeita.

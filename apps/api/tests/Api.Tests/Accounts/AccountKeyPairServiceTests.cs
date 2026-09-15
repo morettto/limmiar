@@ -16,6 +16,8 @@ namespace Api.Tests.Accounts;
 [Collection("Database")]
 public sealed class AccountKeyPairServiceTests : IAsyncLifetime
 {
+    private static readonly TotpSecretCipher SomeTotpSecretCipher = new(new byte[32]);
+
     private readonly PostgresContainerFixture _fixture;
     private Respawner _respawner = null!;
     private NpgsqlDataSource _dataSource = null!;
@@ -45,7 +47,7 @@ public sealed class AccountKeyPairServiceTests : IAsyncLifetime
     [Fact]
     public async Task PublishAsync_TwoConcurrentPublishesWithDifferentPublicKeys_ExactlyOneWinsAndItsKeyIsStored()
     {
-        var store = new PostgresAccountStore(_dataSource);
+        var store = new PostgresAccountStore(_dataSource, SomeTotpSecretCipher);
         var accountId = Guid.NewGuid();
         await store.InsertAsync(SomeAccount(accountId, "keypair-race@example.com"), CancellationToken.None);
         var service = new AccountKeyPairService(store, _dataSource);
@@ -67,7 +69,7 @@ public sealed class AccountKeyPairServiceTests : IAsyncLifetime
     [Fact]
     public async Task PublishAsync_WithUnknownAccountId_ReturnsAccountNotFound()
     {
-        var store = new PostgresAccountStore(_dataSource);
+        var store = new PostgresAccountStore(_dataSource, SomeTotpSecretCipher);
         var service = new AccountKeyPairService(store, _dataSource);
 
         var result = await service.PublishAsync(
@@ -87,7 +89,7 @@ public sealed class AccountKeyPairServiceTests : IAsyncLifetime
     [Fact]
     public async Task VoiceEnrollmentUpdateAfterPublish_KeepsThePair()
     {
-        var store = new PostgresAccountStore(_dataSource);
+        var store = new PostgresAccountStore(_dataSource, SomeTotpSecretCipher);
         var accountId = Guid.NewGuid();
         var account = SomeAccount(accountId, "voice-after-keypair@example.com");
         await store.InsertAsync(account, CancellationToken.None);

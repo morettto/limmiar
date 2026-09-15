@@ -30,3 +30,16 @@ If you are developing a production application, we recommend enabling type-aware
 ```
 
 See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+
+## E2E (Playwright)
+
+`playwright.config.ts`'s `webServer` boots the real .NET API. Since S11-03, accounts live in
+Postgres, so the API needs a real, reachable database on `5432` before `pnpm exec playwright
+test` -- run once per machine/session:
+
+```
+docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=limmiar_e2e postgres:17-alpine
+```
+
+The config runs `--migrate-only` against it before starting the app; `AbacatePay__WebhookSecret`
+still needs to be set in the environment running Playwright (e.g. `AbacatePay__WebhookSecret=e2e-local`).

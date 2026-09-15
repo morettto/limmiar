@@ -12,11 +12,11 @@ namespace Api.Accounts;
 /// <see cref="ListPendingDocumentReviewAsync"/> (staff queue, no account at all) -- so a query
 /// that forgets to set any of the three sees zero rows instead of leaking across accounts.
 /// </summary>
-public sealed class PostgresAccountStore(NpgsqlDataSource dataSource) : IAccountStore
+public sealed class PostgresAccountStore(NpgsqlDataSource dataSource, TotpSecretCipher totpSecretCipher) : IAccountStore
 {
     private const string SelectColumns = """
         id, email, role, password_verifier_sha256, google_subject_id, verification_status,
-        rejection_reason, verification_submitted_at, totp_secret, totp_enabled_at,
+        rejection_reason, verification_submitted_at, totp_secret_encrypted, totp_enabled_at,
         totp_backup_code_hashes, webauthn_credential_id, webauthn_cose_public_key,
         webauthn_sign_count, webauthn_aaguid, recovery_verifier_sha256, voice_wrapped_dek,
         voice_sealed_embedding
@@ -84,7 +84,7 @@ public sealed class PostgresAccountStore(NpgsqlDataSource dataSource) : IAccount
         insertCommand.CommandText = """
             INSERT INTO accounts (
                 id, email, role, password_verifier_sha256, google_subject_id, verification_status,
-                rejection_reason, verification_submitted_at, totp_secret, totp_enabled_at,
+                rejection_reason, verification_submitted_at, totp_secret_encrypted, totp_enabled_at,
                 totp_backup_code_hashes, webauthn_credential_id, webauthn_cose_public_key,
                 webauthn_sign_count, webauthn_aaguid, recovery_verifier_sha256, voice_wrapped_dek,
                 voice_sealed_embedding)
@@ -115,7 +115,7 @@ public sealed class PostgresAccountStore(NpgsqlDataSource dataSource) : IAccount
                 verification_status = @verificationStatus,
                 rejection_reason = @rejectionReason,
                 verification_submitted_at = @verificationSubmittedAt,
-                totp_secret = @totpSecret,
+                totp_secret_encrypted = @totpSecret,
                 totp_enabled_at = @totpEnabledAt,
                 totp_backup_code_hashes = @totpBackupCodeHashes,
                 webauthn_credential_id = @webauthnCredentialId,
@@ -167,7 +167,7 @@ public sealed class PostgresAccountStore(NpgsqlDataSource dataSource) : IAccount
         return queue;
     }
 
-    private static void AddAccountParameters(NpgsqlCommand command, Account account)
+    private void AddAccountParameters(NpgsqlCommand command, Account account)
     {
         command.Parameters.AddWithValue("id", account.Id);
         command.Parameters.AddWithValue("email", account.Email);
@@ -177,7 +177,7 @@ public sealed class PostgresAccountStore(NpgsqlDataSource dataSource) : IAccount
         command.Parameters.AddWithValue("verificationStatus", account.VerificationStatus.ToString());
         command.Parameters.AddWithValue("rejectionReason", (object?)account.RejectionReason ?? DBNull.Value);
         command.Parameters.AddWithValue("verificationSubmittedAt", (object?)account.VerificationSubmittedAt ?? DBNull.Value);
-        command.Parameters.AddWithValue("totpSecret", (object?)account.TotpSecret ?? DBNull.Value);
+        command.Parameters.AddWithValue("totpSecret", account.TotpSecret is { } totpSecret ? totpSecretCipher.Encrypt(totpSecret) : DBNull.Value);
         command.Parameters.AddWithValue("totpEnabledAt", (object?)account.TotpEnabledAt ?? DBNull.Value);
         command.Parameters.AddWithValue("totpBackupCodeHashes", (object?)account.TotpBackupCodeHashes?.ToArray() ?? DBNull.Value);
         command.Parameters.AddWithValue("webauthnCredentialId", (object?)account.WebAuthnCredentialId ?? DBNull.Value);
@@ -189,7 +189,7 @@ public sealed class PostgresAccountStore(NpgsqlDataSource dataSource) : IAccount
         command.Parameters.AddWithValue("voiceSealedEmbedding", (object?)account.VoiceEnrollment?.SealedEmbedding ?? DBNull.Value);
     }
 
-    private static Account ReadAccount(NpgsqlDataReader reader)
+    private Account ReadAccount(NpgsqlDataReader reader)
     {
         var wrappedDek = reader.IsDBNull(16) ? null : reader.GetFieldValue<byte[]>(16);
         var sealedEmbedding = reader.IsDBNull(17) ? null : reader.GetFieldValue<byte[]>(17);
@@ -203,7 +203,7 @@ public sealed class PostgresAccountStore(NpgsqlDataSource dataSource) : IAccount
             VerificationStatus: Enum.Parse<AccountVerificationStatus>(reader.GetString(5)),
             RejectionReason: reader.IsDBNull(6) ? null : reader.GetString(6),
             VerificationSubmittedAt: reader.IsDBNull(7) ? null : reader.GetFieldValue<DateTimeOffset>(7),
-            TotpSecret: reader.IsDBNull(8) ? null : reader.GetString(8),
+            TotpSecret: reader.IsDBNull(8) ? null : totpSecretCipher.Decrypt(reader.GetFieldValue<byte[]>(8)),
             TotpEnabledAt: reader.IsDBNull(9) ? null : reader.GetFieldValue<DateTimeOffset>(9),
             TotpBackupCodeHashes: reader.IsDBNull(10) ? null : reader.GetFieldValue<string[]>(10),
             WebAuthnCredentialId: reader.IsDBNull(11) ? null : reader.GetFieldValue<byte[]>(11),

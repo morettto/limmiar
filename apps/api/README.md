@@ -28,9 +28,13 @@ tentar arrancar o container, não passam silenciosamente. Os testes puramente un
   garante que os dois campos viajam sempre juntos). Desde S11-03 (fatia 6), `PostgresAccountStore`
   persiste em `accounts` (migração `0010_create_accounts.sql`) com RLS por chave de procura (id,
   email ou fila de staff -- ver `Features/Accounts/README.md`); `PasswordVerifier`/
-  `RecoveryVerifier` guardam `SHA256(verifier)`, nunca o verifier. `InMemoryAccountStore` mudou-se
-  para `tests/Api.Tests/Fakes` (fake de `IAccountStore` só para testes que não precisam de provar
-  nada sobre persistência).
+  `RecoveryVerifier` guardam `SHA256(verifier)`, nunca o verifier, e `totp_secret` viaja cifrado
+  (AES-256-GCM, `TotpSecretCipher`) sob uma chave nova de configuração, `Totp:EncryptionKey`
+  (base64 de 32 bytes) -- secret de deploy fail-closed, mesmo grupo de `StaffAccess:ApiKey`/
+  `WebAuthn:RelyingPartyId`/`WebAuthn:ExpectedOrigin`/`AbacatePay:WebhookSecret` (ver
+  `Features/Billing/README.md` para a ordem exata dos guards de arranque). `InMemoryAccountStore`
+  mudou-se para `tests/Api.Tests/Fakes` (fake de `IAccountStore` só para testes que não precisam
+  de provar nada sobre persistência).
   - `Features/Accounts/KeyPair` (S11-04 fatia 1; Postgres desde S11-03 fatia 6) -- o par X25519
     estático por conta (ADR-S11-06) mora em `account_key_pairs`, tabela própria (não uma coluna de
     `accounts`, para o last-write-wins de `IAccountStore.UpdateAsync` nunca a poder apagar):

@@ -325,7 +325,9 @@ Fatias 5–12: ver §5.7.
 - **ADR:** nenhum. Nada é difícil de reverter: trocar a definição de adoção ou juntar um cache é local a `espelho.ts` e `EspelhoP6.tsx`. Persistência: ver `.harness/abordagem/S11-03.md`.
 - **Retenção:** os envelopes não têm caminho de apagar (`GRANT` sem `DELETE`). Um pedido de eliminação LGPD precisa de um ticket próprio.
 - **RLS de `accounts` só impede enumerar.** Quem tem um id ou um email lê a linha. A autorização por chave continua no middleware e nos handlers, como hoje.
-- **`totp_secret` fica em claro em repouso.** Com os verifiers em hash, um dump sozinho não dá login. Cifrar com uma chave da aplicação fica para um ticket de endurecimento.
+- ~~**`totp_secret` fica em claro em repouso.**~~ **Resolvido no mesmo ticket** (decisão pós-forma
+  2, 2026-09-15): `accounts.totp_secret_encrypted` (migração `0011`), AES-256-GCM via
+  `TotpSecretCipher`, chave de `Totp:EncryptionKey` (configuração, fail-closed no arranque).
 - **`UpdateAsync` é last-write-wins sobre o registo inteiro** (TOTP × voz × WebAuthn em corrida): igual a hoje, agora entre máquinas. ponytail: concorrência otimista por `xmin` se aparecer. O par de chaves já está fora deste risco (tabela própria).
 - **Os emissores em memória** (magic link, device pairing, tickets 2FA) continuam por processo. Não é novo neste ticket.
 

@@ -10,15 +10,17 @@ public static class AccountsComposition
         services.AddSingleton<IAccountStore, PostgresAccountStore>();
 
         services.AddSessions();
-        services.AddTwoFactor();
         // WebAuthn's fail-fast config guards must run before ProfessionalVerification's
-        // StaffAccess:ApiKey guard -- MissingConfigurationTests pins this exact order.
+        // StaffAccess:ApiKey guard, which must run before TwoFactor's Totp:EncryptionKey guard
+        // -- MissingConfigurationTests pins this exact order (AbacatePay:WebhookSecret, checked
+        // in Program.Composition.cs's AddBilling, stays last of all).
         services.AddWebAuthn(configuration);
         services.AddMagicLink(configuration);
         services.AddCredentials();
         services.AddDevicePairing(configuration);
         services.AddProfessionalVerification(configuration);
         services.AddVoiceEnrollment();
+        services.AddTwoFactor(configuration);
         services.AddSingleton(sp => new AccountKeyPairService(sp.GetRequiredService<IAccountStore>(), sp.GetRequiredService<NpgsqlDataSource>()));
 
         services.ConfigureHttpJsonOptions(options =>
