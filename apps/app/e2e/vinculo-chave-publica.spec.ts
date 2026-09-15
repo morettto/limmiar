@@ -4,8 +4,8 @@ import { API_BASE_URL } from '../playwright.config'
 import { contaTestKek, registrarPaciente, registrarProfissionalVerificada, type ContaTeste } from './fixtures/contas'
 
 // S11-04: um teste por passo do Cenário E2E (Specs/S11 Partilha e espelho P6.md), com o nome
-// exato de cada "Teste:". Os passos 6-8 (partilha/revogação) são do S11-02. O par de chaves
-// nasce como em par-de-chaves.ts: GET 404 -> gera, sela, PUT; GET 200 -> decifra o existente.
+// exato de cada "Teste:". Os passos 6-8 (partilha/revogação) são do S11-02, em partilha-checkin.spec.ts.
+// O par de chaves nasce como em par-de-chaves.ts: GET 404 -> gera, sela, PUT; GET 200 -> decifra o existente.
 
 test.describe.configure({ mode: 'serial' })
 
