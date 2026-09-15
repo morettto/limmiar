@@ -150,6 +150,26 @@ describe('CheckInsPartilhados', () => {
     expect(await screen.findByRole('alert')).toBeTruthy()
   })
 
+  it('shows the fail-closed alert instead of silently rendering an envelope whose tipo is not checkin', async () => {
+    vi.mocked(garantirParDeChaves).mockResolvedValue({ publicKey: new Uint8Array(), privateKey: PRIVATE_KEY })
+    vi.mocked(listarVinculos).mockResolvedValue({ ok: true, vinculos: [VINCULO_ANA] })
+    vi.mocked(listarItensPartilhados).mockResolvedValue({
+      ok: true,
+      itens: [{ partilhadoEm: '2026-01-14T10:00:00.000Z', ciphertext: new Uint8Array([1]) }],
+    })
+    // Forma de CheckIn coincidente por acidente, mas tipo diferente -- sem a guarda de tipo isto
+    // renderia como um check-in de verdade em vez de falhar fechado.
+    vi.mocked(decifrarItem).mockReturnValueOnce({
+      tipo: 'outro',
+      checkin: { dia: '2026-01-14', sono: 5, ansiedade: 5, frase: 'não deveria aparecer' },
+    })
+
+    renderComponente()
+
+    expect(await screen.findByRole('alert')).toBeTruthy()
+    expect(screen.queryByText(/não deveria aparecer/)).toBeNull()
+  })
+
   it('does not update state after unmounting before the load resolves', async () => {
     let resolveParDeChaves: (v: { publicKey: Uint8Array; privateKey: Uint8Array }) => void = () => {}
     vi.mocked(garantirParDeChaves).mockReturnValue(

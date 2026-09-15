@@ -42,6 +42,10 @@ de propósito (ver `entities/partilha/README.md`).
   tarde.
 - `destinatarios` só devolve vínculos com `chavePublicaDoPar !== null`: sem a pública da
   profissional, `cifrarItem` não tem para quem cifrar.
+- **Fail-closed no tipo do envelope.** `CheckInsPartilhados` verifica `decifrado.tipo === 'checkin'`
+  antes de ler `.checkin` -- `decifrarItem` devolve `unknown`, e um envelope cujo formato coincida
+  por acidente com `CheckIn` mas tenha outro `tipo` nunca deve ser tratado como um check-in de
+  verdade (S11-02, review round-1).
 - **Texto da revogação é invariante, não estilo.** Quando o toggle de `PartilhaCheckIns` fica
   desativado, o texto (`role="status"`) tem de dizer as duas coisas: o que muda (nada novo
   partilhado a partir de agora) e o que não muda (o que já foi partilhado continua com a

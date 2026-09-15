@@ -34,7 +34,7 @@ public sealed class SharingPreferencesEndpointsTests
             new PutSharingPreferencesRequest(0, wrappedDek, ciphertext),
             PatientLinksJsonContext.Default.PutSharingPreferencesRequest);
         Assert.Equal(HttpStatusCode.OK, putResponse.StatusCode);
-        var putView = await putResponse.Content.ReadFromJsonAsync(PatientLinksJsonContext.Default.SharingPreferencesView);
+        var putView = await putResponse.Content.ReadFromJsonAsync(PatientLinksJsonContext.Default.SharingPreferencesVersionView);
         Assert.Equal(1, putView!.Version);
 
         var getResponse = await client.GetAsync($"/accounts/{accountId}/sharing-preferences");

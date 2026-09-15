@@ -15,9 +15,12 @@ function ultimaVistaKey(accountId: string): string {
   return `${ULTIMA_VISTA_KEY_PREFIX}:${accountId}`
 }
 
-// Number(null) === 0, então o caso "nunca gravado" já cai fora do ternário.
+// Number(null) === 0, então o caso "nunca gravado" já cai fora do ternário. Um valor gravado
+// corrompido (não numérico) cairia em NaN e silenciaria a guarda de rollback para sempre; trata-se
+// como 0, mesma decisão TOFU do "nunca gravado" (ver README, Armadilhas).
 function lerUltimaVista(accountId: string): number {
-  return Number(window.localStorage.getItem(ultimaVistaKey(accountId)))
+  const bruto = Number(window.localStorage.getItem(ultimaVistaKey(accountId)))
+  return Number.isFinite(bruto) ? bruto : 0
 }
 
 // Só sobe: uma versão igual ou menor do que a já vista não regride o registo local.

@@ -47,8 +47,11 @@ aqui é puro ou fala só com `fetch`/`localStorage`/`@limmiar/crypto`.
 - `deriveChannelKey` é o mesmo HKDF usado no emparelhamento de dispositivos
   (`device-pairing-channel.ts`); só o `salt` diferente evita que os dois protocolos derivem a
   mesma chave a partir do mesmo par de contas.
-- `lerUltimaVista` conta com `Number(null) === 0`: não reintroduzir um `raw === null ? 0 : ...`
-  explícito, é a mesma coisa com mais código.
+- `lerUltimaVista` conta com `Number(null) === 0` para "nunca gravado": não reintroduzir um
+  `raw === null ? 0 : ...` explícito, é a mesma coisa com mais código. Um valor corrompido em
+  `localStorage` (não numérico) também cai em 0 via `Number.isFinite` (S11-02): TOFU deliberado,
+  não uma tentativa de recuperar o valor real -- o pior caso é uma releitura do servidor, não um
+  rollback silencioso.
 - `comPartilha` substitui o registo inteiro da chave (`{ [tipo]: true }` ou `{}`) em vez de copiar
   o anterior e ligar/desligar um campo (S11-02): com um só `TipoPartilhavel` as duas formas são
   indistinguíveis, e a cópia do registo anterior era código morto (sobrevivia a mutação). Ao

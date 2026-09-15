@@ -44,7 +44,7 @@ public static class SharedItemEndpoints
             .WithName("PutSharingPreferences")
             .WithSummary("Replace this account's sharing-preferences blob under optimistic concurrency")
             .WithDescription("expectedVersion must match the account's current version (0 = never saved); the store then advances it by exactly 1. 409 sharing.version_conflict on a stale expectedVersion -- the caller re-reads and retries. Requires an Authorization: Bearer access token for this exact account.")
-            .Produces<SharingPreferencesView>(StatusCodes.Status200OK)
+            .Produces<SharingPreferencesVersionView>(StatusCodes.Status200OK)
             .Produces<LimmiarProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json");
     }
@@ -96,7 +96,7 @@ public static class SharedItemEndpoints
         return TypedResults.Ok(ToView(preferences));
     }
 
-    private static Results<Ok<SharingPreferencesView>, JsonHttpResult<LimmiarProblemDetails>> HandlePutPreferencesAsync(
+    private static Results<Ok<SharingPreferencesVersionView>, JsonHttpResult<LimmiarProblemDetails>> HandlePutPreferencesAsync(
         Guid accountId,
         PutSharingPreferencesRequest request,
         PatientLinkStore store)
@@ -117,8 +117,8 @@ public static class SharedItemEndpoints
         }
 
         var result = store.PutPreferences(accountId, request.ExpectedVersion, request.WrappedDek, request.Ciphertext);
-        return result.Match<Results<Ok<SharingPreferencesView>, JsonHttpResult<LimmiarProblemDetails>>>(
-            updated => TypedResults.Ok(ToView(updated)),
+        return result.Match<Results<Ok<SharingPreferencesVersionView>, JsonHttpResult<LimmiarProblemDetails>>>(
+            updated => TypedResults.Ok(new SharingPreferencesVersionView(updated.Version)),
             _ => ProblemJson(StatusCodes.Status409Conflict, "Sharing preferences version conflict", PatientLinksProblemCodes.SharingVersionConflict));
     }
 
@@ -149,3 +149,5 @@ public sealed record SharedItemView(DateTimeOffset SharedAt, byte[] Ciphertext);
 public sealed record PutSharingPreferencesRequest(long ExpectedVersion, byte[] WrappedDek, byte[] Ciphertext);
 
 public sealed record SharingPreferencesView(long Version, byte[] WrappedDek, byte[] Ciphertext);
+
+public sealed record SharingPreferencesVersionView(long Version);

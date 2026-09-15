@@ -48,8 +48,11 @@ async function carregarGrupo(p: {
       pacienteAccountId: p.vinculo.pacienteAccountId,
       profissionalAccountId: p.accountId,
       ciphertext: item.ciphertext,
-    }) as ItemPartilhado
-    return decifrado.checkin
+    })
+    if ((decifrado as { tipo?: unknown } | null)?.tipo !== 'checkin') {
+      throw new Error('CheckInsPartilhados: envelope decifrado não é um check-in')
+    }
+    return (decifrado as ItemPartilhado).checkin
   })
   return { vinculo: p.vinculo, checkins: ultimoPorDia(checkins) }
 }

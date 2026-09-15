@@ -176,6 +176,36 @@ describe('lerEstadoPartilha', () => {
     expect(setItemSpy).not.toHaveBeenCalled()
     setItemSpy.mockRestore()
   })
+
+  it('valor corrompido em localStorage não silencia a guarda de rollback para sempre', async () => {
+    const kek = await criarKek()
+    window.localStorage.setItem(ULTIMA_VISTA_KEY, 'abc')
+    const estado = comPartilha({}, CHAVE, 'checkin', true)
+    const { wrappedDek, ciphertext } = await cifrarBlob(kek, 1, estado)
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        respostaJson({ version: 1, wrappedDek: encodeBase64(wrappedDek), ciphertext: encodeBase64(ciphertext) }),
+      ),
+    )
+
+    await lerEstadoPartilha({ baseUrl: BASE_URL, accountId: ACCOUNT_ID, accessToken: ACCESS_TOKEN, kek })
+
+    expect(window.localStorage.getItem(ULTIMA_VISTA_KEY)).toBe('1')
+
+    const { wrappedDek: wrappedDek2, ciphertext: ciphertext2 } = await cifrarBlob(kek, 0, estado)
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        respostaJson({ version: 0, wrappedDek: encodeBase64(wrappedDek2), ciphertext: encodeBase64(ciphertext2) }),
+      ),
+    )
+
+    const erro = await lerEstadoPartilha({ baseUrl: BASE_URL, accountId: ACCOUNT_ID, accessToken: ACCESS_TOKEN, kek }).catch(
+      (e: unknown) => e,
+    )
+    expect(erro).toBeInstanceOf(RollbackDePreferencias)
+  })
 })
 
 describe('definirPartilha', () => {

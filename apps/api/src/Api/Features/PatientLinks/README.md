@@ -38,10 +38,11 @@ partilhado nem o estado do compartilhamento, só `byte[]`.
   sharing.preferences_not_found` se a conta nunca gravou.
 - `PUT /accounts/{accountId}/sharing-preferences` -- substitui o blob sob concorrência
   otimista: `{expectedVersion, wrappedDek, ciphertext}` só grava se `expectedVersion` bater com
-  a versão atual (0 = nunca gravado), e a versão sempre avança exatamente 1. `200
-  {version, wrappedDek, ciphertext}`; `400 validation.invalid_field` se `expectedVersion` for
-  negativo ou algum blob tiver menos de 28 bytes ou mais de 64 KiB; `409
-  sharing.version_conflict` se a versão atual não bater -- o chamador relê e tenta de novo.
+  a versão atual (0 = nunca gravado), e a versão sempre avança exatamente 1. `200 {version}`
+  (só a versão nova; o chamador já tem o resto, `GET` devolve o blob completo); `400
+  validation.invalid_field` se `expectedVersion` for negativo ou algum blob tiver menos de 28
+  bytes ou mais de 64 KiB; `409 sharing.version_conflict` se a versão atual não bater -- o
+  chamador relê e tenta de novo.
 
 Autorização: `RequireAccountAccessMiddleware` em todas (rota `{accountId}`, sem guarda no
 handler) -- `401` sem token/token inválido, `403 auth.forbidden` com token de outra conta (RFC 9110). `403
