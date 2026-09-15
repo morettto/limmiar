@@ -3,7 +3,7 @@ import { encodeBase64 } from '../../shared/lib/base64'
 import {
   enviarItemPartilhado,
   gravarPreferenciasPartilha,
-  listarItensPartilhados,
+  listarPartilhasRecebidas,
   obterPreferenciasPartilha,
 } from './api'
 
@@ -48,39 +48,75 @@ describe('enviarItemPartilhado', () => {
   })
 })
 
-describe('listarItensPartilhados', () => {
+describe('listarPartilhasRecebidas', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
   })
 
-  it('GETs a lista com bearer token e decodifica cada ciphertext de base64', async () => {
+  it('GETs a lista e decodifica unlinkedAt nulo ou data, chave e itens', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
-        JSON.stringify([{ sharedAt: '2026-09-14T10:00:00Z', ciphertext: encodeBase64(CIPHERTEXT) }]),
+        JSON.stringify([
+          {
+            patientAccountId: PEER_ACCOUNT_ID,
+            patientId: 'paciente-1',
+            linkedAt: '2026-09-01T00:00:00Z',
+            unlinkedAt: null,
+            peerPublicKey: encodeBase64(WRAPPED_DEK),
+            items: [{ sharedAt: '2026-09-14T10:00:00Z', ciphertext: encodeBase64(CIPHERTEXT) }],
+          },
+          {
+            patientAccountId: '33333333-3333-3333-3333-333333333333',
+            patientId: 'paciente-2',
+            linkedAt: '2026-08-01T00:00:00Z',
+            unlinkedAt: '2026-08-15T00:00:00Z',
+            peerPublicKey: null,
+            items: [],
+          },
+        ]),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
     )
     vi.stubGlobal('fetch', fetchMock)
 
-    const result = await listarItensPartilhados('http://api.test', ACCOUNT_ID, ACCESS_TOKEN, PEER_ACCOUNT_ID)
+    const result = await listarPartilhasRecebidas('http://api.test', ACCOUNT_ID, ACCESS_TOKEN)
 
-    expect(result).toEqual({ ok: true, itens: [{ partilhadoEm: '2026-09-14T10:00:00Z', ciphertext: CIPHERTEXT }] })
-    expect(fetchMock).toHaveBeenCalledWith(
-      `http://api.test/accounts/${ACCOUNT_ID}/links/${PEER_ACCOUNT_ID}/shared-items`,
-      { headers: { Authorization: `Bearer ${ACCESS_TOKEN}` } },
-    )
+    expect(result).toEqual({
+      ok: true,
+      partilhas: [
+        {
+          pacienteAccountId: PEER_ACCOUNT_ID,
+          patientId: 'paciente-1',
+          vinculadoEm: '2026-09-01T00:00:00Z',
+          desvinculadoEm: null,
+          chavePublicaDoPar: WRAPPED_DEK,
+          itens: [{ partilhadoEm: '2026-09-14T10:00:00Z', ciphertext: CIPHERTEXT }],
+        },
+        {
+          pacienteAccountId: '33333333-3333-3333-3333-333333333333',
+          patientId: 'paciente-2',
+          vinculadoEm: '2026-08-01T00:00:00Z',
+          desvinculadoEm: '2026-08-15T00:00:00Z',
+          chavePublicaDoPar: null,
+          itens: [],
+        },
+      ],
+    })
+    expect(fetchMock).toHaveBeenCalledWith(`http://api.test/accounts/${ACCOUNT_ID}/received-shares`, {
+      headers: { Authorization: `Bearer ${ACCESS_TOKEN}` },
+    })
   })
 
-  it('devolve { ok: false, code, params } no 404 (sem vínculo nessa direção)', async () => {
-    const problem = { type: 'about:blank', title: 'Not found', status: 404, code: 'link.not_found', params: {} }
+  it('devolve { ok: false, code, params } no 403 (token de outra conta)', async () => {
+    const problem = { type: 'about:blank', title: 'Forbidden', status: 403, code: 'auth.forbidden', params: {} }
     const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify(problem), { status: 404, headers: { 'Content-Type': 'application/problem+json' } }),
+      new Response(JSON.stringify(problem), { status: 403, headers: { 'Content-Type': 'application/problem+json' } }),
     )
     vi.stubGlobal('fetch', fetchMock)
 
-    const result = await listarItensPartilhados('http://api.test', ACCOUNT_ID, ACCESS_TOKEN, PEER_ACCOUNT_ID)
+    const result = await listarPartilhasRecebidas('http://api.test', ACCOUNT_ID, ACCESS_TOKEN)
 
-    expect(result).toEqual({ ok: false, code: 'link.not_found', params: {} })
+    expect(result).toEqual({ ok: false, code: 'auth.forbidden', params: {} })
   })
 })
 

@@ -19,8 +19,11 @@ aqui é puro ou fala só com `fetch`/`localStorage`/`@limmiar/crypto`.
   estático-estático X25519 (`getSharedSecret` → `deriveChannelKey(ss, salt)` → AES-GCM), reusando
   só o que `@limmiar/crypto` já exporta; o payload é opaco (serializado com `JSON.stringify`),
   quem sabe a forma do item é o chamador.
-- `enviarItemPartilhado`, `listarItensPartilhados`, `obterPreferenciasPartilha`,
-  `gravarPreferenciasPartilha` (`api.ts`) — um por rota de `PatientLinks` (S11-02 §1).
+- `enviarItemPartilhado`, `listarPartilhasRecebidas`, `obterPreferenciasPartilha`,
+  `gravarPreferenciasPartilha` (`api.ts`) — um por rota de `PatientLinks` (S11-02 §1) que o front
+  ainda usa. `listarPartilhasRecebidas` (S11-03 fatia 11) lê `GET received-shares`: uma chamada só,
+  em vez de `listarVinculos` + `listarItensPartilhados` por vínculo (`listarItensPartilhados` foi
+  apagada, seu único consumidor era `EspelhoP6`; a rota `GET .../shared-items` continua na API).
 - `RollbackDePreferencias`, `lerEstadoPartilha`, `definirPartilha(p: { ...; chave; tipo; ativa })`
   (`preferencias.ts`).
 

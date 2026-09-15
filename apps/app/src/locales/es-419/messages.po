@@ -125,7 +125,7 @@ msgid "Chaveiro bloqueado. Desbloqueie para ver o painel."
 msgstr "Llavero bloqueado. Desbloquéalo para ver el panel."
 
 #. placeholder {0}: grupo.espelho.diasComCheckIn
-#: src/features/partilha/EspelhoP6.tsx:170
+#: src/features/partilha/EspelhoP6.tsx:159
 msgid "Check-in compartilhado em {0} de 7 dias"
 msgstr "Check-in compartido en {0} de 7 días"
 
@@ -478,7 +478,7 @@ msgstr "No se pudo cargar la agenda."
 msgid "Não foi possível carregar a carteira de pacientes. Tente novamente."
 msgstr "No se pudo cargar la cartera de pacientes. Intenta de nuevo."
 
-#: src/features/partilha/EspelhoP6.tsx:198
+#: src/features/partilha/EspelhoP6.tsx:187
 msgid "Não foi possível carregar as sessões."
 msgstr "No se pudieron cargar las sesiones."
 
@@ -486,7 +486,7 @@ msgstr "No se pudieron cargar las sesiones."
 msgid "Não foi possível carregar o painel. Tente novamente."
 msgstr "No se pudo cargar el panel. Intenta de nuevo."
 
-#: src/features/partilha/EspelhoP6.tsx:151
+#: src/features/partilha/EspelhoP6.tsx:140
 msgid "Não foi possível carregar os check-ins compartilhados."
 msgstr "No se pudieron cargar los check-ins compartidos."
 
@@ -547,7 +547,7 @@ msgstr "No hay vínculo con esta cuenta."
 msgid "voice.enrollment_not_found"
 msgstr "No se encontró registro de voz para esta cuenta."
 
-#: src/features/partilha/EspelhoP6.tsx:159
+#: src/features/partilha/EspelhoP6.tsx:148
 msgid "Nenhum check-in compartilhado."
 msgstr "Ningún check-in compartido."
 
@@ -685,7 +685,7 @@ msgstr "SAMU 192"
 msgid "Selecione uma nota na fila."
 msgstr "Seleccione una nota en la cola."
 
-#: src/features/partilha/EspelhoP6.tsx:177
+#: src/features/partilha/EspelhoP6.tsx:166
 msgid "sem check-in"
 msgstr "sin check-in"
 
@@ -702,7 +702,7 @@ msgid "Senha"
 msgstr "Contraseña"
 
 #. placeholder {0}: horaDaSessao(sessao.inicioEm, i18n.locale)
-#: src/features/partilha/EspelhoP6.tsx:188
+#: src/features/partilha/EspelhoP6.tsx:177
 msgid "Sessão às {0}"
 msgstr "Sesión a las {0}"
 
@@ -776,7 +776,7 @@ msgstr "Tipo de cuenta"
 msgid "Tocar áudio de {inicio} a {fim}"
 msgstr "Reproducir audio de {inicio} a {fim}"
 
-#: src/features/partilha/EspelhoP6.tsx:172
+#: src/features/partilha/EspelhoP6.tsx:161
 msgid "Últimos 7 dias"
 msgstr "Últimos 7 días"
 

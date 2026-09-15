@@ -26,31 +26,50 @@ interface SharedItemWire {
   ciphertext: string
 }
 
-export type ListarItensPartilhadosResult =
-  | { ok: true; itens: { partilhadoEm: string; ciphertext: Uint8Array<ArrayBuffer> }[] }
-  | ProblemResult
+export interface PartilhaRecebida {
+  pacienteAccountId: string
+  patientId: string
+  vinculadoEm: string
+  desvinculadoEm: string | null
+  chavePublicaDoPar: Uint8Array<ArrayBuffer> | null
+  itens: { partilhadoEm: string; ciphertext: Uint8Array<ArrayBuffer> }[]
+}
 
-export async function listarItensPartilhados(
+interface ReceivedShareWire {
+  patientAccountId: string
+  patientId: string
+  linkedAt: string
+  unlinkedAt: string | null
+  peerPublicKey: string | null
+  items: SharedItemWire[]
+}
+
+function partilhaRecebidaDeWire(wire: ReceivedShareWire): PartilhaRecebida {
+  return {
+    pacienteAccountId: wire.patientAccountId,
+    patientId: wire.patientId,
+    vinculadoEm: wire.linkedAt,
+    desvinculadoEm: wire.unlinkedAt,
+    chavePublicaDoPar: wire.peerPublicKey === null ? null : decodeBase64(wire.peerPublicKey),
+    itens: wire.items.map((item) => ({ partilhadoEm: item.sharedAt, ciphertext: decodeBase64(item.ciphertext) })),
+  }
+}
+
+export type ListarPartilhasRecebidasResult = { ok: true; partilhas: PartilhaRecebida[] } | ProblemResult
+
+// Substitui listarItensPartilhados (removida na fatia 11, S11-03): 1+N chamadas viram 1. A rota
+// GET .../links/{peer}/shared-items continua na API (ver Features/PatientLinks/README.md).
+export async function listarPartilhasRecebidas(
   baseUrl: string,
   accountId: string,
   accessToken: string,
-  pacienteAccountId: string,
-): Promise<ListarItensPartilhadosResult> {
-  const result = await request(
-    baseUrl,
-    'GET',
-    `/accounts/${accountId}/links/${pacienteAccountId}/shared-items`,
-    undefined,
-    accessToken,
-  )
+): Promise<ListarPartilhasRecebidasResult> {
+  const result = await request(baseUrl, 'GET', `/accounts/${accountId}/received-shares`, undefined, accessToken)
   if (!result.ok) {
     return result
   }
-  const body = (await result.response.json()) as SharedItemWire[]
-  return {
-    ok: true,
-    itens: body.map((item) => ({ partilhadoEm: item.sharedAt, ciphertext: decodeBase64(item.ciphertext) })),
-  }
+  const body = (await result.response.json()) as ReceivedShareWire[]
+  return { ok: true, partilhas: body.map(partilhaRecebidaDeWire) }
 }
 
 interface SharingPreferencesWire {

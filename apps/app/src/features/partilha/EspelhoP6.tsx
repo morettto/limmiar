@@ -2,9 +2,8 @@ import { useEffect, useState } from 'react'
 import type { CryptoKey } from '@limmiar/crypto'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { diaLocal, type CheckIn } from '../../entities/checkin/checkin'
-import { listarVinculos, type Vinculo } from '../../entities/vinculo/api'
 import { garantirParDeChaves } from '../../entities/vinculo/par-de-chaves'
-import { listarItensPartilhados } from '../../entities/partilha/api'
+import { listarPartilhasRecebidas, type PartilhaRecebida } from '../../entities/partilha/api'
 import { decifrarItem } from '../../entities/partilha/cifra'
 import { listarSessoes } from '../../entities/agenda/api'
 import { horaDaSessao, type SessaoAgendada } from '../../entities/agenda/sessao'
@@ -20,7 +19,7 @@ export interface EspelhoP6Props {
 }
 
 interface Grupo {
-  vinculo: Vinculo
+  partilha: PartilhaRecebida
   espelho: Espelho
 }
 
@@ -49,23 +48,18 @@ async function carregarSessoes(p: {
   }
 }
 
-async function carregarCheckins(p: {
-  baseUrl: string
+// carregarPartilha só recebe partilhas com chavePublicaDoPar !== null (filtradas no chamador) --
+// sem envelope de rede aqui: listarPartilhasRecebidas já trouxe os itens numa única chamada.
+function carregarPartilha(p: {
   accountId: string
-  accessToken: string
   privateKey: Uint8Array
-  vinculo: Vinculo
-}): Promise<{ vinculo: Vinculo; checkins: CheckIn[] }> {
-  const itensResultado = await listarItensPartilhados(p.baseUrl, p.accountId, p.accessToken, p.vinculo.pacienteAccountId)
-  if (!itensResultado.ok) {
-    throw new Error(`EspelhoP6: falha ao listar itens partilhados (${itensResultado.code})`)
-  }
-  const checkins = itensResultado.itens.map((item) => {
+  partilha: PartilhaRecebida
+}): { partilha: PartilhaRecebida; checkins: CheckIn[] } {
+  const checkins = p.partilha.itens.map((item) => {
     const decifrado = decifrarItem({
       privadaProfissional: p.privateKey,
-      // carregarCheckins só recebe vínculos com chavePublicaDoPar !== null (filtrados no chamador).
-      publicaPaciente: p.vinculo.chavePublicaDoPar as Uint8Array,
-      pacienteAccountId: p.vinculo.pacienteAccountId,
+      publicaPaciente: p.partilha.chavePublicaDoPar as Uint8Array,
+      pacienteAccountId: p.partilha.pacienteAccountId,
       profissionalAccountId: p.accountId,
       ciphertext: item.ciphertext,
     })
@@ -74,7 +68,7 @@ async function carregarCheckins(p: {
     }
     return (decifrado as ItemPartilhado).checkin
   })
-  return { vinculo: p.vinculo, checkins }
+  return { partilha: p.partilha, checkins }
 }
 
 async function carregarCarga(p: {
@@ -85,36 +79,31 @@ async function carregarCarga(p: {
   agora: Date
 }): Promise<Carga> {
   const { privateKey } = await garantirParDeChaves(p)
-  const vinculosResultado = await listarVinculos(p.baseUrl, p.accountId, p.accessToken)
-  if (!vinculosResultado.ok) {
-    throw new Error(`EspelhoP6: falha ao listar vínculos (${vinculosResultado.code})`)
-  }
-  const vinculosDaProfissional = vinculosResultado.vinculos.filter(
-    (v) => v.profissionalAccountId === p.accountId && v.chavePublicaDoPar !== null,
-  )
 
-  // A agenda tem o seu próprio `.catch` (dentro de `carregarSessoes`); os grupos não -- uma falha
-  // aí (vínculos, chaves ou um envelope) continua fail-closed pelo `try/catch` do chamador.
-  const [sessoesResultado, gruposDeCheckins] = await Promise.all([
+  // A agenda tem o seu próprio `.catch` (dentro de `carregarSessoes`); as partilhas não -- uma
+  // falha aí (chaves, listagem ou um envelope) continua fail-closed pelo `try/catch` do chamador.
+  const [sessoesResultado, partilhasResultado] = await Promise.all([
     carregarSessoes({ baseUrl: p.baseUrl, accountId: p.accountId, accessToken: p.accessToken, agora: p.agora }),
-    Promise.all(
-      vinculosDaProfissional.map((vinculo) =>
-        carregarCheckins({ baseUrl: p.baseUrl, accountId: p.accountId, accessToken: p.accessToken, privateKey, vinculo }),
-      ),
-    ),
+    listarPartilhasRecebidas(p.baseUrl, p.accountId, p.accessToken),
   ])
+  if (!partilhasResultado.ok) {
+    throw new Error(`EspelhoP6: falha ao listar partilhas recebidas (${partilhasResultado.code})`)
+  }
+  const partilhasComChave = partilhasResultado.partilhas.filter((partilha) => partilha.chavePublicaDoPar !== null)
 
   const hoje = diaLocal(p.agora)
-  const grupos = gruposDeCheckins.map(({ vinculo, checkins }) => ({
-    vinculo,
-    espelho: montarEspelho({ checkins, sessoes: sessoesResultado.sessoes, patientId: vinculo.patientId, hoje }),
-  }))
+  const grupos = partilhasComChave
+    .map((partilha) => carregarPartilha({ accountId: p.accountId, privateKey, partilha }))
+    .map(({ partilha, checkins }) => ({
+      partilha,
+      espelho: montarEspelho({ checkins, sessoes: sessoesResultado.sessoes, patientId: partilha.patientId, hoje }),
+    }))
   return { status: 'pronta', grupos, sessoesFalharam: sessoesResultado.falhou }
 }
 
-// Profissional: um grupo por vínculo com os últimos 7 dias (lacuna explícita) dos check-ins que a
-// paciente partilhou, decifrados no dispositivo, e as sessões marcadas no dia local de início.
-// Fail-closed em chaves/vínculos/envelope (alerta geral); a agenda falha isolada (alerta próprio).
+// Profissional: um grupo por paciente já vinculada (ativa ou não) com os últimos 7 dias (lacuna
+// explícita) dos check-ins que ela partilhou, decifrados no dispositivo, e as sessões marcadas no
+// dia local de início. Fail-closed em chaves/partilhas/envelope (alerta geral); agenda isolada.
 export function EspelhoP6({ baseUrl, accountId, accessToken, kek, agora }: EspelhoP6Props) {
   const { i18n, t } = useLingui()
   // `momento` congela no mount (como a árvore de chamada pede): um `agora` de teste não deve
@@ -164,8 +153,8 @@ export function EspelhoP6({ baseUrl, accountId, accessToken, kek, agora }: Espel
   return (
     <div>
       {carga.grupos.map((grupo) => (
-        <section key={grupo.vinculo.pacienteAccountId}>
-          <h2>{grupo.vinculo.patientId}</h2>
+        <section key={grupo.partilha.pacienteAccountId}>
+          <h2>{grupo.partilha.patientId}</h2>
           <p>
             <Trans>Check-in compartilhado em {grupo.espelho.diasComCheckIn} de 7 dias</Trans>
           </p>

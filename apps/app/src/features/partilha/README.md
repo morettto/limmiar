@@ -6,7 +6,9 @@ O orquestrador que liga `entities/partilha` (estado, blob de preferências, cifr
 vinculo` (`Vinculo`, `listarVinculos`, `garantirParDeChaves`) e `entities/checkin` (`CheckIn`):
 decide o que é partilhável, para quem, e cifra um check-in para cada destinatária. É o único lugar
 que conhece as três entidades ao mesmo tempo -- `entities/partilha` fica cega a `Vinculo`/`CheckIn`
-de propósito (ver `entities/partilha/README.md`).
+de propósito (ver `entities/partilha/README.md`). `EspelhoP6` (lado da profissional) não usa
+`Vinculo`/`listarVinculos` desde a fatia 11 (S11-03) -- lê `PartilhaRecebida` de
+`entities/partilha/api.ts` diretamente.
 
 ## Contrato público
 
@@ -27,12 +29,14 @@ de propósito (ver `entities/partilha/README.md`).
   `lerEstadoPartilha`/`definirPartilha` de `entities/partilha/preferencias.ts` via
   `chaveDoVinculo`. Props `{ baseUrl; accountId; accessToken; kek }`.
 - `EspelhoP6` (`EspelhoP6.tsx`, S11-02 fatia 6, `git mv` de `CheckInsPartilhados.tsx` no S11-03) --
-  ecrã da **profissional**: um grupo por vínculo em que ela é a profissional, com os últimos 7 dias
-  (`montarEspelho`, `espelho.ts`) dos check-ins que a paciente partilhou, decifrados no dispositivo
-  (`garantirParDeChaves` + `decifrarItem`), e as sessões da semana (`entities/agenda`) marcadas no
-  dia local de início. Props `{ baseUrl; accountId; accessToken; kek; agora?: Date }`. Nenhum dos
-  dois ecrãs tem montagem de produção ainda -- sem `KeychainProvider`, só alcançáveis por
-  `/e2e/partilha` (`app/routing/E2ePartilhaScaffold.tsx`).
+  ecrã da **profissional**: um grupo por paciente já vinculada (ativa ou não, S11-03 fatia 11),
+  com os últimos 7 dias (`montarEspelho`, `espelho.ts`) dos check-ins que ela partilhou, decifrados
+  no dispositivo (`garantirParDeChaves` + `decifrarItem`), e as sessões da semana (`entities/
+  agenda`) marcadas no dia local de início. Uma única chamada a `listarPartilhasRecebidas`
+  (`entities/partilha/api.ts`) substitui `listarVinculos` + `listarItensPartilhados` por vínculo.
+  Props `{ baseUrl; accountId; accessToken; kek; agora?: Date }`. Nenhum dos dois ecrãs tem
+  montagem de produção ainda -- sem `KeychainProvider`, só alcançáveis por `/e2e/partilha`
+  (`app/routing/E2ePartilhaScaffold.tsx`).
 - `montarEspelho(p): Espelho` / `janelaDoEspelho(agora): { de; ate }` (`espelho.ts`, S11-03, puro,
   sem React) -- `Espelho = { dias: DiaDoEspelho[]; diasComCheckIn: number }`, `dias.length === 7` do
   mais antigo a hoje. Reúne `serieComLacunas` (`entities/checkin`, lacuna explícita, nunca
@@ -58,10 +62,12 @@ de propósito (ver `entities/partilha/README.md`).
 - **Adoção só sobre itens decifrados (S11-03).** `diasComCheckIn` conta dias com item partilhado
   entre os 7 últimos; o servidor nunca soma check-ins não partilhados -- essa contagem seria
   metadado fora da fronteira de partilha (ADR-S11-01 da spec).
-- **Revogado continua visível, sem cache local (S11-03).** `Share` só acrescenta, o servidor nunca
-  apaga envelopes (`PatientLinkStore.cs:116`); `EspelhoP6` relê tudo a cada montagem, de propósito
-  sem persistir nada decifrado no dispositivo da profissional. Consequência aceite: desvincular tira
-  o vínculo da lista (`links` dá 404) e o grupo some, porque não há cache que o mantivesse.
+- **Revogado e desvinculado continuam visíveis, sem cache local (S11-03).** `Share` só acrescenta,
+  o servidor nunca apaga envelopes (`shared_items`, append-only por privilégio); `EspelhoP6` relê
+  tudo a cada montagem, de propósito sem persistir nada decifrado no dispositivo da profissional.
+  Desde a fatia 11, `EspelhoP6` lê `GET received-shares` (não `GET links` + `GET shared-items`,
+  que continuam a dar 404 depois de desvincular) -- por isso o grupo de uma paciente que
+  desvinculou não some: `desvinculadoEm` chega ao front mas não filtra nada, é só metadado.
 - **Falha da agenda é isolada (S11-03).** `!ok`/exceção de `listarSessoes` nunca esconde os sinais
   já decifrados -- só acrescenta um `role="alert"` próprio, mesmo padrão do
   `widgets/painel-profissional`. Falha de chaves, vínculos ou de um envelope continua fail-closed
