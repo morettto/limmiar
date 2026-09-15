@@ -49,18 +49,19 @@ public static class SharedItemEndpoints
             .Produces<LimmiarProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json");
     }
 
-    private static Results<NoContent, JsonHttpResult<LimmiarProblemDetails>> HandleShareAsync(
+    private static async Task<Results<NoContent, JsonHttpResult<LimmiarProblemDetails>>> HandleShareAsync(
         Guid accountId,
         Guid peerAccountId,
         ShareItemRequest request,
-        PatientLinkStore store)
+        PatientLinkStore store,
+        CancellationToken cancellationToken)
     {
         if (!TryValidateBlobSize(request.Ciphertext, "ciphertext", out var problem))
         {
             return problem;
         }
 
-        if (!store.Share(accountId, peerAccountId, request.Ciphertext))
+        if (!await store.ShareAsync(accountId, peerAccountId, request.Ciphertext, cancellationToken))
         {
             return ProblemJson(StatusCodes.Status404NotFound, "Link not found", PatientLinksProblemCodes.LinkNotFound);
         }
@@ -68,12 +69,13 @@ public static class SharedItemEndpoints
         return TypedResults.NoContent();
     }
 
-    private static Results<Ok<IReadOnlyList<SharedItemView>>, JsonHttpResult<LimmiarProblemDetails>> HandleListSharedAsync(
+    private static async Task<Results<Ok<IReadOnlyList<SharedItemView>>, JsonHttpResult<LimmiarProblemDetails>>> HandleListSharedAsync(
         Guid accountId,
         Guid peerAccountId,
-        PatientLinkStore store)
+        PatientLinkStore store,
+        CancellationToken cancellationToken)
     {
-        var items = store.ListShared(accountId, peerAccountId);
+        var items = await store.ListSharedAsync(accountId, peerAccountId, cancellationToken);
         if (items is null)
         {
             return ProblemJson(StatusCodes.Status404NotFound, "Link not found", PatientLinksProblemCodes.LinkNotFound);

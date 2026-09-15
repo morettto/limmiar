@@ -48,26 +48,28 @@ public sealed class PatientLinkStoreTests : IAsyncLifetime
     public async Task DisposeAsync() => await _dataSource.DisposeAsync();
 
     [Fact]
-    public void Redeem_SameCodeTwice_SecondIsInviteNotFound()
+    public async Task RedeemAsync_SameCodeTwice_SecondIsInviteNotFound()
     {
         var store = new PatientLinkStore(_dataSource);
-        var invite = store.CreateInvite(ProfessionalId, PatientId);
+        await SeedAccountsAsync(ProfessionalId, PatientAccountId);
+        var invite = await store.CreateInviteAsync(ProfessionalId, PatientId, CancellationToken.None);
 
-        var first = store.Redeem(invite.Code, PatientAccountId);
+        var first = await store.RedeemAsync(invite.Code, PatientAccountId, CancellationToken.None);
         Assert.True(first.TryGetValue(out _));
 
-        var second = store.Redeem(invite.Code, Guid.NewGuid());
+        var second = await store.RedeemAsync(invite.Code, PatientAccountId, CancellationToken.None);
         var secondFailed = second.Match(_ => (RedeemFailure?)null, failure => failure);
         Assert.Equal(RedeemFailure.InviteNotFound, secondFailed);
     }
 
     [Fact]
-    public void CreateInvite_ReturnsA12CharacterCodeAndSevenDayExpiry()
+    public async Task CreateInviteAsync_ReturnsA12CharacterCodeAndSevenDayExpiry()
     {
         var now = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
         var store = new PatientLinkStore(_dataSource, () => now);
+        await SeedAccountsAsync(ProfessionalId);
 
-        var invite = store.CreateInvite(ProfessionalId, PatientId);
+        var invite = await store.CreateInviteAsync(ProfessionalId, PatientId, CancellationToken.None);
 
         Assert.Equal(12, invite.Code.Length);
         Assert.Equal(ProfessionalId, invite.ProfessionalAccountId);
@@ -77,73 +79,79 @@ public sealed class PatientLinkStoreTests : IAsyncLifetime
     }
 
     [Fact]
-    public void Redeem_AfterExpiry_IsInviteNotFound()
+    public async Task RedeemAsync_AfterExpiry_IsInviteNotFound()
     {
         var now = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
         var clock = now;
         var store = new PatientLinkStore(_dataSource, () => clock);
-        var invite = store.CreateInvite(ProfessionalId, PatientId);
+        await SeedAccountsAsync(ProfessionalId, PatientAccountId);
+        var invite = await store.CreateInviteAsync(ProfessionalId, PatientId, CancellationToken.None);
         clock = now + PatientLinkStore.InviteLifetime;
 
-        var result = store.Redeem(invite.Code, PatientAccountId);
+        var result = await store.RedeemAsync(invite.Code, PatientAccountId, CancellationToken.None);
 
         var failure = result.Match(_ => (RedeemFailure?)null, f => f);
         Assert.Equal(RedeemFailure.InviteNotFound, failure);
     }
 
     [Fact]
-    public void Redeem_UnknownCode_IsInviteNotFound()
+    public async Task RedeemAsync_UnknownCode_IsInviteNotFound()
     {
         var store = new PatientLinkStore(_dataSource);
+        await SeedAccountsAsync(PatientAccountId);
 
-        var result = store.Redeem("NOTACODE1234", PatientAccountId);
+        var result = await store.RedeemAsync("NOTACODE1234", PatientAccountId, CancellationToken.None);
 
         var failure = result.Match(_ => (RedeemFailure?)null, f => f);
         Assert.Equal(RedeemFailure.InviteNotFound, failure);
     }
 
     [Fact]
-    public void Redeem_TwoConcurrentAttemptsOnSameCode_ExactlyOneWins()
+    public async Task RedeemAsync_TwoConcurrentAttemptsOnSameCode_ExactlyOneWins()
     {
         var store = new PatientLinkStore(_dataSource);
-        var invite = store.CreateInvite(ProfessionalId, PatientId);
+        await SeedAccountsAsync(ProfessionalId, PatientAccountId);
+        var invite = await store.CreateInviteAsync(ProfessionalId, PatientId, CancellationToken.None);
         var successCount = 0;
 
-        Parallel.For(0, 20, i =>
+        await Task.WhenAll(Enumerable.Range(0, 20).Select(i => Task.Run(async () =>
         {
-            var result = store.Redeem(invite.Code, PatientAccountId);
+            var result = await store.RedeemAsync(invite.Code, PatientAccountId, CancellationToken.None);
             if (result.TryGetValue(out _))
             {
                 Interlocked.Increment(ref successCount);
             }
-        });
+        })));
 
         Assert.Equal(1, successCount);
     }
 
     [Fact]
-    public void Redeem_WhenAlreadyLinkedToSamePatientAccount_IsAlreadyLinked()
+    public async Task RedeemAsync_WhenAlreadyLinkedToSamePatientAccount_IsAlreadyLinked()
     {
         var store = new PatientLinkStore(_dataSource);
-        var firstInvite = store.CreateInvite(ProfessionalId, PatientId);
-        store.Redeem(firstInvite.Code, PatientAccountId);
-        var secondInvite = store.CreateInvite(ProfessionalId, Guid.NewGuid());
+        await SeedAccountsAsync(ProfessionalId, PatientAccountId);
+        var firstInvite = await store.CreateInviteAsync(ProfessionalId, PatientId, CancellationToken.None);
+        await store.RedeemAsync(firstInvite.Code, PatientAccountId, CancellationToken.None);
+        var secondInvite = await store.CreateInviteAsync(ProfessionalId, Guid.NewGuid(), CancellationToken.None);
 
-        var result = store.Redeem(secondInvite.Code, PatientAccountId);
+        var result = await store.RedeemAsync(secondInvite.Code, PatientAccountId, CancellationToken.None);
 
         var failure = result.Match(_ => (RedeemFailure?)null, f => f);
         Assert.Equal(RedeemFailure.AlreadyLinked, failure);
     }
 
     [Fact]
-    public void Redeem_WhenSamePatientIdAlreadyLinkedToADifferentAccount_IsAlreadyLinked()
+    public async Task RedeemAsync_WhenSamePatientIdAlreadyLinkedToADifferentAccount_IsAlreadyLinked()
     {
         var store = new PatientLinkStore(_dataSource);
-        var firstInvite = store.CreateInvite(ProfessionalId, PatientId);
-        store.Redeem(firstInvite.Code, PatientAccountId);
-        var secondInvite = store.CreateInvite(ProfessionalId, PatientId);
+        var otherPatientAccountId = Guid.NewGuid();
+        await SeedAccountsAsync(ProfessionalId, PatientAccountId, otherPatientAccountId);
+        var firstInvite = await store.CreateInviteAsync(ProfessionalId, PatientId, CancellationToken.None);
+        await store.RedeemAsync(firstInvite.Code, PatientAccountId, CancellationToken.None);
+        var secondInvite = await store.CreateInviteAsync(ProfessionalId, PatientId, CancellationToken.None);
 
-        var result = store.Redeem(secondInvite.Code, Guid.NewGuid());
+        var result = await store.RedeemAsync(secondInvite.Code, otherPatientAccountId, CancellationToken.None);
 
         var failure = result.Match(_ => (RedeemFailure?)null, f => f);
         Assert.Equal(RedeemFailure.AlreadyLinked, failure);
@@ -151,28 +159,30 @@ public sealed class PatientLinkStoreTests : IAsyncLifetime
 
     /// <summary>A different professional inviting the same patient never conflicts -- the "already linked" check is scoped to (professional, patient), not to the patient alone.</summary>
     [Fact]
-    public void Redeem_ForADifferentProfessional_SucceedsEvenThoughPatientIsAlreadyLinkedElsewhere()
+    public async Task RedeemAsync_ForADifferentProfessional_SucceedsEvenThoughPatientIsAlreadyLinkedElsewhere()
     {
         var store = new PatientLinkStore(_dataSource);
-        var firstInvite = store.CreateInvite(ProfessionalId, PatientId);
-        store.Redeem(firstInvite.Code, PatientAccountId);
         var otherProfessionalId = Guid.NewGuid();
-        var secondInvite = store.CreateInvite(otherProfessionalId, Guid.NewGuid());
+        await SeedAccountsAsync(ProfessionalId, PatientAccountId, otherProfessionalId);
+        var firstInvite = await store.CreateInviteAsync(ProfessionalId, PatientId, CancellationToken.None);
+        await store.RedeemAsync(firstInvite.Code, PatientAccountId, CancellationToken.None);
+        var secondInvite = await store.CreateInviteAsync(otherProfessionalId, Guid.NewGuid(), CancellationToken.None);
 
-        var result = store.Redeem(secondInvite.Code, PatientAccountId);
+        var result = await store.RedeemAsync(secondInvite.Code, PatientAccountId, CancellationToken.None);
 
         Assert.True(result.TryGetValue(out _));
     }
 
     [Fact]
-    public void ListFor_ReturnsLinksForEitherProfessionalOrPatientSide()
+    public async Task ListForAsync_ReturnsLinksForEitherProfessionalOrPatientSide()
     {
         var store = new PatientLinkStore(_dataSource);
-        var invite = store.CreateInvite(ProfessionalId, PatientId);
-        store.Redeem(invite.Code, PatientAccountId);
+        await SeedAccountsAsync(ProfessionalId, PatientAccountId);
+        var invite = await store.CreateInviteAsync(ProfessionalId, PatientId, CancellationToken.None);
+        await store.RedeemAsync(invite.Code, PatientAccountId, CancellationToken.None);
 
-        var professionalSide = store.ListFor(ProfessionalId);
-        var patientSide = store.ListFor(PatientAccountId);
+        var professionalSide = await store.ListForAsync(ProfessionalId, CancellationToken.None);
+        var patientSide = await store.ListForAsync(PatientAccountId, CancellationToken.None);
 
         Assert.Single(professionalSide);
         Assert.Single(patientSide);
@@ -180,127 +190,146 @@ public sealed class PatientLinkStoreTests : IAsyncLifetime
     }
 
     [Fact]
-    public void ListFor_UnknownAccount_ReturnsEmpty()
+    public async Task ListForAsync_ExcludesUnlinked()
     {
         var store = new PatientLinkStore(_dataSource);
+        await SeedAccountsAsync(ProfessionalId, PatientAccountId);
+        var invite = await store.CreateInviteAsync(ProfessionalId, PatientId, CancellationToken.None);
+        await store.RedeemAsync(invite.Code, PatientAccountId, CancellationToken.None);
 
-        Assert.Empty(store.ListFor(Guid.NewGuid()));
+        await store.UnlinkAsync(PatientAccountId, ProfessionalId, CancellationToken.None);
+
+        Assert.Empty(await store.ListForAsync(ProfessionalId, CancellationToken.None));
+        Assert.Empty(await store.ListForAsync(PatientAccountId, CancellationToken.None));
     }
 
     [Fact]
-    public void Unlink_ByEitherParty_RemovesTheLinkAndAllowsRelinkingWithANewCode()
+    public async Task ListForAsync_UnknownAccount_ReturnsEmpty()
     {
         var store = new PatientLinkStore(_dataSource);
-        var invite = store.CreateInvite(ProfessionalId, PatientId);
-        store.Redeem(invite.Code, PatientAccountId);
 
-        var unlinked = store.Unlink(PatientAccountId, ProfessionalId);
+        Assert.Empty(await store.ListForAsync(Guid.NewGuid(), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task UnlinkAsync_ByEitherParty_RemovesTheLinkAndAllowsRelinkingWithANewCode()
+    {
+        var store = new PatientLinkStore(_dataSource);
+        await SeedAccountsAsync(ProfessionalId, PatientAccountId);
+        var invite = await store.CreateInviteAsync(ProfessionalId, PatientId, CancellationToken.None);
+        await store.RedeemAsync(invite.Code, PatientAccountId, CancellationToken.None);
+
+        var unlinked = await store.UnlinkAsync(PatientAccountId, ProfessionalId, CancellationToken.None);
 
         Assert.True(unlinked);
-        Assert.Empty(store.ListFor(ProfessionalId));
-        Assert.Empty(store.ListFor(PatientAccountId));
+        Assert.Empty(await store.ListForAsync(ProfessionalId, CancellationToken.None));
+        Assert.Empty(await store.ListForAsync(PatientAccountId, CancellationToken.None));
 
-        var newInvite = store.CreateInvite(ProfessionalId, PatientId);
-        var relinked = store.Redeem(newInvite.Code, PatientAccountId);
+        var newInvite = await store.CreateInviteAsync(ProfessionalId, PatientId, CancellationToken.None);
+        var relinked = await store.RedeemAsync(newInvite.Code, PatientAccountId, CancellationToken.None);
         Assert.True(relinked.TryGetValue(out _));
     }
 
     [Fact]
-    public void Unlink_WhenNoLinkExists_ReturnsFalse()
+    public async Task UnlinkAsync_WhenNoLinkExists_ReturnsFalse()
     {
         var store = new PatientLinkStore(_dataSource);
 
-        Assert.False(store.Unlink(ProfessionalId, PatientAccountId));
+        Assert.False(await store.UnlinkAsync(ProfessionalId, PatientAccountId, CancellationToken.None));
     }
 
-    /// <summary>The professional side initiating unlink (accountId=professional, peerAccountId=patient) is the other order than Unlink_ByEitherParty_..., which unlinks from the patient side.</summary>
+    /// <summary>The professional side initiating unlink (accountId=professional, peerAccountId=patient) is the other order than UnlinkAsync_ByEitherParty_..., which unlinks from the patient side.</summary>
     [Fact]
-    public void Unlink_InitiatedByProfessional_RemovesTheLink()
+    public async Task UnlinkAsync_InitiatedByProfessional_RemovesTheLink()
     {
         var store = new PatientLinkStore(_dataSource);
-        var invite = store.CreateInvite(ProfessionalId, PatientId);
-        store.Redeem(invite.Code, PatientAccountId);
+        await SeedAccountsAsync(ProfessionalId, PatientAccountId);
+        var invite = await store.CreateInviteAsync(ProfessionalId, PatientId, CancellationToken.None);
+        await store.RedeemAsync(invite.Code, PatientAccountId, CancellationToken.None);
 
-        var unlinked = store.Unlink(ProfessionalId, PatientAccountId);
+        var unlinked = await store.UnlinkAsync(ProfessionalId, PatientAccountId, CancellationToken.None);
 
         Assert.True(unlinked);
-        Assert.Empty(store.ListFor(ProfessionalId));
+        Assert.Empty(await store.ListForAsync(ProfessionalId, CancellationToken.None));
     }
 
-    /// <summary>An unrelated pair of ids against a non-empty link list still returns false -- neither side of the one existing link matches, so FindIndex never claims a hit.</summary>
+    /// <summary>An unrelated pair of ids against a non-empty link list still returns false -- neither side of the one existing link matches, so no row is affected.</summary>
     [Fact]
-    public void Unlink_WithUnrelatedAccountsWhileAnotherLinkExists_ReturnsFalse()
+    public async Task UnlinkAsync_WithUnrelatedAccountsWhileAnotherLinkExists_ReturnsFalse()
     {
         var store = new PatientLinkStore(_dataSource);
-        var invite = store.CreateInvite(ProfessionalId, PatientId);
-        store.Redeem(invite.Code, PatientAccountId);
+        await SeedAccountsAsync(ProfessionalId, PatientAccountId);
+        var invite = await store.CreateInviteAsync(ProfessionalId, PatientId, CancellationToken.None);
+        await store.RedeemAsync(invite.Code, PatientAccountId, CancellationToken.None);
 
-        var unlinked = store.Unlink(Guid.NewGuid(), Guid.NewGuid());
+        var unlinked = await store.UnlinkAsync(Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
 
         Assert.False(unlinked);
-        Assert.Single(store.ListFor(ProfessionalId));
+        Assert.Single(await store.ListForAsync(ProfessionalId, CancellationToken.None));
     }
 
     /// <summary>accountId matches the link's professional side, but peerAccountId does not match its patient side -- a half-match on the first (professional, patient) pair still returns false.</summary>
     [Fact]
-    public void Unlink_WhenAccountMatchesProfessionalButPeerDoesNotMatchPatient_ReturnsFalse()
+    public async Task UnlinkAsync_WhenAccountMatchesProfessionalButPeerDoesNotMatchPatient_ReturnsFalse()
     {
         var store = new PatientLinkStore(_dataSource);
-        var invite = store.CreateInvite(ProfessionalId, PatientId);
-        store.Redeem(invite.Code, PatientAccountId);
+        await SeedAccountsAsync(ProfessionalId, PatientAccountId);
+        var invite = await store.CreateInviteAsync(ProfessionalId, PatientId, CancellationToken.None);
+        await store.RedeemAsync(invite.Code, PatientAccountId, CancellationToken.None);
 
-        var unlinked = store.Unlink(ProfessionalId, Guid.NewGuid());
+        var unlinked = await store.UnlinkAsync(ProfessionalId, Guid.NewGuid(), CancellationToken.None);
 
         Assert.False(unlinked);
     }
 
     /// <summary>peerAccountId matches the link's professional side, but accountId does not match its patient side -- a half-match on the second (professional, patient) pair still returns false.</summary>
     [Fact]
-    public void Unlink_WhenPeerMatchesProfessionalButAccountDoesNotMatchPatient_ReturnsFalse()
+    public async Task UnlinkAsync_WhenPeerMatchesProfessionalButAccountDoesNotMatchPatient_ReturnsFalse()
     {
         var store = new PatientLinkStore(_dataSource);
-        var invite = store.CreateInvite(ProfessionalId, PatientId);
-        store.Redeem(invite.Code, PatientAccountId);
+        await SeedAccountsAsync(ProfessionalId, PatientAccountId);
+        var invite = await store.CreateInviteAsync(ProfessionalId, PatientId, CancellationToken.None);
+        await store.RedeemAsync(invite.Code, PatientAccountId, CancellationToken.None);
 
-        var unlinked = store.Unlink(Guid.NewGuid(), ProfessionalId);
+        var unlinked = await store.UnlinkAsync(Guid.NewGuid(), ProfessionalId, CancellationToken.None);
 
         Assert.False(unlinked);
     }
 
     [Fact]
-    public void Share_WhenNoLinkExists_ReturnsFalse()
+    public async Task ShareAsync_WhenNoLinkExists_ReturnsFalse()
     {
         var store = new PatientLinkStore(_dataSource);
 
-        Assert.False(store.Share(PatientAccountId, ProfessionalId, SomeCiphertext()));
+        Assert.False(await store.ShareAsync(PatientAccountId, ProfessionalId, SomeCiphertext(), CancellationToken.None));
     }
 
     [Fact]
-    public void ListShared_WhenNoLinkExists_ReturnsNull()
+    public async Task ListSharedAsync_WhenNoLinkExists_ReturnsNull()
     {
         var store = new PatientLinkStore(_dataSource);
 
-        Assert.Null(store.ListShared(ProfessionalId, PatientAccountId));
+        Assert.Null(await store.ListSharedAsync(ProfessionalId, PatientAccountId, CancellationToken.None));
     }
 
     [Fact]
-    public void ListShared_WhenLinkedButNothingShared_ReturnsEmpty()
+    public async Task ListSharedAsync_WhenLinkedButNothingShared_ReturnsEmpty()
     {
-        var store = LinkedStore();
+        var store = await LinkedStoreAsync();
 
-        Assert.Empty(store.ListShared(ProfessionalId, PatientAccountId)!);
+        Assert.Empty((await store.ListSharedAsync(ProfessionalId, PatientAccountId, CancellationToken.None))!);
     }
 
     [Fact]
-    public void Share_ThenListShared_ReturnsItemsInArrivalOrder()
+    public async Task ShareAsync_ThenListSharedAsync_ReturnsItemsInArrivalOrder()
     {
-        var store = LinkedStore();
+        var store = await LinkedStoreAsync();
         var first = SomeCiphertext(0x01);
         var second = SomeCiphertext(0x02);
 
-        Assert.True(store.Share(PatientAccountId, ProfessionalId, first));
-        Assert.True(store.Share(PatientAccountId, ProfessionalId, second));
-        var items = store.ListShared(ProfessionalId, PatientAccountId);
+        Assert.True(await store.ShareAsync(PatientAccountId, ProfessionalId, first, CancellationToken.None));
+        Assert.True(await store.ShareAsync(PatientAccountId, ProfessionalId, second, CancellationToken.None));
+        var items = await store.ListSharedAsync(ProfessionalId, PatientAccountId, CancellationToken.None);
 
         Assert.Equal(2, items!.Count);
         Assert.Equal(first, items[0].Ciphertext);
@@ -309,26 +338,26 @@ public sealed class PatientLinkStoreTests : IAsyncLifetime
 
     /// <summary>Direction matters: Share only succeeds with accountId as the patient side. A professional cannot Share into her own inbox.</summary>
     [Fact]
-    public void Share_WithSidesSwapped_ReturnsFalse()
+    public async Task ShareAsync_WithSidesSwapped_ReturnsFalse()
     {
-        var store = LinkedStore();
+        var store = await LinkedStoreAsync();
 
-        Assert.False(store.Share(ProfessionalId, PatientAccountId, SomeCiphertext()));
+        Assert.False(await store.ShareAsync(ProfessionalId, PatientAccountId, SomeCiphertext(), CancellationToken.None));
     }
 
     [Fact]
-    public void Unlink_KeepsSharedItems_RelinkListsThem()
+    public async Task UnlinkAsync_KeepsSharedItems_RelinkListsThem()
     {
-        var store = LinkedStore();
-        store.Share(PatientAccountId, ProfessionalId, SomeCiphertext());
+        var store = await LinkedStoreAsync();
+        await store.ShareAsync(PatientAccountId, ProfessionalId, SomeCiphertext(), CancellationToken.None);
 
-        store.Unlink(PatientAccountId, ProfessionalId);
-        Assert.Null(store.ListShared(ProfessionalId, PatientAccountId));
+        await store.UnlinkAsync(PatientAccountId, ProfessionalId, CancellationToken.None);
+        Assert.Null(await store.ListSharedAsync(ProfessionalId, PatientAccountId, CancellationToken.None));
 
-        var newInvite = store.CreateInvite(ProfessionalId, PatientId);
-        store.Redeem(newInvite.Code, PatientAccountId);
+        var newInvite = await store.CreateInviteAsync(ProfessionalId, PatientId, CancellationToken.None);
+        await store.RedeemAsync(newInvite.Code, PatientAccountId, CancellationToken.None);
 
-        Assert.Single(store.ListShared(ProfessionalId, PatientAccountId)!);
+        Assert.Single((await store.ListSharedAsync(ProfessionalId, PatientAccountId, CancellationToken.None))!);
     }
 
     [Fact]
@@ -369,6 +398,34 @@ public sealed class PatientLinkStoreTests : IAsyncLifetime
         Assert.Equal(1, (await store.GetPreferencesAsync(accountId, CancellationToken.None))!.Version);
     }
 
+    /// <summary>Coverage gap left by fatia 8: expectedVersion > 0 with a row that was never saved is the only path where ReadCurrentPreferencesVersionAsync's ExecuteScalarAsync returns null (ternary's `: 0` arm).</summary>
+    [Fact]
+    public async Task PutPreferencesAsync_WithNonZeroExpectedVersionButNeverSaved_ReturnsZeroAsFailure()
+    {
+        var store = new PatientLinkStore(_dataSource);
+        var accountId = await SeedAccountAsync("prefs-never-saved-nonzero@example.com");
+
+        var result = await store.PutPreferencesAsync(accountId, 5, SomeCiphertext(0xA0), SomeCiphertext(0xA1), CancellationToken.None);
+
+        var failure = result.Match(_ => (long?)null, currentVersion => currentVersion);
+        Assert.Equal(0, failure);
+    }
+
+    /// <summary>Coverage gap left by fatia 8: every other PutPreferencesAsync test only ever passes expectedVersion 0, so the UPDATE branch (expectedVersion > 0, the row already exists) never ran.</summary>
+    [Fact]
+    public async Task PutPreferencesAsync_WithCorrectNonZeroExpectedVersion_AdvancesVersion()
+    {
+        var store = new PatientLinkStore(_dataSource);
+        var accountId = await SeedAccountAsync("prefs-advance@example.com");
+        await store.PutPreferencesAsync(accountId, 0, SomeCiphertext(0xA0), SomeCiphertext(0xA1), CancellationToken.None);
+
+        var result = await store.PutPreferencesAsync(accountId, 1, SomeCiphertext(0xB0), SomeCiphertext(0xB1), CancellationToken.None);
+
+        Assert.True(result.TryGetValue(out var preferences));
+        Assert.Equal(2, preferences!.Version);
+        Assert.Equivalent(preferences, await store.GetPreferencesAsync(accountId, CancellationToken.None));
+    }
+
     [Fact]
     public async Task PutPreferencesAsync_ConcurrentSameExpectedVersion_ExactlyOneWins()
     {
@@ -389,22 +446,35 @@ public sealed class PatientLinkStoreTests : IAsyncLifetime
         Assert.Equal(1, (await store.GetPreferencesAsync(accountId, CancellationToken.None))!.Version);
     }
 
-    /// <summary>sharing_preferences.account_id has an FK to accounts -- unlike the still-in-memory invite/link/shared-item tests, the CAS tests need a real row.</summary>
+    /// <summary>sharing_preferences.account_id has an FK to accounts -- the CAS tests need a real row.</summary>
     private async Task<Guid> SeedAccountAsync(string email)
     {
         var accountId = Guid.NewGuid();
-        var accountStore = new Api.Accounts.PostgresAccountStore(_dataSource, new Api.Accounts.TotpSecretCipher(new byte[32]));
-        await accountStore.InsertAsync(
-            new Api.Accounts.Account(accountId, email, Api.Accounts.AccountRole.Patient, PasswordVerifier: null, GoogleSubjectId: null),
-            CancellationToken.None);
+        await SeedAccountsWithEmailsAsync([(accountId, email)]);
         return accountId;
     }
 
-    private PatientLinkStore LinkedStore()
+    /// <summary>patient_link_invites and patient_links both have FKs to accounts (S11-03 fatia 9) -- every id used as a professional or patient account side needs a real row first. Email is unique per id, not semantic; these tests only care about ids.</summary>
+    private async Task SeedAccountsAsync(params Guid[] accountIds) =>
+        await SeedAccountsWithEmailsAsync(accountIds.Select(id => (id, $"{id}@example.com")));
+
+    private async Task SeedAccountsWithEmailsAsync(IEnumerable<(Guid Id, string Email)> accounts)
+    {
+        var accountStore = new Api.Accounts.PostgresAccountStore(_dataSource, new Api.Accounts.TotpSecretCipher(new byte[32]));
+        foreach (var (id, email) in accounts)
+        {
+            await accountStore.InsertAsync(
+                new Api.Accounts.Account(id, email, Api.Accounts.AccountRole.Patient, PasswordVerifier: null, GoogleSubjectId: null),
+                CancellationToken.None);
+        }
+    }
+
+    private async Task<PatientLinkStore> LinkedStoreAsync()
     {
         var store = new PatientLinkStore(_dataSource);
-        var invite = store.CreateInvite(ProfessionalId, PatientId);
-        store.Redeem(invite.Code, PatientAccountId);
+        await SeedAccountsAsync(ProfessionalId, PatientAccountId);
+        var invite = await store.CreateInviteAsync(ProfessionalId, PatientId, CancellationToken.None);
+        await store.RedeemAsync(invite.Code, PatientAccountId, CancellationToken.None);
         return store;
     }
 

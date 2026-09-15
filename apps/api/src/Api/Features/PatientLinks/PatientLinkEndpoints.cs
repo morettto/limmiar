@@ -79,12 +79,13 @@ public static class PatientLinkEndpoints
         return TypedResults.Ok(links);
     }
 
-    private static Results<NoContent, JsonHttpResult<LimmiarProblemDetails>> HandleUnlink(
+    private static async Task<Results<NoContent, JsonHttpResult<LimmiarProblemDetails>>> HandleUnlink(
         Guid accountId,
         Guid peerAccountId,
-        PatientLinkService linkService)
+        PatientLinkService linkService,
+        CancellationToken cancellationToken)
     {
-        if (!linkService.Unlink(accountId, peerAccountId))
+        if (!await linkService.UnlinkAsync(accountId, peerAccountId, cancellationToken))
         {
             return ProblemJson(StatusCodes.Status404NotFound, "Link not found", PatientLinksProblemCodes.LinkNotFound);
         }

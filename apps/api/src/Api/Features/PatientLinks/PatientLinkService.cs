@@ -45,7 +45,7 @@ public sealed class PatientLinkService(IAccountStore accounts, PatientLinkStore 
             return CreateInviteFailure.NotAuthorized;
         }
 
-        return links.CreateInvite(professionalAccountId, patientId);
+        return await links.CreateInviteAsync(professionalAccountId, patientId, cancellationToken);
     }
 
     public async Task<Result<LinkView, RedeemLinkFailure>> RedeemAsync(
@@ -62,7 +62,8 @@ public sealed class PatientLinkService(IAccountStore accounts, PatientLinkStore 
             return RedeemLinkFailure.NotAPatient;
         }
 
-        return await links.Redeem(code, patientAccountId).Match(
+        var redeemResult = await links.RedeemAsync(code, patientAccountId, cancellationToken);
+        return await redeemResult.Match(
             async link =>
             {
                 Result<LinkView, RedeemLinkFailure> view = await ToViewAsync(link, patientAccountId, cancellationToken);
@@ -75,7 +76,7 @@ public sealed class PatientLinkService(IAccountStore accounts, PatientLinkStore 
     public async Task<IReadOnlyList<LinkView>> ListAsync(Guid accountId, CancellationToken cancellationToken)
     {
         var views = new List<LinkView>();
-        foreach (var link in links.ListFor(accountId))
+        foreach (var link in await links.ListForAsync(accountId, cancellationToken))
         {
             views.Add(await ToViewAsync(link, accountId, cancellationToken));
         }
@@ -83,7 +84,8 @@ public sealed class PatientLinkService(IAccountStore accounts, PatientLinkStore 
         return views;
     }
 
-    public bool Unlink(Guid accountId, Guid peerAccountId) => links.Unlink(accountId, peerAccountId);
+    public async Task<bool> UnlinkAsync(Guid accountId, Guid peerAccountId, CancellationToken cancellationToken) =>
+        await links.UnlinkAsync(accountId, peerAccountId, cancellationToken);
 
     private async Task<LinkView> ToViewAsync(PatientLink link, Guid viewerAccountId, CancellationToken cancellationToken)
     {

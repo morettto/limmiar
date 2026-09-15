@@ -125,18 +125,23 @@ tentar arrancar o container, não passam silenciosamente. Os testes puramente un
   como `"pendente"|"concedido"|"revogado"`. Fatia 3 de seis do ticket S10-02: ainda sem
   consumidor real (o portão do microfone e a máquina de sessão são as fatias 4 e 5). Ver o
   README do módulo (`src/Api/Features/Consent/README.md`).
-- `src/Api/Features/PatientLinks` (S11-04 fatias 2-3) -- vínculo 1:1 profissional-paciente por
-  código de uso único (`PatientLinkStore`, singleton em memória, sem migração própria -- as
-  contas de que depende passaram a Postgres em S11-03 fatia 6, mas vínculos/convites/envelopes
-  continuam em memória até ao S11-03 fatia 7): 12 caracteres Crockford-Base32, TTL de 7 dias, uso
-  único; `409 link.already_linked` por `(profissional, conta da paciente)` OU `(profissional,
-  patientId)`. `PatientLinkService` cruza papel/autorização com `IAccountStore`; `LinkView`
-  carrega a pública do par via `AccountKeyPairService.GetAsync` (não mais `Account.KeyPair`,
-  apagado quando o par de chaves ganhou tabela própria) do OUTRO lado -- a única resposta desta
-  API com a pública de outra conta, e só para quem é parte do vínculo. `DELETE
+- `src/Api/Features/PatientLinks` (S11-04 fatias 2-3; S11-03 fatias 7-9) -- vínculo 1:1
+  profissional-paciente por código de uso único. Convites, vínculos e preferências de
+  compartilhamento vivem em Postgres desde S11-03 (migração
+  `0012_create_patient_links_and_sharing.sql`), com RLS por chave de procura -- o resgate usa o
+  GUC `app.invite_code` (quem resgata não tem sessão na conta que emitiu o código, só o código),
+  e desvincular é soft (`patient_links.unlinked_at`) para `GET links`/`GET shared-items`
+  continuarem a dar 404 sem mudança de comportamento: 12 caracteres Crockford-Base32, TTL de 7
+  dias, uso único; `409 link.already_linked` por `(profissional, conta da paciente)` OU
+  `(profissional, patientId)`, agora um índice único parcial em vez de lock de aplicação.
+  `PatientLinkService` cruza papel/autorização com `IAccountStore`; `LinkView` carrega a pública
+  do par via `AccountKeyPairService.GetAsync` do OUTRO lado -- a única resposta desta API com a
+  pública de outra conta, e só para quem é parte do vínculo. `DELETE
   /accounts/{accountId}/links/{peerAccountId}` desvincula por qualquer das partes, `404
-  link.not_found` se não havia vínculo. Desde S11-02 (fatias 1-2), o mesmo store também guarda
-  envelopes de `shared-items` e o blob opaco de `sharing-preferences` (CAS por `version`, `409
+  link.not_found` se não havia vínculo ativo. Desde S11-02 (fatias 1-2), o mesmo store também
+  guarda envelopes de `shared-items` (ainda em memória, fatia 10 do S11-03 move para a tabela
+  `shared_items` que a migração `0012` já criou) e o blob opaco de `sharing-preferences` em
+  Postgres desde a fatia 8 (CAS por `version` como garantia de banco, `409
   sharing.version_conflict`) -- o servidor nunca vê o tipo do item nem o estado do
   compartilhamento. Ver o README do módulo (`src/Api/Features/PatientLinks/README.md`).
 - `src/Api/Features/Billing` -- cliente AbacatePay e dedupe de webhooks (S12-01,

@@ -325,26 +325,6 @@ public sealed class PatientLinkEndpointsTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    /// <summary>Accounts never disappear in this system (no delete-account operation), so a peer id with no matching account cannot happen through the public API -- reached here only by seeding PatientLinkStore directly through DI, the same "otherwise unreachable" technique as the session-bypass tests. Proves PatientLinkService.ToViewAsync's peer?.KeyPair?.PublicKey does not throw and degrades to null.</summary>
-    [Fact]
-    public async Task GetLinks_WhenPeerAccountIsUnknown_ReturnsNullPeerPublicKey()
-    {
-        using var factory = CreateFactory();
-        using var patientClient = factory.CreateClient();
-        var patientAccountId = await RegisterPatientAsync(patientClient, "link-peer-unknown@example.com");
-
-        var store = factory.Services.GetRequiredService<PatientLinkStore>();
-        var phantomProfessionalId = Guid.NewGuid();
-        var invite = store.CreateInvite(phantomProfessionalId, Guid.NewGuid());
-        store.Redeem(invite.Code, patientAccountId);
-
-        var links = await GetLinksAsync(patientClient, patientAccountId);
-
-        Assert.Single(links);
-        Assert.Equal(phantomProfessionalId, links[0].ProfessionalAccountId);
-        Assert.Null(links[0].PeerPublicKey);
-    }
-
     [Fact]
     public async Task GetLinks_WithNoLinks_ReturnsEmptyArray()
     {

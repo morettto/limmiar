@@ -30,98 +30,172 @@ public sealed class PatientLinkStore(NpgsqlDataSource dataSource, Func<DateTimeO
     public static readonly TimeSpan InviteLifetime = TimeSpan.FromDays(7);
 
     private readonly Func<DateTimeOffset> _clock = clock ?? (() => DateTimeOffset.UtcNow);
-    private readonly Lock _lock = new();
-    private readonly Dictionary<string, LinkInvite> _invites = new(StringComparer.Ordinal);
-    private readonly List<PatientLink> _links = [];
 
     // ponytail: sem teto de itens por vínculo, além da memória do processo. Upgrade: tabela
     // shared_items (já criada pela migração 0012) fica pronta para a fatia 10 usar.
+    // ponytail: o par (check IsLinkedAsync + append) já não é atômico com Unlink -- entre o
+    // SELECT em Postgres e a escrita aqui, um Unlink concorrente pode intercalar-se (janela
+    // estreita, sem teste que a exercite). Aceitável até a fatia 10 mover os envelopes para
+    // shared_items: a partir daí o INSERT/SELECT corre na mesma transação Postgres do vínculo.
+    private readonly Lock _sharedItemsLock = new();
     private readonly Dictionary<(Guid PatientAccountId, Guid ProfessionalAccountId), List<SharedItem>> _sharedItems = new();
 
-    public LinkInvite CreateInvite(Guid professionalAccountId, Guid patientId)
+    /// <summary>Row inserted with <c>professional_account_id = me</c> (S11-03 fatia 9, migration 0012) -- the FK to accounts means an invite for an unknown professional account id is now rejected by the database, not just unreachable through the API.</summary>
+    public async Task<LinkInvite> CreateInviteAsync(Guid professionalAccountId, Guid patientId, CancellationToken cancellationToken)
     {
-        var invite = new LinkInvite(
-            RandomNumberGenerator.GetString(CodeAlphabet, CodeLength),
-            professionalAccountId,
-            patientId,
-            _clock() + InviteLifetime);
+        var code = RandomNumberGenerator.GetString(CodeAlphabet, CodeLength);
+        var expiresAt = _clock() + InviteLifetime;
 
-        lock (_lock)
-        {
-            _invites[invite.Code] = invite;
-        }
+        await using var scope = await dataSource.OpenTenantScopedTransactionAsync(professionalAccountId, cancellationToken);
 
-        return invite;
+        await using var insertCommand = scope.Connection.CreateCommand();
+        insertCommand.Transaction = scope.Transaction;
+        insertCommand.CommandText = """
+            INSERT INTO patient_link_invites (code, professional_account_id, patient_id, expires_at)
+            VALUES (@code, @professionalAccountId, @patientId, @expiresAt)
+            """;
+        insertCommand.Parameters.AddWithValue("code", code);
+        insertCommand.Parameters.AddWithValue("professionalAccountId", professionalAccountId);
+        insertCommand.Parameters.AddWithValue("patientId", patientId);
+        insertCommand.Parameters.AddWithValue("expiresAt", expiresAt);
+        await insertCommand.ExecuteNonQueryAsync(cancellationToken);
+
+        await scope.Transaction.CommitAsync(cancellationToken);
+        return new LinkInvite(code, professionalAccountId, patientId, expiresAt);
     }
 
     /// <summary>
     /// Invalid, expired, or already-redeemed code all collapse into <see cref="RedeemFailure.InviteNotFound"/>
-    /// -- a caller cannot tell "never existed" from "already used" apart. The invite is consumed
-    /// only on success, inside the same lock as the duplicate check, so two concurrent redeems of
-    /// the same code always leave exactly one winner (proven by
-    /// PatientLinkStoreTests.Redeem_TwoConcurrentAttemptsOnSameCode_ExactlyOneWins).
+    /// -- a caller cannot tell "never existed" from "already used" apart. GUC <c>app.invite_code</c>
+    /// (abordagem (d)) makes the one invite row visible to a caller who has no session on the
+    /// issuing professional's account, only the code. The invite is deleted (<c>DELETE ...
+    /// RETURNING</c>) in the same transaction as the <c>patient_links</c> insert: two concurrent
+    /// redeems of the same code race the row lock on that single invite row, so only the first
+    /// DELETE finds it -- the rest see zero rows and report InviteNotFound before ever attempting
+    /// an insert (proven by PatientLinkStoreTests.RedeemAsync_TwoConcurrentAttemptsOnSameCode_ExactlyOneWins).
+    /// A second invite for an already-linked pair instead loses the race on
+    /// patient_links_active_account_pair_uq/patient_links_active_patient_id_uq (23505) and reports
+    /// AlreadyLinked.
     /// </summary>
-    public Result<PatientLink, RedeemFailure> Redeem(string code, Guid patientAccountId)
+    public async Task<Result<PatientLink, RedeemFailure>> RedeemAsync(string code, Guid patientAccountId, CancellationToken cancellationToken)
     {
-        lock (_lock)
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        await SetConfigAsync(connection, transaction, "app.invite_code", code, cancellationToken);
+        await SetConfigAsync(connection, transaction, "app.tenant_id", patientAccountId.ToString(), cancellationToken);
+
+        Guid professionalAccountId;
+        Guid patientId;
+        await using (var deleteCommand = connection.CreateCommand())
         {
-            if (!_invites.TryGetValue(code, out var invite) || invite.ExpiresAt <= _clock())
+            deleteCommand.Transaction = transaction;
+            deleteCommand.CommandText = """
+                DELETE FROM patient_link_invites
+                WHERE code = @code AND expires_at > @now
+                RETURNING professional_account_id, patient_id
+                """;
+            deleteCommand.Parameters.AddWithValue("code", code);
+            deleteCommand.Parameters.AddWithValue("now", _clock());
+
+            await using var reader = await deleteCommand.ExecuteReaderAsync(cancellationToken);
+            if (!await reader.ReadAsync(cancellationToken))
             {
                 return RedeemFailure.InviteNotFound;
             }
 
-            var alreadyLinked = _links.Exists(link =>
-                link.ProfessionalAccountId == invite.ProfessionalAccountId &&
-                (link.PatientAccountId == patientAccountId || link.PatientId == invite.PatientId));
-            if (alreadyLinked)
+            professionalAccountId = reader.GetGuid(0);
+            patientId = reader.GetGuid(1);
+        }
+
+        var linkedAt = _clock();
+        await using (var insertCommand = connection.CreateCommand())
+        {
+            insertCommand.Transaction = transaction;
+            insertCommand.CommandText = """
+                INSERT INTO patient_links (professional_account_id, patient_account_id, patient_id, linked_at)
+                VALUES (@professionalAccountId, @patientAccountId, @patientId, @linkedAt)
+                """;
+            insertCommand.Parameters.AddWithValue("professionalAccountId", professionalAccountId);
+            insertCommand.Parameters.AddWithValue("patientAccountId", patientAccountId);
+            insertCommand.Parameters.AddWithValue("patientId", patientId);
+            insertCommand.Parameters.AddWithValue("linkedAt", linkedAt);
+
+            try
+            {
+                await insertCommand.ExecuteNonQueryAsync(cancellationToken);
+            }
+            catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation)
             {
                 return RedeemFailure.AlreadyLinked;
             }
-
-            var link = new PatientLink(invite.ProfessionalAccountId, patientAccountId, invite.PatientId, _clock());
-            _links.Add(link);
-            _invites.Remove(code);
-            return link;
         }
+
+        await transaction.CommitAsync(cancellationToken);
+        return new PatientLink(professionalAccountId, patientAccountId, patientId, linkedAt);
     }
 
-    /// <summary>Every link where <paramref name="accountId"/> is either side -- the professional or the patient.</summary>
-    public IReadOnlyList<PatientLink> ListFor(Guid accountId)
+    /// <summary>Every active link where <paramref name="accountId"/> is either side -- the professional or the patient. Soft-unlinked rows (<c>unlinked_at</c> set) never appear here (S11-03 fatia 9); <c>GET links</c> keeps its 404-after-unlink behavior downstream because there is simply no row to view.</summary>
+    public async Task<IReadOnlyList<PatientLink>> ListForAsync(Guid accountId, CancellationToken cancellationToken)
     {
-        lock (_lock)
-        {
-            return _links.FindAll(link => link.ProfessionalAccountId == accountId || link.PatientAccountId == accountId);
-        }
-    }
+        await using var scope = await dataSource.OpenTenantScopedTransactionAsync(accountId, cancellationToken);
 
-    /// <summary>Either party may unlink. False if no link exists between the two accounts.</summary>
-    public bool Unlink(Guid accountId, Guid peerAccountId)
-    {
-        lock (_lock)
+        await using var selectCommand = scope.Connection.CreateCommand();
+        selectCommand.Transaction = scope.Transaction;
+        selectCommand.CommandText = """
+            SELECT professional_account_id, patient_account_id, patient_id, linked_at
+            FROM patient_links
+            WHERE (professional_account_id = @accountId OR patient_account_id = @accountId) AND unlinked_at IS NULL
+            ORDER BY linked_at
+            """;
+        selectCommand.Parameters.AddWithValue("accountId", accountId);
+
+        var links = new List<PatientLink>();
+        await using (var reader = await selectCommand.ExecuteReaderAsync(cancellationToken))
         {
-            var index = _links.FindIndex(link =>
-                (link.ProfessionalAccountId == accountId && link.PatientAccountId == peerAccountId) ||
-                (link.ProfessionalAccountId == peerAccountId && link.PatientAccountId == accountId));
-            if (index < 0)
+            while (await reader.ReadAsync(cancellationToken))
             {
-                return false;
+                links.Add(new PatientLink(reader.GetGuid(0), reader.GetGuid(1), reader.GetGuid(2), reader.GetFieldValue<DateTimeOffset>(3)));
             }
-
-            _links.RemoveAt(index);
-            return true;
         }
+
+        await scope.Transaction.CommitAsync(cancellationToken);
+        return links;
     }
 
-    /// <summary>False if no link exists between the two accounts in this direction -- share only travels along a real (patient, professional) link. Unlink does not remove what was already appended here (README invariant: revoking is a preferences-blob change, never a delete of past envelopes).</summary>
-    public bool Share(Guid patientAccountId, Guid professionalAccountId, byte[] ciphertext)
+    /// <summary>Either party may unlink. Soft (<c>unlinked_at = now</c>, S11-03 fatia 9) -- the row survives for the fatia 10 received-shares history, only the two partial unique indexes free up for a new invite. False if no ACTIVE link exists between the two accounts.</summary>
+    public async Task<bool> UnlinkAsync(Guid accountId, Guid peerAccountId, CancellationToken cancellationToken)
     {
-        lock (_lock)
-        {
-            if (!IsLinked(patientAccountId, professionalAccountId))
-            {
-                return false;
-            }
+        await using var scope = await dataSource.OpenTenantScopedTransactionAsync(accountId, cancellationToken);
 
+        await using var updateCommand = scope.Connection.CreateCommand();
+        updateCommand.Transaction = scope.Transaction;
+        updateCommand.CommandText = """
+            UPDATE patient_links
+            SET unlinked_at = @unlinkedAt
+            WHERE unlinked_at IS NULL
+              AND ((professional_account_id = @accountId AND patient_account_id = @peerAccountId)
+                OR (professional_account_id = @peerAccountId AND patient_account_id = @accountId))
+            """;
+        updateCommand.Parameters.AddWithValue("unlinkedAt", _clock());
+        updateCommand.Parameters.AddWithValue("accountId", accountId);
+        updateCommand.Parameters.AddWithValue("peerAccountId", peerAccountId);
+
+        var affectedRows = await updateCommand.ExecuteNonQueryAsync(cancellationToken);
+        await scope.Transaction.CommitAsync(cancellationToken);
+        return affectedRows > 0;
+    }
+
+    /// <summary>False if no ACTIVE link exists between the two accounts in this direction -- share only travels along a real (patient, professional) link. Unlink does not remove what was already appended here (README invariant: revoking is a preferences-blob change, never a delete of past envelopes). The link check itself is Postgres (fatia 9); the envelope list is still the in-memory dictionary (fatia 10 moves it to shared_items).</summary>
+    public async Task<bool> ShareAsync(Guid patientAccountId, Guid professionalAccountId, byte[] ciphertext, CancellationToken cancellationToken)
+    {
+        if (!await IsLinkedAsync(patientAccountId, professionalAccountId, patientAccountId, cancellationToken))
+        {
+            return false;
+        }
+
+        lock (_sharedItemsLock)
+        {
             var key = (patientAccountId, professionalAccountId);
             if (!_sharedItems.TryGetValue(key, out var items))
             {
@@ -130,24 +204,36 @@ public sealed class PatientLinkStore(NpgsqlDataSource dataSource, Func<DateTimeO
             }
 
             items.Add(new SharedItem(professionalAccountId, patientAccountId, _clock(), ciphertext));
-            return true;
         }
+
+        return true;
     }
 
-    /// <summary>Null if no link exists between the two accounts in this direction; otherwise the items in arrival order, possibly empty. Re-linking after Unlink surfaces whatever was shared before -- the list is keyed by account pair, not by link instance.</summary>
-    public IReadOnlyList<SharedItem>? ListShared(Guid professionalAccountId, Guid patientAccountId)
+    /// <summary>Null if no ACTIVE link exists between the two accounts in this direction; otherwise the items in arrival order, possibly empty. Re-linking after Unlink surfaces whatever was shared before -- the list is keyed by account pair, not by link instance.</summary>
+    public async Task<IReadOnlyList<SharedItem>?> ListSharedAsync(Guid professionalAccountId, Guid patientAccountId, CancellationToken cancellationToken)
     {
-        lock (_lock)
+        if (!await IsLinkedAsync(patientAccountId, professionalAccountId, professionalAccountId, cancellationToken))
         {
-            if (!IsLinked(patientAccountId, professionalAccountId))
-            {
-                return null;
-            }
+            return null;
+        }
 
+        lock (_sharedItemsLock)
+        {
             return _sharedItems.TryGetValue((patientAccountId, professionalAccountId), out var items)
                 ? items.ToArray()
                 : [];
         }
+    }
+
+    private static async Task SetConfigAsync(
+        NpgsqlConnection connection, NpgsqlTransaction transaction, string setting, string value, CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "SELECT set_config(@setting, @value, true)";
+        command.Parameters.AddWithValue("setting", setting);
+        command.Parameters.AddWithValue("value", value);
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     /// <summary>Null if the account never saved sharing preferences (S11-03 fatia 8, Postgres).</summary>
@@ -248,6 +334,22 @@ public sealed class PatientLinkStore(NpgsqlDataSource dataSource, Func<DateTimeO
     private static SharingPreferences ReadPreferences(NpgsqlDataReader reader) =>
         new(reader.GetInt64(0), reader.GetFieldValue<byte[]>(1), reader.GetFieldValue<byte[]>(2));
 
-    private bool IsLinked(Guid patientAccountId, Guid professionalAccountId) =>
-        _links.Exists(link => link.ProfessionalAccountId == professionalAccountId && link.PatientAccountId == patientAccountId);
+    /// <summary><paramref name="tenantId"/> is whichever side is calling (accountId in the endpoint) -- the RLS policy on patient_links only shows rows where that side matches, so an unrelated caller sees zero rows regardless of the WHERE clause below.</summary>
+    private async Task<bool> IsLinkedAsync(Guid patientAccountId, Guid professionalAccountId, Guid tenantId, CancellationToken cancellationToken)
+    {
+        await using var scope = await dataSource.OpenTenantScopedTransactionAsync(tenantId, cancellationToken);
+
+        await using var selectCommand = scope.Connection.CreateCommand();
+        selectCommand.Transaction = scope.Transaction;
+        selectCommand.CommandText = """
+            SELECT 1 FROM patient_links
+            WHERE patient_account_id = @patientAccountId AND professional_account_id = @professionalAccountId AND unlinked_at IS NULL
+            """;
+        selectCommand.Parameters.AddWithValue("patientAccountId", patientAccountId);
+        selectCommand.Parameters.AddWithValue("professionalAccountId", professionalAccountId);
+
+        var result = await selectCommand.ExecuteScalarAsync(cancellationToken);
+        await scope.Transaction.CommitAsync(cancellationToken);
+        return result is not null;
+    }
 }

@@ -4,13 +4,15 @@
 
 Vínculo 1:1 profissional-paciente (sem equipa, sem muitos-para-muitos) por código de uso único,
 e a superfície HTTP das 4 rotas (fatias 2-3 do ticket S11-04; fatia 1, o par de chaves X25519,
-mora em `Accounts/KeyPair` -- ver `apps/api/README.md`). Convites e vínculos vivem só em
-memória, como as contas de que dependem (abordagem (c), `.harness/abordagem/S11-04.md`).
+mora em `Accounts/KeyPair` -- ver `apps/api/README.md`). Desde S11-03 (fatias 7-9,
+`.harness/abordagem/S11-03.md`), convites, vínculos e preferências de compartilhamento vivem em
+Postgres com RLS (migração `0012_create_patient_links_and_sharing.sql`), não em memória.
 
 Desde S11-02 (fatias 1-2), o mesmo `PatientLinkStore` também guarda os envelopes cifrados que a
-paciente partilha com a profissional e o blob opaco de preferências de compartilhamento de cada
-conta -- ver abordagem (c) de `.harness/abordagem/S11-02.md`. O servidor nunca vê o tipo do item
-partilhado nem o estado do compartilhamento, só `byte[]`.
+paciente partilha com a profissional -- ver abordagem (c) de `.harness/abordagem/S11-02.md`. O
+servidor nunca vê o tipo do item partilhado, só `byte[]`. Os envelopes continuam em memória até
+à fatia 10 (S11-03, lote 3, junto da rota `GET received-shares`); a tabela `shared_items` já
+existe na migração `0012` para essa fatia usar.
 
 ## Contrato público
 
@@ -52,48 +54,62 @@ link.not_authorized` cobre tanto "não é profissional ativa" (convite) quanto "
 ## Invariantes
 
 - Código: 12 caracteres Crockford-Base32 (`0-9A-HJKMNPQRSTVWXYZ`, exclui I/L/O/U), 60 bits, TTL
-  de 7 dias (`PatientLinkStore.InviteLifetime`), uso único.
+  de 7 dias (`PatientLinkStore.InviteLifetime`), uso único -- consumido por `DELETE ...
+  RETURNING` na mesma transação do `INSERT` em `patient_links`.
 - Só uma paciente resgata um código; inválido, expirado ou já usado colapsam no mesmo
-  `link.invite_not_found` (um chamador não distingue "nunca existiu" de "já foi usado").
+  `link.invite_not_found` (um chamador não distingue "nunca existiu" de "já foi usado"). O
+  resgate lê o convite sob o GUC `app.invite_code` (RLS, abordagem (d)) -- quem resgata nunca
+  teve sessão na conta que emitiu o código, só o código em mãos.
 - `409 link.already_linked` se a mesma `(profissional, conta da paciente)` OU `(profissional,
-  patientId)` já está vinculada -- duas invites para o mesmo par nunca duplicam o vínculo.
+  patientId)` já está vinculada -- garantido pelos índices únicos parciais
+  `patient_links_active_account_pair_uq`/`patient_links_active_patient_id_uq`
+  (`WHERE unlinked_at IS NULL`), não por lock de aplicação. Duas tentativas concorrentes do
+  MESMO código resolvem-se no `DELETE` da invite, não nesse índice: só a primeira encontra a
+  linha, as outras já veem `link.invite_not_found` (`PatientLinkStoreTests.RedeemAsync_TwoConcurrentAttemptsOnSameCode_ExactlyOneWins`).
+- Desvincular é soft (`patient_links.unlinked_at`, S11-03 fatia 9): a linha sobrevive, só sai dos
+  índices únicos parciais e do `WHERE unlinked_at IS NULL` que `ListForAsync`/`ShareAsync`/
+  `ListSharedAsync` usam -- por isso `GET links` e `GET shared-items` continuam a dar 404 depois
+  de desvincular, sem mudança de comportamento. Revincular cria uma linha nova.
 - A pública de outra conta só sai em `GET links` de quem é parte do vínculo (decisão (d) da
-  abordagem) -- não existe rota de chave pública avulsa.
-- Desvincular não mexe em pares de chaves nem no que já foi partilhado -- é só a remoção do
-  registo de vínculo.
-- `PatientLinkStore` é singleton, lock único (`System.Threading.Lock`), sem interface: o volume
-  é baixo (um convite por vínculo humano), granularidade por código não compensa a complexidade.
-- Um envelope partilhado só é aceito se já existir vínculo `(paciente=accountId,
-  profissional=peerAccountId)`, verificado sob o mesmo lock do `append` -- sem corrida com
-  `Unlink`. Desvincular não apaga envelopes, só esconde a lista (404) até haver vínculo de novo
-  entre as mesmas duas contas; revogar o compartilhamento é só uma troca do blob de preferências,
-  nunca um apagão de envelopes já enviados.
-- `PutPreferences` é concorrência otimista de um único contador: só grava se `expectedVersion`
-  bater com a versão atual da conta (0 = nunca gravado), e sempre avança exatamente 1 no sucesso.
-  Em conflito devolve a versão atual (não o motivo), para o chamador reler e tentar de novo --
-  provado sob `Parallel.For` com o mesmo `expectedVersion` em
-  `PatientLinkStoreTests.PutPreferences_ConcurrentSameExpectedVersion_ExactlyOneWins`.
+  abordagem) -- não existe rota de chave pública avulsa. Em Postgres isso é a política
+  `key_pair_ever_linked_read` em `account_key_pairs` (migração `0012`).
+- Desvincular não mexe em pares de chaves nem no que já foi partilhado -- é só o soft-unlink do
+  vínculo.
+- `patient_link_invites`/`patient_links`/`shared_items` têm FK para `accounts` (professional e
+  patient); `patient_id` fica sem FK porque não existe tabela `patients`. Convidar ou resgatar
+  para uma conta inexistente falha na base, não só na API.
+- Um envelope partilhado só é aceito se já existir vínculo ATIVO `(paciente=accountId,
+  profissional=peerAccountId)` -- a checagem em si já corre contra Postgres (`IsLinkedAsync`),
+  mas o `append` continua num dicionário em memória (ver Armadilhas). Desvincular não apaga
+  envelopes; revogar o compartilhamento é só uma troca do blob de preferências.
+- `PutPreferencesAsync` é concorrência otimista como garantia de banco (S11-03 fatia 8): só
+  grava se `expectedVersion` bater com a versão atual da conta (0 = nunca gravado, via `INSERT
+  ... ON CONFLICT DO NOTHING`; caso contrário via `UPDATE ... WHERE version = @esperado`), e
+  sempre avança exatamente 1 no sucesso. Em conflito devolve a versão atual lida na mesma
+  transação (não o motivo) -- provado sob 20 chamadas concorrentes em
+  `PatientLinkStoreTests.PutPreferencesAsync_ConcurrentSameExpectedVersion_ExactlyOneWins`.
 
 ## Armadilhas
 
-- `ponytail`: lock global e tudo em memória; teto = reinício do processo perde vínculos e
-  convites. As contas de que este módulo depende já saíram de `InMemoryAccountStore` (S11-03
-  fatia 6, `PostgresAccountStore`), mas vínculos/convites/envelopes continuam em memória até ao
-  S11-03 fatia 7 (esboço de `patient_links` com RLS dupla em `.harness/abordagem/S11-04.md`,
-  alternativa C2, e `.harness/abordagem/S11-03.md` migração `0011`).
-- `ponytail`: sem teto de itens partilhados por vínculo além da memória do processo. Upgrade:
-  tabela junto com `patient_links` na mesma fatia 7.
+- `ponytail`: os envelopes partilhados (`ShareAsync`/`ListSharedAsync`) ainda vivem num
+  dicionário em memória, sem teto além da memória do processo -- teto = reinício perde o que foi
+  partilhado (a tabela `shared_items` já existe, migração `0012`). Upgrade: fatia 10 (S11-03,
+  lote 3), junto da rota `GET received-shares`.
+- `ponytail`: o par "checar vínculo ativo + anexar envelope" já não é atômico -- a checagem
+  corre numa transação Postgres, o append num lock em memória à parte, deixando uma janela
+  estreita para um `Unlink` concorrente se intercalar entre as duas. Sem teste que a exercite;
+  aceitável até a fatia 10 mover o envelope para dentro da mesma transação do vínculo.
 - `Api.Platform.Result<TValue, TFailure>` relaxou a constraint de `TFailure` de `struct, Enum`
-  para `struct` (S11-02) para que `PutPreferences` pudesse devolver
+  para `struct` (S11-02) para que `PutPreferencesAsync` pudesse devolver
   `Result<SharingPreferences, long>` -- a razão de falha é o próprio número de versão atual, não
   um enum nomeado. Toda constraint anterior (`enum : struct, Enum`) continua satisfazendo
   `struct`, nenhum chamador existente muda de comportamento.
-- `patientId` nunca é validado contra `patient_record_entries` -- exigiria Postgres e partiria o
-  E2E (que não tem Docker, `playwright.config.ts`). Um `patientId` errado só prejudica a própria
-  profissional que o digitou, não abre acesso a ninguém.
-- `PatientLinkService.ToViewAsync` degrada a pública do par para `null` se a conta do outro lado
-  não existir -- estruturalmente impossível hoje (não há apagar conta), mas é código defensivo,
-  não uma suposição de que a conta sempre existe.
+- `patientId` nunca é validado contra `patient_record_entries` -- não existe tabela `patients`
+  (ver acima). Um `patientId` errado só prejudica a própria profissional que o digitou, não abre
+  acesso a ninguém.
+- `PatientLinkService.ToViewAsync` degrada a pública do par para `null` se o par nunca publicou
+  chave -- não se a conta não existir: a FK em `patient_links` torna isso estruturalmente
+  impossível desde a fatia 9 (antes era só "impossível hoje", sem imposição da base).
 
 ## Fora de âmbito
 
