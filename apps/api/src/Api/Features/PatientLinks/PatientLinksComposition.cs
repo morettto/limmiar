@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using Api.Accounts;
+using Npgsql;
 
 namespace Api.PatientLinks;
 
@@ -7,7 +8,7 @@ public static class PatientLinksComposition
 {
     public static void AddPatientLinks(this IServiceCollection services)
     {
-        services.AddSingleton<PatientLinkStore>();
+        services.AddSingleton(sp => new PatientLinkStore(sp.GetRequiredService<NpgsqlDataSource>()));
         services.AddSingleton(sp => new PatientLinkService(
             sp.GetRequiredService<IAccountStore>(),
             sp.GetRequiredService<PatientLinkStore>(),

@@ -83,11 +83,12 @@ public static class SharedItemEndpoints
             items.Select(item => new SharedItemView(item.SharedAt, item.Ciphertext)).ToArray());
     }
 
-    private static Results<Ok<SharingPreferencesView>, JsonHttpResult<LimmiarProblemDetails>> HandleGetPreferencesAsync(
+    private static async Task<Results<Ok<SharingPreferencesView>, JsonHttpResult<LimmiarProblemDetails>>> HandleGetPreferencesAsync(
         Guid accountId,
-        PatientLinkStore store)
+        PatientLinkStore store,
+        CancellationToken cancellationToken)
     {
-        var preferences = store.GetPreferences(accountId);
+        var preferences = await store.GetPreferencesAsync(accountId, cancellationToken);
         if (preferences is null)
         {
             return ProblemJson(StatusCodes.Status404NotFound, "Sharing preferences not found", PatientLinksProblemCodes.SharingPreferencesNotFound);
@@ -96,10 +97,11 @@ public static class SharedItemEndpoints
         return TypedResults.Ok(ToView(preferences));
     }
 
-    private static Results<Ok<SharingPreferencesVersionView>, JsonHttpResult<LimmiarProblemDetails>> HandlePutPreferencesAsync(
+    private static async Task<Results<Ok<SharingPreferencesVersionView>, JsonHttpResult<LimmiarProblemDetails>>> HandlePutPreferencesAsync(
         Guid accountId,
         PutSharingPreferencesRequest request,
-        PatientLinkStore store)
+        PatientLinkStore store,
+        CancellationToken cancellationToken)
     {
         if (request.ExpectedVersion < 0)
         {
@@ -116,7 +118,7 @@ public static class SharedItemEndpoints
             return ciphertextProblem;
         }
 
-        var result = store.PutPreferences(accountId, request.ExpectedVersion, request.WrappedDek, request.Ciphertext);
+        var result = await store.PutPreferencesAsync(accountId, request.ExpectedVersion, request.WrappedDek, request.Ciphertext, cancellationToken);
         return result.Match<Results<Ok<SharingPreferencesVersionView>, JsonHttpResult<LimmiarProblemDetails>>>(
             updated => TypedResults.Ok(new SharingPreferencesVersionView(updated.Version)),
             _ => ProblemJson(StatusCodes.Status409Conflict, "Sharing preferences version conflict", PatientLinksProblemCodes.SharingVersionConflict));

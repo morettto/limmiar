@@ -1,21 +1,56 @@
+using Api.Data;
 using Api.PatientLinks;
+using Api.Tests.Infrastructure;
+using Npgsql;
+using Respawn;
 
 namespace Api.Tests.PatientLinks;
 
 /// <summary>
-/// S11-04 fatia 2: convites de uso único e vínculos em memória, relógio injetado -- sem Docker,
-/// sem HTTP. Molde de injeção de relógio: DevicePairingIssuerTests.
+/// S11-04 fatia 2: convites de uso único, vínculos, envelopes e o CAS de preferências, relógio
+/// injetado. Preferências (S11-03 fatia 8) e convites/vínculos (fatia 9) falam Postgres real
+/// (Testcontainers) -- exactly-one-wins deixou de ser um lock de processo, tem de correr contra
+/// conexões de verdade, mesmo molde de AccountKeyPairServiceTests. Envelopes continuam em
+/// memória até à fatia 10 (lote 3), por isso os testes de Share/ListShared abaixo não tocam o
+/// container -- só criam um store contra ele e exercitam os dicionários internos.
 /// </summary>
-public sealed class PatientLinkStoreTests
+[Collection("Database")]
+public sealed class PatientLinkStoreTests : IAsyncLifetime
 {
     private static readonly Guid ProfessionalId = Guid.NewGuid();
     private static readonly Guid PatientId = Guid.NewGuid();
     private static readonly Guid PatientAccountId = Guid.NewGuid();
 
+    private readonly PostgresContainerFixture _fixture;
+    private Respawner _respawner = null!;
+    private NpgsqlDataSource _dataSource = null!;
+
+    public PatientLinkStoreTests(PostgresContainerFixture fixture)
+    {
+        _fixture = fixture;
+    }
+
+    public async Task InitializeAsync()
+    {
+        await using var adminConnection = new NpgsqlConnection(_fixture.AdminConnectionString);
+        await adminConnection.OpenAsync();
+
+        _respawner = await Respawner.CreateAsync(adminConnection, new RespawnerOptions
+        {
+            SchemasToInclude = ["public"],
+            DbAdapter = DbAdapter.Postgres,
+        });
+        await _respawner.ResetAsync(adminConnection);
+
+        _dataSource = NpgsqlDataSourceFactory.Create(_fixture.AppRoleConnectionString);
+    }
+
+    public async Task DisposeAsync() => await _dataSource.DisposeAsync();
+
     [Fact]
     public void Redeem_SameCodeTwice_SecondIsInviteNotFound()
     {
-        var store = new PatientLinkStore();
+        var store = new PatientLinkStore(_dataSource);
         var invite = store.CreateInvite(ProfessionalId, PatientId);
 
         var first = store.Redeem(invite.Code, PatientAccountId);
@@ -30,7 +65,7 @@ public sealed class PatientLinkStoreTests
     public void CreateInvite_ReturnsA12CharacterCodeAndSevenDayExpiry()
     {
         var now = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
-        var store = new PatientLinkStore(() => now);
+        var store = new PatientLinkStore(_dataSource, () => now);
 
         var invite = store.CreateInvite(ProfessionalId, PatientId);
 
@@ -46,7 +81,7 @@ public sealed class PatientLinkStoreTests
     {
         var now = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
         var clock = now;
-        var store = new PatientLinkStore(() => clock);
+        var store = new PatientLinkStore(_dataSource, () => clock);
         var invite = store.CreateInvite(ProfessionalId, PatientId);
         clock = now + PatientLinkStore.InviteLifetime;
 
@@ -59,7 +94,7 @@ public sealed class PatientLinkStoreTests
     [Fact]
     public void Redeem_UnknownCode_IsInviteNotFound()
     {
-        var store = new PatientLinkStore();
+        var store = new PatientLinkStore(_dataSource);
 
         var result = store.Redeem("NOTACODE1234", PatientAccountId);
 
@@ -70,7 +105,7 @@ public sealed class PatientLinkStoreTests
     [Fact]
     public void Redeem_TwoConcurrentAttemptsOnSameCode_ExactlyOneWins()
     {
-        var store = new PatientLinkStore();
+        var store = new PatientLinkStore(_dataSource);
         var invite = store.CreateInvite(ProfessionalId, PatientId);
         var successCount = 0;
 
@@ -89,7 +124,7 @@ public sealed class PatientLinkStoreTests
     [Fact]
     public void Redeem_WhenAlreadyLinkedToSamePatientAccount_IsAlreadyLinked()
     {
-        var store = new PatientLinkStore();
+        var store = new PatientLinkStore(_dataSource);
         var firstInvite = store.CreateInvite(ProfessionalId, PatientId);
         store.Redeem(firstInvite.Code, PatientAccountId);
         var secondInvite = store.CreateInvite(ProfessionalId, Guid.NewGuid());
@@ -103,7 +138,7 @@ public sealed class PatientLinkStoreTests
     [Fact]
     public void Redeem_WhenSamePatientIdAlreadyLinkedToADifferentAccount_IsAlreadyLinked()
     {
-        var store = new PatientLinkStore();
+        var store = new PatientLinkStore(_dataSource);
         var firstInvite = store.CreateInvite(ProfessionalId, PatientId);
         store.Redeem(firstInvite.Code, PatientAccountId);
         var secondInvite = store.CreateInvite(ProfessionalId, PatientId);
@@ -118,7 +153,7 @@ public sealed class PatientLinkStoreTests
     [Fact]
     public void Redeem_ForADifferentProfessional_SucceedsEvenThoughPatientIsAlreadyLinkedElsewhere()
     {
-        var store = new PatientLinkStore();
+        var store = new PatientLinkStore(_dataSource);
         var firstInvite = store.CreateInvite(ProfessionalId, PatientId);
         store.Redeem(firstInvite.Code, PatientAccountId);
         var otherProfessionalId = Guid.NewGuid();
@@ -132,7 +167,7 @@ public sealed class PatientLinkStoreTests
     [Fact]
     public void ListFor_ReturnsLinksForEitherProfessionalOrPatientSide()
     {
-        var store = new PatientLinkStore();
+        var store = new PatientLinkStore(_dataSource);
         var invite = store.CreateInvite(ProfessionalId, PatientId);
         store.Redeem(invite.Code, PatientAccountId);
 
@@ -147,7 +182,7 @@ public sealed class PatientLinkStoreTests
     [Fact]
     public void ListFor_UnknownAccount_ReturnsEmpty()
     {
-        var store = new PatientLinkStore();
+        var store = new PatientLinkStore(_dataSource);
 
         Assert.Empty(store.ListFor(Guid.NewGuid()));
     }
@@ -155,7 +190,7 @@ public sealed class PatientLinkStoreTests
     [Fact]
     public void Unlink_ByEitherParty_RemovesTheLinkAndAllowsRelinkingWithANewCode()
     {
-        var store = new PatientLinkStore();
+        var store = new PatientLinkStore(_dataSource);
         var invite = store.CreateInvite(ProfessionalId, PatientId);
         store.Redeem(invite.Code, PatientAccountId);
 
@@ -173,7 +208,7 @@ public sealed class PatientLinkStoreTests
     [Fact]
     public void Unlink_WhenNoLinkExists_ReturnsFalse()
     {
-        var store = new PatientLinkStore();
+        var store = new PatientLinkStore(_dataSource);
 
         Assert.False(store.Unlink(ProfessionalId, PatientAccountId));
     }
@@ -182,7 +217,7 @@ public sealed class PatientLinkStoreTests
     [Fact]
     public void Unlink_InitiatedByProfessional_RemovesTheLink()
     {
-        var store = new PatientLinkStore();
+        var store = new PatientLinkStore(_dataSource);
         var invite = store.CreateInvite(ProfessionalId, PatientId);
         store.Redeem(invite.Code, PatientAccountId);
 
@@ -196,7 +231,7 @@ public sealed class PatientLinkStoreTests
     [Fact]
     public void Unlink_WithUnrelatedAccountsWhileAnotherLinkExists_ReturnsFalse()
     {
-        var store = new PatientLinkStore();
+        var store = new PatientLinkStore(_dataSource);
         var invite = store.CreateInvite(ProfessionalId, PatientId);
         store.Redeem(invite.Code, PatientAccountId);
 
@@ -210,7 +245,7 @@ public sealed class PatientLinkStoreTests
     [Fact]
     public void Unlink_WhenAccountMatchesProfessionalButPeerDoesNotMatchPatient_ReturnsFalse()
     {
-        var store = new PatientLinkStore();
+        var store = new PatientLinkStore(_dataSource);
         var invite = store.CreateInvite(ProfessionalId, PatientId);
         store.Redeem(invite.Code, PatientAccountId);
 
@@ -223,7 +258,7 @@ public sealed class PatientLinkStoreTests
     [Fact]
     public void Unlink_WhenPeerMatchesProfessionalButAccountDoesNotMatchPatient_ReturnsFalse()
     {
-        var store = new PatientLinkStore();
+        var store = new PatientLinkStore(_dataSource);
         var invite = store.CreateInvite(ProfessionalId, PatientId);
         store.Redeem(invite.Code, PatientAccountId);
 
@@ -235,7 +270,7 @@ public sealed class PatientLinkStoreTests
     [Fact]
     public void Share_WhenNoLinkExists_ReturnsFalse()
     {
-        var store = new PatientLinkStore();
+        var store = new PatientLinkStore(_dataSource);
 
         Assert.False(store.Share(PatientAccountId, ProfessionalId, SomeCiphertext()));
     }
@@ -243,7 +278,7 @@ public sealed class PatientLinkStoreTests
     [Fact]
     public void ListShared_WhenNoLinkExists_ReturnsNull()
     {
-        var store = new PatientLinkStore();
+        var store = new PatientLinkStore(_dataSource);
 
         Assert.Null(store.ListShared(ProfessionalId, PatientAccountId));
     }
@@ -297,63 +332,77 @@ public sealed class PatientLinkStoreTests
     }
 
     [Fact]
-    public void GetPreferences_WhenNeverSaved_ReturnsNull()
+    public async Task GetPreferencesAsync_WhenNeverSaved_ReturnsNull()
     {
-        var store = new PatientLinkStore();
+        var store = new PatientLinkStore(_dataSource);
 
-        Assert.Null(store.GetPreferences(Guid.NewGuid()));
+        Assert.Null(await store.GetPreferencesAsync(Guid.NewGuid(), CancellationToken.None));
     }
 
     [Fact]
-    public void PutPreferences_WithExpectedVersionZero_CreatesVersion1()
+    public async Task PutPreferencesAsync_WithExpectedVersionZero_CreatesVersion1()
     {
-        var store = new PatientLinkStore();
-        var accountId = Guid.NewGuid();
+        var store = new PatientLinkStore(_dataSource);
+        var accountId = await SeedAccountAsync("prefs-create@example.com");
 
-        var result = store.PutPreferences(accountId, 0, SomeCiphertext(0xA0), SomeCiphertext(0xA1));
+        var result = await store.PutPreferencesAsync(accountId, 0, SomeCiphertext(0xA0), SomeCiphertext(0xA1), CancellationToken.None);
 
         Assert.True(result.TryGetValue(out var preferences));
         Assert.Equal(1, preferences!.Version);
-        Assert.Equal(preferences, store.GetPreferences(accountId));
+        // Assert.Equivalent (not Equal): byte[] is not IEquatable, so record equality on
+        // SharingPreferences falls back to reference equality -- same gap fatia 6 hit on
+        // PostgresAccountStoreTests round-trips.
+        Assert.Equivalent(preferences, await store.GetPreferencesAsync(accountId, CancellationToken.None));
     }
 
     [Fact]
-    public void PutPreferences_WithStaleExpectedVersion_ReturnsCurrentVersionAsFailure()
+    public async Task PutPreferencesAsync_WithStaleExpectedVersion_ReturnsCurrentVersionAsFailure()
     {
-        var store = new PatientLinkStore();
-        var accountId = Guid.NewGuid();
-        store.PutPreferences(accountId, 0, SomeCiphertext(0xA0), SomeCiphertext(0xA1));
+        var store = new PatientLinkStore(_dataSource);
+        var accountId = await SeedAccountAsync("prefs-stale@example.com");
+        await store.PutPreferencesAsync(accountId, 0, SomeCiphertext(0xA0), SomeCiphertext(0xA1), CancellationToken.None);
 
-        var result = store.PutPreferences(accountId, 0, SomeCiphertext(0xB0), SomeCiphertext(0xB1));
+        var result = await store.PutPreferencesAsync(accountId, 0, SomeCiphertext(0xB0), SomeCiphertext(0xB1), CancellationToken.None);
 
         var failure = result.Match(_ => (long?)null, currentVersion => currentVersion);
         Assert.Equal(1, failure);
-        Assert.Equal(1, store.GetPreferences(accountId)!.Version);
+        Assert.Equal(1, (await store.GetPreferencesAsync(accountId, CancellationToken.None))!.Version);
     }
 
     [Fact]
-    public void PutPreferences_ConcurrentSameExpectedVersion_ExactlyOneWins()
+    public async Task PutPreferencesAsync_ConcurrentSameExpectedVersion_ExactlyOneWins()
     {
-        var store = new PatientLinkStore();
-        var accountId = Guid.NewGuid();
+        var store = new PatientLinkStore(_dataSource);
+        var accountId = await SeedAccountAsync("prefs-race@example.com");
         var successCount = 0;
 
-        Parallel.For(0, 20, i =>
+        await Task.WhenAll(Enumerable.Range(0, 20).Select(i => Task.Run(async () =>
         {
-            var result = store.PutPreferences(accountId, 0, SomeCiphertext((byte)i), SomeCiphertext((byte)i));
+            var result = await store.PutPreferencesAsync(accountId, 0, SomeCiphertext((byte)i), SomeCiphertext((byte)i), CancellationToken.None);
             if (result.TryGetValue(out _))
             {
                 Interlocked.Increment(ref successCount);
             }
-        });
+        })));
 
         Assert.Equal(1, successCount);
-        Assert.Equal(1, store.GetPreferences(accountId)!.Version);
+        Assert.Equal(1, (await store.GetPreferencesAsync(accountId, CancellationToken.None))!.Version);
     }
 
-    private static PatientLinkStore LinkedStore()
+    /// <summary>sharing_preferences.account_id has an FK to accounts -- unlike the still-in-memory invite/link/shared-item tests, the CAS tests need a real row.</summary>
+    private async Task<Guid> SeedAccountAsync(string email)
     {
-        var store = new PatientLinkStore();
+        var accountId = Guid.NewGuid();
+        var accountStore = new Api.Accounts.PostgresAccountStore(_dataSource, new Api.Accounts.TotpSecretCipher(new byte[32]));
+        await accountStore.InsertAsync(
+            new Api.Accounts.Account(accountId, email, Api.Accounts.AccountRole.Patient, PasswordVerifier: null, GoogleSubjectId: null),
+            CancellationToken.None);
+        return accountId;
+    }
+
+    private PatientLinkStore LinkedStore()
+    {
+        var store = new PatientLinkStore(_dataSource);
         var invite = store.CreateInvite(ProfessionalId, PatientId);
         store.Redeem(invite.Code, PatientAccountId);
         return store;
