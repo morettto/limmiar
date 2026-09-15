@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Api.Accounts;
 
 namespace Api.Tests.Accounts;
@@ -18,8 +19,27 @@ public sealed class AccountServiceTests
         Assert.NotNull(result.Account);
         Assert.Equal("new@example.com", result.Account!.Email);
         Assert.Equal(AccountRole.Professional, result.Account.Role);
-        Assert.Equal(SomeVerifier, result.Account.PasswordVerifier);
+        Assert.Equal(SHA256.HashData(SomeVerifier), result.Account.PasswordVerifier);
         Assert.NotEqual(Guid.Empty, result.Account.Id);
+    }
+
+    // A dump of the store (or a Postgres backup) must never contain the verifier itself --
+    // only SHA256(verifier). The verifier is already the output of a slow client-side KDF
+    // (Argon2id, ACCOUNT_VERIFIER_PARAMS in packages/crypto), so a fast hash on top is enough
+    // to keep a raw dump from being replayable as a login, without re-deriving a second slow
+    // KDF server-side. See ConstantTimePasswordVerifierComparer, which re-hashes what the
+    // client submits before comparing.
+    [Fact]
+    public async Task RegisterAsync_StoresSha256OfVerifier_NotTheVerifier()
+    {
+        var store = new FakeAccountStore();
+        var handler = new RegisterHandler(store, new TwoFactorTicketIssuer(), new SessionTokenIssuer());
+
+        var result = await handler.Handle(new RegisterCommand("hashed@example.com", SomeVerifier, AccountRole.Patient), CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.NotEqual(SomeVerifier, result.Account!.PasswordVerifier);
+        Assert.Equal(SHA256.HashData(SomeVerifier), result.Account.PasswordVerifier);
     }
 
     [Fact]

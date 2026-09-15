@@ -4,16 +4,43 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Api.Accounts;
 using Api.Serialization;
+using Api.Tests.Infrastructure;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
+using Respawn;
 
 namespace Api.Tests.Auth;
 
-/// <summary>Security-review fix: GET .../queue and POST .../decision are staff-only and require the X-Staff-Api-Key header to match TestStaffApiKey; PostDecision_WithoutStaffApiKey_Returns401WithProblemDetails and GetQueue_WithoutStaffApiKey_Returns401WithProblemDetails are the regression tests proving the gate itself.</summary>
-public sealed class ProfessionalVerificationEndpointsTests
+/// <summary>Security-review fix: GET .../queue and POST .../decision are staff-only and require the X-Staff-Api-Key header to match TestStaffApiKey; PostDecision_WithoutStaffApiKey_Returns401WithProblemDetails and GetQueue_WithoutStaffApiKey_Returns401WithProblemDetails are the regression tests proving the gate itself. Accounts live in Postgres (S11-03) -- real fixture + Respawn reset, same discipline as SchedulingEndpointsTests.</summary>
+[Collection("Database")]
+public sealed class ProfessionalVerificationEndpointsTests : IAsyncLifetime
 {
     private const string TestStaffApiKey = "test-staff-api-key";
+
+    private readonly PostgresContainerFixture _fixture;
+    private Respawner _respawner = null!;
+
+    public ProfessionalVerificationEndpointsTests(PostgresContainerFixture fixture)
+    {
+        _fixture = fixture;
+    }
+
+    public async Task InitializeAsync()
+    {
+        await using var adminConnection = new NpgsqlConnection(_fixture.AdminConnectionString);
+        await adminConnection.OpenAsync();
+
+        _respawner = await Respawner.CreateAsync(adminConnection, new RespawnerOptions
+        {
+            SchemasToInclude = ["public"],
+            DbAdapter = DbAdapter.Postgres,
+        });
+        await _respawner.ResetAsync(adminConnection);
+    }
+
+    public Task DisposeAsync() => Task.CompletedTask;
 
     private const string ValidStubCode = "111111";
 
@@ -444,22 +471,23 @@ public sealed class ProfessionalVerificationEndpointsTests
         return accountId;
     }
 
-    private static WebApplicationFactory<Program> CreateFactory() =>
+    private WebApplicationFactory<Program> CreateFactory() =>
         new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>
             {
                 // Same reasoning as AuthEndpointsTests.CreateFactory: never touches Postgres, but
                 // startup still needs a syntactically valid ConnectionStrings:AppDb.
-                builder.UseSetting("ConnectionStrings:AppDb", "Host=127.0.0.1;Port=1;Username=app_role;Password=unused;");
+                builder.UseSetting("ConnectionStrings:AppDb", _fixture.AppRoleConnectionString);
                 builder.UseSetting("StaffAccess:ApiKey", TestStaffApiKey);
                 builder.UseSetting("WebAuthn:RelyingPartyId", "limmiar.test");
                 builder.UseSetting("WebAuthn:ExpectedOrigin", "https://limmiar.test");
                 builder.UseSetting("AbacatePay:WebhookSecret", "whsec_test123");
+                builder.UseSetting("Totp:EncryptionKey", TotpTestEncryptionKey.Base64);
                 builder.ConfigureTestServices(services => services.AddSingleton<ITotpProvider>(new StubTotpProvider()));
             });
 
     /// <summary>A real access token can never resolve to an unknown account, so this swaps in a stub that treats any GUID-shaped bearer token as proof for that exact account.</summary>
-    private static WebApplicationFactory<Program> CreateFactoryWithSessionBypass(ICouncilRegistryVerifier councilRegistryVerifier) =>
+    private WebApplicationFactory<Program> CreateFactoryWithSessionBypass(ICouncilRegistryVerifier councilRegistryVerifier) =>
         CreateFactory(councilRegistryVerifier).WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services => services.AddSingleton<ISessionTokenIssuer>(new AlwaysValidSessionTokenIssuer())));
 
@@ -467,7 +495,7 @@ public sealed class ProfessionalVerificationEndpointsTests
         client.DefaultRequestHeaders.Add("X-Staff-Api-Key", TestStaffApiKey);
 
     /// <summary>Real CRP/CRM verification is out of scope for S02-02; overrides the production ICouncilRegistryVerifier registration with a fake.</summary>
-    private static WebApplicationFactory<Program> CreateFactory(ICouncilRegistryVerifier councilRegistryVerifier) =>
+    private WebApplicationFactory<Program> CreateFactory(ICouncilRegistryVerifier councilRegistryVerifier) =>
         CreateFactory().WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services =>
                 services.AddSingleton(councilRegistryVerifier)));

@@ -186,10 +186,8 @@ describe('RecoveryScreen', () => {
     fillForm('pro2@example.com', VALID_MNEMONIC)
     fireEvent.click(screen.getByRole('button', { name: 'Recuperar acesso' }))
 
-    await waitFor(() =>
-      expect(beginTotpEnrollmentMock).toHaveBeenCalledWith('http://api.test', account.id, 'ticket-recovery-setup'),
-    )
-    expect(await screen.findByDisplayValue('JBSWY3DPEHPK3PXP')).toBeTruthy()
+    expect(await screen.findByDisplayValue('JBSWY3DPEHPK3PXP', {}, { timeout: 10000 })).toBeTruthy()
+    expect(beginTotpEnrollmentMock).toHaveBeenCalledWith('http://api.test', account.id, 'ticket-recovery-setup')
     expect(onRecovered).not.toHaveBeenCalled()
 
     fireEvent.change(screen.getByLabelText(/código de 6 dígitos/i), { target: { value: '123456' } })

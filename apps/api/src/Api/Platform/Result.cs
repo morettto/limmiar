@@ -4,13 +4,16 @@ namespace Api.Platform;
 
 /// <summary>
 /// A store/service boundary result: either a value or a typed failure reason, never both nor
-/// neither. <c>default(Result&lt;TValue, TFailure&gt;)</c> is constructible (it is a struct)
-/// and reads as a failure with reason 0 -- a real, named member in every production failure
-/// enum in this repository.
+/// neither. <c>TFailure</c> may be any struct, not only an enum -- e.g. <c>long</c>, the current
+/// version on a CAS conflict. <c>default(Result&lt;TValue, TFailure&gt;)</c> is constructible (it
+/// is a struct) and reads as a failure with reason <c>default(TFailure)</c> -- for every enum
+/// <c>TFailure</c> in this repository that is a real, named member (0); for a non-enum
+/// <c>TFailure</c> such as <c>long</c> (an optimistic-concurrency version number), it is the
+/// type's own default (0).
 /// </summary>
 public readonly record struct Result<TValue, TFailure>
     where TValue : class
-    where TFailure : struct, Enum
+    where TFailure : struct
 {
     private readonly TValue? value;
     private readonly TFailure failure;
@@ -25,7 +28,7 @@ public readonly record struct Result<TValue, TFailure>
 
     public static Result<TValue, TFailure> Failure(TFailure failure) => new(null, failure);
 
-    // Unambiguous because TValue : class and TFailure : struct, Enum can never be the same type.
+    // Unambiguous because TValue : class and TFailure : struct can never be the same type.
     public static implicit operator Result<TValue, TFailure>(TValue value) => Success(value);
 
     public static implicit operator Result<TValue, TFailure>(TFailure failure) => Failure(failure);

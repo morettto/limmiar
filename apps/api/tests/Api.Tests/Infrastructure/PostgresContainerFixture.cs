@@ -25,12 +25,26 @@ public sealed class PostgresContainerFixture : IAsyncLifetime
         .WithPassword("postgres")
         .Build();
 
-    public string AdminConnectionString => _container.GetConnectionString();
+    // MaxPoolSize caps each connection string's own pool (Npgsql's NpgsqlDataSource keeps a
+    // dedicated pool per instance, not shared by connection string like classic NpgsqlConnection
+    // pooling): S11-03 moved Accounts into Postgres, so every *EndpointsTests class now boots a
+    // real app -- its own NpgsqlDataSource -- against this one container. At the default pool
+    // size of 100 each, the container's own connection limit (Postgres default max_connections
+    // = 100) was exhausted well before 30+ WebApplicationFactory instances got through the suite,
+    // failing unrelated tests with "remaining connection slots are reserved for roles with the
+    // SUPERUSER attribute". Every test here uses at most a handful of concurrent connections.
+    private const int MaxPoolSizePerConnectionString = 5;
+
+    public string AdminConnectionString => new NpgsqlConnectionStringBuilder(_container.GetConnectionString())
+    {
+        MaxPoolSize = MaxPoolSizePerConnectionString,
+    }.ConnectionString;
 
     public string AppRoleConnectionString => new NpgsqlConnectionStringBuilder(_container.GetConnectionString())
     {
         Username = "app_role",
         Password = AppRolePassword,
+        MaxPoolSize = MaxPoolSizePerConnectionString,
     }.ConnectionString;
 
     public async Task InitializeAsync()
