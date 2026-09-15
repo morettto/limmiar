@@ -98,6 +98,9 @@ export default tseslint.config(
             // Error messages are developer-facing diagnostics (thrown/rejected, never
             // rendered UI), same convention already used across this repo's *.ts files.
             'Error',
+            // Same rationale as `Error` above -- a trace, never rendered UI (e.g.
+            // features/vinculo's garantirParDeChaves failure trace in .tsx components).
+            'console.error',
           ],
         },
       ],
