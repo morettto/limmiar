@@ -10,7 +10,8 @@ public static class PatientLinksComposition
         services.AddSingleton<PatientLinkStore>();
         services.AddSingleton(sp => new PatientLinkService(
             sp.GetRequiredService<IAccountStore>(),
-            sp.GetRequiredService<PatientLinkStore>()));
+            sp.GetRequiredService<PatientLinkStore>(),
+            sp.GetRequiredService<AccountKeyPairService>()));
 
         services.ConfigureHttpJsonOptions(options =>
         {

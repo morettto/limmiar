@@ -28,7 +28,7 @@ public sealed record LinkView(Guid ProfessionalAccountId, Guid PatientAccountId,
 /// Role checks and account lookups around <see cref="PatientLinkStore"/>: the store knows
 /// nothing about accounts or roles, only codes and pairs of ids.
 /// </summary>
-public sealed class PatientLinkService(IAccountStore accounts, PatientLinkStore links)
+public sealed class PatientLinkService(IAccountStore accounts, PatientLinkStore links, AccountKeyPairService keyPairs)
 {
     /// <summary>Same guard as ConsentService.RecordAsync/NoteService.SignAsync: generating an invite for a patientId carries the same authorization risk as creating a patient record.</summary>
     public async Task<Result<LinkInvite, CreateInviteFailure>> CreateInviteAsync(
@@ -88,7 +88,7 @@ public sealed class PatientLinkService(IAccountStore accounts, PatientLinkStore 
     private async Task<LinkView> ToViewAsync(PatientLink link, Guid viewerAccountId, CancellationToken cancellationToken)
     {
         var peerAccountId = viewerAccountId == link.ProfessionalAccountId ? link.PatientAccountId : link.ProfessionalAccountId;
-        var peer = await accounts.FindByIdAsync(peerAccountId, cancellationToken);
-        return new LinkView(link.ProfessionalAccountId, link.PatientAccountId, link.PatientId, link.LinkedAt, peer?.KeyPair?.PublicKey);
+        var peerPair = await keyPairs.GetAsync(peerAccountId, cancellationToken);
+        return new LinkView(link.ProfessionalAccountId, link.PatientAccountId, link.PatientId, link.LinkedAt, peerPair?.PublicKey);
     }
 }

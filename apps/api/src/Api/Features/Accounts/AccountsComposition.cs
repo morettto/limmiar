@@ -1,4 +1,5 @@
 using Api.Serialization;
+using Npgsql;
 
 namespace Api.Accounts;
 
@@ -6,7 +7,7 @@ public static class AccountsComposition
 {
     public static void AddAccounts(this IServiceCollection services, IConfiguration configuration)
     {
-        services.AddSingleton<IAccountStore, InMemoryAccountStore>();
+        services.AddSingleton<IAccountStore, PostgresAccountStore>();
 
         services.AddSessions();
         services.AddTwoFactor();
@@ -18,7 +19,7 @@ public static class AccountsComposition
         services.AddDevicePairing(configuration);
         services.AddProfessionalVerification(configuration);
         services.AddVoiceEnrollment();
-        services.AddSingleton(sp => new AccountKeyPairService(sp.GetRequiredService<IAccountStore>()));
+        services.AddSingleton(sp => new AccountKeyPairService(sp.GetRequiredService<IAccountStore>(), sp.GetRequiredService<NpgsqlDataSource>()));
 
         services.ConfigureHttpJsonOptions(options =>
         {

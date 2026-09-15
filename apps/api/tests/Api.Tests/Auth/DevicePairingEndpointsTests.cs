@@ -5,16 +5,43 @@ using System.Text.Json;
 using Api.Accounts;
 using Api.Serialization;
 using Api.Tests.Accounts;
+using Api.Tests.Infrastructure;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
+using Respawn;
 
 namespace Api.Tests.Auth;
 
-/// <summary>S02-04 HTTP-layer tests for the device-pairing-by-QR handshake (domain layer covered by DevicePairingIssuerTests): who each endpoint authenticates, which failure maps to which status/code, and that claim/payload-fetch stay single-use over real HTTP.</summary>
-public sealed class DevicePairingEndpointsTests
+/// <summary>S02-04 HTTP-layer tests for the device-pairing-by-QR handshake (domain layer covered by DevicePairingIssuerTests): who each endpoint authenticates, which failure maps to which status/code, and that claim/payload-fetch stay single-use over real HTTP. Accounts live in Postgres (S11-03) -- real fixture + Respawn reset, same discipline as SchedulingEndpointsTests.</summary>
+[Collection("Database")]
+public sealed class DevicePairingEndpointsTests : IAsyncLifetime
 {
     private static readonly byte[] SomeVerifier = CreateVerifier(0x01);
+
+    private readonly PostgresContainerFixture _fixture;
+    private Respawner _respawner = null!;
+
+    public DevicePairingEndpointsTests(PostgresContainerFixture fixture)
+    {
+        _fixture = fixture;
+    }
+
+    public async Task InitializeAsync()
+    {
+        await using var adminConnection = new NpgsqlConnection(_fixture.AdminConnectionString);
+        await adminConnection.OpenAsync();
+
+        _respawner = await Respawner.CreateAsync(adminConnection, new RespawnerOptions
+        {
+            SchemasToInclude = ["public"],
+            DbAdapter = DbAdapter.Postgres,
+        });
+        await _respawner.ResetAsync(adminConnection);
+    }
+
+    public Task DisposeAsync() => Task.CompletedTask;
 
     /// <summary>Stand-ins for raw X25519 public keys -- opaque to this backend, so any distinguishable bytes will do.</summary>
     private static readonly byte[] PrimaryPublicKey = [0xA0, 0xA1, 0xA2, 0xA3];
@@ -491,13 +518,13 @@ public sealed class DevicePairingEndpointsTests
         return doc.RootElement.GetProperty("code").GetString();
     }
 
-    private static WebApplicationFactory<Program> CreateFactory() =>
+    private WebApplicationFactory<Program> CreateFactory() =>
         new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>
             {
                 // Same reasoning as AuthEndpointsTests.CreateFactory: never touches Postgres, but
                 // startup still needs a syntactically valid ConnectionStrings:AppDb.
-                builder.UseSetting("ConnectionStrings:AppDb", "Host=127.0.0.1;Port=1;Username=app_role;Password=unused;");
+                builder.UseSetting("ConnectionStrings:AppDb", _fixture.AppRoleConnectionString);
                 builder.UseSetting("StaffAccess:ApiKey", "test-staff-api-key");
                 builder.UseSetting("WebAuthn:RelyingPartyId", "limmiar.test");
                 builder.UseSetting("WebAuthn:ExpectedOrigin", "https://limmiar.test");
@@ -512,7 +539,7 @@ public sealed class DevicePairingEndpointsTests
     }
 
     /// <summary>Overrides the production INewDeviceAlertSender registration with a capturing fake so the S02-07 tests can read back which e-mail POST .../payload alerted.</summary>
-    private static (WebApplicationFactory<Program> Factory, CapturingNewDeviceAlertSender Sender) CreateFactoryWithNewDeviceAlertCapture()
+    private (WebApplicationFactory<Program> Factory, CapturingNewDeviceAlertSender Sender) CreateFactoryWithNewDeviceAlertCapture()
     {
         var sender = new CapturingNewDeviceAlertSender();
         var factory = CreateFactory().WithWebHostBuilder(builder =>

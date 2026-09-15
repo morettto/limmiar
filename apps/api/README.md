@@ -25,27 +25,31 @@ tentar arrancar o container, não passam silenciosamente. Os testes puramente un
   verificação profissional, cadastro de voz (`VoiceEnrollmentService`: `EnrollAsync`/
   `GetAsync`/`DeleteAsync` sobre `Account.VoiceEnrollment`, um único `VoiceEnrollment?` que
   agrupa `WrappedDek`/`SealedEmbedding` -- o compilador, não uma invariante em prosa, é quem
-  garante que os dois campos viajam sempre juntos). Armazenamento em memória
-  (`InMemoryAccountStore`) -- ainda não persistido em Postgres.
-  - `Features/Accounts/KeyPair` (S11-04 fatia 1) -- o par X25519 estático por conta
-    (ADR-S11-06): `AccountKeyPairService.PublishAsync`/`GetAsync` sobre `Account.KeyPair`
+  garante que os dois campos viajam sempre juntos). Desde S11-03 (fatia 6), `PostgresAccountStore`
+  persiste em `accounts` (migração `0010_create_accounts.sql`) com RLS por chave de procura (id,
+  email ou fila de staff -- ver `Features/Accounts/README.md`); `PasswordVerifier`/
+  `RecoveryVerifier` guardam `SHA256(verifier)`, nunca o verifier. `InMemoryAccountStore` mudou-se
+  para `tests/Api.Tests/Fakes` (fake de `IAccountStore` só para testes que não precisam de provar
+  nada sobre persistência).
+  - `Features/Accounts/KeyPair` (S11-04 fatia 1; Postgres desde S11-03 fatia 6) -- o par X25519
+    estático por conta (ADR-S11-06) mora em `account_key_pairs`, tabela própria (não uma coluna de
+    `accounts`, para o last-write-wins de `IAccountStore.UpdateAsync` nunca a poder apagar):
+    `AccountKeyPairService.PublishAsync`/`GetAsync` sobre essa tabela
     (`AccountKeyPair(PublicKey, WrappedDek, SealedPrivateKey)`, mesmo molde de envelope
     DEK/KEK que `VoiceEnrollment`). A pública é imutável: publicar de novo a MESMA `publicKey`
     substitui o envelope (204, serve rotação de KEK); uma `publicKey` DIFERENTE é `409
-    key_pair.public_key_conflict` -- a primeira publicação vence, garantido contra corrida por um
-    `SemaphoreSlim` de instância em `AccountKeyPairService` que serializa find+check+update
-    (mesma forma que `PatientLinkStore.Redeem` usa `lock`, mas aqui a secção crítica faz
-    `await`). `PUT`/`GET
+    key_pair.public_key_conflict` -- a primeira publicação vence, decidido pelo próprio Postgres
+    (`INSERT ... ON CONFLICT ... WHERE public_key = EXCLUDED.public_key`), não por um
+    `SemaphoreSlim` de instância (que só serializava um processo). `PUT`/`GET
     /accounts/{accountId}/key-pair` ficam protegidas por `RequireAccountAccessMiddleware` como
     qualquer outra rota `{accountId}` (`401`/`403` por RFC 9110), sem guarda própria.
 - `src/Api/Patients` -- prontuário do paciente: modelo append-only cifrado sobre Postgres
   (`patient_record_entries`, migração `0002_create_patient_record_entries.sql`), RLS por
-  tenant, sem UPDATE/DELETE possível (nem por grant de DB, nem por rota HTTP). É a primeira
-  fatia vertical do produto de facto apoiada em Postgres (ao contrário de Accounts, que
-  ainda é em memória) -- para o próximo módulo que precisar de uma tabela real com RLS por
-  tenant, usar `Api/Data`'s `OpenTenantScopedTransactionAsync` (ver abaixo), não reescrever o
-  `SET LOCAL app.tenant_id` à mão; `PatientService`'s mapeamento de exceção de conflito de
-  unicidade para resultado de falha continua a ser o padrão a seguir para esse caso.
+  tenant, sem UPDATE/DELETE possível (nem por grant de DB, nem por rota HTTP). Para o próximo
+  módulo que precisar de uma tabela real com RLS por tenant, usar `Api/Data`'s
+  `OpenTenantScopedTransactionAsync` (ver abaixo), não reescrever o `SET LOCAL app.tenant_id` à
+  mão; `PatientService`'s mapeamento de exceção de conflito de unicidade para resultado de falha
+  continua a ser o padrão a seguir para esse caso.
 - `src/Api/Scheduling` -- agenda: agendar, mover e cancelar sessões (`scheduled_sessions`,
   migração `0004_create_scheduled_sessions.sql`), RLS por tenant via a mesma
   `OpenTenantScopedTransactionAsync` que Patients usa. Ao contrário de Patients, `starts_at`/
@@ -118,12 +122,14 @@ tentar arrancar o container, não passam silenciosamente. Os testes puramente un
   consumidor real (o portão do microfone e a máquina de sessão são as fatias 4 e 5). Ver o
   README do módulo (`src/Api/Features/Consent/README.md`).
 - `src/Api/Features/PatientLinks` (S11-04 fatias 2-3) -- vínculo 1:1 profissional-paciente por
-  código de uso único (`PatientLinkStore`, singleton em memória, sem migração -- as contas de
-  que depende também vivem em memória): 12 caracteres Crockford-Base32, TTL de 7 dias, uso
+  código de uso único (`PatientLinkStore`, singleton em memória, sem migração própria -- as
+  contas de que depende passaram a Postgres em S11-03 fatia 6, mas vínculos/convites/envelopes
+  continuam em memória até ao S11-03 fatia 7): 12 caracteres Crockford-Base32, TTL de 7 dias, uso
   único; `409 link.already_linked` por `(profissional, conta da paciente)` OU `(profissional,
   patientId)`. `PatientLinkService` cruza papel/autorização com `IAccountStore`; `LinkView`
-  carrega a pública do par (`Accounts/KeyPair`) do OUTRO lado -- a única resposta desta API com a
-  pública de outra conta, e só para quem é parte do vínculo. `DELETE
+  carrega a pública do par via `AccountKeyPairService.GetAsync` (não mais `Account.KeyPair`,
+  apagado quando o par de chaves ganhou tabela própria) do OUTRO lado -- a única resposta desta
+  API com a pública de outra conta, e só para quem é parte do vínculo. `DELETE
   /accounts/{accountId}/links/{peerAccountId}` desvincula por qualquer das partes, `404
   link.not_found` se não havia vínculo. Desde S11-02 (fatias 1-2), o mesmo store também guarda
   envelopes de `shared-items` e o blob opaco de `sharing-preferences` (CAS por `version`, `409
@@ -148,11 +154,19 @@ tentar arrancar o container, não passam silenciosamente. Os testes puramente un
   `voice.enrollment_not_found` para o `GET`/`DELETE` de cadastro de voz sem cadastro
   prévio, distinto de `auth.account_not_found`).
 - `src/Api/Platform/Data` -- `MigrationRunner` (executor de `*.sql` sem framework, AOT-safe),
-  `NpgsqlDataSourceFactory`, e `OpenTenantScopedTransactionAsync` (extensão de
+  `NpgsqlDataSourceFactory` (builder AOT-safe via `NpgsqlSlimDataSourceBuilder`; `EnableArrays()`
+  desde S11-03 fatia 6, para `accounts.totp_backup_code_hashes text[]` -- o slim builder não traz
+  suporte a array por omissão), e `OpenTenantScopedTransactionAsync` (extensão de
   `NpgsqlDataSource`): abre ligação + transação e já corre o `set_config('app.tenant_id',
   ..., true)` que a política `tenant_isolation` de qualquer tabela com RLS por tenant
   precisa -- é o único sítio do repositório que emite esse `set_config`, para todo o resto
-  não voltar a reescrevê-lo. **Regra de imutabilidade das migrações**: enquanto
+  não voltar a reescrevê-lo. `Program.Composition.cs` regista o `NpgsqlDataSource` singleton via
+  um delegate de fábrica (`AddSingleton(_ => NpgsqlDataSourceFactory.Create(...))`), não uma
+  instância já construída -- só assim o container de DI o descarta ao fim de cada
+  `WebApplicationFactory` de teste; registá-lo como instância pronta (a forma antiga) fazia cada
+  factory de teste vazar o seu pool de ligações até o Postgres do Testcontainers esgotar
+  `max_connections`, o que só apareceu quando Accounts passou a Postgres em S11-03 e a maioria
+  dos `*EndpointsTests` passou a precisar de uma app real. **Regra de imutabilidade das migrações**: enquanto
   `MigrationRunner` não tiver tabela de migrações aplicadas, ele corre todo `*.sql` de
   `migrations/` em todo o arranque -- um ficheiro de migração já publicado é imutável, porque
   uma base onde ele já correu vê qualquer edição desse ficheiro como um `CREATE TABLE IF NOT

@@ -38,7 +38,17 @@ public partial class Program
         var appConnectionString = builder.Configuration.GetConnectionString("AppDb")
             ?? throw new InvalidOperationException("Missing required configuration: ConnectionStrings:AppDb");
 
-        builder.Services.AddSingleton(NpgsqlDataSourceFactory.Create(appConnectionString));
+        // A factory delegate, not a pre-built instance: DI only disposes a singleton it built
+        // itself (AddSingleton(instance) registers an externally-owned object the container
+        // never calls Dispose on -- see the .NET DI docs on instance-based registration). Every
+        // WebApplicationFactory<Program> in the test suite is a full host that gets disposed per
+        // test; with the instance-registration form, each one leaked its NpgsqlDataSource's
+        // pooled connections until Npgsql's own idle timeout (minutes), and enough
+        // WebApplicationFactory instances in one run exhausted Postgres's max_connections
+        // (S11-03, surfaced once accounts moved off InMemoryAccountStore and most
+        // *EndpointsTests classes started booting a real NpgsqlDataSource against the shared
+        // Testcontainers Postgres).
+        builder.Services.AddSingleton(_ => NpgsqlDataSourceFactory.Create(appConnectionString));
 
         builder.Services.AddExceptionHandler<GlobalProblemExceptionHandler>();
 

@@ -77,11 +77,12 @@ link.not_authorized` cobre tanto "não é profissional ativa" (convite) quanto "
 ## Armadilhas
 
 - `ponytail`: lock global e tudo em memória; teto = reinício do processo perde vínculos e
-  convites, exatamente como as contas de que dependem. Upgrade: tabela Postgres quando as contas
-  saírem de `InMemoryAccountStore` (esboço de `patient_links` com RLS dupla em
-  `.harness/abordagem/S11-04.md`, alternativa C2).
+  convites. As contas de que este módulo depende já saíram de `InMemoryAccountStore` (S11-03
+  fatia 6, `PostgresAccountStore`), mas vínculos/convites/envelopes continuam em memória até ao
+  S11-03 fatia 7 (esboço de `patient_links` com RLS dupla em `.harness/abordagem/S11-04.md`,
+  alternativa C2, e `.harness/abordagem/S11-03.md` migração `0011`).
 - `ponytail`: sem teto de itens partilhados por vínculo além da memória do processo. Upgrade:
-  tabela junto com `patient_links` quando as contas saírem de memória.
+  tabela junto com `patient_links` na mesma fatia 7.
 - `Api.Platform.Result<TValue, TFailure>` relaxou a constraint de `TFailure` de `struct, Enum`
   para `struct` (S11-02) para que `PutPreferences` pudesse devolver
   `Result<SharingPreferences, long>` -- a razão de falha é o próprio número de versão atual, não

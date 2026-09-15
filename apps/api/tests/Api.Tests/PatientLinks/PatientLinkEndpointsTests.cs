@@ -4,19 +4,48 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Api.Accounts;
 using Api.PatientLinks;
+using Api.Tests.Infrastructure;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
+using Respawn;
 
 namespace Api.Tests.PatientLinks;
 
 /// <summary>
-/// S11-04 fatia 3: HTTP round-trip for the 4 PatientLinks routes. No Postgres needed -- Account
-/// and PatientLinkStore both live in memory, same reason as VoiceEnrollmentEndpointsTests.
+/// S11-04 fatia 3: HTTP round-trip for the 4 PatientLinks routes. Accounts live in Postgres
+/// (S11-03); PatientLinkStore itself is still in memory -- real fixture + Respawn reset only
+/// because the app now needs Postgres to boot at all, same discipline as
+/// SchedulingEndpointsTests.
 /// </summary>
-public sealed class PatientLinkEndpointsTests
+[Collection("Database")]
+public sealed class PatientLinkEndpointsTests : IAsyncLifetime
 {
     private const string ValidStubCode = "111111";
+
+    private readonly PostgresContainerFixture _fixture;
+    private Respawner _respawner = null!;
+
+    public PatientLinkEndpointsTests(PostgresContainerFixture fixture)
+    {
+        _fixture = fixture;
+    }
+
+    public async Task InitializeAsync()
+    {
+        await using var adminConnection = new NpgsqlConnection(_fixture.AdminConnectionString);
+        await adminConnection.OpenAsync();
+
+        _respawner = await Respawner.CreateAsync(adminConnection, new RespawnerOptions
+        {
+            SchemasToInclude = ["public"],
+            DbAdapter = DbAdapter.Postgres,
+        });
+        await _respawner.ResetAsync(adminConnection);
+    }
+
+    public Task DisposeAsync() => Task.CompletedTask;
 
     private static readonly byte[] SomeVerifier = CreateVerifier(0x01);
 
@@ -477,11 +506,11 @@ public sealed class PatientLinkEndpointsTests
         return verifier;
     }
 
-    private static WebApplicationFactory<Program> CreateFactory() =>
+    private WebApplicationFactory<Program> CreateFactory() =>
         new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>
             {
-                builder.UseSetting("ConnectionStrings:AppDb", "Host=127.0.0.1;Port=1;Username=app_role;Password=unused;");
+                builder.UseSetting("ConnectionStrings:AppDb", _fixture.AppRoleConnectionString);
                 builder.UseSetting("StaffAccess:ApiKey", "test-staff-api-key");
                 builder.UseSetting("WebAuthn:RelyingPartyId", "limmiar.test");
                 builder.UseSetting("WebAuthn:ExpectedOrigin", "https://limmiar.test");
@@ -493,7 +522,7 @@ public sealed class PatientLinkEndpointsTests
                 });
             });
 
-    private static WebApplicationFactory<Program> CreateFactoryWithSessionBypass() =>
+    private WebApplicationFactory<Program> CreateFactoryWithSessionBypass() =>
         CreateFactory().WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services => services.AddSingleton<ISessionTokenIssuer>(new AlwaysValidSessionTokenIssuer())));
 

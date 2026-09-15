@@ -3,20 +3,47 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Api.Accounts;
+using Api.Tests.Infrastructure;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
+using Respawn;
 
 namespace Api.Tests.Accounts;
 
 /// <summary>
-/// S11-04 fatia 1: PUT/GET Account.KeyPair (the X25519 public/sealed-private envelope). No
-/// Postgres needed -- Account lives in InMemoryAccountStore, same reason as
-/// VoiceEnrollmentEndpointsTests.
+/// S11-04 fatia 1: PUT/GET the account's X25519 key pair envelope (own table,
+/// account_key_pairs, since S11-03 fatia 6). Accounts and key pairs live in Postgres -- real
+/// fixture + Respawn reset, same discipline as SchedulingEndpointsTests.
 /// </summary>
-public sealed class AccountKeyPairEndpointsTests
+[Collection("Database")]
+public sealed class AccountKeyPairEndpointsTests : IAsyncLifetime
 {
     private const string ValidStubCode = "111111";
+
+    private readonly PostgresContainerFixture _fixture;
+    private Respawner _respawner = null!;
+
+    public AccountKeyPairEndpointsTests(PostgresContainerFixture fixture)
+    {
+        _fixture = fixture;
+    }
+
+    public async Task InitializeAsync()
+    {
+        await using var adminConnection = new NpgsqlConnection(_fixture.AdminConnectionString);
+        await adminConnection.OpenAsync();
+
+        _respawner = await Respawner.CreateAsync(adminConnection, new RespawnerOptions
+        {
+            SchemasToInclude = ["public"],
+            DbAdapter = DbAdapter.Postgres,
+        });
+        await _respawner.ResetAsync(adminConnection);
+    }
+
+    public Task DisposeAsync() => Task.CompletedTask;
 
     private static readonly byte[] SomeVerifier = CreateVerifier(0x01);
 
@@ -337,11 +364,11 @@ public sealed class AccountKeyPairEndpointsTests
         return blob;
     }
 
-    private static WebApplicationFactory<Program> CreateFactory() =>
+    private WebApplicationFactory<Program> CreateFactory() =>
         new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>
             {
-                builder.UseSetting("ConnectionStrings:AppDb", "Host=127.0.0.1;Port=1;Username=app_role;Password=unused;");
+                builder.UseSetting("ConnectionStrings:AppDb", _fixture.AppRoleConnectionString);
                 builder.UseSetting("StaffAccess:ApiKey", "test-staff-api-key");
                 builder.UseSetting("WebAuthn:RelyingPartyId", "limmiar.test");
                 builder.UseSetting("WebAuthn:ExpectedOrigin", "https://limmiar.test");
@@ -349,7 +376,7 @@ public sealed class AccountKeyPairEndpointsTests
                 builder.ConfigureTestServices(services => services.AddSingleton<ITotpProvider>(new StubTotpProvider()));
             });
 
-    private static WebApplicationFactory<Program> CreateFactoryWithSessionBypass() =>
+    private WebApplicationFactory<Program> CreateFactoryWithSessionBypass() =>
         CreateFactory().WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services => services.AddSingleton<ISessionTokenIssuer>(new AlwaysValidSessionTokenIssuer())));
 

@@ -17,5 +17,4 @@ public sealed record Account(
     uint? WebAuthnSignCount = null,
     Guid? WebAuthnAaGuid = null,
     byte[]? RecoveryVerifier = null,
-    VoiceEnrollment? VoiceEnrollment = null,
-    AccountKeyPair? KeyPair = null);
+    VoiceEnrollment? VoiceEnrollment = null);
