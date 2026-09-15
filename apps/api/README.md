@@ -139,11 +139,14 @@ tentar arrancar o container, não passam silenciosamente. Os testes puramente un
   pública de outra conta, e só para quem é parte do vínculo. `DELETE
   /accounts/{accountId}/links/{peerAccountId}` desvincula por qualquer das partes, `404
   link.not_found` se não havia vínculo ativo. Desde S11-02 (fatias 1-2), o mesmo store também
-  guarda envelopes de `shared-items` (ainda em memória, fatia 10 do S11-03 move para a tabela
-  `shared_items` que a migração `0012` já criou) e o blob opaco de `sharing-preferences` em
-  Postgres desde a fatia 8 (CAS por `version` como garantia de banco, `409
-  sharing.version_conflict`) -- o servidor nunca vê o tipo do item nem o estado do
-  compartilhamento. Ver o README do módulo (`src/Api/Features/PatientLinks/README.md`).
+  guarda envelopes de `shared-items`; desde S11-03 fatia 10 (migração
+  `0013_shared_items_patient_read.sql`) vivem em `shared_items` (Postgres, append-only por
+  privilégio, checagem de vínculo e `INSERT` na mesma instrução SQL sob `FOR SHARE` -- atômico
+  com `Unlink`), e `GET /accounts/{accountId}/received-shares` (novo) lista toda paciente já
+  vinculada a essa profissional, com `unlinkedAt` para pares desfeitos, sem nunca dar 404. O blob
+  opaco de `sharing-preferences` está em Postgres desde a fatia 8 (CAS por `version` como
+  garantia de banco, `409 sharing.version_conflict`) -- o servidor nunca vê o tipo do item nem o
+  estado do compartilhamento. Ver o README do módulo (`src/Api/Features/PatientLinks/README.md`).
 - `src/Api/Features/Billing` -- cliente AbacatePay e dedupe de webhooks (S12-01,
   `abacatepay_webhook_events`, migração `0009_...`), a única tabela sem RLS -- ver
   `docs/adr/ADR-S12-01-dedupe-de-webhook-sem-rls.md` e o README do módulo

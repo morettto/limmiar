@@ -13,11 +13,10 @@ public enum RedeemFailure
 }
 
 /// <summary>
-/// Convites, vínculos e preferências de compartilhamento em Postgres desde S11-03 (fatia 8:
-/// preferências; fatia 9: convites e vínculos, GUC <c>app.invite_code</c> para o resgate,
-/// <c>unlinked_at</c> soft para desvincular). Envelopes partilhados (<see cref="ShareAsync"/>/
-/// <see cref="ListSharedAsync"/>) continuam em memória até à fatia 10 (lote 3, junto da rota
-/// <c>received-shares</c>) -- ver <c>.harness/S11-03-forma.md</c> §5.5.
+/// Convites, vínculos, envelopes partilhados e preferências de compartilhamento, todos em
+/// Postgres desde S11-03 (fatia 8: preferências; fatia 9: convites e vínculos, GUC
+/// <c>app.invite_code</c> para o resgate, <c>unlinked_at</c> soft para desvincular; fatia 10:
+/// envelopes em <c>shared_items</c> e <see cref="ListReceivedSharesAsync"/>).
 /// </summary>
 public sealed class PatientLinkStore(NpgsqlDataSource dataSource, Func<DateTimeOffset>? clock = null)
 {
@@ -31,14 +30,9 @@ public sealed class PatientLinkStore(NpgsqlDataSource dataSource, Func<DateTimeO
 
     private readonly Func<DateTimeOffset> _clock = clock ?? (() => DateTimeOffset.UtcNow);
 
-    // ponytail: sem teto de itens por vínculo, além da memória do processo. Upgrade: tabela
-    // shared_items (já criada pela migração 0012) fica pronta para a fatia 10 usar.
-    // ponytail: o par (check IsLinkedAsync + append) já não é atômico com Unlink -- entre o
-    // SELECT em Postgres e a escrita aqui, um Unlink concorrente pode intercalar-se (janela
-    // estreita, sem teste que a exercite). Aceitável até a fatia 10 mover os envelopes para
-    // shared_items: a partir daí o INSERT/SELECT corre na mesma transação Postgres do vínculo.
-    private readonly Lock _sharedItemsLock = new();
-    private readonly Dictionary<(Guid PatientAccountId, Guid ProfessionalAccountId), List<SharedItem>> _sharedItems = new();
+    // ponytail: sem paginação em ListReceivedSharesAsync -- teto = memória do processo e o
+    // tamanho da resposta HTTP (abordagem (e), E1). Upgrade: paginar por patient_account_id se
+    // uma profissional acumular muitas pacientes ao longo do tempo.
 
     /// <summary>Row inserted with <c>professional_account_id = me</c> (S11-03 fatia 9, migration 0012) -- the FK to accounts means an invite for an unknown professional account id is now rejected by the database, not just unreachable through the API.</summary>
     public async Task<LinkInvite> CreateInviteAsync(Guid professionalAccountId, Guid patientId, CancellationToken cancellationToken)
@@ -186,30 +180,47 @@ public sealed class PatientLinkStore(NpgsqlDataSource dataSource, Func<DateTimeO
         return affectedRows > 0;
     }
 
-    /// <summary>False if no ACTIVE link exists between the two accounts in this direction -- share only travels along a real (patient, professional) link. Unlink does not remove what was already appended here (README invariant: revoking is a preferences-blob change, never a delete of past envelopes). The link check itself is Postgres (fatia 9); the envelope list is still the in-memory dictionary (fatia 10 moves it to shared_items).</summary>
+    /// <summary>
+    /// False if no ACTIVE link exists between the two accounts in this direction -- share only
+    /// travels along a real (patient, professional) link. Unlink does not remove what was already
+    /// appended here (README invariant: revoking is a preferences-blob change, never a delete of
+    /// past envelopes). S11-03 fatia 10: the link check and the insert are now one Postgres
+    /// statement (<c>INSERT ... SELECT ... WHERE EXISTS (...) FOR SHARE</c>), so a concurrent
+    /// <see cref="UnlinkAsync"/> can no longer interleave between "checked" and "appended" -- the
+    /// <c>FOR SHARE</c> row lock on the matching <c>patient_links</c> row forces the two
+    /// transactions to serialize: whichever commits first decides the outcome for the other
+    /// (proven by PatientLinkStoreTests.ShareAsync_ConcurrentWithUnlink_NeverInsertsAnEnvelopeAfterUnlinkedAt).
+    /// </summary>
     public async Task<bool> ShareAsync(Guid patientAccountId, Guid professionalAccountId, byte[] ciphertext, CancellationToken cancellationToken)
     {
-        if (!await IsLinkedAsync(patientAccountId, professionalAccountId, patientAccountId, cancellationToken))
-        {
-            return false;
-        }
+        var sharedAt = _clock();
+        await using var scope = await dataSource.OpenTenantScopedTransactionAsync(patientAccountId, cancellationToken);
 
-        lock (_sharedItemsLock)
-        {
-            var key = (patientAccountId, professionalAccountId);
-            if (!_sharedItems.TryGetValue(key, out var items))
-            {
-                items = [];
-                _sharedItems[key] = items;
-            }
+        await using var insertCommand = scope.Connection.CreateCommand();
+        insertCommand.Transaction = scope.Transaction;
+        insertCommand.CommandText = """
+            INSERT INTO shared_items (patient_account_id, professional_account_id, shared_at, ciphertext)
+            SELECT @patientAccountId, @professionalAccountId, @sharedAt, @ciphertext
+            WHERE EXISTS (
+                SELECT 1 FROM patient_links
+                WHERE patient_account_id = @patientAccountId
+                  AND professional_account_id = @professionalAccountId
+                  AND unlinked_at IS NULL
+                FOR SHARE
+            )
+            RETURNING id
+            """;
+        insertCommand.Parameters.AddWithValue("patientAccountId", patientAccountId);
+        insertCommand.Parameters.AddWithValue("professionalAccountId", professionalAccountId);
+        insertCommand.Parameters.AddWithValue("sharedAt", sharedAt);
+        insertCommand.Parameters.AddWithValue("ciphertext", ciphertext);
 
-            items.Add(new SharedItem(professionalAccountId, patientAccountId, _clock(), ciphertext));
-        }
-
-        return true;
+        var insertedId = await insertCommand.ExecuteScalarAsync(cancellationToken);
+        await scope.Transaction.CommitAsync(cancellationToken);
+        return insertedId is not null;
     }
 
-    /// <summary>Null if no ACTIVE link exists between the two accounts in this direction; otherwise the items in arrival order, possibly empty. Re-linking after Unlink surfaces whatever was shared before -- the list is keyed by account pair, not by link instance.</summary>
+    /// <summary>Null if no ACTIVE link exists between the two accounts in this direction; otherwise the items in arrival order, possibly empty. Re-linking after Unlink surfaces whatever was shared before -- the list is keyed by account pair, not by link instance. The link check and the read are two statements (unlike <see cref="ShareAsync"/>): a GET has nothing to race atomically against, it only needs the same 404-after-unlink answer <see cref="SharedItemEndpoints"/> already gives.</summary>
     public async Task<IReadOnlyList<SharedItem>?> ListSharedAsync(Guid professionalAccountId, Guid patientAccountId, CancellationToken cancellationToken)
     {
         if (!await IsLinkedAsync(patientAccountId, professionalAccountId, professionalAccountId, cancellationToken))
@@ -217,12 +228,96 @@ public sealed class PatientLinkStore(NpgsqlDataSource dataSource, Func<DateTimeO
             return null;
         }
 
-        lock (_sharedItemsLock)
+        await using var scope = await dataSource.OpenTenantScopedTransactionAsync(professionalAccountId, cancellationToken);
+
+        await using var selectCommand = scope.Connection.CreateCommand();
+        selectCommand.Transaction = scope.Transaction;
+        selectCommand.CommandText = """
+            SELECT shared_at, ciphertext FROM shared_items
+            WHERE patient_account_id = @patientAccountId AND professional_account_id = @professionalAccountId
+            ORDER BY id
+            """;
+        selectCommand.Parameters.AddWithValue("patientAccountId", patientAccountId);
+        selectCommand.Parameters.AddWithValue("professionalAccountId", professionalAccountId);
+
+        var items = new List<SharedItem>();
+        await using (var reader = await selectCommand.ExecuteReaderAsync(cancellationToken))
         {
-            return _sharedItems.TryGetValue((patientAccountId, professionalAccountId), out var items)
-                ? items.ToArray()
-                : [];
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                items.Add(new SharedItem(professionalAccountId, patientAccountId, reader.GetFieldValue<DateTimeOffset>(0), reader.GetFieldValue<byte[]>(1)));
+            }
         }
+
+        await scope.Transaction.CommitAsync(cancellationToken);
+        return items;
+    }
+
+    /// <summary>
+    /// Every patient this professional was ever linked to (S11-03 fatia 10, abordagem (e) E1) --
+    /// one row per <c>patient_account_id</c>, the most recent <c>patient_links</c> row for that
+    /// pair (<c>DISTINCT ON</c>), whether that link is still active or was soft-unlinked. Every
+    /// envelope ever shared along the pair is attached regardless of the link's current state --
+    /// this is the read <c>EspelhoP6</c> uses instead of <c>GET links</c> + <c>GET shared-items</c>
+    /// per link, precisely because those two 404 after unlink and this must not. Never null, never
+    /// throws for "no links yet" -- an empty list is a valid answer for a brand new professional.
+    /// </summary>
+    public async Task<IReadOnlyList<ReceivedShare>> ListReceivedSharesAsync(Guid professionalAccountId, CancellationToken cancellationToken)
+    {
+        await using var scope = await dataSource.OpenTenantScopedTransactionAsync(professionalAccountId, cancellationToken);
+
+        await using var selectCommand = scope.Connection.CreateCommand();
+        selectCommand.Transaction = scope.Transaction;
+        selectCommand.CommandText = """
+            WITH latest_links AS (
+                SELECT DISTINCT ON (patient_account_id) patient_account_id, patient_id, linked_at, unlinked_at
+                FROM patient_links
+                WHERE professional_account_id = @professionalAccountId
+                ORDER BY patient_account_id, linked_at DESC
+            )
+            SELECT ll.patient_account_id, ll.patient_id, ll.linked_at, ll.unlinked_at, kp.public_key,
+                   si.shared_at, si.ciphertext
+            FROM latest_links ll
+            LEFT JOIN account_key_pairs kp ON kp.account_id = ll.patient_account_id
+            LEFT JOIN shared_items si ON si.patient_account_id = ll.patient_account_id
+                                      AND si.professional_account_id = @professionalAccountId
+            ORDER BY ll.linked_at, si.id
+            """;
+        selectCommand.Parameters.AddWithValue("professionalAccountId", professionalAccountId);
+
+        var order = new List<Guid>();
+        var byPatient = new Dictionary<Guid, (Guid PatientId, DateTimeOffset LinkedAt, DateTimeOffset? UnlinkedAt, byte[]? PeerPublicKey, List<SharedItem> Items)>();
+
+        await using (var reader = await selectCommand.ExecuteReaderAsync(cancellationToken))
+        {
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                var patientAccountId = reader.GetGuid(0);
+                if (!byPatient.TryGetValue(patientAccountId, out var entry))
+                {
+                    entry = (
+                        reader.GetGuid(1),
+                        reader.GetFieldValue<DateTimeOffset>(2),
+                        reader.IsDBNull(3) ? null : reader.GetFieldValue<DateTimeOffset>(3),
+                        reader.IsDBNull(4) ? null : reader.GetFieldValue<byte[]>(4),
+                        []);
+                    byPatient[patientAccountId] = entry;
+                    order.Add(patientAccountId);
+                }
+
+                if (!reader.IsDBNull(5))
+                {
+                    entry.Items.Add(new SharedItem(professionalAccountId, patientAccountId, reader.GetFieldValue<DateTimeOffset>(5), reader.GetFieldValue<byte[]>(6)));
+                }
+            }
+        }
+
+        await scope.Transaction.CommitAsync(cancellationToken);
+        return order.Select(patientAccountId =>
+        {
+            var entry = byPatient[patientAccountId];
+            return new ReceivedShare(patientAccountId, entry.PatientId, entry.LinkedAt, entry.UnlinkedAt, entry.PeerPublicKey, entry.Items);
+        }).ToArray();
     }
 
     private static async Task SetConfigAsync(

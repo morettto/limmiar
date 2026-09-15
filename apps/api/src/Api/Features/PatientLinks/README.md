@@ -8,11 +8,11 @@ mora em `Accounts/KeyPair` -- ver `apps/api/README.md`). Desde S11-03 (fatias 7-
 `.harness/abordagem/S11-03.md`), convites, vínculos e preferências de compartilhamento vivem em
 Postgres com RLS (migração `0012_create_patient_links_and_sharing.sql`), não em memória.
 
-Desde S11-02 (fatias 1-2), o mesmo `PatientLinkStore` também guarda os envelopes cifrados que a
-paciente partilha com a profissional -- ver abordagem (c) de `.harness/abordagem/S11-02.md`. O
-servidor nunca vê o tipo do item partilhado, só `byte[]`. Os envelopes continuam em memória até
-à fatia 10 (S11-03, lote 3, junto da rota `GET received-shares`); a tabela `shared_items` já
-existe na migração `0012` para essa fatia usar.
+Desde S11-02, o mesmo `PatientLinkStore` também guarda os envelopes cifrados que a paciente
+partilha com a profissional (abordagem (c) de `.harness/abordagem/S11-02.md`) -- o servidor nunca
+vê o tipo do item, só `byte[]`. Desde S11-03 fatia 10 (migração `0013`), os envelopes vivem em
+`shared_items` (Postgres, append-only), e `GET received-shares` lê tudo o que a profissional
+recebeu, inclusive de pares já desfeitos.
 
 ## Contrato público
 
@@ -27,24 +27,25 @@ existe na migração `0012` para essa fatia usar.
   `404 link.not_found` se não havia vínculo entre as duas contas.
 - `POST /accounts/{accountId}/links/{peerAccountId}/shared-items` -- `accountId` (a paciente)
   anexa um envelope opaco `{ciphertext}` ao que partilha com `peerAccountId` (a profissional).
-  `204`; `400 validation.invalid_field` se `ciphertext` tiver menos de 28 bytes
-  (`SealedBlobShape`) ou mais de 64 KiB; `404 link.not_found` se não houver vínculo com
-  `accountId` como paciente e `peerAccountId` como profissional -- a direção importa.
-- `GET /accounts/{accountId}/links/{peerAccountId}/shared-items` -- lista o que
-  `peerAccountId` (a paciente) partilhou com `accountId` (a profissional), em ordem de chegada.
-  `200 SharedItemView[]`; `404 link.not_found` se não houver vínculo com `accountId` como
-  profissional e `peerAccountId` como paciente. Desvincular esconde a lista (404) sem apagar os
-  itens; revincular volta a mostrá-los.
+  `204`; `400 validation.invalid_field` se `ciphertext` tiver menos de 28 bytes ou mais de 64 KiB;
+  `404 link.not_found` sem vínculo `(paciente=accountId, profissional=peerAccountId)` ATIVO.
+- `GET /accounts/{accountId}/links/{peerAccountId}/shared-items` -- lista o que `peerAccountId`
+  (a paciente) partilhou com `accountId` (a profissional), em ordem de chegada. `200
+  SharedItemView[]`; `404 link.not_found` sem vínculo `(profissional=accountId,
+  paciente=peerAccountId)` ATIVO. Desvincular esconde a lista (404) sem apagar os itens.
+- `GET /accounts/{accountId}/received-shares` -- lista, para `accountId` (a profissional), toda
+  paciente com quem ela algum dia esteve vinculada: um item por par (`patientAccountId`,
+  `patientId`, `linkedAt`, `unlinkedAt`, `peerPublicKey`, `items[]`). `200 ReceivedShareView[]`,
+  `[]` se nunca vinculada -- **nunca 404**: sempre a coleção da própria conta, e um par desfeito
+  continua na lista com `unlinkedAt` preenchido. Só pares em que `accountId` é a profissional.
 - `GET /accounts/{accountId}/sharing-preferences` -- devolve o blob de preferências de
   compartilhamento da conta. `200 {version, wrappedDek, ciphertext}`; `404
   sharing.preferences_not_found` se a conta nunca gravou.
-- `PUT /accounts/{accountId}/sharing-preferences` -- substitui o blob sob concorrência
-  otimista: `{expectedVersion, wrappedDek, ciphertext}` só grava se `expectedVersion` bater com
-  a versão atual (0 = nunca gravado), e a versão sempre avança exatamente 1. `200 {version}`
-  (só a versão nova; o chamador já tem o resto, `GET` devolve o blob completo); `400
-  validation.invalid_field` se `expectedVersion` for negativo ou algum blob tiver menos de 28
-  bytes ou mais de 64 KiB; `409 sharing.version_conflict` se a versão atual não bater -- o
-  chamador relê e tenta de novo.
+- `PUT /accounts/{accountId}/sharing-preferences` -- substitui o blob sob concorrência otimista:
+  `{expectedVersion, wrappedDek, ciphertext}` só grava se `expectedVersion` bater com a atual
+  (0 = nunca gravado), e a versão sempre avança 1. `200 {version}`; `400 validation.invalid_field`
+  se `expectedVersion` for negativo ou algum blob fora de 28..64 KiB; `409
+  sharing.version_conflict` se a versão não bater -- o chamador relê e tenta de novo.
 
 Autorização: `RequireAccountAccessMiddleware` em todas (rota `{accountId}`, sem guarda no
 handler) -- `401` sem token/token inválido, `403 auth.forbidden` com token de outra conta (RFC 9110). `403
@@ -75,13 +76,23 @@ link.not_authorized` cobre tanto "não é profissional ativa" (convite) quanto "
   `key_pair_ever_linked_read` em `account_key_pairs` (migração `0012`).
 - Desvincular não mexe em pares de chaves nem no que já foi partilhado -- é só o soft-unlink do
   vínculo.
-- `patient_link_invites`/`patient_links`/`shared_items` têm FK para `accounts` (professional e
-  patient); `patient_id` fica sem FK porque não existe tabela `patients`. Convidar ou resgatar
-  para uma conta inexistente falha na base, não só na API.
-- Um envelope partilhado só é aceito se já existir vínculo ATIVO `(paciente=accountId,
-  profissional=peerAccountId)` -- a checagem em si já corre contra Postgres (`IsLinkedAsync`),
-  mas o `append` continua num dicionário em memória (ver Armadilhas). Desvincular não apaga
-  envelopes; revogar o compartilhamento é só uma troca do blob de preferências.
+- `patient_link_invites`/`patient_links`/`shared_items` têm FK para `accounts`; `patient_id` fica
+  sem FK porque não existe tabela `patients`. Convidar/resgatar para conta inexistente falha na
+  base, não só na API.
+- Um envelope só é aceito se já existir vínculo ATIVO `(paciente=accountId,
+  profissional=peerAccountId)`. Desde a fatia 10, a checagem e o `INSERT` em `shared_items` são a
+  MESMA instrução SQL (`INSERT ... SELECT ... WHERE EXISTS (... FOR SHARE)`): o `FOR SHARE` trava
+  a linha de `patient_links` lida, então um `UnlinkAsync` concorrente (lock exclusivo do `UPDATE`)
+  bloqueia até o `Share` terminar, e vice-versa -- serializam em vez de intercalar
+  (`ShareAsync_ConcurrentWithUnlink_NeverInsertsAnEnvelopeAfterUnlinkedAt`). Desvincular não apaga
+  envelopes; revogar é só trocar o blob de preferências. A tabela é append-only por privilégio
+  (`GRANT SELECT, INSERT` sem `UPDATE`/`DELETE`, migração `0012`) -- falha na base, não só na API.
+  Duas políticas SELECT permissivas (0012 + 0013) somam com OR: profissional e paciente do par
+  leem a linha, uma terceira conta não lê.
+- `ListReceivedSharesAsync` agrupa por `patient_account_id` com `DISTINCT ON` (linha mais recente
+  de `patient_links` do par, ativa ou desfeita), com a pública atual da paciente e todo envelope
+  já trocado -- a leitura que `EspelhoP6` usa desde a fatia 11 em vez de `GET links` + `GET
+  shared-items` por vínculo, que continuam a dar 404 depois de desvincular.
 - `PutPreferencesAsync` é concorrência otimista como garantia de banco (S11-03 fatia 8): só
   grava se `expectedVersion` bater com a versão atual da conta (0 = nunca gravado, via `INSERT
   ... ON CONFLICT DO NOTHING`; caso contrário via `UPDATE ... WHERE version = @esperado`), e
@@ -91,28 +102,19 @@ link.not_authorized` cobre tanto "não é profissional ativa" (convite) quanto "
 
 ## Armadilhas
 
-- `ponytail`: os envelopes partilhados (`ShareAsync`/`ListSharedAsync`) ainda vivem num
-  dicionário em memória, sem teto além da memória do processo -- teto = reinício perde o que foi
-  partilhado (a tabela `shared_items` já existe, migração `0012`). Upgrade: fatia 10 (S11-03,
-  lote 3), junto da rota `GET received-shares`.
-- `ponytail`: o par "checar vínculo ativo + anexar envelope" já não é atômico -- a checagem
-  corre numa transação Postgres, o append num lock em memória à parte, deixando uma janela
-  estreita para um `Unlink` concorrente se intercalar entre as duas. Sem teste que a exercite;
-  aceitável até a fatia 10 mover o envelope para dentro da mesma transação do vínculo.
+- `ponytail`: `ListReceivedSharesAsync` não pagina -- teto = memória do processo e tamanho da
+  resposta HTTP. Upgrade: paginar por `patient_account_id` (abordagem (e), E1).
 - `Api.Platform.Result<TValue, TFailure>` relaxou a constraint de `TFailure` de `struct, Enum`
   para `struct` (S11-02) para que `PutPreferencesAsync` pudesse devolver
   `Result<SharingPreferences, long>` -- a razão de falha é o próprio número de versão atual, não
   um enum nomeado. Toda constraint anterior (`enum : struct, Enum`) continua satisfazendo
   `struct`, nenhum chamador existente muda de comportamento.
-- `patientId` nunca é validado contra `patient_record_entries` -- não existe tabela `patients`
-  (ver acima). Um `patientId` errado só prejudica a própria profissional que o digitou, não abre
-  acesso a ninguém.
-- `PatientLinkService.ToViewAsync` degrada a pública do par para `null` se o par nunca publicou
-  chave -- não se a conta não existir: a FK em `patient_links` torna isso estruturalmente
-  impossível desde a fatia 9 (antes era só "impossível hoje", sem imposição da base).
+- `patientId` nunca é validado contra `patient_record_entries` -- um `patientId` errado só
+  prejudica a própria profissional que o digitou, não abre acesso a ninguém.
+- `PatientLinkService.ToViewAsync` degrada a pública do par para `null` só se o par nunca
+  publicou chave -- a FK em `patient_links` torna "conta inexistente" impossível desde a fatia 9.
 
 ## Fora de âmbito
 
-Fatias 4-6 do ticket S11-04 (`apps/app`): `garantirParDeChaves`, os ecrãs de convite/resgate/
-desvincular, o cenário Playwright e o ADR-S11-06 do par de chaves selado. Ver
-`.harness/S11-04-forma.md`.
+Fatias 4-6 do ticket S11-04 (`apps/app`): `garantirParDeChaves`, ecrãs de convite/resgate/
+desvincular, cenário Playwright e o ADR-S11-06 do par de chaves selado. Ver `.harness/S11-04-forma.md`.

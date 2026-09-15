@@ -35,6 +35,8 @@ public static class PatientLinksComposition
 [JsonSerializable(typeof(ShareItemRequest))]
 [JsonSerializable(typeof(SharedItemView))]
 [JsonSerializable(typeof(IReadOnlyList<SharedItemView>))]
+[JsonSerializable(typeof(ReceivedShareView))]
+[JsonSerializable(typeof(IReadOnlyList<ReceivedShareView>))]
 [JsonSerializable(typeof(PutSharingPreferencesRequest))]
 [JsonSerializable(typeof(SharingPreferencesView))]
 [JsonSerializable(typeof(SharingPreferencesVersionView))]

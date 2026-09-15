@@ -360,6 +360,121 @@ public sealed class PatientLinkStoreTests : IAsyncLifetime
         Assert.Single((await store.ListSharedAsync(ProfessionalId, PatientAccountId, CancellationToken.None))!);
     }
 
+    /// <summary>S11-03 fatia 10: ShareAsync now checks the active link and inserts in the same statement, so a link already soft-unlinked before the call is exactly the same as never having linked -- no envelope is appended.</summary>
+    [Fact]
+    public async Task ShareAsync_AfterUnlink_ReturnsFalse()
+    {
+        var store = await LinkedStoreAsync();
+        await store.UnlinkAsync(PatientAccountId, ProfessionalId, CancellationToken.None);
+
+        Assert.False(await store.ShareAsync(PatientAccountId, ProfessionalId, SomeCiphertext(), CancellationToken.None));
+    }
+
+    /// <summary>
+    /// Proves the atomicity claimed on ShareAsync's doc comment: whichever of Share/Unlink commits
+    /// first wins the FOR SHARE lock on the patient_links row, so the two transactions serialize
+    /// instead of interleaving. The invariant checked here does not depend on which one wins --
+    /// only that no envelope's shared_at ever lands after the link's unlinked_at, which the old
+    /// in-memory-dictionary implementation could not guarantee (see the README's now-removed
+    /// ponytail note).
+    /// </summary>
+    [Fact]
+    public async Task ShareAsync_ConcurrentWithUnlink_NeverInsertsAnEnvelopeAfterUnlinkedAt()
+    {
+        var store = await LinkedStoreAsync();
+
+        var shareTasks = Enumerable.Range(0, 20)
+            .Select(i => Task.Run(() => store.ShareAsync(PatientAccountId, ProfessionalId, SomeCiphertext((byte)i), CancellationToken.None)))
+            .ToArray();
+        var unlinkTask = Task.Run(() => store.UnlinkAsync(PatientAccountId, ProfessionalId, CancellationToken.None));
+
+        await Task.WhenAll(shareTasks.Cast<Task>().Append(unlinkTask));
+
+        var receivedShares = await store.ListReceivedSharesAsync(ProfessionalId, CancellationToken.None);
+        var share = Assert.Single(receivedShares);
+        if (share.UnlinkedAt is { } unlinkedAt)
+        {
+            Assert.All(share.Items, item => Assert.True(item.SharedAt <= unlinkedAt));
+        }
+    }
+
+    [Fact]
+    public async Task ListReceivedSharesAsync_WhenNeverLinkedToAnyone_ReturnsEmpty()
+    {
+        var store = new PatientLinkStore(_dataSource);
+
+        Assert.Empty(await store.ListReceivedSharesAsync(ProfessionalId, CancellationToken.None));
+    }
+
+    /// <summary>The forma's fatia 10 red test: envelopes shared before the patient unlinks stay attached to the pair, and unlinkedAt reports when it happened -- this is exactly what GET shared-items 404s away, and why P6 reads this instead.</summary>
+    [Fact]
+    public async Task ListReceivedSharesAsync_AfterUnlink_ReturnsPriorItemsWithUnlinkedAt()
+    {
+        var clock = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        var store = new PatientLinkStore(_dataSource, () => clock);
+        await SeedAccountsAsync(ProfessionalId, PatientAccountId);
+        var invite = await store.CreateInviteAsync(ProfessionalId, PatientId, CancellationToken.None);
+        await store.RedeemAsync(invite.Code, PatientAccountId, CancellationToken.None);
+        var ciphertext = SomeCiphertext(0x0A);
+        await store.ShareAsync(PatientAccountId, ProfessionalId, ciphertext, CancellationToken.None);
+
+        clock = clock.AddDays(1);
+        await store.UnlinkAsync(PatientAccountId, ProfessionalId, CancellationToken.None);
+
+        var shares = await store.ListReceivedSharesAsync(ProfessionalId, CancellationToken.None);
+
+        var share = Assert.Single(shares);
+        Assert.Equal(PatientAccountId, share.PatientAccountId);
+        Assert.Equal(PatientId, share.PatientId);
+        Assert.Equal(clock, share.UnlinkedAt);
+        var item = Assert.Single(share.Items);
+        Assert.Equal(ciphertext, item.Ciphertext);
+    }
+
+    [Fact]
+    public async Task ListReceivedSharesAsync_WhileStillLinked_ReturnsNullUnlinkedAt()
+    {
+        var store = await LinkedStoreAsync();
+
+        var shares = await store.ListReceivedSharesAsync(ProfessionalId, CancellationToken.None);
+
+        var share = Assert.Single(shares);
+        Assert.Null(share.UnlinkedAt);
+        Assert.Empty(share.Items);
+    }
+
+    [Fact]
+    public async Task ListReceivedSharesAsync_IncludesPeerPublicKeyWhenPatientPublishedOne()
+    {
+        var store = await LinkedStoreAsync();
+        var accountStore = new Api.Accounts.PostgresAccountStore(_dataSource, new Api.Accounts.TotpSecretCipher(new byte[32]));
+        var keyPairs = new Api.Accounts.AccountKeyPairService(accountStore, _dataSource);
+        var publicKey = SomeBlob(0xAB, 32);
+        await keyPairs.PublishAsync(
+            PatientAccountId,
+            new Api.Accounts.AccountKeyPair(publicKey, SomeCiphertext(0xB0), SomeCiphertext(0xB1)),
+            CancellationToken.None);
+
+        var shares = await store.ListReceivedSharesAsync(ProfessionalId, CancellationToken.None);
+
+        var share = Assert.Single(shares);
+        Assert.Equal(publicKey, share.PeerPublicKey);
+    }
+
+    [Fact]
+    public async Task ListReceivedSharesAsync_ReturnsOneRowPerPatientEvenWithMultipleLinkCycles()
+    {
+        var store = await LinkedStoreAsync();
+        await store.UnlinkAsync(PatientAccountId, ProfessionalId, CancellationToken.None);
+        var newInvite = await store.CreateInviteAsync(ProfessionalId, PatientId, CancellationToken.None);
+        await store.RedeemAsync(newInvite.Code, PatientAccountId, CancellationToken.None);
+
+        var shares = await store.ListReceivedSharesAsync(ProfessionalId, CancellationToken.None);
+
+        var share = Assert.Single(shares);
+        Assert.Null(share.UnlinkedAt);
+    }
+
     [Fact]
     public async Task GetPreferencesAsync_WhenNeverSaved_ReturnsNull()
     {
@@ -478,9 +593,11 @@ public sealed class PatientLinkStoreTests : IAsyncLifetime
         return store;
     }
 
-    private static byte[] SomeCiphertext(byte fill = 0x01)
+    private static byte[] SomeCiphertext(byte fill = 0x01) => SomeBlob(fill, 28);
+
+    private static byte[] SomeBlob(byte fill, int length)
     {
-        var blob = new byte[28];
+        var blob = new byte[length];
         Array.Fill(blob, fill);
         return blob;
     }

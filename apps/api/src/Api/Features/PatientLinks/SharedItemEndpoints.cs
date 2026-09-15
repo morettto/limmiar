@@ -33,6 +33,12 @@ public static class SharedItemEndpoints
             .Produces<IReadOnlyList<SharedItemView>>(StatusCodes.Status200OK)
             .Produces<LimmiarProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json");
 
+        app.MapGet("/accounts/{accountId:guid}/received-shares", HandleListReceivedSharesAsync)
+            .WithName("ListReceivedShares")
+            .WithSummary("List every patient accountId (the professional side) was ever linked to, with everything shared along the way")
+            .WithDescription("Unlike GET shared-items, this never 404s and never hides a soft-unlinked pair -- unlinkedAt is null while the pair is still linked, a timestamp once undone. Always 200, [] if accountId was never linked to anyone. Requires an Authorization: Bearer access token for this exact account.")
+            .Produces<IReadOnlyList<ReceivedShareView>>(StatusCodes.Status200OK);
+
         app.MapGet("/accounts/{accountId:guid}/sharing-preferences", HandleGetPreferencesAsync)
             .WithName("GetSharingPreferences")
             .WithSummary("Fetch this account's sharing-preferences blob")
@@ -84,6 +90,24 @@ public static class SharedItemEndpoints
         return TypedResults.Ok<IReadOnlyList<SharedItemView>>(
             items.Select(item => new SharedItemView(item.SharedAt, item.Ciphertext)).ToArray());
     }
+
+    private static async Task<Ok<IReadOnlyList<ReceivedShareView>>> HandleListReceivedSharesAsync(
+        Guid accountId,
+        PatientLinkStore store,
+        CancellationToken cancellationToken)
+    {
+        var shares = await store.ListReceivedSharesAsync(accountId, cancellationToken);
+        return TypedResults.Ok<IReadOnlyList<ReceivedShareView>>(shares.Select(ToView).ToArray());
+    }
+
+    private static ReceivedShareView ToView(ReceivedShare share) =>
+        new(
+            share.PatientAccountId,
+            share.PatientId,
+            share.LinkedAt,
+            share.UnlinkedAt,
+            share.PeerPublicKey,
+            share.Items.Select(item => new SharedItemView(item.SharedAt, item.Ciphertext)).ToArray());
 
     private static async Task<Results<Ok<SharingPreferencesView>, JsonHttpResult<LimmiarProblemDetails>>> HandleGetPreferencesAsync(
         Guid accountId,
@@ -149,6 +173,10 @@ public static class SharedItemEndpoints
 public sealed record ShareItemRequest(byte[] Ciphertext);
 
 public sealed record SharedItemView(DateTimeOffset SharedAt, byte[] Ciphertext);
+
+public sealed record ReceivedShareView(
+    Guid PatientAccountId, Guid PatientId, DateTimeOffset LinkedAt, DateTimeOffset? UnlinkedAt,
+    byte[]? PeerPublicKey, IReadOnlyList<SharedItemView> Items);
 
 public sealed record PutSharingPreferencesRequest(long ExpectedVersion, byte[] WrappedDek, byte[] Ciphertext);
 

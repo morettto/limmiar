@@ -144,6 +144,96 @@ public sealed class SharedItemEndpointsTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task ReceivedShares_WhenNeverLinkedToAnyone_Returns200WithEmptyArray()
+    {
+        using var factory = CreateFactory();
+        using var professionalClient = factory.CreateClient();
+        var professionalId = await RegisterActiveProfessionalAsync(professionalClient, "received-empty-professional@example.com");
+
+        var response = await professionalClient.GetAsync($"/accounts/{professionalId}/received-shares");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var shares = await response.Content.ReadFromJsonAsync(PatientLinksJsonContext.Default.IReadOnlyListReceivedShareView);
+        Assert.Empty(shares!);
+    }
+
+    /// <summary>S11-03 fatia 10: the whole point of received-shares over GET shared-items -- the envelope shared before unlinking is still there, tagged with when the pair was undone.</summary>
+    [Fact]
+    public async Task ReceivedShares_AfterPatientUnlinks_Returns200WithUnlinkedAt()
+    {
+        using var factory = CreateFactory();
+        using var professionalClient = factory.CreateClient();
+        var professionalId = await RegisterActiveProfessionalAsync(professionalClient, "received-unlink-professional@example.com");
+
+        using var patientClient = factory.CreateClient();
+        var patientAccountId = await RegisterPatientAsync(patientClient, "received-unlink-patient@example.com");
+        await LinkAsync(professionalClient, professionalId, patientClient, patientAccountId);
+
+        var ciphertext = SomeCiphertext(0xC2);
+        await patientClient.PostAsJsonAsync(
+            $"/accounts/{patientAccountId}/links/{professionalId}/shared-items",
+            new ShareItemRequest(ciphertext),
+            PatientLinksJsonContext.Default.ShareItemRequest);
+
+        await patientClient.DeleteAsync($"/accounts/{patientAccountId}/links/{professionalId}");
+
+        var response = await professionalClient.GetAsync($"/accounts/{professionalId}/received-shares");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var shares = await response.Content.ReadFromJsonAsync(PatientLinksJsonContext.Default.IReadOnlyListReceivedShareView);
+        var share = Assert.Single(shares!);
+        Assert.Equal(patientAccountId, share.PatientAccountId);
+        Assert.NotNull(share.UnlinkedAt);
+        var item = Assert.Single(share.Items);
+        Assert.Equal(ciphertext, item.Ciphertext);
+    }
+
+    /// <summary>accountId is the patient side here -- received-shares only ever reports pairs where accountId is the professional (abordagem (e), E1): a patient's own account never sees its own shares reflected back through this route.</summary>
+    [Fact]
+    public async Task ReceivedShares_WhenCallerIsThePatientSide_ReturnsEmptyArray()
+    {
+        using var factory = CreateFactory();
+        using var professionalClient = factory.CreateClient();
+        var professionalId = await RegisterActiveProfessionalAsync(professionalClient, "received-patient-side-professional@example.com");
+
+        using var patientClient = factory.CreateClient();
+        var patientAccountId = await RegisterPatientAsync(patientClient, "received-patient-side-patient@example.com");
+        await LinkAsync(professionalClient, professionalId, patientClient, patientAccountId);
+
+        var response = await patientClient.GetAsync($"/accounts/{patientAccountId}/received-shares");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var shares = await response.Content.ReadFromJsonAsync(PatientLinksJsonContext.Default.IReadOnlyListReceivedShareView);
+        Assert.Empty(shares!);
+    }
+
+    [Fact]
+    public async Task ReceivedShares_WithoutBearerToken_Returns401WithProblemDetails()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+
+        var response = await client.GetAsync($"/accounts/{Guid.NewGuid()}/received-shares");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ReceivedShares_WithTokenForDifferentAccount_Returns403WithProblemDetails()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        await RegisterPatientAsync(client, "received-forbidden-owner@example.com");
+
+        using var otherClient = factory.CreateClient();
+        var otherAccountId = await RegisterPatientAsync(otherClient, "received-forbidden-target@example.com");
+
+        var response = await client.GetAsync($"/accounts/{otherAccountId}/received-shares");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Post_WithShortCiphertext_Returns400WithProblemDetails()
     {
         using var factory = CreateFactory();

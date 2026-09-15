@@ -135,6 +135,65 @@ public sealed class PatientLinksRlsTests : IAsyncLifetime
         await transaction.CommitAsync();
     }
 
+    /// <summary>S11-03 fatia 10: two permissive SELECT policies on shared_items (professional from 0012, patient from 0013) OR together -- both parties of the pair see the row, a third account sees none.</summary>
+    [Fact]
+    public async Task SharedItem_VisibleToBothPatientAndProfessionalOfThePair_NotToAThirdAccount()
+    {
+        await using var professionalConnection = await OpenAppRoleConnectionAsync();
+        await using (var professionalTransaction = await professionalConnection.BeginTransactionAsync())
+        {
+            await SetConfigAsync(professionalConnection, professionalTransaction, "app.tenant_id", ProfessionalAccountId.ToString());
+            Assert.Equal(1, await CountAsync(professionalConnection, professionalTransaction, "shared_items"));
+            await professionalTransaction.CommitAsync();
+        }
+
+        await using var patientConnection = await OpenAppRoleConnectionAsync();
+        await using (var patientTransaction = await patientConnection.BeginTransactionAsync())
+        {
+            await SetConfigAsync(patientConnection, patientTransaction, "app.tenant_id", PatientAccountId.ToString());
+            Assert.Equal(1, await CountAsync(patientConnection, patientTransaction, "shared_items"));
+            await patientTransaction.CommitAsync();
+        }
+
+        await using var thirdConnection = await OpenAppRoleConnectionAsync();
+        await using var thirdTransaction = await thirdConnection.BeginTransactionAsync();
+        await SetConfigAsync(thirdConnection, thirdTransaction, "app.tenant_id", ThirdAccountId.ToString());
+        Assert.Equal(0, await CountAsync(thirdConnection, thirdTransaction, "shared_items"));
+        await thirdTransaction.CommitAsync();
+    }
+
+    /// <summary>0012's GRANT SELECT, INSERT ON shared_items TO app_role (no UPDATE/DELETE) -- an envelope, once written, cannot be edited or removed even by the party that owns it.</summary>
+    [Fact]
+    public async Task SharedItem_CannotBeUpdatedOrDeletedByAppRole()
+    {
+        await using var connection = await OpenAppRoleConnectionAsync();
+        await using var transaction = await connection.BeginTransactionAsync();
+        await SetConfigAsync(connection, transaction, "app.tenant_id", PatientAccountId.ToString());
+
+        await using (var updateCommand = connection.CreateCommand())
+        {
+            updateCommand.Transaction = transaction;
+            updateCommand.CommandText = "UPDATE shared_items SET ciphertext = @ciphertext WHERE patient_account_id = @patientAccountId";
+            updateCommand.Parameters.AddWithValue("ciphertext", SomeBlob(0xFF, 28));
+            updateCommand.Parameters.AddWithValue("patientAccountId", PatientAccountId);
+            await Assert.ThrowsAsync<PostgresException>(() => updateCommand.ExecuteNonQueryAsync());
+        }
+
+        await transaction.RollbackAsync();
+
+        await using var deleteConnection = await OpenAppRoleConnectionAsync();
+        await using var deleteTransaction = await deleteConnection.BeginTransactionAsync();
+        await SetConfigAsync(deleteConnection, deleteTransaction, "app.tenant_id", PatientAccountId.ToString());
+
+        await using var deleteCommand = deleteConnection.CreateCommand();
+        deleteCommand.Transaction = deleteTransaction;
+        deleteCommand.CommandText = "DELETE FROM shared_items WHERE patient_account_id = @patientAccountId";
+        deleteCommand.Parameters.AddWithValue("patientAccountId", PatientAccountId);
+        await Assert.ThrowsAsync<PostgresException>(() => deleteCommand.ExecuteNonQueryAsync());
+
+        await deleteTransaction.RollbackAsync();
+    }
+
     [Fact]
     public async Task PeerPublicKey_VisibleOnlyToEverLinkedAccount()
     {
