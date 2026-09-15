@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Security.Cryptography;
 using System.Text.Json;
 using Api.Accounts;
 using Api.Serialization;
@@ -215,8 +216,11 @@ public sealed class RecoveryEndpointsTests
     {
         const string email = "recover-immediate@example.com";
         var recoveryVerifier = CreateVerifier(0x05);
+        // The store only ever holds SHA256(verifier) (RegisterRecoveryVerifierHandler) -- the
+        // seed here mirrors that invariant so the real ConstantTimePasswordVerifierComparer
+        // matches the raw verifier the request below submits.
         var account = new Account(
-            Guid.NewGuid(), email, AccountRole.Patient, SomeVerifier, null, RecoveryVerifier: recoveryVerifier);
+            Guid.NewGuid(), email, AccountRole.Patient, SHA256.HashData(SomeVerifier), null, RecoveryVerifier: SHA256.HashData(recoveryVerifier));
         using var factory = CreateFactory().WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services => services.AddSingleton<IAccountStore>(new SeededAccountStore(account))));
         using var client = factory.CreateClient();
