@@ -73,11 +73,10 @@ public sealed class PatientLinkStore(NpgsqlDataSource dataSource, Func<DateTimeO
     /// </summary>
     public async Task<Result<PatientLink, RedeemFailure>> RedeemAsync(string code, Guid patientAccountId, CancellationToken cancellationToken)
     {
-        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
-
-        await SetConfigAsync(connection, transaction, "app.invite_code", code, cancellationToken);
-        await SetConfigAsync(connection, transaction, "app.tenant_id", patientAccountId.ToString(), cancellationToken);
+        await using var scope = await dataSource.OpenTenantScopedTransactionAsync(
+            cancellationToken, ("app.invite_code", code), ("app.tenant_id", patientAccountId.ToString()));
+        var connection = scope.Connection;
+        var transaction = scope.Transaction;
 
         Guid professionalAccountId;
         Guid patientId;
@@ -318,17 +317,6 @@ public sealed class PatientLinkStore(NpgsqlDataSource dataSource, Func<DateTimeO
             var entry = byPatient[patientAccountId];
             return new ReceivedShare(patientAccountId, entry.PatientId, entry.LinkedAt, entry.UnlinkedAt, entry.PeerPublicKey, entry.Items);
         }).ToArray();
-    }
-
-    private static async Task SetConfigAsync(
-        NpgsqlConnection connection, NpgsqlTransaction transaction, string setting, string value, CancellationToken cancellationToken)
-    {
-        await using var command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = "SELECT set_config(@setting, @value, true)";
-        command.Parameters.AddWithValue("setting", setting);
-        command.Parameters.AddWithValue("value", value);
-        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     /// <summary>Null if the account never saved sharing preferences (S11-03 fatia 8, Postgres).</summary>

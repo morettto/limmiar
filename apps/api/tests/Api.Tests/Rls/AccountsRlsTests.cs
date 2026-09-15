@@ -97,6 +97,26 @@ public sealed class AccountsRlsTests : IAsyncLifetime
     }
 
     /// <summary>
+    /// Ronda 1 de review, achado importante: a 0010 concedia SELECT sobre a tabela accounts
+    /// inteira a app_role, e o REVOKE UPDATE (totp_secret) da 0011 e por coluna -- no Postgres
+    /// isso nunca anula um GRANT SELECT de tabela inteira, entao a leitura em claro continuava
+    /// aberta. A coluna esta congelada (ninguem mais le/escreve totp_secret, ver 0011), por isso
+    /// nao ha WHERE que faca a policy de RLS entrar em jogo aqui -- so a permissao de coluna.
+    /// </summary>
+    [Fact]
+    public async Task SelectingTotpSecretColumn_IsDeniedByColumnPrivilege()
+    {
+        await using var connection = new NpgsqlConnection(_fixture.AppRoleConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT totp_secret FROM accounts";
+
+        var ex = await Assert.ThrowsAsync<PostgresException>(() => command.ExecuteReaderAsync());
+        Assert.Equal(PostgresErrorCodes.InsufficientPrivilege, ex.SqlState);
+    }
+
+    /// <summary>
     /// Connects as app_role and, when a lookup key is provided, sets the matching GUC
     /// transactionally via <c>set_config(..., is_local: true)</c> -- exactly the pattern
     /// PostgresAccountStore relies on for each of IAccountStore's three lookup shapes.

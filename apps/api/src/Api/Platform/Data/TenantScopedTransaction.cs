@@ -26,22 +26,35 @@ public static class NpgsqlDataSourceTenantExtensions
 {
     /// <summary>
     /// Opens a connection, begins a transaction, and sets <c>app.tenant_id</c> for that
-    /// transaction's tenant_isolation RLS policy -- the single place this repo issues that
-    /// <c>set_config</c> call, so every RLS-scoped store method gets it by construction
-    /// instead of re-typing it.
+    /// transaction's tenant_isolation RLS policy. Thin wrapper over the <c>params</c> overload
+    /// below -- the single place this repo issues a <c>set_config</c> call, so every RLS-scoped
+    /// store method gets it by construction instead of re-typing it.
+    /// </summary>
+    public static Task<TenantScopedTransaction> OpenTenantScopedTransactionAsync(
+        this NpgsqlDataSource dataSource, Guid tenantId, CancellationToken cancellationToken) =>
+        dataSource.OpenTenantScopedTransactionAsync(cancellationToken, ("app.tenant_id", tenantId.ToString()));
+
+    /// <summary>
+    /// Opens a connection, begins a transaction, and sets every given GUC on it via
+    /// <c>set_config(..., true)</c> -- the arbitrary-GUC shape needed by lookups that key on
+    /// something other than <c>app.tenant_id</c> (<c>app.account_email</c>, <c>app.staff_review</c>,
+    /// <c>app.invite_code</c>), so those store methods share this one connection+transaction+
+    /// set_config primitive too instead of repeating it inline.
     /// </summary>
     public static async Task<TenantScopedTransaction> OpenTenantScopedTransactionAsync(
-        this NpgsqlDataSource dataSource, Guid tenantId, CancellationToken cancellationToken)
+        this NpgsqlDataSource dataSource, CancellationToken cancellationToken, params (string Name, string Value)[] gucs)
     {
         var connection = await dataSource.OpenConnectionAsync(cancellationToken);
         var transaction = await connection.BeginTransactionAsync(cancellationToken);
 
-        await using (var setTenantCommand = connection.CreateCommand())
+        foreach (var (name, value) in gucs)
         {
-            setTenantCommand.Transaction = transaction;
-            setTenantCommand.CommandText = "SELECT set_config('app.tenant_id', @tenantId, true)";
-            setTenantCommand.Parameters.AddWithValue("tenantId", tenantId.ToString());
-            await setTenantCommand.ExecuteNonQueryAsync(cancellationToken);
+            await using var setConfigCommand = connection.CreateCommand();
+            setConfigCommand.Transaction = transaction;
+            setConfigCommand.CommandText = "SELECT set_config(@name, @value, true)";
+            setConfigCommand.Parameters.AddWithValue("name", name);
+            setConfigCommand.Parameters.AddWithValue("value", value);
+            await setConfigCommand.ExecuteNonQueryAsync(cancellationToken);
         }
 
         return new TenantScopedTransaction { Connection = connection, Transaction = transaction };

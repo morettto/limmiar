@@ -62,4 +62,15 @@ public sealed class TotpSecretCipherTests
 
         Assert.Throws<ArgumentException>(() => new TotpSecretCipher(badKey));
     }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(27)]
+    public void Decrypt_WithBlobShorterThanNoncePlusTag_ThrowsArgumentException(int blobLength)
+    {
+        var cipher = new TotpSecretCipher(SomeKey);
+        var tooShort = new byte[blobLength];
+
+        Assert.Throws<ArgumentException>(() => cipher.Decrypt(tooShort));
+    }
 }

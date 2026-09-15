@@ -171,8 +171,15 @@ tentar arrancar o container, não passam silenciosamente. Os testes puramente un
   suporte a array por omissão), e `OpenTenantScopedTransactionAsync` (extensão de
   `NpgsqlDataSource`): abre ligação + transação e já corre o `set_config('app.tenant_id',
   ..., true)` que a política `tenant_isolation` de qualquer tabela com RLS por tenant
-  precisa -- é o único sítio do repositório que emite esse `set_config`, para todo o resto
-  não voltar a reescrevê-lo. `Program.Composition.cs` regista o `NpgsqlDataSource` singleton via
+  precisa. Desde a ronda 1 de review do S11-03 há uma segunda sobrecarga,
+  `OpenTenantScopedTransactionAsync(CancellationToken, params (string Name, string Value)[])`,
+  para lookups que chaveiam por outro GUC que não `app.tenant_id` (`app.account_email` em
+  `PostgresAccountStore.FindByEmailAsync`, `app.staff_review` em
+  `ListPendingDocumentReviewAsync`, `app.invite_code` + `app.tenant_id` juntos em
+  `PatientLinkStore.RedeemAsync`) -- a sobrecarga de `Guid tenantId` é hoje um wrapper fino sobre
+  essa, e as duas juntas continuam a ser o único sítio do repositório que emite `set_config`, para
+  todo o resto não voltar a reescrevê-lo inline. `Program.Composition.cs` regista o
+  `NpgsqlDataSource` singleton via
   um delegate de fábrica (`AddSingleton(_ => NpgsqlDataSourceFactory.Create(...))`), não uma
   instância já construída -- só assim o container de DI o descarta ao fim de cada
   `WebApplicationFactory` de teste; registá-lo como instância pronta (a forma antiga) fazia cada

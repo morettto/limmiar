@@ -24,19 +24,10 @@ public sealed class PostgresAccountStore(NpgsqlDataSource dataSource, TotpSecret
 
     public async Task<Account?> FindByEmailAsync(string normalizedEmail, CancellationToken cancellationToken)
     {
-        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var scope = await dataSource.OpenTenantScopedTransactionAsync(cancellationToken, ("app.account_email", normalizedEmail));
 
-        await using (var setEmailCommand = connection.CreateCommand())
-        {
-            setEmailCommand.Transaction = transaction;
-            setEmailCommand.CommandText = "SELECT set_config('app.account_email', @email, true)";
-            setEmailCommand.Parameters.AddWithValue("email", normalizedEmail);
-            await setEmailCommand.ExecuteNonQueryAsync(cancellationToken);
-        }
-
-        await using var selectCommand = connection.CreateCommand();
-        selectCommand.Transaction = transaction;
+        await using var selectCommand = scope.Connection.CreateCommand();
+        selectCommand.Transaction = scope.Transaction;
         selectCommand.CommandText = $"SELECT {SelectColumns} FROM accounts WHERE email = @email";
         selectCommand.Parameters.AddWithValue("email", normalizedEmail);
 
@@ -49,7 +40,7 @@ public sealed class PostgresAccountStore(NpgsqlDataSource dataSource, TotpSecret
             }
         }
 
-        await transaction.CommitAsync(cancellationToken);
+        await scope.Transaction.CommitAsync(cancellationToken);
         return account;
     }
 
@@ -135,18 +126,10 @@ public sealed class PostgresAccountStore(NpgsqlDataSource dataSource, TotpSecret
 
     public async Task<IReadOnlyList<Account>> ListPendingDocumentReviewAsync(CancellationToken cancellationToken)
     {
-        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var scope = await dataSource.OpenTenantScopedTransactionAsync(cancellationToken, ("app.staff_review", "on"));
 
-        await using (var setStaffReviewCommand = connection.CreateCommand())
-        {
-            setStaffReviewCommand.Transaction = transaction;
-            setStaffReviewCommand.CommandText = "SELECT set_config('app.staff_review', 'on', true)";
-            await setStaffReviewCommand.ExecuteNonQueryAsync(cancellationToken);
-        }
-
-        await using var selectCommand = connection.CreateCommand();
-        selectCommand.Transaction = transaction;
+        await using var selectCommand = scope.Connection.CreateCommand();
+        selectCommand.Transaction = scope.Transaction;
         selectCommand.CommandText = $"""
             SELECT {SelectColumns}
             FROM accounts
@@ -163,7 +146,7 @@ public sealed class PostgresAccountStore(NpgsqlDataSource dataSource, TotpSecret
             }
         }
 
-        await transaction.CommitAsync(cancellationToken);
+        await scope.Transaction.CommitAsync(cancellationToken);
         return queue;
     }
 

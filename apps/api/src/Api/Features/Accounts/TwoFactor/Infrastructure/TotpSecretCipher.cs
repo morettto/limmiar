@@ -51,6 +51,14 @@ public sealed class TotpSecretCipher
 
     public string Decrypt(byte[] encrypted)
     {
+        var minimumLengthBytes = NonceLengthBytes + TagLengthBytes;
+        if (encrypted.Length < minimumLengthBytes)
+        {
+            throw new ArgumentException(
+                $"Encrypted TOTP secret must be at least {minimumLengthBytes} bytes (nonce + tag), got {encrypted.Length}.",
+                nameof(encrypted));
+        }
+
         var nonce = encrypted.AsSpan(0, NonceLengthBytes);
         var ciphertext = encrypted.AsSpan(NonceLengthBytes, encrypted.Length - NonceLengthBytes - TagLengthBytes);
         var tag = encrypted.AsSpan(encrypted.Length - TagLengthBytes, TagLengthBytes);

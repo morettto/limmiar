@@ -13,7 +13,21 @@ ALTER TABLE accounts ADD COLUMN IF NOT EXISTS totp_secret_encrypted bytea
 
 GRANT UPDATE (totp_secret_encrypted) ON accounts TO app_role;
 
--- app_role continua com SELECT/INSERT sobre accounts (grants existentes da 0010) -- so a
--- permissao de ESCREVER na coluna antiga sai, a leitura fica para nunca quebrar uma consulta
--- `SELECT *` legada.
+-- app_role continua com INSERT sobre accounts (grant existente da 0010) -- so a permissao de
+-- ESCREVER na coluna antiga sai por UPDATE.
 REVOKE UPDATE (totp_secret) ON accounts FROM app_role;
+
+-- Ronda 1 de review (achado importante): um REVOKE de coluna nunca anula um GRANT de tabela
+-- inteira no Postgres -- o `GRANT SELECT ON accounts TO app_role` da 0010 continuava a deixar
+-- ler totp_secret em claro apesar do REVOKE UPDATE acima. PostgresAccountStore nunca faz
+-- `SELECT *` (ver SelectColumns), so colunas nomeadas sem totp_secret, por isso fechar a leitura
+-- aqui nao quebra nenhum leitor real. Expand puro e idempotente: repetir este REVOKE/GRANT e um
+-- no-op. Prova: AccountsRlsTests.SelectingTotpSecretColumn_IsDeniedByColumnPrivilege.
+REVOKE SELECT ON accounts FROM app_role;
+GRANT SELECT (
+    id, email, role, password_verifier_sha256, google_subject_id, verification_status,
+    rejection_reason, verification_submitted_at, totp_enabled_at, totp_backup_code_hashes,
+    webauthn_credential_id, webauthn_cose_public_key, webauthn_sign_count, webauthn_aaguid,
+    recovery_verifier_sha256, voice_wrapped_dek, voice_sealed_embedding, created_at,
+    totp_secret_encrypted
+) ON accounts TO app_role;

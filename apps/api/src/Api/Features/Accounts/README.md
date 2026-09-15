@@ -44,8 +44,14 @@ desta conta.
   `StaffAccess:ApiKey`/`AbacatePay:WebhookSecret` -- ver `Features/Billing/README.md`). Só
   `PostgresAccountStore` cifra/decifra; `TotpProvider` e os handlers de `TwoFactor` continuam a
   ver `Account.TotpSecret` em claro, sem saber que a persistência cifra por baixo. A coluna
-  antiga `accounts.totp_secret` (texto, claro) fica sem `GRANT UPDATE` mas não é apagada --
-  migração é expand, nunca destrutiva.
+  antiga `accounts.totp_secret` (texto, claro) fica sem `GRANT UPDATE` nem `GRANT SELECT` --
+  ronda 1 de review do S11-03 fechou a leitura também, porque um `REVOKE` de coluna nunca anula
+  um `GRANT SELECT` de tabela inteira no Postgres: a 0011 agora troca esse grant por
+  `GRANT SELECT (lista de colunas sem totp_secret)`, provado por
+  `AccountsRlsTests.SelectingTotpSecretColumn_IsDeniedByColumnPrivilege` -- a coluna não é
+  apagada, migração é expand, nunca destrutiva. `TotpSecretCipher.Decrypt` valida o tamanho
+  mínimo do blob (nonce + tag = 28 bytes) antes de fatiar o array, e lança `ArgumentException`
+  em vez de `ArgumentOutOfRangeException` para um blob curto.
 
 ## Armadilhas
 
