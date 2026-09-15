@@ -5,6 +5,7 @@ import { registrarPaciente, registrarProfissionalVerificada, contaTestKek, type 
 import { garantirParDeChaves } from '../src/entities/vinculo/par-de-chaves'
 import { criarConviteVinculo, resgatarConviteVinculo } from '../src/entities/vinculo/api'
 import { decifrarItem } from '../src/entities/partilha/cifra'
+import { diaLocal } from '../src/entities/checkin/checkin'
 
 // S11-02, fatia 7: passos 6-8 do Cenário E2E (Specs/S11 Partilha e espelho P6.md). Os passos 1-5
 // (par de chaves das duas + vínculo) são preparação, feita via API direto (mesmas funções que
@@ -41,6 +42,12 @@ let martaPage: Page
 // Marcador da frase de "hoje", usado para achar o mesmo item nos dois lados sem depender de
 // `diaLocal` calculado duas vezes (uma no teste, outra no browser).
 let fraseHoje: string
+// Marcador do check-in de amanhã, nunca partilhado (revogado antes de gravar) -- fatia 4 prova a
+// ausência dele em P6.
+let fraseAmanha: string
+// patientId do convite do beforeAll: a fatia 4 precisa dele para casar a sessão stubada da
+// agenda com o vínculo de Marta/Ana.
+let patientId: string
 
 function newActorContext(browser: Browser): Promise<BrowserContext> {
   return browser.newContext({ locale: 'pt-BR' })
@@ -63,7 +70,8 @@ test.beforeAll(async ({ browser, request }) => {
   martaPrivateKey = martaPar.privateKey
   anaPublicKey = anaPar.publicKey
 
-  const invite = await criarConviteVinculo(API_BASE_URL, marta.accountId, marta.accessToken, crypto.randomUUID())
+  patientId = crypto.randomUUID()
+  const invite = await criarConviteVinculo(API_BASE_URL, marta.accountId, marta.accessToken, patientId)
   if (!invite.ok) {
     throw new Error(`prep: falha ao criar convite (${invite.code})`)
   }
@@ -142,10 +150,11 @@ test.describe('S11-02 · Partilha seletiva cifrada de check-ins (paciente → pr
   test('a profissional decifra no dispositivo dela o check-in compartilhado', async () => {
     await martaPage.goto(partilhaUrl({ accountId: marta.accountId, accessToken: marta.accessToken, kek: martaKekRaw, papel: 'profissional' }))
 
-    const item = martaPage.getByRole('listitem')
-    await expect(item).toHaveCount(1)
-    await expect(item.first()).toContainText('3/2')
-    await expect(item.first()).toContainText(fraseHoje)
+    const itens = martaPage.getByRole('listitem')
+    await expect(itens).toHaveCount(7)
+    const itemDeHoje = itens.filter({ hasText: fraseHoje })
+    await expect(itemDeHoje).toHaveCount(1)
+    await expect(itemDeHoje).toContainText('3/2')
   })
 
   test('a paciente revoga: o check-in de amanhã não é cifrado para a profissional, o de hoje continua visível e a tela diz isso sem prometer apagar', async ({ request }) => {
@@ -175,7 +184,7 @@ test.describe('S11-02 · Partilha seletiva cifrada de check-ins (paciente → pr
     await anaPage.goto(
       partilhaUrl({ accountId: ana.accountId, accessToken: ana.accessToken, kek: anaKekRaw, papel: 'paciente', agora: amanha }),
     )
-    const fraseAmanha = `frase-amanha-${crypto.randomUUID()}`
+    fraseAmanha = `frase-amanha-${crypto.randomUUID()}`
     await anaPage.getByRole('group', { name: 'Sono' }).getByRole('radio', { name: '4' }).check()
     await anaPage.getByRole('group', { name: 'Ansiedade' }).getByRole('radio', { name: '1' }).check()
     await anaPage.getByLabel('Uma frase (opcional)').fill(fraseAmanha)
@@ -211,5 +220,45 @@ test.describe('S11-02 · Partilha seletiva cifrada de check-ins (paciente → pr
     ).json()) as { peerPublicKey: string | null }[]
     expect(martaLinks).toHaveLength(1)
     expect(martaLinks[0]!.peerPublicKey).not.toBeNull()
+  })
+
+  test('a profissional vê em P6 o check-in de hoje que a paciente revogou depois, amanhã como lacuna, a sessão marcada e a adoção só do que foi partilhado', async () => {
+    const agoraReal = new Date()
+    const amanha = new Date(Date.now() + 24 * 60 * 60 * 1000)
+
+    // Só `agenda/sessions` leva stub (playwright.config.ts:43, sem Postgres nesta suíte);
+    // vínculo, chaves e envelopes continuam reais.
+    await martaPage.route('**/agenda/sessions*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          sessions: [{ sessionId: crypto.randomUUID(), patientId, startsAt: agoraReal.toISOString(), durationMinutes: 50 }],
+        }),
+      })
+    })
+
+    await martaPage.goto(
+      partilhaUrl({
+        accountId: marta.accountId,
+        accessToken: marta.accessToken,
+        kek: martaKekRaw,
+        papel: 'profissional',
+        agora: amanha.toISOString(),
+      }),
+    )
+
+    const itens = martaPage.getByRole('listitem')
+    await expect(itens).toHaveCount(7)
+
+    const itemDeHoje = itens.filter({ hasText: diaLocal(agoraReal) })
+    await expect(itemDeHoje).toContainText(fraseHoje)
+    await expect(itemDeHoje).toContainText('Sessão às')
+
+    const itemDeAmanha = itens.filter({ hasText: diaLocal(amanha) })
+    await expect(itemDeAmanha).toContainText('sem check-in')
+
+    await expect(martaPage.getByText(fraseAmanha)).toHaveCount(0)
+    await expect(martaPage.getByText('Check-in compartilhado em 1 de 7 dias')).toBeVisible()
   })
 })

@@ -19,8 +19,10 @@ vi.mock('../../pages/paciente-hoje/PacienteHojePage', () => ({
 vi.mock('../../features/partilha/PartilhaCheckIns', () => ({
   PartilhaCheckIns: vi.fn(() => <div data-testid="partilha-checkins" />),
 }))
-vi.mock('../../features/partilha/CheckInsPartilhados', () => ({
-  CheckInsPartilhados: vi.fn(() => <div data-testid="checkins-partilhados" />),
+vi.mock('../../features/partilha/EspelhoP6', () => ({
+  EspelhoP6: vi.fn((props: { accountId: string; agora?: Date }) => (
+    <div data-testid="espelho-p6" data-account-id={props.accountId} data-agora={props.agora?.toISOString() ?? ''} />
+  )),
 }))
 
 const BASE_URL = 'http://api.test'
@@ -76,12 +78,20 @@ describe('E2ePartilhaScaffold', () => {
     expect(screen.getByTestId('paciente-hoje').dataset.agora).toBe('')
   })
 
-  it('papel=profissional renders CheckInsPartilhados, not the patient screens', async () => {
+  it('papel=profissional renders EspelhoP6, not the patient screens', async () => {
     renderScaffold('profissional')
 
-    expect(await screen.findByTestId('checkins-partilhados')).toBeTruthy()
+    expect(await screen.findByTestId('espelho-p6')).toBeTruthy()
+    expect(screen.getByTestId('espelho-p6').dataset.agora).toBe('')
     expect(screen.queryByTestId('paciente-hoje')).toBeNull()
     expect(screen.queryByTestId('partilha-checkins')).toBeNull()
+  })
+
+  it('parses a non-empty agora search param into a Date passed to EspelhoP6', async () => {
+    renderScaffold('profissional', '2026-01-15T10:00:00.000Z')
+
+    expect(await screen.findByTestId('espelho-p6')).toBeTruthy()
+    expect(screen.getByTestId('espelho-p6').dataset.agora).toBe('2026-01-15T10:00:00.000Z')
   })
 
   it('does not update state after unmounting before importKek resolves', async () => {

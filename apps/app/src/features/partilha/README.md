@@ -26,11 +26,18 @@ de propósito (ver `entities/partilha/README.md`).
   por vínculo em que ela é a paciente ("Compartilhar check-ins com esta profissional"), ligado a
   `lerEstadoPartilha`/`definirPartilha` de `entities/partilha/preferencias.ts` via
   `chaveDoVinculo`. Props `{ baseUrl; accountId; accessToken; kek }`.
-- `CheckInsPartilhados` (`CheckInsPartilhados.tsx`, S11-02 fatia 6) -- ecrã da **profissional**: um
-  grupo por vínculo em que ela é a profissional, com os check-ins que a paciente partilhou,
-  decifrados no dispositivo (`garantirParDeChaves` + `decifrarItem`). Props `{ baseUrl; accountId;
-  accessToken; kek }`. Nenhum dos dois ecrãs tem montagem de produção ainda -- sem
-  `KeychainProvider`, só alcançáveis por `/e2e/partilha` (`app/routing/E2ePartilhaScaffold.tsx`).
+- `EspelhoP6` (`EspelhoP6.tsx`, S11-02 fatia 6, `git mv` de `CheckInsPartilhados.tsx` no S11-03) --
+  ecrã da **profissional**: um grupo por vínculo em que ela é a profissional, com os últimos 7 dias
+  (`montarEspelho`, `espelho.ts`) dos check-ins que a paciente partilhou, decifrados no dispositivo
+  (`garantirParDeChaves` + `decifrarItem`), e as sessões da semana (`entities/agenda`) marcadas no
+  dia local de início. Props `{ baseUrl; accountId; accessToken; kek; agora?: Date }`. Nenhum dos
+  dois ecrãs tem montagem de produção ainda -- sem `KeychainProvider`, só alcançáveis por
+  `/e2e/partilha` (`app/routing/E2ePartilhaScaffold.tsx`).
+- `montarEspelho(p): Espelho` / `janelaDoEspelho(agora): { de; ate }` (`espelho.ts`, S11-03, puro,
+  sem React) -- `Espelho = { dias: DiaDoEspelho[]; diasComCheckIn: number }`, `dias.length === 7` do
+  mais antigo a hoje. Reúne `serieComLacunas` (`entities/checkin`, lacuna explícita, nunca
+  interpola) com as sessões filtradas por `patientId` e agrupadas pelo dia local de `inicioEm`.
+  `janelaDoEspelho` devolve `[hoje−6 00:00, amanhã 00:00)` em campos locais, para `listarSessoes`.
 
 ## Invariantes
 
@@ -42,10 +49,23 @@ de propósito (ver `entities/partilha/README.md`).
   tarde.
 - `destinatarios` só devolve vínculos com `chavePublicaDoPar !== null`: sem a pública da
   profissional, `cifrarItem` não tem para quem cifrar.
-- **Fail-closed no tipo do envelope.** `CheckInsPartilhados` verifica `decifrado.tipo === 'checkin'`
-  antes de ler `.checkin` -- `decifrarItem` devolve `unknown`, e um envelope cujo formato coincida
-  por acidente com `CheckIn` mas tenha outro `tipo` nunca deve ser tratado como um check-in de
-  verdade (S11-02, review round-1).
+- **Fail-closed no tipo do envelope.** `EspelhoP6` verifica `decifrado.tipo === 'checkin'` antes de
+  ler `.checkin` -- `decifrarItem` devolve `unknown`, e um envelope cujo formato coincida por
+  acidente com `CheckIn` mas tenha outro `tipo` (ou seja `null`) nunca deve ser tratado como um
+  check-in de verdade (S11-02, review round-1).
+- **Lacuna explícita, nunca interpolada (S11-03).** `montarEspelho` usa `serieComLacunas`: um dia
+  sem item partilhado é `checkin: null`, nunca o valor do dia vizinho.
+- **Adoção só sobre itens decifrados (S11-03).** `diasComCheckIn` conta dias com item partilhado
+  entre os 7 últimos; o servidor nunca soma check-ins não partilhados -- essa contagem seria
+  metadado fora da fronteira de partilha (ADR-S11-01 da spec).
+- **Revogado continua visível, sem cache local (S11-03).** `Share` só acrescenta, o servidor nunca
+  apaga envelopes (`PatientLinkStore.cs:116`); `EspelhoP6` relê tudo a cada montagem, de propósito
+  sem persistir nada decifrado no dispositivo da profissional. Consequência aceite: desvincular tira
+  o vínculo da lista (`links` dá 404) e o grupo some, porque não há cache que o mantivesse.
+- **Falha da agenda é isolada (S11-03).** `!ok`/exceção de `listarSessoes` nunca esconde os sinais
+  já decifrados -- só acrescenta um `role="alert"` próprio, mesmo padrão do
+  `widgets/painel-profissional`. Falha de chaves, vínculos ou de um envelope continua fail-closed
+  (todo o ecrã cai).
 - **Texto da revogação é invariante, não estilo.** Quando o toggle de `PartilhaCheckIns` fica
   desativado, o texto (`role="status"`) tem de dizer as duas coisas: o que muda (nada novo
   partilhado a partir de agora) e o que não muda (o que já foi partilhado continua com a

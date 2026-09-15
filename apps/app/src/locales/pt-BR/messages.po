@@ -124,6 +124,11 @@ msgstr "Chaveiro bloqueado. Desbloqueie para ver a carteira de pacientes."
 msgid "Chaveiro bloqueado. Desbloqueie para ver o painel."
 msgstr "Chaveiro bloqueado. Desbloqueie para ver o painel."
 
+#. placeholder {0}: grupo.espelho.diasComCheckIn
+#: src/features/partilha/EspelhoP6.tsx:170
+msgid "Check-in compartilhado em {0} de 7 dias"
+msgstr "Check-in compartilhado em {0} de 7 dias"
+
 #: src/pages/paciente-hoje/PacienteHojePage.tsx:136
 msgid "Check-in salvo neste dispositivo, mas não foi compartilhado."
 msgstr "Check-in salvo neste dispositivo, mas não foi compartilhado."
@@ -473,11 +478,15 @@ msgstr "Não foi possível carregar a agenda."
 msgid "Não foi possível carregar a carteira de pacientes. Tente novamente."
 msgstr "Não foi possível carregar a carteira de pacientes. Tente novamente."
 
+#: src/features/partilha/EspelhoP6.tsx:198
+msgid "Não foi possível carregar as sessões."
+msgstr "Não foi possível carregar as sessões."
+
 #: src/widgets/painel-profissional/PainelProfissional.tsx:192
 msgid "Não foi possível carregar o painel. Tente novamente."
 msgstr "Não foi possível carregar o painel. Tente novamente."
 
-#: src/features/partilha/CheckInsPartilhados.tsx:111
+#: src/features/partilha/EspelhoP6.tsx:151
 msgid "Não foi possível carregar os check-ins compartilhados."
 msgstr "Não foi possível carregar os check-ins compartilhados."
 
@@ -538,8 +547,7 @@ msgstr "Não há vínculo com esta conta."
 msgid "voice.enrollment_not_found"
 msgstr "Nenhum cadastro de voz encontrado para esta conta."
 
-#: src/features/partilha/CheckInsPartilhados.tsx:119
-#: src/features/partilha/CheckInsPartilhados.tsx:131
+#: src/features/partilha/EspelhoP6.tsx:159
 msgid "Nenhum check-in compartilhado."
 msgstr "Nenhum check-in compartilhado."
 
@@ -677,6 +685,10 @@ msgstr "SAMU 192"
 msgid "Selecione uma nota na fila."
 msgstr "Selecione uma nota na fila."
 
+#: src/features/partilha/EspelhoP6.tsx:177
+msgid "sem check-in"
+msgstr "sem check-in"
+
 #: src/pages/paciente-hoje/PacienteHojePage.tsx:142
 msgid "sem registo"
 msgstr "sem registo"
@@ -688,6 +700,11 @@ msgstr "Sem sessão ativa. Não é possível assinar."
 #: src/widgets/auth-screen/AuthScreen.tsx:202
 msgid "Senha"
 msgstr "Senha"
+
+#. placeholder {0}: horaDaSessao(sessao.inicioEm, i18n.locale)
+#: src/features/partilha/EspelhoP6.tsx:188
+msgid "Sessão às {0}"
+msgstr "Sessão às {0}"
 
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:148
@@ -758,6 +775,10 @@ msgstr "Tipo de conta"
 #: src/features/nota-editor/Citacao.tsx:31
 msgid "Tocar áudio de {inicio} a {fim}"
 msgstr "Tocar áudio de {inicio} a {fim}"
+
+#: src/features/partilha/EspelhoP6.tsx:172
+msgid "Últimos 7 dias"
+msgstr "Últimos 7 dias"
 
 #: src/pages/paciente-hoje/PacienteHojePage.tsx:127
 msgid "Uma frase (opcional)"

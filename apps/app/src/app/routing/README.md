@@ -40,7 +40,8 @@ ser chamado direto de qualquer `pages/` -- este módulo deixou de ser o único s
    `ResgatarConviteVinculo`/`DesvincularVinculo` sem um chaveiro real. `E2ePartilhaScaffold.tsx`
    (S11-02 fatia 6, `/e2e/partilha`) segue o mesmo molde, mais `agora` (ISO 8601, `''` = relógio
    real) para o E2E fixar "hoje" nos dois lados da cena: `papel=paciente` monta `PacienteHojePage`
-   com a prop `partilha` + `PartilhaCheckIns`; `papel=profissional` monta `CheckInsPartilhados`.
+   com a prop `partilha` + `PartilhaCheckIns`; `papel=profissional` monta `EspelhoP6`
+   (`git mv` de `CheckInsPartilhados` no S11-03), com a mesma `agora`.
 5. **S11-01: layout pathless `paciente`** (`id: 'paciente'`, sem `path`) monta
    `<ContactoEmergencia/>` como irmão do `<Outlet/>`, uma única vez, para todo ecrã de paciente
    herdar o caminho de emergência sem repeti-lo (invariante do ticket S11-01: emergência visível em

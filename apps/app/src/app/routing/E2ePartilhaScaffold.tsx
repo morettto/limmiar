@@ -3,7 +3,7 @@ import { type CryptoKey, webcrypto } from '@limmiar/crypto'
 import { decodeBase64 } from '../../shared/lib/base64'
 import { PacienteHojePage } from '../../pages/paciente-hoje/PacienteHojePage'
 import { PartilhaCheckIns } from '../../features/partilha/PartilhaCheckIns'
-import { CheckInsPartilhados } from '../../features/partilha/CheckInsPartilhados'
+import { EspelhoP6 } from '../../features/partilha/EspelhoP6'
 
 export interface E2ePartilhaScaffoldProps {
   baseUrl: string
@@ -41,7 +41,13 @@ export function E2ePartilhaScaffold({ baseUrl, accountId, accessToken, kek, pape
 
   if (papel === 'profissional') {
     return (
-      <CheckInsPartilhados baseUrl={baseUrl} accountId={accountId} accessToken={accessToken} kek={kekImportada} />
+      <EspelhoP6
+        baseUrl={baseUrl}
+        accountId={accountId}
+        accessToken={accessToken}
+        kek={kekImportada}
+        agora={agora === '' ? undefined : new Date(agora)}
+      />
     )
   }
 
