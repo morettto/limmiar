@@ -42,9 +42,12 @@ tocar na chave de partilha), e devolve 409 se a `publicKey` for outra. A primeir
 vence; dois dispositivos em corrida no primeiro desbloqueio convergem para o par de quem chegou
 primeiro, porque o segundo perde o `PUT` com 409 e lê de volta o que já está publicado.
 
-A única resposta da API que devolve a pública de **outra** conta é `GET /accounts/{id}/links`
-(decisão d do mesmo portão de abordagem): a pública chega embutida em `LinkView.PeerPublicKey`, e
-só a quem já é parte do vínculo. Não há rota de chave pública por id de conta.
+As únicas respostas da API que devolvem a pública de **outra** conta são `GET /accounts/{id}/links`
+(decisão d do mesmo portão de abordagem) e, desde S11-03 fatia 10, `GET
+/accounts/{id}/received-shares` (`ReceivedShareView.peerPublicKey`, abordagem (e) do
+`.harness/abordagem/S11-03.md`): a pública chega embutida, e só a quem já foi parte do vínculo --
+inclusive um vínculo já desfeito, porque essa rota existe justamente para sobreviver ao
+desvínculo. Não há rota de chave pública por id de conta.
 
 ## Consequências
 
@@ -61,6 +64,7 @@ só a quem já é parte do vínculo. Não há rota de chave pública por id de c
 - Forward secrecy e rotação periódica do par ficam fora de âmbito. Se um dia forem exigidas, o
   par deixa de ser estático e passa a precisar de versão -- outro ADR, porque recifra o que já foi
   partilhado.
-- Sem Postgres na suite E2E (`playwright.config.ts`), o par vive em `Account` em memória, com o
-  mesmo teto de durabilidade das contas: reinício perde tudo. Não é decisão deste ADR -- é herdado
-  de `InMemoryAccountStore`, e persistir contas é um ticket à parte.
+- **Resolvido (S11-03, consequência final).** O par deixou de viver em `Account` em memória: mora
+  em `account_key_pairs` (Postgres, tabela própria, migração `0010`), com RLS por chave de
+  procura (`key_pair_owner` + `key_pair_ever_linked_read`, migração `0012`), e a suíte E2E roda
+  contra um Postgres real (`playwright.config.ts`). O ticket à parte previsto aqui era este.

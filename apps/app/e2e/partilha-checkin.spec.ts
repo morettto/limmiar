@@ -261,4 +261,39 @@ test.describe('S11-02 · Partilha seletiva cifrada de check-ins (paciente → pr
     await expect(martaPage.getByText(fraseAmanha)).toHaveCount(0)
     await expect(martaPage.getByText('Check-in compartilhado em 1 de 7 dias')).toBeVisible()
   })
+
+  test('a paciente desvincula e a profissional continua a ver em P6 o check-in de hoje que foi decifrado antes, sem nada posterior à revogação', async ({ request }) => {
+    const desvincularResponse = await request.delete(`${API_BASE_URL}/accounts/${ana.accountId}/links/${marta.accountId}`, {
+      headers: { Authorization: `Bearer ${ana.accessToken}` },
+    })
+    expect(desvincularResponse.ok()).toBe(true)
+
+    // Invariante do humano: GET links e GET shared-items mantêm o 404 depois de desvincular.
+    const linksAfterUnlink = await request.get(`${API_BASE_URL}/accounts/${marta.accountId}/links`, {
+      headers: { Authorization: `Bearer ${marta.accessToken}` },
+    })
+    expect(await linksAfterUnlink.json()).toEqual([])
+
+    const sharedItemsAfterUnlink = await request.get(
+      `${API_BASE_URL}/accounts/${marta.accountId}/links/${ana.accountId}/shared-items`,
+      { headers: { Authorization: `Bearer ${marta.accessToken}` } },
+    )
+    expect(sharedItemsAfterUnlink.status()).toBe(404)
+
+    const agoraReal = new Date()
+    await martaPage.route('**/agenda/sessions*', async (route) => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ sessions: [] }) })
+    })
+
+    await martaPage.goto(
+      partilhaUrl({ accountId: marta.accountId, accessToken: marta.accessToken, kek: martaKekRaw, papel: 'profissional', agora: agoraReal.toISOString() }),
+    )
+
+    const itens = martaPage.getByRole('listitem')
+    await expect(itens).toHaveCount(7)
+    const itemDeHoje = itens.filter({ hasText: diaLocal(agoraReal) })
+    await expect(itemDeHoje).toContainText(fraseHoje)
+    await expect(martaPage.getByText(fraseAmanha)).toHaveCount(0)
+    await expect(martaPage.getByText('Check-in compartilhado em 1 de 7 dias')).toBeVisible()
+  })
 })
