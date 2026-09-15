@@ -8,12 +8,7 @@ export function comPartilha(
   tipo: TipoPartilhavel,
   ativa: boolean,
 ): EstadoPartilha {
-  const atual = estado[chave] ?? {}
-  const proximo: Partial<Record<TipoPartilhavel, true>> = { ...atual }
-  if (ativa) {
-    proximo[tipo] = true
-  } else {
-    delete proximo[tipo]
-  }
-  return { ...estado, [chave]: proximo }
+  // ponytail: um só TipoPartilhavel, o registo da chave é substituído inteiro; ao nascer um
+  // segundo tipo, voltar a copiar o registo anterior (e testar que o outro tipo sobrevive).
+  return { ...estado, [chave]: ativa ? { [tipo]: true } : {} }
 }
