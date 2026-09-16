@@ -961,6 +961,7 @@ public sealed class AuthEndpointsTests : IAsyncLifetime
                 builder.UseSetting("WebAuthn:RelyingPartyId", WebAuthnRelyingPartyId);
                 builder.UseSetting("WebAuthn:ExpectedOrigin", WebAuthnOrigin);
                 builder.UseSetting("AbacatePay:WebhookSecret", "whsec_test123");
+                builder.UseSetting("AbacatePay:ApiKey", "test-abacate-key");
                 builder.UseSetting("Totp:EncryptionKey", TotpTestEncryptionKey.Base64);
             });
 

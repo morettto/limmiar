@@ -20,6 +20,8 @@ public static class AbacatePayWebhookSignature
     public const string PublicKey =
         "t9dXRhHHo3yDEj5pVDYz0frf7q6bMKyMRmxxCPIPp3RCplBfXRxqlC6ZpiWmOqj4L63qEaeUOtrCI8P0VMUgo6iIga2ri9ogaHFs0WIIywSMg0q7RmBfybe1E5XJcfC4IW3alNqym0tXoAKkzvfEjZxV6bE0oG2zJrNNYmUCKZyV0KZ3JS8Votf9EAWWYdiDkMkpbMdPggfh1EqHlVkMiTady6jOR3hyzGEHrIz2Ret0xHKMbiqkr9HS1JhNHDX9";
 
+    private static readonly byte[] PublicKeyBytes = Encoding.UTF8.GetBytes(PublicKey);
+
     /// <summary>
     /// Verifica os dois: o HMAC-SHA256/base64 sobre <paramref name="rawBody"/> (header
     /// <c>X-Webhook-Signature</c>) e o segredo de registo (query <c>?webhookSecret=</c>).
@@ -30,13 +32,26 @@ public static class AbacatePayWebhookSignature
     public static bool IsAuthentic(
         ReadOnlySpan<byte> rawBody, string? signatureHeader, string? webhookSecretFromQuery, string expectedSecret)
     {
-        var expectedSignature = Convert.ToBase64String(HMACSHA256.HashData(Encoding.UTF8.GetBytes(PublicKey), rawBody));
+        var expectedSignature = HMACSHA256.HashData(PublicKeyBytes, rawBody);
+        var receivedSignature = TryDecodeBase64(signatureHeader);
 
         var signatureMatches = CryptographicOperations.FixedTimeEquals(
-            Encoding.UTF8.GetBytes(expectedSignature), Encoding.UTF8.GetBytes(signatureHeader ?? string.Empty));
+            expectedSignature, receivedSignature);
         var secretMatches = CryptographicOperations.FixedTimeEquals(
             Encoding.UTF8.GetBytes(webhookSecretFromQuery ?? string.Empty), Encoding.UTF8.GetBytes(expectedSecret));
 
         return signatureMatches && secretMatches;
+    }
+
+    private static byte[] TryDecodeBase64(string? value)
+    {
+        try
+        {
+            return Convert.FromBase64String(value ?? string.Empty);
+        }
+        catch (FormatException)
+        {
+            return [];
+        }
     }
 }
