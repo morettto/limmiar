@@ -574,6 +574,7 @@ public sealed class PublicBookingEndpointsTests : IAsyncLifetime
                 builder.UseSetting("WebAuthn:ExpectedOrigin", "https://limmiar.test");
                 builder.UseSetting("AbacatePay:WebhookSecret", "whsec_test123");
                 builder.UseSetting("AbacatePay:ApiKey", "test-abacate-key");
+                builder.UseSetting("Totp:EncryptionKey", TotpTestEncryptionKey.Base64);
                 builder.ConfigureTestServices(services =>
                 {
                     services.AddSingleton<ITotpProvider>(new StubTotpProvider());

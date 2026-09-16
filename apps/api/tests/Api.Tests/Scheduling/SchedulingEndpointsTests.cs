@@ -4,7 +4,6 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Api.Accounts;
 using Api.Scheduling;
-using Api.Scheduling;
 using Api.Serialization;
 using Api.Tests.Infrastructure;
 using Microsoft.AspNetCore.Mvc.Testing;
