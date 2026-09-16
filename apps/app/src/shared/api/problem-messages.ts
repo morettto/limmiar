@@ -177,6 +177,42 @@ const knownProblemMessages: Record<ProblemCode, MessageDescriptor> = {
     id: 'consent.not_authorized_to_record',
     message: 'Sua conta ainda não pode registrar consentimento.',
   }),
+  'key_pair.not_found': msg({
+    id: 'key_pair.not_found',
+    message: 'Nenhum par de chaves publicado para esta conta.',
+  }),
+  'key_pair.public_key_conflict': msg({
+    id: 'key_pair.public_key_conflict',
+    message: 'Esta conta já tem uma chave pública publicada diferente desta.',
+  }),
+  'link.invite_not_found': msg({
+    id: 'link.invite_not_found',
+    message: 'Código inválido ou expirado.',
+  }),
+  // Mesma técnica de "um código para dois motivos": inválido, expirado e já usado devolvem o
+  // mesmo texto, para não dar a quem tenta um código roubado uma pista de qual dos três é.
+  'link.already_linked': msg({
+    id: 'link.already_linked',
+    message: 'Vocês já estão vinculados.',
+  }),
+  // Mesmo código para "não é profissional ativa" (criar convite) e "não é paciente" (resgatar) --
+  // ver PatientLinksProblemCodes.LinkNotAuthorized na API.
+  'link.not_authorized': msg({
+    id: 'link.not_authorized',
+    message: 'Sua conta não pode participar deste vínculo.',
+  }),
+  'link.not_found': msg({
+    id: 'link.not_found',
+    message: 'Não há vínculo com esta conta.',
+  }),
+  'sharing.preferences_not_found': msg({
+    id: 'sharing.preferences_not_found',
+    message: 'Nenhuma preferência de compartilhamento salva.',
+  }),
+  'sharing.version_conflict': msg({
+    id: 'sharing.version_conflict',
+    message: 'Suas preferências mudaram em outro dispositivo. Tente novamente.',
+  }),
 }
 
 // Fallback for a backend `code` not in the registry above. The raw code string must

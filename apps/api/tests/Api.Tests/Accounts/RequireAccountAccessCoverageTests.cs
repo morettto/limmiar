@@ -7,6 +7,8 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 
+using Api.Tests.Infrastructure;
+
 namespace Api.Tests.Accounts;
 
 /// <summary>
@@ -114,5 +116,6 @@ public sealed class RequireAccountAccessCoverageTests
                 builder.UseSetting("WebAuthn:ExpectedOrigin", "https://limmiar.test");
                 builder.UseSetting("AbacatePay:WebhookSecret", "whsec_test123");
                 builder.UseSetting("AbacatePay:ApiKey", "test-abacate-key");
+                builder.UseSetting("Totp:EncryptionKey", TotpTestEncryptionKey.Base64);
             });
 }

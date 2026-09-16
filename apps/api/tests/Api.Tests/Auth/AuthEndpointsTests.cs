@@ -10,15 +10,43 @@ using Api.Tests.Accounts;
 // internal seam. That IVT made both types resolvable, so the unqualified name became
 // ambiguous; this alias pins it back to the test fake this file always meant.
 using CapturingMagicLinkEmailSender = Api.Tests.Accounts.CapturingMagicLinkEmailSender;
+using Api.Tests.Infrastructure;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
+using Respawn;
 
 namespace Api.Tests.Auth;
 
-public sealed class AuthEndpointsTests
+/// <summary>Accounts live in Postgres (S11-03) -- real fixture + Respawn reset, same discipline as SchedulingEndpointsTests.</summary>
+[Collection("Database")]
+public sealed class AuthEndpointsTests : IAsyncLifetime
 {
     private static readonly byte[] SomeVerifier = CreateVerifier(0x01);
+
+    private readonly PostgresContainerFixture _fixture;
+    private Respawner _respawner = null!;
+
+    public AuthEndpointsTests(PostgresContainerFixture fixture)
+    {
+        _fixture = fixture;
+    }
+
+    public async Task InitializeAsync()
+    {
+        await using var adminConnection = new NpgsqlConnection(_fixture.AdminConnectionString);
+        await adminConnection.OpenAsync();
+
+        _respawner = await Respawner.CreateAsync(adminConnection, new RespawnerOptions
+        {
+            SchemasToInclude = ["public"],
+            DbAdapter = DbAdapter.Postgres,
+        });
+        await _respawner.ResetAsync(adminConnection);
+    }
+
+    public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
     public async Task PostRegister_WithNewEmail_Returns201WithAccountBody()
@@ -918,26 +946,27 @@ public sealed class AuthEndpointsTests
     }
 
     /// <summary>Sets MagicLink:TestCaptureEndpoint=true instead of overriding IMagicLinkEmailSender directly -- these tests are specifically about that config-gated wiring.</summary>
-    private static WebApplicationFactory<Program> CreateFactoryWithTestCaptureEndpoint() =>
+    private WebApplicationFactory<Program> CreateFactoryWithTestCaptureEndpoint() =>
         CreateFactory().WithWebHostBuilder(builder =>
             builder.UseSetting("MagicLink:TestCaptureEndpoint", "true"));
 
-    private static WebApplicationFactory<Program> CreateFactory() =>
+    private WebApplicationFactory<Program> CreateFactory() =>
         new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>
             {
                 // Never touches Postgres, but startup still needs a syntactically valid
                 // ConnectionStrings:AppDb to construct the NpgsqlDataSource singleton.
-                builder.UseSetting("ConnectionStrings:AppDb", "Host=127.0.0.1;Port=1;Username=app_role;Password=unused;");
+                builder.UseSetting("ConnectionStrings:AppDb", _fixture.AppRoleConnectionString);
                 builder.UseSetting("StaffAccess:ApiKey", "test-staff-api-key");
                 builder.UseSetting("WebAuthn:RelyingPartyId", WebAuthnRelyingPartyId);
                 builder.UseSetting("WebAuthn:ExpectedOrigin", WebAuthnOrigin);
                 builder.UseSetting("AbacatePay:WebhookSecret", "whsec_test123");
                 builder.UseSetting("AbacatePay:ApiKey", "test-abacate-key");
+                builder.UseSetting("Totp:EncryptionKey", TotpTestEncryptionKey.Base64);
             });
 
     /// <summary>Overrides the production IMagicLinkEmailSender registration with a capturing fake so a test can read back the token a request "sent".</summary>
-    private static (WebApplicationFactory<Program> Factory, CapturingMagicLinkEmailSender Sender) CreateFactoryWithMagicLinkCapture()
+    private (WebApplicationFactory<Program> Factory, CapturingMagicLinkEmailSender Sender) CreateFactoryWithMagicLinkCapture()
     {
         var sender = new CapturingMagicLinkEmailSender();
         var factory = CreateFactory().WithWebHostBuilder(builder =>
@@ -946,7 +975,7 @@ public sealed class AuthEndpointsTests
     }
 
     /// <summary>Real Google ID token verification is out of scope for S02-01; overrides the production IGoogleIdentityProvider registration with a fake.</summary>
-    private static WebApplicationFactory<Program> CreateFactory(IGoogleIdentityProvider googleIdentityProvider) =>
+    private WebApplicationFactory<Program> CreateFactory(IGoogleIdentityProvider googleIdentityProvider) =>
         CreateFactory().WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services =>
                 services.AddSingleton(googleIdentityProvider)));

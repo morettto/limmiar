@@ -12,7 +12,7 @@ export interface TotpChallengeProps {
 
 type SubmitState = { status: 'idle' } | { status: 'submitting' } | { status: 'error'; message: string }
 
-const SIX_DIGIT_CODE = /^\d{6}$/
+const SIX_DIGIT_CODE = /^\d{6}$/u
 
 function toTotpChallengeParams(value: string): { code: string } | { backupCode: string } {
   return SIX_DIGIT_CODE.test(value) ? { code: value } : { backupCode: value }

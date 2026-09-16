@@ -109,6 +109,26 @@ describe('TotpChallenge', () => {
     )
   })
 
+  it('submits digits followed by text as { backupCode }, not { code }', async () => {
+    verifyTotpChallengeMock.mockResolvedValue({ ok: true, account: {
+      id: ACCOUNT_ID,
+      email: 'user@example.com',
+      role: 'Professional',
+      twoFactorRequirement: 'ChallengeRequired',
+      twoFactorTicket: null,
+    } })
+    renderTotpChallenge()
+
+    fireEvent.change(screen.getByLabelText(/código/i), { target: { value: '123456abc' } })
+    fireEvent.click(screen.getByRole('button', { name: /verificar/i }))
+
+    await waitFor(() =>
+      expect(verifyTotpChallengeMock).toHaveBeenCalledWith('http://api.test', ACCOUNT_ID, TICKET, {
+        backupCode: '123456abc',
+      }),
+    )
+  })
+
   it('submits a hyphenated backup code as { backupCode } (with the ticket) and calls onVerified', async () => {
     const account: Account = {
       id: ACCOUNT_ID,

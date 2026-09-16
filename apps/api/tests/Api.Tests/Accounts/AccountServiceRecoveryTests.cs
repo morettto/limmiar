@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Api.Accounts;
 
 namespace Api.Tests.Accounts;
@@ -129,10 +130,25 @@ public sealed class AccountServiceRecoveryTests
         var result = await handler.Handle(new RegisterRecoveryVerifierCommand(account.Id, SomeVerifier), CancellationToken.None);
 
         Assert.True(result.Succeeded);
-        Assert.Equal(SomeVerifier, result.Account!.RecoveryVerifier);
+        Assert.Equal(SHA256.HashData(SomeVerifier), result.Account!.RecoveryVerifier);
 
         var stored = await store.FindByIdAsync(account.Id, CancellationToken.None);
-        Assert.Equal(SomeVerifier, stored!.RecoveryVerifier);
+        Assert.Equal(SHA256.HashData(SomeVerifier), stored!.RecoveryVerifier);
+    }
+
+    // Same discipline as RegisterHandler: a store dump must never contain the recovery
+    // verifier, only its SHA-256.
+    [Fact]
+    public async Task RegisterRecoveryVerifierAsync_StoresSha256OfVerifier_NotTheVerifier()
+    {
+        var account = new Account(Guid.NewGuid(), "pro-hash@example.com", AccountRole.Professional, SomeVerifier, null);
+        var store = new FakeAccountStore(account);
+        var handler = new RegisterRecoveryVerifierHandler(store);
+
+        var result = await handler.Handle(new RegisterRecoveryVerifierCommand(account.Id, SomeVerifier), CancellationToken.None);
+
+        Assert.NotEqual(SomeVerifier, result.Account!.RecoveryVerifier);
+        Assert.Equal(SHA256.HashData(SomeVerifier), result.Account.RecoveryVerifier);
     }
 
     [Fact]
@@ -148,7 +164,7 @@ public sealed class AccountServiceRecoveryTests
         var result = await handler.Handle(new RegisterRecoveryVerifierCommand(account.Id, secondVerifier), CancellationToken.None);
 
         Assert.True(result.Succeeded);
-        Assert.Equal(secondVerifier, result.Account!.RecoveryVerifier);
+        Assert.Equal(SHA256.HashData(secondVerifier), result.Account!.RecoveryVerifier);
     }
 
     private static RecoverAccessHandler CreateRecoverAccessHandler(FakeAccountStore store, IPasswordVerifierComparer comparer) =>

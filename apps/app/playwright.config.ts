@@ -36,20 +36,24 @@ export default defineConfig({
     },
     {
       // `--no-launch-profile`: launchSettings.json would pin its own port and force the
-      // Development environment. The `__` settings below satisfy BuildApp's fail-fast
-      // requirements (no local Postgres here) and shorten the TTLs the expiry tests need.
+      // Development environment. Accounts moved into Postgres (S11-03): migrations run first,
+      // against a real Postgres this suite expects on 5432 (see apps/app/README.md).
       command:
+        'dotnet run --no-launch-profile --project ../api/src/Api/Api.csproj -- --migrate-only && ' +
         'dotnet run --no-launch-profile --project ../api/src/Api/Api.csproj',
-      // Plain liveness probe, not /health/db: this suite has no real Postgres behind
-      // ConnectionStrings:AppDb, so /health/db would never turn healthy and Playwright
-      // would wait out its full timeout every run.
-      url: `${API_BASE_URL}/health`,
+      // /health/db, not the plain liveness probe -- the readiness signal that migrations have
+      // actually finished, now that a real Postgres backs ConnectionStrings:AppDb.
+      url: `${API_BASE_URL}/health/db`,
       reuseExistingServer: false,
       timeout: 60_000,
       env: {
         ASPNETCORE_URLS: API_BASE_URL,
-        ConnectionStrings__AppDb: 'Host=127.0.0.1;Port=5432;Database=limmiar_e2e;Username=limmiar_e2e;Password=limmiar_e2e',
+        ConnectionStrings__AdminDb: 'Host=127.0.0.1;Port=5432;Database=limmiar_e2e;Username=postgres;Password=postgres',
+        ConnectionStrings__AppDb: 'Host=127.0.0.1;Port=5432;Database=limmiar_e2e;Username=app_role;Password=limmiar_e2e',
         StaffAccess__ApiKey: 'e2e-unused-staff-key',
+        // AES-256-GCM key for accounts.totp_secret_encrypted (S11-03, endurecimento) -- base64
+        // of 32 bytes, fixed test value like every other E2E-only secret on this list.
+        Totp__EncryptionKey: 'VFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFQ=',
         // WebAuthn is BuildApp's third fail-fast requirement, so every run through this
         // webServer needs both values. RelyingPartyId is "localhost", not 127.0.0.1:
         // Chromium rejects an IP literal as an RP ID at credentials.create().

@@ -9,8 +9,9 @@ ser chamado direto de qualquer `pages/` -- este módulo deixou de ser o único s
 ## Fluxo principal
 
 1. `router.tsx` declara uma rota por `createRoute`. Rotas cuja página não precisa de nada além da
-   própria sessão (`/`, `/settings/copilot`) apontam `component` direto para a página --
-   `HomePage`, `CopilotKeyPage` -- sem route component intermédio: as duas chamam `useSession()`
+   própria sessão (`/settings/copilot`) apontam `component` direto para a página --
+   `CopilotKeyPage` -- sem route component intermédio; `/` só passa por `IndexRouteComponent` para
+   o redirect de paciente (S11-01, passo 6). `HomePage` e `CopilotKeyPage` chamam `useSession()`
    sozinhas (S18-10, ver `entities/account/README.md` e os READMEs das duas páginas). As que
    precisam de search params ainda têm um route component próprio (`MagicLinkCallbackRouteComponent`,
    `AuthScreenE2ERouteComponent`, `RecoveryScreenE2ERouteComponent`, `NotaRouteComponent`,
@@ -24,21 +25,40 @@ ser chamado direto de qualquer `pages/` -- este módulo deixou de ser o único s
    proibir `app -> features` (só `pages -> app`), e `SessionProvider` já importava direto de
    `features/copilot-byok`.
 2. `routeTree` regista as rotas E2E-only (`/auth/screen`, `/devices/pair-*`, `/auth/recover`,
-   `/auth/recovery-phrase-setup`, `/e2e/microfone`) só quando `VITE_ENABLE_E2E_TEST_ROUTES ===
-   'true'` -- gate de build-time, não `import.meta.env.DEV`, porque `playwright.config.ts` corre
-   um `vite build` real, não `vite dev`.
+   `/auth/recovery-phrase-setup`, `/e2e/microfone`, `/e2e/vinculo`, `/e2e/partilha`) só quando
+   `VITE_ENABLE_E2E_TEST_ROUTES === 'true'` -- gate de build-time, não `import.meta.env.DEV`,
+   porque `playwright.config.ts` corre um `vite build` real, não `vite dev`.
 3. `magicLinkCallbackRoute` passa sempre `baseUrl={API_BASE_URL}`
    (`import.meta.env.VITE_API_BASE_URL ?? ''`, constante de build) ao `MagicLinkCallback` --
    `MagicLinkCallbackSearch` só tem `token`, lido por `readSearchString`. Nenhum ramo, gate de e2e
    incluído, deixa a query string escolher o servidor (S18-17, ver Decisões).
 4. `E2eMicrofoneScaffold.tsx` é andaime de E2E puro (sem equivalente de produção): fica fora de
    `router.tsx` para o router continuar só tabela de rotas e a sua copy ficar fora do portão de
-   i18n.
+   i18n. `E2eVinculoScaffold.tsx` (S11-04, `/e2e/vinculo`) segue o mesmo molde: sem
+   `KeychainProvider` ainda, semeia `accountId`/`accessToken`/`kek`/`papel`/`patientId` pela query
+   string para `vinculo-chave-publica.spec.ts` alcançar `GerarConviteVinculo`/
+   `ResgatarConviteVinculo`/`DesvincularVinculo` sem um chaveiro real. `E2ePartilhaScaffold.tsx`
+   (S11-02 fatia 6, `/e2e/partilha`) segue o mesmo molde, mais `agora` (ISO 8601, `''` = relógio
+   real) para o E2E fixar "hoje" nos dois lados da cena: `papel=paciente` monta `PacienteHojePage`
+   com a prop `partilha` + `PartilhaCheckIns`; `papel=profissional` monta `EspelhoP6`
+   (`git mv` de `CheckInsPartilhados` no S11-03), com a mesma `agora`.
+5. **S11-01: layout pathless `paciente`** (`id: 'paciente'`, sem `path`) monta
+   `<ContactoEmergencia/>` como irmão do `<Outlet/>`, uma única vez, para todo ecrã de paciente
+   herdar o caminho de emergência sem repeti-lo (invariante do ticket S11-01: emergência visível em
+   todo ecrã de paciente). `/hoje` (produto) e `/e2e/paciente-hoje` (E2E-only, decodifica uma KEK de
+   teste via `E2ePacienteHojeScaffold.tsx`) são filhos desse layout. Ecrã de paciente novo que não
+   entrar como filho deste layout perde a emergência -- não é opcional.
+6. `IndexRouteComponent` redireciona `sessao?.role === 'Patient'` para `/hoje` via `<Navigate/>`,
+   antes de montar `HomePage` (S11-01).
 
 ## Pontos de entrada
 
 - `router` (`router.tsx`) -- exportado e montado por `App.tsx` via `<RouterProvider>`.
 - `E2eMicrofoneScaffold({ consentimento })` (`E2eMicrofoneScaffold.tsx`).
+- `E2eVinculoScaffold({ baseUrl, accountId, accessToken, kek, papel, patientId })`
+  (`E2eVinculoScaffold.tsx`).
+- `E2ePartilhaScaffold({ baseUrl, accountId, accessToken, kek, papel, agora })`
+  (`E2ePartilhaScaffold.tsx`).
 
 ## Decisões relevantes
 
@@ -74,7 +94,7 @@ ser chamado direto de qualquer `pages/` -- este módulo deixou de ser o único s
   fronteira `fsd-pages-no-app`. Descer `useSession()` para `entities/account/session-context.tsx`
   (camada que `pages` já podia importar) tornou os dois wrappers desnecessários -- `HomePage` e
   `CopilotKeyPage` chamam `useSession()` diretamente. O S09 reintroduziu `IndexRouteComponent`
-  sem `useSession()`: passa a `HomePage` só `chaveiro` (sempre `null` enquanto não existe
+  (com `useSession()` só para o redirect de paciente do S11-01, passo 6): passa a `HomePage` só `chaveiro` (sempre `null` enquanto não existe
   `KeychainProvider` -- falha fechada, decisão humana) e `notas` (vazia, sem GET de nota); ver
   `pages/home/README.md` e `widgets/painel-profissional/README.md`. `BibliotecaRouteComponent` fica porque a rota ainda fixa fixtures de
   produto (`chaveIndice`, `store`) que não fazem sentido dentro da página; deixou só de chamar

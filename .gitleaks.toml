@@ -20,3 +20,10 @@ regexes = [
   '''^[a-z]+-fixture-\d+$''',
   '''^t9dXRhHHo3yDEj5pVDYz0frf7q6bMKyMRmxxCPIPp3RCplBfXRxqlC6ZpiWmOqj4L63qEaeUOtrCI8P0VMUgo6iIga2ri9ogaHFs0WIIywSMg0q7RmBfybe1E5XJcfC4IW3alNqym0tXoAKkzvfEjZxV6bE0oG2zJrNNYmUCKZyV0KZ3JS8Votf9EAWWYdiDkMkpbMdPggfh1EqHlVkMiTady6jOR3hyzGEHrIz2Ret0xHKMbiqkr9HS1JhNHDX9$''',
 ]
+
+# Historical test-only invite-code literals were detected after the scanner was changed to
+# inspect the complete repository history. The fixtures were replaced with `test-code`; this
+# commit allowlist keeps the immutable old commit from failing every future pull request.
+commits = [
+  "23ab908634393a6295a2af98fb1d69f100e6d4a4",
+]

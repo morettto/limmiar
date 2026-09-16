@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Mediator;
 
 namespace Api.Accounts;
@@ -17,7 +18,8 @@ public sealed class RegisterRecoveryVerifierHandler(IAccountStore store) : IRequ
             return RegisterRecoveryVerifierResult.Failure(RegisterRecoveryVerifierFailureReason.NotAProfessionalAccount);
         }
 
-        var updated = account with { RecoveryVerifier = request.RecoveryVerifier };
+        // Same discipline as RegisterHandler: only SHA256(verifier) is ever stored.
+        var updated = account with { RecoveryVerifier = SHA256.HashData(request.RecoveryVerifier) };
         await store.UpdateAsync(updated, cancellationToken);
         return RegisterRecoveryVerifierResult.Success(updated);
     }

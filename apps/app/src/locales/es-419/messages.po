@@ -54,6 +54,10 @@ msgstr "Esperando a que el otro dispositivo envíe la clave..."
 msgid "auth.device_pairing_payload_not_ready"
 msgstr "Espera a que el otro dispositivo lea el código antes de liberar el acceso."
 
+#: src/pages/paciente-hoje/PacienteHojePage.tsx:125
+msgid "Ansiedade"
+msgstr "Ansiedad"
+
 #: src/features/qr-scan/PairingScan.tsx:115
 msgid "Aponte a câmera para o código QR exibido no outro dispositivo."
 msgstr "Apunta la cámara al código QR que se muestra en el otro dispositivo."
@@ -96,6 +100,10 @@ msgstr "Cargando pacientes..."
 msgid "Carregando painel..."
 msgstr "Cargando panel..."
 
+#: src/features/vinculo/DesvincularVinculo.tsx:53
+msgid "Carregando vínculos..."
+msgstr "Cargando vínculos..."
+
 #: src/features/copilot-byok/CopilotKeySetup.tsx:83
 msgid "Chave de API"
 msgstr "Clave de API"
@@ -103,6 +111,10 @@ msgstr "Clave de API"
 #: src/features/copilot-byok/CopilotKeySetup.tsx:31
 msgid "Chaveiro bloqueado. Desbloqueie para cadastrar sua chave de API."
 msgstr "Llavero bloqueado. Desbloquéalo para registrar tu clave de API."
+
+#: src/pages/paciente-hoje/PacienteHojePage.tsx:80
+msgid "Chaveiro bloqueado. Desbloqueie para registrar o check-in de hoje."
+msgstr "Llavero bloqueado. Desbloquéalo para registrar el check-in de hoy."
 
 #: src/widgets/patient-wallet/PatientWallet.tsx:85
 msgid "Chaveiro bloqueado. Desbloqueie para ver a carteira de pacientes."
@@ -112,6 +124,19 @@ msgstr "Llavero bloqueado. Desbloquéalo para ver la cartera de pacientes."
 msgid "Chaveiro bloqueado. Desbloqueie para ver o painel."
 msgstr "Llavero bloqueado. Desbloquéalo para ver el panel."
 
+#. placeholder {0}: grupo.espelho.diasComCheckIn
+#: src/features/partilha/EspelhoP6.tsx:161
+#~ msgid "Check-in compartilhado em {0} de 7 dias"
+#~ msgstr "Check-in compartido en {0} de 7 días"
+
+#: src/features/partilha/EspelhoP6.tsx:163
+msgid "Check-in compartilhado em {diasComCheckIn} de 7 dias"
+msgstr "Check-in compartido en {diasComCheckIn} de 7 días"
+
+#: src/pages/paciente-hoje/PacienteHojePage.tsx:136
+msgid "Check-in salvo neste dispositivo, mas não foi compartilhado."
+msgstr "Check-in guardado en este dispositivo, pero no se compartió."
+
 #: src/features/totp-enrollment/TotpSetup.tsx:158
 msgid "Código de 6 dígitos do aplicativo autenticador"
 msgstr "Código de 6 dígitos de tu app autenticadora"
@@ -119,6 +144,29 @@ msgstr "Código de 6 dígitos de tu app autenticadora"
 #: src/features/totp-challenge/TotpChallenge.tsx:53
 msgid "Código de verificação"
 msgstr "Código de verificación"
+
+#: src/features/vinculo/ResgatarConviteVinculo.tsx:66
+msgid "Código de vínculo"
+msgstr "Código de vínculo"
+
+#. placeholder {0}: convite.codigo
+#. placeholder {1}: convite.validade
+#: src/features/vinculo/GerarConviteVinculo.tsx:48
+#~ msgid "Código de vínculo: {0}. Válido até {1}."
+#~ msgstr "Código de vínculo: {0}. Válido hasta {1}."
+
+#: src/features/vinculo/GerarConviteVinculo.tsx:49
+msgid "Código de vínculo: {codigo}. Válido até {validade}."
+msgstr "Código de vínculo: {codigo}. Válido hasta {validade}."
+
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:188
+msgid "link.invite_not_found"
+msgstr "Código inválido o expirado."
+
+#: src/features/vinculo/ResgatarConviteVinculo.tsx:54
+#~ msgid "Código inválido ou expirado."
+#~ msgstr "Código inválido o vencido."
 
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:47
@@ -144,6 +192,14 @@ msgstr "Código secreto"
 #: src/widgets/auth-screen/AuthScreen.tsx:153
 msgid "Como você vai usar o Limmiar?"
 msgstr "¿Cómo vas a usar Limmiar?"
+
+#: src/features/partilha/PartilhaCheckIns.tsx:53
+msgid "Compartilhamento de check-ins desativado. O que muda: os check-ins que você registrar a partir de agora não são compartilhados. O que não muda: os check-ins já compartilhados continuam com a profissional, que pode já tê-los lido, e a Limmiar não consegue apagá-los. O vínculo continua ativo."
+msgstr "Se desactivó el uso compartido de check-ins. Qué cambia: los check-ins que registres a partir de ahora no se comparten. Qué no cambia: los check-ins ya compartidos siguen con la profesional, que puede haberlos leído, y Limmiar no puede eliminarlos. El vínculo sigue activo."
+
+#: src/features/partilha/PartilhaCheckIns.tsx:123
+msgid "Compartilhar check-ins com esta profissional"
+msgstr "Compartir check-ins con esta profesional"
 
 #: src/features/qr-scan/PairingScan.tsx:113
 msgid "Concluindo o pareamento..."
@@ -178,6 +234,10 @@ msgstr "Cuenta creada. Estás registrado como profesional."
 msgid "auth.account_not_found"
 msgstr "Cuenta no encontrada."
 
+#: src/widgets/contacto-emergencia/ContactoEmergencia.tsx:9
+msgid "Contacto de emergência"
+msgstr "Contacto de emergencia"
+
 #: src/widgets/auth-screen/AuthScreen.tsx:233
 msgid "Continuar com o Google"
 msgstr "Continuar con Google"
@@ -185,6 +245,23 @@ msgstr "Continuar con Google"
 #: src/widgets/auth-screen/AuthScreen.tsx:225
 msgid "Criar conta"
 msgstr "Crear cuenta"
+
+#: src/widgets/contacto-emergencia/ContactoEmergencia.tsx:11
+msgid "CVV 188 · apoio emocional 24 h"
+msgstr "CVV 188 · apoyo emocional 24 h"
+
+#: src/features/vinculo/DesvincularVinculo.tsx:95
+msgid "Desvincular"
+msgstr "Desvincular"
+
+#. placeholder {0}: vinculo.patientId
+#: src/features/vinculo/DesvincularVinculo.tsx:91
+#~ msgid "Desvincular vínculo com {0}"
+#~ msgstr "Desvincular de {0}"
+
+#: src/features/vinculo/DesvincularVinculo.tsx:92
+msgid "Desvincular vínculo com {patientId}"
+msgstr "Desvincular vínculo con {patientId}"
 
 #: src/features/totp-challenge/TotpChallenge.tsx:47
 msgid "Digite o código de 6 dígitos do seu aplicativo autenticador ou um dos seus códigos de backup."
@@ -232,6 +309,11 @@ msgstr "Escanea este código QR con el dispositivo que quieres vincular."
 #: src/shared/api/problem-messages.ts:73
 msgid "auth.not_a_professional_account"
 msgstr "Esta acción solo está disponible para cuentas de profesional."
+
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:184
+msgid "key_pair.public_key_conflict"
+msgstr "Esta cuenta ya tiene publicada una clave pública diferente."
 
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:81
@@ -322,9 +404,21 @@ msgstr "Frase de recuperación inválida. Verifica que hayas escrito todas las p
 msgid "Gerando sua frase de recuperação..."
 msgstr "Generando tu frase de recuperación..."
 
+#: src/features/vinculo/GerarConviteVinculo.tsx:67
+msgid "Gerar código de vínculo"
+msgstr "Generar código de vínculo"
+
 #: src/widgets/auth-screen/AuthScreen.tsx:179
 msgid "Gerencie pacientes, prontuários e agenda em um só lugar."
 msgstr "Gestiona pacientes, historiales clínicos y agenda en un solo lugar."
+
+#: src/pages/paciente-hoje/PacienteHojePage.tsx:133
+msgid "Guardado"
+msgstr "Guardado"
+
+#: src/pages/paciente-hoje/PacienteHojePage.tsx:131
+msgid "Guardar"
+msgstr "Guardar"
 
 #: src/features/totp-enrollment/TotpSetup.tsx:98
 msgid "Guarde seus códigos de backup"
@@ -341,6 +435,10 @@ msgstr "Guardé mis códigos"
 #: src/features/recovery/RecoveryPhraseSetup.tsx:97
 msgid "Guardei minha frase"
 msgstr "Guardé mi frase"
+
+#: src/pages/paciente-hoje/PacienteHojePage.tsx:117
+msgid "Hoje: como você está agora?"
+msgstr "Hoy: ¿cómo te sientes ahora?"
 
 #: src/widgets/painel-profissional/PainelProfissional.tsx:180
 msgid "Indicadores"
@@ -392,9 +490,21 @@ msgstr "No se pudo cargar la agenda."
 msgid "Não foi possível carregar a carteira de pacientes. Tente novamente."
 msgstr "No se pudo cargar la cartera de pacientes. Intenta de nuevo."
 
+#: src/features/partilha/EspelhoP6.tsx:193
+msgid "Não foi possível carregar as sessões."
+msgstr "No se pudieron cargar las sesiones."
+
 #: src/widgets/painel-profissional/PainelProfissional.tsx:192
 msgid "Não foi possível carregar o painel. Tente novamente."
 msgstr "No se pudo cargar el panel. Intenta de nuevo."
+
+#: src/features/partilha/EspelhoP6.tsx:142
+msgid "Não foi possível carregar os check-ins compartilhados."
+msgstr "No se pudieron cargar los check-ins compartidos."
+
+#: src/features/partilha/PartilhaCheckIns.tsx:104
+msgid "Não foi possível carregar suas preferências de compartilhamento. Nada novo será compartilhado até que elas carreguem."
+msgstr "No se pudieron cargar tus preferencias de uso compartido. No se compartirá nada nuevo hasta que se carguen."
 
 #: src/features/device-pairing-primary/PairPrimaryDevice.tsx:57
 msgid "Não foi possível concluir o pareamento com segurança. Tente novamente."
@@ -426,15 +536,41 @@ msgstr "No se pudo preparar la búsqueda. Intenta de nuevo."
 msgid "Não foi possível salvar a chave. Tente novamente."
 msgstr "No se pudo guardar la clave. Intenta de nuevo."
 
+#: src/pages/paciente-hoje/PacienteHojePage.tsx:121
+msgid "Não foi possível salvar o check-in. Tente novamente."
+msgstr "No fue posible guardar el check-in. Intenta de nuevo."
+
+#: src/features/partilha/PartilhaCheckIns.tsx:128
+msgid "Não foi possível salvar sua preferência de compartilhamento. Tente novamente."
+msgstr "No se pudo guardar tu preferencia de uso compartido. Inténtalo de nuevo."
+
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:41
 msgid "auth.totp_not_pending"
 msgstr "No hay una configuración de verificación en dos pasos pendiente para esta cuenta."
 
 #. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:204
+msgid "link.not_found"
+msgstr "No hay vínculo con esta cuenta."
+
+#. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:160
 msgid "voice.enrollment_not_found"
 msgstr "No se encontró registro de voz para esta cuenta."
+
+#: src/features/partilha/EspelhoP6.tsx:150
+msgid "Nenhum check-in compartilhado."
+msgstr "Ningún check-in compartido."
+
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:180
+msgid "key_pair.not_found"
+msgstr "No hay un par de claves publicado para esta cuenta."
+
+#: src/features/vinculo/DesvincularVinculo.tsx:73
+msgid "Nenhum vínculo."
+msgstr "Sin vínculos."
 
 #: src/widgets/biblioteca/BibliotecaNotas.tsx:53
 msgid "Nenhuma nota encontrada."
@@ -443,6 +579,11 @@ msgstr "No se encontraron notas."
 #: src/features/nota-fila/FilaAssinatura.tsx:94
 msgid "Nenhuma nota nesta aba."
 msgstr "Ninguna nota en esta pestaña."
+
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:208
+msgid "sharing.preferences_not_found"
+msgstr "Ninguna preferencia de uso compartido guardada."
 
 #: src/pages/notas/NotaPage.tsx:125
 msgid "Nota assinada em {dataAssinatura}."
@@ -463,9 +604,13 @@ msgid "unexpected_error"
 msgstr "Ocurrió un error inesperado en el servidor."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:184
+#: src/shared/api/problem-messages.ts:220
 msgid "errors.generic"
 msgstr "Ocurrió un error inesperado. Inténtalo de nuevo."
+
+#: src/features/partilha/PartilhaCheckIns.tsx:47
+msgid "Os check-ins que você registrar a partir de agora são compartilhados com esta profissional."
+msgstr "Los check-ins que registres a partir de ahora se comparten con esta profesional."
 
 #: src/widgets/auth-screen/AuthScreen.tsx:174
 #: src/widgets/painel-profissional/PainelProfissional.tsx:203
@@ -544,9 +689,21 @@ msgstr "Cerrar sesión"
 msgid "Salvar"
 msgstr "Guardar"
 
+#: src/widgets/contacto-emergencia/ContactoEmergencia.tsx:14
+msgid "SAMU 192"
+msgstr "SAMU 192"
+
 #: src/widgets/soap-editor/FilaEEditor.tsx:39
 msgid "Selecione uma nota na fila."
 msgstr "Seleccione una nota en la cola."
+
+#: src/features/partilha/EspelhoP6.tsx:170
+msgid "sem check-in"
+msgstr "sin check-in"
+
+#: src/pages/paciente-hoje/PacienteHojePage.tsx:142
+msgid "sem registo"
+msgstr "sin registro"
 
 #: src/pages/notas/NotaPage.tsx:95
 msgid "Sem sessão ativa. Não é possível assinar."
@@ -556,6 +713,15 @@ msgstr "No hay sesión activa. No es posible firmar."
 msgid "Senha"
 msgstr "Contraseña"
 
+#. placeholder {0}: horaDaSessao(sessao.inicioEm, i18n.locale)
+#: src/features/partilha/EspelhoP6.tsx:179
+#~ msgid "Sessão às {0}"
+#~ msgstr "Sesión a las {0}"
+
+#: src/features/partilha/EspelhoP6.tsx:182
+msgid "Sessão às {inicio}"
+msgstr "Sesión a las {inicio}"
+
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:148
 msgid "agenda.session_not_found"
@@ -564,6 +730,10 @@ msgstr "Sesión no encontrada."
 #: src/widgets/painel-profissional/PainelProfissional.tsx:186
 msgid "Sessões na semana"
 msgstr "Sesiones esta semana"
+
+#: src/pages/paciente-hoje/PacienteHojePage.tsx:124
+msgid "Sono"
+msgstr "Sueño"
 
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:140
@@ -586,6 +756,11 @@ msgid "consent.not_authorized_to_record"
 msgstr "Su cuenta todavía no puede registrar consentimiento."
 
 #. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:200
+msgid "link.not_authorized"
+msgstr "Tu cuenta no puede participar en este vínculo."
+
+#. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:95
 msgid "auth.refresh_token_invalid"
 msgstr "Tu sesión expiró. Inicia sesión de nuevo."
@@ -600,6 +775,11 @@ msgstr "Tu sesión expiró. Inicia sesión de nuevo."
 msgid "auth.totp_ticket_invalid"
 msgstr "Tu verificación en dos pasos expiró. Inicia sesión de nuevo."
 
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:212
+msgid "sharing.version_conflict"
+msgstr "Tus preferencias cambiaron en otro dispositivo. Inténtalo de nuevo."
+
 #: src/features/nota-editor/EditorSoap.tsx:28
 msgid "Subjetivo"
 msgstr "Subjetivo"
@@ -611,6 +791,14 @@ msgstr "Tipo de cuenta"
 #: src/features/nota-editor/Citacao.tsx:31
 msgid "Tocar áudio de {inicio} a {fim}"
 msgstr "Reproducir audio de {inicio} a {fim}"
+
+#: src/features/partilha/EspelhoP6.tsx:165
+msgid "Últimos 7 dias"
+msgstr "Últimos 7 días"
+
+#: src/pages/paciente-hoje/PacienteHojePage.tsx:127
+msgid "Uma frase (opcional)"
+msgstr "Una frase (opcional)"
 
 #: src/features/totp-challenge/TotpChallenge.tsx:44
 msgid "Verificação em duas etapas"
@@ -624,7 +812,20 @@ msgstr "Verificar"
 msgid "Verifique seu e-mail para continuar. Enviamos um link de acesso, se este e-mail existir."
 msgstr "Revisa tu correo electrónico para continuar. Enviamos un enlace de acceso, si este correo existe."
 
+#: src/features/vinculo/ResgatarConviteVinculo.tsx:56
+msgid "Vinculada."
+msgstr "Vinculada."
+
+#: src/features/vinculo/ResgatarConviteVinculo.tsx:88
+msgid "Vincular"
+msgstr "Vincular"
+
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:105
 msgid "auth.forbidden"
 msgstr "No tienes acceso a esta cuenta."
+
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:194
+msgid "link.already_linked"
+msgstr "Ya están vinculados."

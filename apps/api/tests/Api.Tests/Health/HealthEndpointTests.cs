@@ -1,6 +1,8 @@
 using System.Net;
 using Microsoft.AspNetCore.Mvc.Testing;
 
+using Api.Tests.Infrastructure;
+
 namespace Api.Tests.Health;
 
 public sealed class HealthEndpointTests
@@ -21,6 +23,7 @@ public sealed class HealthEndpointTests
                 builder.UseSetting("WebAuthn:ExpectedOrigin", "https://limmiar.test");
                 builder.UseSetting("AbacatePay:WebhookSecret", "whsec_test123");
                 builder.UseSetting("AbacatePay:ApiKey", "test-abacate-key");
+                builder.UseSetting("Totp:EncryptionKey", TotpTestEncryptionKey.Base64);
             });
 
         using var client = factory.CreateClient();

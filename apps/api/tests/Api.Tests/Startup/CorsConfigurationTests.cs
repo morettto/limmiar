@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Mvc.Testing;
 
+using Api.Tests.Infrastructure;
+
 namespace Api.Tests.Startup;
 
 /// <summary>Proves Program.Composition.cs's Cors:AllowedOrigins branch: an empty allow-list (the default, covered by every other WebApplicationFactory test) versus a configured one that actually opens CORS for that origin.</summary>
@@ -18,7 +20,8 @@ public sealed class CorsConfigurationTests
                 builder.UseSetting("WebAuthn:RelyingPartyId", "limmiar.test");
                 builder.UseSetting("WebAuthn:ExpectedOrigin", "https://limmiar.test");
                 builder.UseSetting("AbacatePay:WebhookSecret", "whsec_test123");
-                builder.UseSetting("AbacatePay:ApiKey", "test-abacate-key");
+               builder.UseSetting("AbacatePay:ApiKey", "test-abacate-key");
+               builder.UseSetting("Totp:EncryptionKey", TotpTestEncryptionKey.Base64);
                 builder.UseSetting("Cors:AllowedOrigins:0", AllowedOrigin);
             });
         using var client = factory.CreateClient();
@@ -44,7 +47,8 @@ public sealed class CorsConfigurationTests
                 builder.UseSetting("WebAuthn:RelyingPartyId", "limmiar.test");
                 builder.UseSetting("WebAuthn:ExpectedOrigin", "https://limmiar.test");
                 builder.UseSetting("AbacatePay:WebhookSecret", "whsec_test123");
-                builder.UseSetting("AbacatePay:ApiKey", "test-abacate-key");
+               builder.UseSetting("AbacatePay:ApiKey", "test-abacate-key");
+               builder.UseSetting("Totp:EncryptionKey", TotpTestEncryptionKey.Base64);
                 builder.UseSetting("Cors:AllowedOrigins:0", AllowedOrigin);
             });
         using var client = factory.CreateClient();

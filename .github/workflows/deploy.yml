@@ -5,10 +5,29 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     name: Build + deploy apps/app
+    # Accounts moved into Postgres (S11-03): playwright.config.ts's webServer now needs a real,
+    # reachable database on 5432 to boot the API at all -- same image/port the local E2E docs
+    # (apps/app/README.md) and Api.Tests' Testcontainers fixture already use.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: limmiar_e2e
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
 
