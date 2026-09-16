@@ -16,6 +16,8 @@ export default {
     '!src/**/*.test.{ts,tsx}',
     '!src/**/*.spec.{ts,tsx}',
     '!src/test-support/**',
+    // E2E route scaffolds are test-only entry points, not product behavior.
+    '!src/app/routing/E2e*Scaffold.tsx',
   ],
   coverageAnalysis: 'perTest',
   reporters: ['html', 'clear-text', 'progress'],
