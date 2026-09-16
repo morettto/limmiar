@@ -100,4 +100,24 @@ describe('cifrarItem/decifrarItem', () => {
 
     expect(JSON.parse(new TextDecoder().decode(plaintext))).toEqual(item)
   })
+
+  it('recusa um item decifrado que não seja um check-in', () => {
+    const paciente = generateKeyPair()
+    const profissional = generateKeyPair()
+    const ciphertext = cifrarItem({
+      privadaPaciente: paciente.privateKey,
+      publicaProfissional: profissional.publicKey,
+      pacienteAccountId: PACIENTE_ACCOUNT_ID,
+      profissionalAccountId: PROFISSIONAL_ACCOUNT_ID,
+      item: { tipo: 'outro', checkin: {} } as never,
+    })
+
+    expect(() => decifrarItem({
+      privadaProfissional: profissional.privateKey,
+      publicaPaciente: paciente.publicKey,
+      pacienteAccountId: PACIENTE_ACCOUNT_ID,
+      profissionalAccountId: PROFISSIONAL_ACCOUNT_ID,
+      ciphertext,
+    })).toThrow('Envelope partilhado inválido')
+  })
 })

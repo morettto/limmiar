@@ -26,7 +26,9 @@ export async function partilharCheckIn(p: {
     throw new Error(`partilharCheckIn: falha ao listar vínculos (${vinculosResultado.code})`)
   }
 
-  const dest = destinatarios(estado, vinculosResultado.vinculos, p.accountId, 'checkin')
+  const dest = destinatarios(estado, vinculosResultado.vinculos, p.accountId, 'checkin').filter(
+    (vinculo): vinculo is typeof vinculo & { chavePublicaDoPar: Uint8Array } => vinculo.chavePublicaDoPar !== null,
+  )
   if (dest.length === 0) {
     return { partilhadoCom: [] }
   }
@@ -36,9 +38,6 @@ export async function partilharCheckIn(p: {
   const partilhadoCom: string[] = []
   for (const vinculo of dest) {
     // destinatarios() já garante chavePublicaDoPar !== null para cada vínculo devolvido.
-    if (vinculo.chavePublicaDoPar === null) {
-      throw new Error('partilharCheckIn: vínculo sem chave pública')
-    }
     const publicaProfissional = vinculo.chavePublicaDoPar
     const ciphertext = cifrarItem({
       privadaPaciente: privateKey,

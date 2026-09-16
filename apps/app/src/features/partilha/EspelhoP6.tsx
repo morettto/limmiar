@@ -52,11 +52,8 @@ async function carregarSessoes(p: {
 function carregarPartilha(p: {
   accountId: string
   privateKey: Uint8Array
-  partilha: PartilhaRecebida
+  partilha: PartilhaRecebida & { chavePublicaDoPar: Uint8Array }
 }): { partilha: PartilhaRecebida; checkins: CheckIn[] } {
-  if (p.partilha.chavePublicaDoPar === null) {
-    throw new Error('EspelhoP6: envelope sem chave pública do par')
-  }
   const publicaPaciente = p.partilha.chavePublicaDoPar
   const checkins = p.partilha.itens.map((item) => {
     const decifrado = decifrarItem({
@@ -92,7 +89,9 @@ async function carregarCarga(p: {
   if (!partilhasResultado.ok) {
     throw new Error(`EspelhoP6: falha ao listar partilhas recebidas (${partilhasResultado.code})`)
   }
-  const partilhasComChave = partilhasResultado.partilhas.filter((partilha) => partilha.chavePublicaDoPar !== null)
+  const partilhasComChave = partilhasResultado.partilhas.filter(
+    (partilha): partilha is PartilhaRecebida & { chavePublicaDoPar: Uint8Array } => partilha.chavePublicaDoPar !== null,
+  )
 
   const hoje = diaLocal(p.agora)
   const grupos = partilhasComChave
