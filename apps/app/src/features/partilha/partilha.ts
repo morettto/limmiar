@@ -10,14 +10,16 @@ export function chaveDoVinculo(v: Vinculo): string {
   return `${v.profissionalAccountId}|${v.vinculadoEm}`
 }
 
+type VinculoComChave = Vinculo & { chavePublicaDoPar: Uint8Array }
+
 export function destinatarios(
   estado: EstadoPartilha,
   vinculos: readonly Vinculo[],
   pacienteAccountId: string,
   tipo: TipoPartilhavel,
-): Vinculo[] {
+): VinculoComChave[] {
   return vinculos.filter(
-    (v) =>
+    (v): v is VinculoComChave =>
       v.pacienteAccountId === pacienteAccountId &&
       v.chavePublicaDoPar !== null &&
       estado[chaveDoVinculo(v)]?.[tipo] === true,

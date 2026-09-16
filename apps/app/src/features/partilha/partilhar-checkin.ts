@@ -26,9 +26,7 @@ export async function partilharCheckIn(p: {
     throw new Error(`partilharCheckIn: falha ao listar vínculos (${vinculosResultado.code})`)
   }
 
-  const dest = destinatarios(estado, vinculosResultado.vinculos, p.accountId, 'checkin').filter(
-    (vinculo): vinculo is typeof vinculo & { chavePublicaDoPar: Uint8Array } => vinculo.chavePublicaDoPar !== null,
-  )
+  const dest = destinatarios(estado, vinculosResultado.vinculos, p.accountId, 'checkin')
   if (dest.length === 0) {
     return { partilhadoCom: [] }
   }
