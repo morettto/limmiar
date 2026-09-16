@@ -77,6 +77,46 @@ describe('partilharCheckIn', () => {
     expect(fetchMock).not.toHaveBeenCalledWith(expect.stringContaining('/shared-items'), expect.anything())
   })
 
+  it('ignora vínculo ativo sem chave pública do par', async () => {
+    const kek = await criarKek()
+    const vinculoSemChave = {
+      profissionalAccountId: PROFISSIONAL_ACCOUNT_ID,
+      pacienteAccountId: ACCOUNT_ID,
+      patientId: 'patient-1',
+      vinculadoEm: '2026-09-14T10:00:00Z',
+      chavePublicaDoPar: null,
+    }
+    const estado = comPartilha({}, chaveDoVinculo(vinculoSemChave), 'checkin', true)
+    const { wrappedDek, ciphertext } = await cifrarBlobPreferencias(kek, 1, estado)
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.endsWith('/sharing-preferences')) {
+        return Promise.resolve(
+          respostaJson({ version: 1, wrappedDek: encodeBase64(wrappedDek), ciphertext: encodeBase64(ciphertext) }),
+        )
+      }
+      if (url.endsWith('/links')) {
+        return Promise.resolve(respostaJson([{
+          professionalAccountId: PROFISSIONAL_ACCOUNT_ID,
+          patientAccountId: ACCOUNT_ID,
+          patientId: 'patient-1',
+          linkedAt: '2026-09-14T10:00:00Z',
+          peerPublicKey: null,
+        }]))
+      }
+      throw new Error(`chamada inesperada: ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(partilharCheckIn({
+      baseUrl: BASE_URL,
+      accountId: ACCOUNT_ID,
+      accessToken: ACCESS_TOKEN,
+      kek,
+      checkin: CHECKIN,
+    })).resolves.toEqual({ partilhadoCom: [] })
+    expect(fetchMock).not.toHaveBeenCalledWith(expect.stringContaining('/key-pair'), expect.anything())
+  })
+
   it('um destinatário ativo: cifra para a pública dela e a Marta decifra o mesmo check-in', async () => {
     const kek = await criarKek()
     const profissional = generateKeyPair()
