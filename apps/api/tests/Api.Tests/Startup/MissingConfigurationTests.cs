@@ -81,6 +81,26 @@ public sealed class MissingConfigurationTests
         Assert.Contains("AbacatePay:WebhookSecret", exception.Message);
     }
 
+    /// <summary>AbacatePay:ApiKey é o guard a seguir ao WebhookSecret em AddBilling -- o segredo
+    /// é definido aqui para chegar especificamente a este guard.</summary>
+    [Fact]
+    public void CreatingHost_WithoutAbacatePayApiKey_ThrowsInvalidOperationException()
+    {
+        using var factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder =>
+            {
+                builder.UseSetting("ConnectionStrings:AppDb", "Host=127.0.0.1;Port=1;Username=app_role;Password=unused;");
+                builder.UseSetting("StaffAccess:ApiKey", "test-staff-api-key");
+                builder.UseSetting("WebAuthn:RelyingPartyId", "limmiar.test");
+                builder.UseSetting("WebAuthn:ExpectedOrigin", "https://limmiar.test");
+                builder.UseSetting("AbacatePay:WebhookSecret", "whsec_test123");
+            });
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("AbacatePay:ApiKey", exception.Message);
+    }
+
     [Fact]
     public async Task Main_WithMigrateOnlyFlagAndWithoutAdminDbConnectionString_ThrowsInvalidOperationException()
     {

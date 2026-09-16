@@ -112,7 +112,7 @@ public sealed class SchedulingEndpointsTests : IAsyncLifetime
         }
 
         Assert.Equal(
-            new[] { "cancelled_at", "created_at", "duration_minutes", "id", "patient_id", "recording_active", "starts_at", "tenant_id" },
+            new[] { "cancelled_at", "created_at", "duration_minutes", "id", "no_show", "patient_id", "recording_active", "starts_at", "tenant_id" },
             columns);
     }
 
@@ -886,6 +886,7 @@ public sealed class SchedulingEndpointsTests : IAsyncLifetime
                 builder.UseSetting("WebAuthn:RelyingPartyId", "limmiar.test");
                 builder.UseSetting("WebAuthn:ExpectedOrigin", "https://limmiar.test");
                 builder.UseSetting("AbacatePay:WebhookSecret", "whsec_test123");
+                builder.UseSetting("AbacatePay:ApiKey", "test-abacate-key");
                 builder.ConfigureTestServices(services =>
                 {
                     services.AddSingleton<ITotpProvider>(new StubTotpProvider());

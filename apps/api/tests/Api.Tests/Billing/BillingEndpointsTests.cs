@@ -75,6 +75,18 @@ public sealed class BillingEndpointsTests
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    [Fact]
+    public async Task PostWebhook_WithoutData_Returns200WithoutConfirmingAnything()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        var body = "{\"id\":\"log_nodata1\",\"event\":\"checkout.completed\",\"apiVersion\":2,\"devMode\":false}"u8.ToArray();
+
+        var response = await PostRawAsync(client, body, ValidSignature(body));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
     /// <summary>Critério de aceite 3.</summary>
     [Fact]
     public async Task PostWebhook_SameBytesTwice_SecondIsDuplicateAndOnlyOneRowExists()
@@ -116,6 +128,7 @@ public sealed class BillingEndpointsTests
                 builder.UseSetting("WebAuthn:RelyingPartyId", "limmiar.test");
                 builder.UseSetting("WebAuthn:ExpectedOrigin", "https://limmiar.test");
                 builder.UseSetting("AbacatePay:WebhookSecret", WebhookSecret);
+                builder.UseSetting("AbacatePay:ApiKey", "test-abacate-key");
             });
 
     private static async Task<HttpResponseMessage> PostRawAsync(HttpClient client, byte[] body, string? signature)

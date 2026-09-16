@@ -25,6 +25,7 @@ public static class BillingEndpoints
         HttpRequest request,
         AbacatePayWebhookSecret webhookSecret,
         AbacatePayWebhookStore store,
+        IBookingPaymentStore payments,
         CancellationToken cancellationToken)
     {
         var rawBody = await ReadBoundedBodyAsync(request, cancellationToken);
@@ -57,6 +58,15 @@ public static class BillingEndpoints
         }
 
         var isFirstSighting = await store.TryRecordAsync(webhookEvent.Id, webhookEvent.Event, cancellationToken);
+
+        if (webhookEvent.Data is not null)
+        {
+            await payments.ConfirmPaymentAsync(
+                webhookEvent.Data.Id,
+                AbacatePayMapper.ToPaymentStatus(webhookEvent.Data.Status),
+                webhookEvent.Data.Amount,
+                cancellationToken);
+        }
 
         return TypedResults.Ok(new WebhookAckResponse(true, !isFirstSighting));
     }

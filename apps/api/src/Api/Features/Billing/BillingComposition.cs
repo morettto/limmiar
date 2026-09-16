@@ -24,8 +24,19 @@ public static class BillingComposition
         var webhookSecret = configuration["AbacatePay:WebhookSecret"]
             ?? throw new InvalidOperationException("Missing required configuration: AbacatePay:WebhookSecret");
 
+        var apiKey = configuration["AbacatePay:ApiKey"]
+            ?? throw new InvalidOperationException("Missing required configuration: AbacatePay:ApiKey");
+
         services.AddSingleton(new AbacatePayWebhookSecret(webhookSecret));
         services.AddSingleton<AbacatePayWebhookStore>();
+        services.AddSingleton<IPublicLinkStore, PublicLinkStore>();
+        services.AddSingleton<IBookingPaymentStore, BookingPaymentStore>();
+        services.AddTransient<IPublicBooking, PublicBookingService>();
+
+        // Cliente tipado: AddTypedClient é a fábrica sem Options nem reflexão no arranque.
+        // Transiente por IAbacatePayClient (tipo explícito) -- senão o HttpMessageHandler
+        // fica captivo e o DNS nunca refresca.
+        services.AddHttpClient<IAbacatePayClient>().AddTypedClient<IAbacatePayClient>((http, _) => new AbacatePayClient(http, apiKey));
 
         services.ConfigureHttpJsonOptions(options =>
         {
@@ -36,6 +47,7 @@ public static class BillingComposition
     public static void MapBilling(this IEndpointRouteBuilder app)
     {
         app.MapBillingEndpoints();
+        app.MapPublicBookingEndpoints();
     }
 }
 
@@ -50,7 +62,11 @@ public static class BillingComposition
 [JsonSerializable(typeof(CreateCheckoutRequest))]
 [JsonSerializable(typeof(CheckoutEnvelope))]
 [JsonSerializable(typeof(AbacatePayWebhookEvent))]
+[JsonSerializable(typeof(AbacateData))]
 [JsonSerializable(typeof(WebhookAckResponse))]
+[JsonSerializable(typeof(PublicReserveRequest))]
+[JsonSerializable(typeof(PublicReserveResponse))]
+[JsonSerializable(typeof(NoShowResponse))]
 public partial class AbacatePayJsonContext : JsonSerializerContext
 {
 }

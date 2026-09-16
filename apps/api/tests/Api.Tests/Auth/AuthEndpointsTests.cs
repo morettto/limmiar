@@ -933,6 +933,7 @@ public sealed class AuthEndpointsTests
                 builder.UseSetting("WebAuthn:RelyingPartyId", WebAuthnRelyingPartyId);
                 builder.UseSetting("WebAuthn:ExpectedOrigin", WebAuthnOrigin);
                 builder.UseSetting("AbacatePay:WebhookSecret", "whsec_test123");
+                builder.UseSetting("AbacatePay:ApiKey", "test-abacate-key");
             });
 
     /// <summary>Overrides the production IMagicLinkEmailSender registration with a capturing fake so a test can read back the token a request "sent".</summary>

@@ -48,4 +48,18 @@ public sealed class AbacatePayJsonContextTests
         Assert.False(envelope.Success);
         Assert.Null(envelope.Data);
     }
+
+    [Fact]
+    public void WebhookFixture_Deserializes_DataPaid()
+    {
+        var bytes = AbacatePayFixtures.ReadBytes("webhook-checkout-completed.json");
+
+        var webhookEvent = JsonSerializer.Deserialize(bytes, AbacatePayJsonContext.Default.AbacatePayWebhookEvent);
+
+        Assert.NotNull(webhookEvent);
+        Assert.NotNull(webhookEvent.Data);
+        Assert.Equal("bill_abc123xyz", webhookEvent.Data.Id);
+        Assert.Equal(CheckoutStatus.Paid, webhookEvent.Data.Status);
+        Assert.Equal(10000, webhookEvent.Data.Amount);
+    }
 }

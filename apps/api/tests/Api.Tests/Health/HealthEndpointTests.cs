@@ -20,6 +20,7 @@ public sealed class HealthEndpointTests
                 builder.UseSetting("WebAuthn:RelyingPartyId", "limmiar.test");
                 builder.UseSetting("WebAuthn:ExpectedOrigin", "https://limmiar.test");
                 builder.UseSetting("AbacatePay:WebhookSecret", "whsec_test123");
+                builder.UseSetting("AbacatePay:ApiKey", "test-abacate-key");
             });
 
         using var client = factory.CreateClient();

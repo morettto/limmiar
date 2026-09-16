@@ -25,7 +25,15 @@ public enum AbacatePayFailureReason
     MalformedResponse,
 }
 
-public sealed class AbacatePayClient
+public interface IAbacatePayClient
+{
+    Task<Result<Checkout, AbacatePayFailureReason>> CreateCheckoutAsync(
+        CreateCheckoutRequest request, CancellationToken cancellationToken);
+
+    Task<RefundOutcome> RefundAsync(string externalId, CancellationToken cancellationToken);
+}
+
+public sealed class AbacatePayClient : IAbacatePayClient
 {
     /// <summary>
     /// O índice (llms.txt) anuncia /checkouts/one; a página do endpoint documenta
@@ -42,7 +50,6 @@ public sealed class AbacatePayClient
         _http.BaseAddress = new Uri(BaseUrl);
         _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
     }
-
     public Task<Result<Checkout, AbacatePayFailureReason>> CreateCheckoutAsync(
         CreateCheckoutRequest request, CancellationToken cancellationToken) =>
         SendAsync(
@@ -54,6 +61,11 @@ public sealed class AbacatePayClient
         SendAsync(
             () => _http.GetAsync($"checkouts/get?id={Uri.EscapeDataString(checkoutId)}", cancellationToken),
             cancellationToken);
+
+    /// <summary>Adaptador mínimo: a v2 não documenta reembolso (lacuna), logo se o dinheiro
+    /// precisar de voltar e este for o caminho, o chamador trata ProviderHasNoRefund.</summary>
+    public Task<RefundOutcome> RefundAsync(string externalId, CancellationToken cancellationToken) =>
+        Task.FromResult(RefundOutcome.ProviderHasNoRefund);
 
     private static async Task<Result<Checkout, AbacatePayFailureReason>> SendAsync(
         Func<Task<HttpResponseMessage>> send, CancellationToken cancellationToken)
