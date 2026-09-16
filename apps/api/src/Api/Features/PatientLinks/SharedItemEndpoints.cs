@@ -59,7 +59,7 @@ public static class SharedItemEndpoints
         Guid accountId,
         Guid peerAccountId,
         ShareItemRequest request,
-        PatientLinkStore store,
+        SharedItemStore store,
         CancellationToken cancellationToken)
     {
         if (!TryValidateBlobSize(request.Ciphertext, "ciphertext", out var problem))
@@ -78,7 +78,7 @@ public static class SharedItemEndpoints
     private static async Task<Results<Ok<IReadOnlyList<SharedItemView>>, JsonHttpResult<LimmiarProblemDetails>>> HandleListSharedAsync(
         Guid accountId,
         Guid peerAccountId,
-        PatientLinkStore store,
+        SharedItemStore store,
         CancellationToken cancellationToken)
     {
         var items = await store.ListSharedAsync(accountId, peerAccountId, cancellationToken);
@@ -93,7 +93,7 @@ public static class SharedItemEndpoints
 
     private static async Task<Ok<IReadOnlyList<ReceivedShareView>>> HandleListReceivedSharesAsync(
         Guid accountId,
-        PatientLinkStore store,
+        SharedItemStore store,
         CancellationToken cancellationToken)
     {
         var shares = await store.ListReceivedSharesAsync(accountId, cancellationToken);
@@ -111,7 +111,7 @@ public static class SharedItemEndpoints
 
     private static async Task<Results<Ok<SharingPreferencesView>, JsonHttpResult<LimmiarProblemDetails>>> HandleGetPreferencesAsync(
         Guid accountId,
-        PatientLinkStore store,
+        SharingPreferencesStore store,
         CancellationToken cancellationToken)
     {
         var preferences = await store.GetPreferencesAsync(accountId, cancellationToken);
@@ -126,7 +126,7 @@ public static class SharedItemEndpoints
     private static async Task<Results<Ok<SharingPreferencesVersionView>, JsonHttpResult<LimmiarProblemDetails>>> HandlePutPreferencesAsync(
         Guid accountId,
         PutSharingPreferencesRequest request,
-        PatientLinkStore store,
+        SharingPreferencesStore store,
         CancellationToken cancellationToken)
     {
         if (request.ExpectedVersion < 0)

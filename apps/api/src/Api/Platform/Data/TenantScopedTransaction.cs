@@ -23,6 +23,36 @@ public sealed class TenantScopedTransaction : IAsyncDisposable
         return command;
     }
 
+    public async Task<T?> QuerySingleAsync<T>(
+        string sql,
+        Func<NpgsqlDataReader, T> map,
+        CancellationToken cancellationToken,
+        Action<NpgsqlCommand>? configure = null)
+        where T : class
+    {
+        await using var command = CreateCommand(sql);
+        configure?.Invoke(command);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken) ? map(reader) : null;
+    }
+
+    public async Task<IReadOnlyList<T>> QueryListAsync<T>(
+        string sql,
+        Func<NpgsqlDataReader, T> map,
+        CancellationToken cancellationToken,
+        Action<NpgsqlCommand>? configure = null)
+    {
+        await using var command = CreateCommand(sql);
+        configure?.Invoke(command);
+        var rows = new List<T>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            rows.Add(map(reader));
+        }
+        return rows;
+    }
+
     public async ValueTask DisposeAsync()
     {
         await Transaction.DisposeAsync();

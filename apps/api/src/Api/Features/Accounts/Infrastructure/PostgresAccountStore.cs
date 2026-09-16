@@ -22,46 +22,25 @@ public sealed class PostgresAccountStore(NpgsqlDataSource dataSource, TotpSecret
         voice_sealed_embedding
         """;
 
-    public async Task<Account?> FindByEmailAsync(string normalizedEmail, CancellationToken cancellationToken)
+    public Task<Account?> FindByEmailAsync(string normalizedEmail, CancellationToken cancellationToken)
+        => FindOneAsync("email = @email", "email", normalizedEmail, cancellationToken, ("app.account_email", normalizedEmail));
+
+    public Task<Account?> FindByIdAsync(Guid id, CancellationToken cancellationToken)
+        => FindOneAsync("id = @id", "id", id, cancellationToken, ("app.tenant_id", id.ToString()));
+
+    private async Task<Account?> FindOneAsync(
+        string predicate,
+        string parameterName,
+        object parameterValue,
+        CancellationToken cancellationToken,
+        params (string Name, string Value)[] gucs)
     {
-        await using var scope = await dataSource.OpenTenantScopedTransactionAsync(cancellationToken, ("app.account_email", normalizedEmail));
-
-        await using var selectCommand = scope.Connection.CreateCommand();
-        selectCommand.Transaction = scope.Transaction;
-        selectCommand.CommandText = $"SELECT {SelectColumns} FROM accounts WHERE email = @email";
-        selectCommand.Parameters.AddWithValue("email", normalizedEmail);
-
-        Account? account = null;
-        await using (var reader = await selectCommand.ExecuteReaderAsync(cancellationToken))
-        {
-            if (await reader.ReadAsync(cancellationToken))
-            {
-                account = ReadAccount(reader);
-            }
-        }
-
-        await scope.Transaction.CommitAsync(cancellationToken);
-        return account;
-    }
-
-    public async Task<Account?> FindByIdAsync(Guid id, CancellationToken cancellationToken)
-    {
-        await using var scope = await dataSource.OpenTenantScopedTransactionAsync(id, cancellationToken);
-
-        await using var selectCommand = scope.Connection.CreateCommand();
-        selectCommand.Transaction = scope.Transaction;
-        selectCommand.CommandText = $"SELECT {SelectColumns} FROM accounts WHERE id = @id";
-        selectCommand.Parameters.AddWithValue("id", id);
-
-        Account? account = null;
-        await using (var reader = await selectCommand.ExecuteReaderAsync(cancellationToken))
-        {
-            if (await reader.ReadAsync(cancellationToken))
-            {
-                account = ReadAccount(reader);
-            }
-        }
-
+        await using var scope = await dataSource.OpenTenantScopedTransactionAsync(cancellationToken, gucs);
+        var account = await scope.QuerySingleAsync(
+            $"SELECT {SelectColumns} FROM accounts WHERE {predicate}",
+            ReadAccount,
+            cancellationToken,
+            command => command.Parameters.AddWithValue(parameterName, parameterValue));
         await scope.Transaction.CommitAsync(cancellationToken);
         return account;
     }
