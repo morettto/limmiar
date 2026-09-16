@@ -12,6 +12,7 @@ import {
 const ACCOUNT_ID = '11111111-1111-1111-1111-111111111111'
 const PATIENT_ACCOUNT_ID = '22222222-2222-2222-2222-222222222222'
 const ACCESS_TOKEN = 'access-token-abc'
+const INVITE_CODE = 'test-code'
 const PATIENT_ID = '33333333-3333-3333-3333-333333333333'
 const PUBLIC_KEY = new Uint8Array(32).fill(1)
 const WRAPPED_DEK = new Uint8Array(44).fill(2)
@@ -160,7 +161,7 @@ describe('resgatarConviteVinculo', () => {
     )
     vi.stubGlobal('fetch', fetchMock)
 
-    const result = await resgatarConviteVinculo('http://api.test', PATIENT_ACCOUNT_ID, ACCESS_TOKEN, 'ABCD1234EFGH')
+    const result = await resgatarConviteVinculo('http://api.test', PATIENT_ACCOUNT_ID, ACCESS_TOKEN, INVITE_CODE)
 
     expect(result).toEqual({
       ok: true,
@@ -198,7 +199,7 @@ describe('resgatarConviteVinculo', () => {
     )
     vi.stubGlobal('fetch', fetchMock)
 
-    const result = await resgatarConviteVinculo('http://api.test', PATIENT_ACCOUNT_ID, ACCESS_TOKEN, 'ABCD1234EFGH')
+    const result = await resgatarConviteVinculo('http://api.test', PATIENT_ACCOUNT_ID, ACCESS_TOKEN, INVITE_CODE)
 
     expect(result).toEqual({ ok: false, code: 'link.already_linked', params: {} })
   })

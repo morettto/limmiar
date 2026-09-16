@@ -20,6 +20,7 @@ const garantirParDeChavesMock = vi.mocked(parDeChavesModule.garantirParDeChaves)
 const BASE_URL = 'http://api.test'
 const ACCOUNT_ID = 'conta-ana'
 const ACCESS_TOKEN = 'token-ana'
+const INVITE_CODE = 'test-code'
 
 const VINCULO: Vinculo = {
   profissionalAccountId: 'conta-marta',
@@ -68,11 +69,11 @@ describe('ResgatarConviteVinculo', () => {
     const onVinculada = vi.fn()
 
     await renderComponent(onVinculada)
-    fireEvent.change(screen.getByLabelText('Código de vínculo'), { target: { value: 'ABCD1234EFGH' } })
+    fireEvent.change(screen.getByLabelText('Código de vínculo'), { target: { value: INVITE_CODE } })
     fireEvent.click(screen.getByRole('button', { name: 'Vincular' }))
 
     expect((await screen.findByRole('status')).textContent).toBe('Vinculada.')
-    expect(resgatarConviteVinculoMock).toHaveBeenCalledWith(BASE_URL, ACCOUNT_ID, ACCESS_TOKEN, 'ABCD1234EFGH')
+    expect(resgatarConviteVinculoMock).toHaveBeenCalledWith(BASE_URL, ACCOUNT_ID, ACCESS_TOKEN, INVITE_CODE)
     expect(onVinculada).toHaveBeenCalledWith(VINCULO)
   })
 
