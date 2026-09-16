@@ -11,9 +11,9 @@ contrato JSON fixado contra fixtures gravadas (critério de aceite 1), o cliente
 handler HTTP falso, a verificação pura da assinatura HMAC do webhook, a tabela de dedupe e o
 seu store, a invariante de RLS que a exceção da tabela de dedupe respeita, o endpoint que os
 liga (critério de aceite 3: reentrega devolve `duplicate:true`, nunca 409), o registo em DI
-(`AddBilling`/`MapBilling`), a configuração obrigatória `AbacatePay:WebhookSecret` com falha
+(`AddBilling`/`MapBillingEndpoints`), a configuração obrigatória `AbacatePay:WebhookSecret` com falha
 rápida, e a sonda viva de drift agendada (critério de aceite 2). Só o ADR de dedupe sem RLS
-fica para o fecho -- ver `.harness/S12-01-forma.md` para o desenho completo já aprovado.
+já está documentado em `docs/adr/ADR-S12-01-dedupe-de-webhook-sem-rls.md`.
 
 ## Fluxo principal
 
@@ -38,8 +38,8 @@ fica para o fecho -- ver `.harness/S12-01-forma.md` para o desenho completo já 
     seam testado sem HTTP nenhum (`AbacatePayClientMapResponseTests`, 7 casos). Exposto ao
     projeto de testes via `<InternalsVisibleTo>` em `Api.csproj` (item nativo do SDK, sem
     `AssemblyInfo.cs` nem atributo à mão).
-  - `AbacatePayClient(HttpClient, string apiKey)` -- o seam é o construtor: fixa
-    `BaseAddress = BaseUrl` e `Authorization: Bearer <apiKey>`. Sem interface, sem fábrica.
+  - `AbacatePayClient(HttpClient, string apiKey)` -- o seam é o construtor: valida a chave e
+    cada pedido usa URL absoluta e `Authorization: Bearer <apiKey>`, sem mutar o cliente.
   - `CreateCheckoutAsync`/`GetCheckoutAsync` -- `HttpRequestException` vira `Unavailable`;
     `OperationCanceledException` (onde `TaskCanceledException` de timeout se inclui) só vira
     `Unavailable` quando o token do chamador NÃO está cancelado -- cancelamento cooperativo
@@ -79,7 +79,7 @@ fica para o fecho -- ver `.harness/S12-01-forma.md` para o desenho completo já 
     falha rápida por `InvalidOperationException` (molde `Program.cs:36-37`, não
     `ConsentComposition.AddConsent`, que não tem chave obrigatória própria). Regista
     `AbacatePayWebhookSecret` (record, não `string` nua) e `AbacatePayWebhookStore`.
-  - `MapBilling(WebApplication)` -- chama `BillingEndpoints.MapBillingEndpoints`.
+  - `MapBillingEndpoints(IEndpointRouteBuilder)` -- regista o endpoint do webhook.
   - `AbacatePayJsonContext` -- agora também `[JsonSerializable(AbacatePayWebhookEvent)]` e
     `[JsonSerializable(WebhookAckResponse)]`, além dos dois registados nas fatias 1-4.
 - `BillingEndpoints.cs` -- `POST /webhooks/abacatepay`
@@ -108,7 +108,7 @@ fica para o fecho -- ver `.harness/S12-01-forma.md` para o desenho completo já 
   sobre o corpo cru de cada pedido real.
 - `Api.Billing.AbacatePayWebhookStore.TryRecordAsync(string eventId, string eventType,
   CancellationToken)` -- Postgres real (Testcontainers nos testes), sem RLS.
-- `POST /webhooks/abacatepay` -- a fronteira HTTP do webhook. `AddBilling`/`MapBilling` são os
+- `POST /webhooks/abacatepay` -- a fronteira HTTP do webhook. `AddBilling`/`MapBillingEndpoints` são os
   pontos de registo em `Program.Composition.cs`. `BillingEndpoints.ReadBoundedBodyAsync` --
   `internal`, o leitor limitado que impõe o teto de 64 KiB.
 
@@ -193,7 +193,7 @@ fica para o fecho -- ver `.harness/S12-01-forma.md` para o desenho completo já 
   pesa mais), mas por haver um único escritor e pelo par `GRANT`/`REVOKE`.
   `RowLevelSecurityCoverageTests` é o teste que passa a impor "toda tabela com dados de tenant
   tem RLS" como invariante geral, com esta tabela como a única exceção nomeada. O ADR completo
-   (`docs/adr/ADR-S12-01-dedupe-de-webhook-sem-rls.md`) fica para o fecho.
+   (`docs/adr/ADR-S12-01-dedupe-de-webhook-sem-rls.md`) documenta a exceção de RLS.
 - **`AddBilling` recebe `IConfiguration`, ao contrário de `ConsentComposition.AddConsent`.**
   O molde do Consent não tem parâmetro porque não tem nenhuma chave obrigatória própria;
   `AbacatePay:WebhookSecret` obriga `AddBilling` a ler configuração, e o molde para essa
@@ -237,12 +237,6 @@ fica para o fecho -- ver `.harness/S12-01-forma.md` para o desenho completo já 
   S12-02 acrescenta junto do endpoint que o usa. `AbacatePayClient` só usa o que lhe é passado.
 
 ## Fora de âmbito desta dispatch
-
-Nona e última fatia de código do ticket S12-01. Não tocado, fica para o fecho:
-`docs/adr/ADR-S12-01-dedupe-de-webhook-sem-rls.md` (a ADR que documenta por que
-`abacatepay_webhook_events` não tem RLS -- a decisão em si já está em vigor e testada por
-`RowLevelSecurityCoverageTests`, só falta o documento). Ver `.harness/S12-01-forma.md`
-("Seams, por ordem de fatia") para a lista completa e a ordem.
 
 ## S12-02 -- reserva pública (`PublicBooking`)
 
@@ -337,3 +331,6 @@ e `IPublicBooking` não são captivos (duas resoluções do root provider, inst�
   SELECT→INSERT.
 - No-show não mexe em dinheiro (veredito só regista); reembolsar `Excused` fica por
   decidir fora deste ticket.
+
+O módulo está completo para o âmbito S12-01. A decisão da tabela de dedupe sem RLS está em
+`docs/adr/ADR-S12-01-dedupe-de-webhook-sem-rls.md`.

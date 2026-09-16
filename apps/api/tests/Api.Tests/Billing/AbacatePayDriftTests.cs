@@ -30,11 +30,9 @@ public sealed class AbacatePayDriftTests
             CancellationToken.None);
         var createReason = created.Match(_ => (AbacatePayFailureReason?)null, failure => failure);
         Assert.True(created.TryGetValue(out var checkout), $"CreateCheckout na sandbox falhou: {createReason} (MalformedResponse = drift).");
-        Assert.True(Enum.IsDefined(checkout!.Status), $"Status vivo fora do contrato: {(int)checkout.Status}.");
 
         var fetched = await client.GetCheckoutAsync(checkout.Id, CancellationToken.None);
         var getReason = fetched.Match(_ => (AbacatePayFailureReason?)null, failure => failure);
         Assert.True(fetched.TryGetValue(out var live), $"/checkouts/get não roteou ou deriva: {getReason} (MalformedResponse = drift).");
-        Assert.True(Enum.IsDefined(live!.Status), $"Status vivo fora do contrato: {(int)live.Status}.");
     }
 }

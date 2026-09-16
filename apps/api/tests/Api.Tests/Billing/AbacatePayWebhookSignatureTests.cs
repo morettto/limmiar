@@ -44,6 +44,14 @@ public sealed class AbacatePayWebhookSignatureTests
     }
 
     [Fact]
+    public void HeaderInvalido_ReturnsFalse()
+    {
+        var authentic = AbacatePayWebhookSignature.IsAuthentic(RawBody, "not-base64", ExpectedSecret, ExpectedSecret);
+
+        Assert.False(authentic);
+    }
+
+    [Fact]
     public void SegredoErrado_ReturnsFalse()
     {
         var authentic = AbacatePayWebhookSignature.IsAuthentic(RawBody, ValidSignature(RawBody), "different-secret", ExpectedSecret);

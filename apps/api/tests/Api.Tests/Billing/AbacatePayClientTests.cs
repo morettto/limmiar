@@ -14,6 +14,26 @@ public sealed class AbacatePayClientTests
         new([new CheckoutItem("prod_abc123xyz", 1)], ["PIX"], "pedido-123", null, null);
 
     [Fact]
+    public void Constructor_DoesNotMutateHttpClientDefaults()
+    {
+        var handler = new CannedResponseHandler(_ => new HttpResponseMessage(HttpStatusCode.OK));
+        using var http = new HttpClient(handler) { BaseAddress = new Uri("https://example.test/") };
+
+        _ = new AbacatePayClient(http, "abc_test_key");
+
+        Assert.Equal(new Uri("https://example.test/"), http.BaseAddress);
+        Assert.Null(http.DefaultRequestHeaders.Authorization);
+    }
+
+    [Fact]
+    public void Constructor_RejectsBlankApiKey()
+    {
+        using var http = new HttpClient(new CannedResponseHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)));
+
+        Assert.Throws<ArgumentException>(() => new AbacatePayClient(http, " "));
+    }
+
+    [Fact]
     public async Task CreateCheckoutAsync_SendsAbsoluteUrlWithBearerAuthAndSerializedBody()
     {
         var handler = new CannedResponseHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
@@ -50,6 +70,15 @@ public sealed class AbacatePayClientTests
             "https://api.abacatepay.com/v2/checkouts/get?id=bill_abc123xyz",
             handler.LastRequest.RequestUri!.ToString());
         Assert.Equal(new AuthenticationHeaderValue("Bearer", "abc_test_key"), handler.LastRequest.Headers.Authorization);
+    }
+
+    [Fact]
+    public async Task GetCheckoutAsync_RejectsBlankCheckoutId()
+    {
+        using var http = new HttpClient(new CannedResponseHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)));
+        var client = new AbacatePayClient(http, "abc_test_key");
+
+        await Assert.ThrowsAsync<ArgumentException>(() => client.GetCheckoutAsync(" ", CancellationToken.None));
     }
 
     [Fact]

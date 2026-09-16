@@ -81,7 +81,7 @@ public partial class Program
         routes.MapScheduling();
         routes.MapNotes();
         routes.MapConsent();
-        routes.MapBilling();
+        routes.MapBillingEndpoints();
 
         return app;
     }
