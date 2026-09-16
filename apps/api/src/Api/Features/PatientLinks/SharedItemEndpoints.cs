@@ -5,8 +5,8 @@ using static Api.Problems.ProblemResults;
 namespace Api.PatientLinks;
 
 /// <summary>
-/// Server-opaque envelope sharing (S11-02 fatia 1) and the sharing-preferences blob (fatia 2).
-/// Handlers talk straight to <see cref="PatientLinkStore"/>, no service layer -- authorization
+/// Server-opaque envelope sharing (S11-02 fatia 1). Handlers talk straight to
+/// <see cref="SharedItemStore"/>, no service layer -- authorization
 /// IS the link (verified inside the store, under the same lock as the write, see abordagem (c)).
 /// </summary>
 public static class SharedItemEndpoints
@@ -39,20 +39,6 @@ public static class SharedItemEndpoints
             .WithDescription("Unlike GET shared-items, this never 404s and never hides a soft-unlinked pair -- unlinkedAt is null while the pair is still linked, a timestamp once undone. Always 200, [] if accountId was never linked to anyone. Requires an Authorization: Bearer access token for this exact account.")
             .Produces<IReadOnlyList<ReceivedShareView>>(StatusCodes.Status200OK);
 
-        app.MapGet("/accounts/{accountId:guid}/sharing-preferences", HandleGetPreferencesAsync)
-            .WithName("GetSharingPreferences")
-            .WithSummary("Fetch this account's sharing-preferences blob")
-            .WithDescription("Opaque to the server: a DEK wrapped by the account's own KEK plus the ciphertext it protects. 404 if the account never saved preferences. Requires an Authorization: Bearer access token for this exact account.")
-            .Produces<SharingPreferencesView>(StatusCodes.Status200OK)
-            .Produces<LimmiarProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json");
-
-        app.MapPut("/accounts/{accountId:guid}/sharing-preferences", HandlePutPreferencesAsync)
-            .WithName("PutSharingPreferences")
-            .WithSummary("Replace this account's sharing-preferences blob under optimistic concurrency")
-            .WithDescription("expectedVersion must match the account's current version (0 = never saved); the store then advances it by exactly 1. 409 sharing.version_conflict on a stale expectedVersion -- the caller re-reads and retries. Requires an Authorization: Bearer access token for this exact account.")
-            .Produces<SharingPreferencesVersionView>(StatusCodes.Status200OK)
-            .Produces<LimmiarProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")
-            .Produces<LimmiarProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json");
     }
 
     private static async Task<Results<NoContent, JsonHttpResult<LimmiarProblemDetails>>> HandleShareAsync(
@@ -109,51 +95,7 @@ public static class SharedItemEndpoints
             share.PeerPublicKey,
             share.Items.Select(item => new SharedItemView(item.SharedAt, item.Ciphertext)).ToArray());
 
-    private static async Task<Results<Ok<SharingPreferencesView>, JsonHttpResult<LimmiarProblemDetails>>> HandleGetPreferencesAsync(
-        Guid accountId,
-        SharingPreferencesStore store,
-        CancellationToken cancellationToken)
-    {
-        var preferences = await store.GetPreferencesAsync(accountId, cancellationToken);
-        if (preferences is null)
-        {
-            return ProblemJson(StatusCodes.Status404NotFound, "Sharing preferences not found", PatientLinksProblemCodes.SharingPreferencesNotFound);
-        }
-
-        return TypedResults.Ok(ToView(preferences));
-    }
-
-    private static async Task<Results<Ok<SharingPreferencesVersionView>, JsonHttpResult<LimmiarProblemDetails>>> HandlePutPreferencesAsync(
-        Guid accountId,
-        PutSharingPreferencesRequest request,
-        SharingPreferencesStore store,
-        CancellationToken cancellationToken)
-    {
-        if (request.ExpectedVersion < 0)
-        {
-            return ValidationProblem("expectedVersion");
-        }
-
-        if (!TryValidateBlobSize(request.WrappedDek, "wrappedDek", out var wrappedDekProblem))
-        {
-            return wrappedDekProblem;
-        }
-
-        if (!TryValidateBlobSize(request.Ciphertext, "ciphertext", out var ciphertextProblem))
-        {
-            return ciphertextProblem;
-        }
-
-        var updated = await store.PutPreferencesAsync(accountId, request.ExpectedVersion, request.WrappedDek, request.Ciphertext, cancellationToken);
-        return updated is null
-            ? ProblemJson(StatusCodes.Status409Conflict, "Sharing preferences version conflict", PatientLinksProblemCodes.SharingVersionConflict)
-            : TypedResults.Ok(new SharingPreferencesVersionView(updated.Version));
-    }
-
-    private static SharingPreferencesView ToView(SharingPreferences preferences) =>
-        new(preferences.Version, preferences.WrappedDek, preferences.Ciphertext);
-
-    private static bool TryValidateBlobSize(byte[]? blob, string field, out JsonHttpResult<LimmiarProblemDetails> problem)
+    internal static bool TryValidateBlobSize(byte[]? blob, string field, out JsonHttpResult<LimmiarProblemDetails> problem)
     {
         if (!SealedBlobShape.TryValidateSealedBlobShape(blob, field, out problem))
         {

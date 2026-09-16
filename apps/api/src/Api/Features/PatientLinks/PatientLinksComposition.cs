@@ -9,8 +9,8 @@ public static class PatientLinksComposition
     public static void AddPatientLinks(this IServiceCollection services)
     {
         services.AddSingleton(sp => new PatientLinkStore(sp.GetRequiredService<NpgsqlDataSource>()));
-        services.AddSingleton(sp => new SharedItemStore(sp.GetRequiredService<PatientLinkStore>()));
-        services.AddSingleton(sp => new SharingPreferencesStore(sp.GetRequiredService<PatientLinkStore>()));
+        services.AddSingleton(sp => new SharedItemStore(sp.GetRequiredService<NpgsqlDataSource>()));
+        services.AddSingleton(sp => new SharingPreferencesStore(sp.GetRequiredService<NpgsqlDataSource>()));
         services.AddSingleton(sp => new PatientLinkService(
             sp.GetRequiredService<IAccountStore>(),
             sp.GetRequiredService<PatientLinkStore>()));
@@ -25,6 +25,7 @@ public static class PatientLinksComposition
     {
         app.MapPatientLinkEndpoints();
         app.MapSharedItemEndpoints();
+        app.MapSharingPreferencesEndpoints();
     }
 }
 

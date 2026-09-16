@@ -15,7 +15,15 @@ GRANT UPDATE (totp_secret_encrypted) ON accounts TO app_role;
 
 -- app_role continua com INSERT sobre accounts (grant existente da 0010) -- so a permissao de
 -- ESCREVER na coluna antiga sai por UPDATE.
-REVOKE UPDATE (totp_secret) ON accounts FROM app_role;
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'accounts' AND column_name = 'totp_secret'
+    ) THEN
+        REVOKE UPDATE (totp_secret) ON accounts FROM app_role;
+    END IF;
+END $$;
 
 -- Ronda 1 de review (achado importante): um REVOKE de coluna nunca anula um GRANT de tabela
 -- inteira no Postgres -- o `GRANT SELECT ON accounts TO app_role` da 0010 continuava a deixar

@@ -43,6 +43,16 @@ public sealed class TotpSecretCipherTests
     }
 
     [Fact]
+    public void Decrypt_WithUnsupportedVersion_ThrowsCryptographicException()
+    {
+        var cipher = new TotpSecretCipher(SomeKey);
+        var encrypted = cipher.Encrypt(Guid.Empty, "GENERATEDSECRETXYZ");
+        encrypted[0] = 2;
+
+        Assert.Throws<CryptographicException>(() => cipher.Decrypt(Guid.Empty, encrypted));
+    }
+
+    [Fact]
     public void Decrypt_WithWrongKey_ThrowsCryptographicException()
     {
         var cipher = new TotpSecretCipher(SomeKey);

@@ -68,12 +68,17 @@ CREATE POLICY account_update_self ON accounts
 GRANT SELECT, INSERT ON accounts TO app_role;
 -- email e created_at sao imutaveis por privilegio (nunca ha UPDATE ... SET email nem SET created_at
 -- no codigo, mas o GRANT em si e o que torna isso estrutural); id nunca aparece num GRANT UPDATE.
-GRANT UPDATE (
-    role, password_verifier_sha256, google_subject_id, verification_status, rejection_reason,
-    verification_submitted_at, totp_secret, totp_enabled_at, totp_backup_code_hashes,
-    webauthn_credential_id, webauthn_cose_public_key, webauthn_sign_count, webauthn_aaguid,
-    recovery_verifier_sha256, voice_wrapped_dek, voice_sealed_embedding
-) ON accounts TO app_role;
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'accounts' AND column_name = 'totp_secret'
+    ) THEN
+        EXECUTE 'GRANT UPDATE (role, password_verifier_sha256, google_subject_id, verification_status, rejection_reason, verification_submitted_at, totp_secret, totp_enabled_at, totp_backup_code_hashes, webauthn_credential_id, webauthn_cose_public_key, webauthn_sign_count, webauthn_aaguid, recovery_verifier_sha256, voice_wrapped_dek, voice_sealed_embedding) ON accounts TO app_role';
+    ELSE
+        GRANT UPDATE (role, password_verifier_sha256, google_subject_id, verification_status, rejection_reason, verification_submitted_at, totp_enabled_at, totp_backup_code_hashes, webauthn_credential_id, webauthn_cose_public_key, webauthn_sign_count, webauthn_aaguid, recovery_verifier_sha256, voice_wrapped_dek, voice_sealed_embedding) ON accounts TO app_role;
+    END IF;
+END $$;
 REVOKE DELETE ON accounts FROM app_role;
 
 -- O par de chaves X25519 (ADR-S11-06) mora em tabela propria, nao em colunas de accounts:

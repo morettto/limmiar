@@ -38,6 +38,8 @@ public readonly record struct Result<TValue, TFailure>
         return this.value is not null;
     }
 
+    public TFailure FailureReason => failure;
+
     /// <summary>Calls exactly one of the two, never both.</summary>
     public TResult Match<TResult>(Func<TValue, TResult> onSuccess, Func<TFailure, TResult> onFailure) =>
         value is not null ? onSuccess(value) : onFailure(failure);

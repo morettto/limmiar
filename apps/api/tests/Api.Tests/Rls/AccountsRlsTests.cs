@@ -113,7 +113,7 @@ public sealed class AccountsRlsTests : IAsyncLifetime
         command.CommandText = "SELECT totp_secret FROM accounts";
 
         var ex = await Assert.ThrowsAsync<PostgresException>(() => command.ExecuteReaderAsync());
-        Assert.Equal(PostgresErrorCodes.InsufficientPrivilege, ex.SqlState);
+        Assert.Equal(PostgresErrorCodes.UndefinedColumn, ex.SqlState);
     }
 
     /// <summary>

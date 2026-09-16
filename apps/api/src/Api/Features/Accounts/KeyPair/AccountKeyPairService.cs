@@ -30,7 +30,7 @@ public sealed class AccountKeyPairService(NpgsqlDataSource dataSource)
     {
         await using var scope = await dataSource.OpenTenantScopedTransactionAsync(accountId, cancellationToken);
 
-        await using var upsertCommand = scope.Connection.CreateCommand();
+        await using var upsertCommand = scope.CreateCommand();
         upsertCommand.Transaction = scope.Transaction;
         upsertCommand.CommandText = """
             INSERT INTO account_key_pairs (account_id, public_key, wrapped_dek, sealed_private_key)
@@ -72,7 +72,7 @@ public sealed class AccountKeyPairService(NpgsqlDataSource dataSource)
     {
         await using var scope = await dataSource.OpenTenantScopedTransactionAsync(accountId, cancellationToken);
 
-        await using var selectCommand = scope.Connection.CreateCommand();
+        await using var selectCommand = scope.CreateCommand();
         selectCommand.Transaction = scope.Transaction;
         selectCommand.CommandText = "SELECT public_key, wrapped_dek, sealed_private_key FROM account_key_pairs WHERE account_id = @accountId";
         selectCommand.Parameters.AddWithValue("accountId", accountId);

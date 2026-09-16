@@ -63,6 +63,32 @@ public sealed class PatientLinkStoreTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task ListForWithPeerKeyAsync_WithoutPublishedPeerKey_ReturnsNullKey()
+    {
+        var store = new PatientLinkStore(_dataSource);
+        await SeedAccountsAsync(ProfessionalId, PatientAccountId);
+        var invite = await store.CreateInviteAsync(ProfessionalId, PatientId, CancellationToken.None);
+        await store.RedeemAsync(invite.Code, PatientAccountId, CancellationToken.None);
+
+        var links = await store.ListForWithPeerKeyAsync(PatientAccountId, CancellationToken.None);
+
+        Assert.Single(links);
+        Assert.Null(links[0].PeerPublicKey);
+    }
+
+    [Fact]
+    public async Task RedeemWithPeerKeyAsync_WithUnknownCode_ReturnsInviteNotFound()
+    {
+        var store = new PatientLinkStore(_dataSource);
+        await SeedAccountsAsync(PatientAccountId);
+
+        var result = await store.RedeemWithPeerKeyAsync("UNKNOWN-CODE", PatientAccountId, CancellationToken.None);
+
+        var failure = result.Match(_ => (RedeemFailure?)null, value => value);
+        Assert.Equal(RedeemFailure.InviteNotFound, failure);
+    }
+
+    [Fact]
     public async Task CreateInviteAsync_ReturnsA12CharacterCodeAndSevenDayExpiry()
     {
         var now = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);

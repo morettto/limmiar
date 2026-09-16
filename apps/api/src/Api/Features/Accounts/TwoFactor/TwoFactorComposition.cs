@@ -7,7 +7,14 @@ public static class TwoFactorComposition
     {
         services.AddSingleton<ITotpProvider, TotpProvider>();
         services.AddSingleton<ITwoFactorTicketIssuer, TwoFactorTicketIssuer>();
-        services.AddSingleton(new TotpSecretCipher(ReadEncryptionKey(configuration)));
+        try
+        {
+            services.AddSingleton(new TotpSecretCipher(ReadEncryptionKey(configuration)));
+        }
+        catch (ArgumentException ex)
+        {
+            throw new InvalidOperationException("Totp:EncryptionKey must decode to exactly 32 bytes.", ex);
+        }
     }
 
     // Fails closed unconditionally, same discipline as WebAuthn:RelyingPartyId/ExpectedOrigin

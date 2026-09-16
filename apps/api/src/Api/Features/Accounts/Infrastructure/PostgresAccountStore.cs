@@ -156,11 +156,6 @@ public sealed class PostgresAccountStore(NpgsqlDataSource dataSource, TotpSecret
         int Ord(string name) => reader.GetOrdinal(name);
         var wrappedDek = reader.IsDBNull(Ord("voice_wrapped_dek")) ? null : reader.GetFieldValue<byte[]>(Ord("voice_wrapped_dek"));
         var sealedEmbedding = reader.IsDBNull(Ord("voice_sealed_embedding")) ? null : reader.GetFieldValue<byte[]>(Ord("voice_sealed_embedding"));
-        if (wrappedDek is not null && sealedEmbedding is null)
-        {
-            throw new InvalidOperationException("An account voice enrollment is missing its sealed embedding.");
-        }
-
         return new Account(
             Id: reader.GetGuid(Ord("id")),
             Email: reader.GetString(Ord("email")),
@@ -178,6 +173,16 @@ public sealed class PostgresAccountStore(NpgsqlDataSource dataSource, TotpSecret
             WebAuthnSignCount: reader.IsDBNull(Ord("webauthn_sign_count")) ? null : (uint)reader.GetInt64(Ord("webauthn_sign_count")),
             WebAuthnAaGuid: reader.IsDBNull(Ord("webauthn_aaguid")) ? null : reader.GetGuid(Ord("webauthn_aaguid")),
             RecoveryVerifier: reader.IsDBNull(Ord("recovery_verifier_sha256")) ? null : reader.GetFieldValue<byte[]>(Ord("recovery_verifier_sha256")),
-            VoiceEnrollment: wrappedDek is null ? null : new VoiceEnrollment(wrappedDek, sealedEmbedding ?? throw new InvalidOperationException("An account voice enrollment is missing its sealed embedding.")));
+            VoiceEnrollment: ReadVoiceEnrollment(wrappedDek, sealedEmbedding));
+    }
+
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage(Justification =
+        "The accounts_voice_envelope_pairs database constraint makes this defensive invariant unreachable from persisted rows; keep the fail-closed guard for corrupted databases.")]
+    private static VoiceEnrollment? ReadVoiceEnrollment(byte[]? wrappedDek, byte[]? sealedEmbedding)
+    {
+        if (wrappedDek is null) return null;
+        return sealedEmbedding is null
+            ? throw new InvalidOperationException("An account voice enrollment is missing its sealed embedding.")
+            : new VoiceEnrollment(wrappedDek, sealedEmbedding);
     }
 }
