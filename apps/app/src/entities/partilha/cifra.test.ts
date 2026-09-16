@@ -120,4 +120,32 @@ describe('cifrarItem/decifrarItem', () => {
       ciphertext,
     })).toThrow('Envelope partilhado inválido')
   })
+
+  it.each([
+    ['nulo', null],
+    ['primitivo', 'checkin'],
+    ['sem tipo', { checkin: {} }],
+    ['tipo incorreto', { tipo: 'nota', checkin: {} }],
+    ['sem checkin', { tipo: 'checkin' }],
+    ['checkin nulo', { tipo: 'checkin', checkin: null }],
+    ['checkin primitivo', { tipo: 'checkin', checkin: 'texto' }],
+  ])('recusa payload %s', (_, item) => {
+    const paciente = generateKeyPair()
+    const profissional = generateKeyPair()
+    const ciphertext = cifrarItem({
+      privadaPaciente: paciente.privateKey,
+      publicaProfissional: profissional.publicKey,
+      pacienteAccountId: PACIENTE_ACCOUNT_ID,
+      profissionalAccountId: PROFISSIONAL_ACCOUNT_ID,
+      item: item as never,
+    })
+
+    expect(() => decifrarItem({
+      privadaProfissional: profissional.privateKey,
+      publicaPaciente: paciente.publicKey,
+      pacienteAccountId: PACIENTE_ACCOUNT_ID,
+      profissionalAccountId: PROFISSIONAL_ACCOUNT_ID,
+      ciphertext,
+    })).toThrow('Envelope partilhado inválido')
+  })
 })
