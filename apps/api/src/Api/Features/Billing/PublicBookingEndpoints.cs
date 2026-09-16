@@ -15,7 +15,7 @@ public static class BookingProblemCodes
 
 public static class PublicBookingEndpoints
 {
-    public static void MapPublicBookingEndpoints(this WebApplication app)
+    public static void MapPublicBookingEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapPost("/p/{token}/reserve", HandleReserveAsync)
             .WithName("PostPublicReserve")
@@ -70,6 +70,7 @@ public static class PublicBookingEndpoints
 
     private static async Task<Results<Ok<NoShowResponse>, JsonHttpResult<LimmiarProblemDetails>>> HandleNoShowAsync(
         Guid sessionId,
+        HttpContext httpContext,
         [FromHeader(Name = "Authorization")] string? authorization,
         ISessionTokenIssuer sessionTokenIssuer,
         ScheduledSessionStore sessions,
@@ -80,7 +81,7 @@ public static class PublicBookingEndpoints
             : null;
         if (accountId is null)
         {
-            return AccessTokenUnauthorizedProblem();
+            return AccessTokenUnauthorizedProblem(httpContext);
         }
 
         var marked = await sessions.TryMarkNoShowAsync(accountId.Value, sessionId, cancellationToken);
