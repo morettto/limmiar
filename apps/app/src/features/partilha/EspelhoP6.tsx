@@ -154,14 +154,16 @@ export function EspelhoP6({ baseUrl, accountId, accessToken, kek, agora }: Espel
 
   return (
     <div>
-      {carga.grupos.map((grupo) => (
+      {carga.grupos.map((grupo) => {
+        const { diasComCheckIn, dias } = grupo.espelho
+        return (
         <section key={grupo.partilha.pacienteAccountId}>
           <h2>{grupo.partilha.patientId}</h2>
           <p>
-            <Trans>Check-in compartilhado em {grupo.espelho.diasComCheckIn} de 7 dias</Trans>
+            <Trans>Check-in compartilhado em {diasComCheckIn} de 7 dias</Trans>
           </p>
           <ol aria-label={t`Últimos 7 dias`}>
-            {grupo.espelho.dias.map((dia) => (
+            {dias.map((dia) => (
               <li key={dia.dia}>
                 {dia.checkin === null ? (
                   <>
@@ -173,17 +175,19 @@ export function EspelhoP6({ baseUrl, accountId, accessToken, kek, agora }: Espel
                     {dia.checkin.frase !== null ? ` · ${dia.checkin.frase}` : ''}
                   </>
                 )}
-                {dia.sessoes.map((sessao) => (
-                  <span key={sessao.sessionId}>
+                {dia.sessoes.map((sessao) => {
+                  const inicio = horaDaSessao(sessao.inicioEm, i18n.locale)
+                  return <span key={sessao.sessionId}>
                     {' '}
-                    · <Trans>Sessão às {horaDaSessao(sessao.inicioEm, i18n.locale)}</Trans>
+                    · <Trans>Sessão às {inicio}</Trans>
                   </span>
-                ))}
+                })}
               </li>
             ))}
           </ol>
         </section>
-      ))}
+          )
+      })}
       {carga.sessoesFalharam && (
         <p role="alert">
           <Trans>Não foi possível carregar as sessões.</Trans>

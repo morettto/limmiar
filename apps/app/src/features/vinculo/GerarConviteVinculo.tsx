@@ -43,9 +43,10 @@ export function GerarConviteVinculo({ baseUrl, accountId, accessToken, kek, pati
   }
 
   if (convite.status === 'gerado') {
+    const { codigo, validade } = convite
     return (
       <div className="mx-auto max-w-sm p-4">
-        <p role="status">{t`Código de vínculo: ${convite.codigo}. Válido até ${convite.validade}.`}</p>
+        <p role="status">{t`Código de vínculo: ${codigo}. Válido até ${validade}.`}</p>
       </div>
     )
   }

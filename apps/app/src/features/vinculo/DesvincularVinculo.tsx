@@ -80,15 +80,16 @@ export function DesvincularVinculo({ baseUrl, accountId, accessToken }: Desvincu
     <ul className="mx-auto max-w-sm p-4">
       {estado.vinculos.map((vinculo) => {
         const outraContaId = outraContaDoVinculo(vinculo, accountId)
+        const { patientId } = vinculo
         const mensagemErro = erroPorConta[outraContaId]
         return (
           <li key={outraContaId} className="mb-3">
             <div className="flex items-center justify-between gap-2">
-              <span>{vinculo.patientId}</span>
+              <span>{patientId}</span>
               <button
                 type="button"
                 onClick={() => void handleDesvincular(outraContaId)}
-                aria-label={t`Desvincular vínculo com ${vinculo.patientId}`}
+                aria-label={t`Desvincular vínculo com ${patientId}`}
                 className="rounded-md bg-neutral-900 px-3 py-1 text-white"
               >
                 <Trans>Desvincular</Trans>

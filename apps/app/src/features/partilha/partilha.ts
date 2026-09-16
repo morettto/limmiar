@@ -1,8 +1,7 @@
-import type { CheckIn } from '../../entities/checkin/checkin'
 import type { Vinculo } from '../../entities/vinculo/api'
 import type { EstadoPartilha, TipoPartilhavel } from '../../entities/partilha/partilha'
 
-export type ItemPartilhado = { tipo: 'checkin'; checkin: CheckIn }
+export type { ItemPartilhado } from '../../shared/lib/item-partilhado'
 
 // profissionalAccountId isolado não bastaria: um vínculo novo com a mesma dupla
 // paciente-profissional (depois de desvincular e vincular de novo) precisa de nunca herdar a

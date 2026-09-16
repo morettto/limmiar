@@ -1,5 +1,5 @@
 import { decrypt, deriveChannelKey, encrypt, getSharedSecret } from '@limmiar/crypto'
-import type { ItemPartilhado } from '../../features/partilha/partilha'
+import type { ItemPartilhado } from '../../shared/lib/item-partilhado'
 
 const SALT_PREFIX = 'limmiar/partilha/v1|'
 

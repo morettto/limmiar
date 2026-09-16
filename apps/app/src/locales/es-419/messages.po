@@ -125,9 +125,13 @@ msgid "Chaveiro bloqueado. Desbloqueie para ver o painel."
 msgstr "Llavero bloqueado. Desbloquéalo para ver el panel."
 
 #. placeholder {0}: grupo.espelho.diasComCheckIn
-#: src/features/partilha/EspelhoP6.tsx:159
-msgid "Check-in compartilhado em {0} de 7 dias"
-msgstr "Check-in compartido en {0} de 7 días"
+#: src/features/partilha/EspelhoP6.tsx:161
+#~ msgid "Check-in compartilhado em {0} de 7 dias"
+#~ msgstr "Check-in compartido en {0} de 7 días"
+
+#: src/features/partilha/EspelhoP6.tsx:163
+msgid "Check-in compartilhado em {diasComCheckIn} de 7 dias"
+msgstr "Check-in compartido en {diasComCheckIn} de 7 días"
 
 #: src/pages/paciente-hoje/PacienteHojePage.tsx:136
 msgid "Check-in salvo neste dispositivo, mas não foi compartilhado."
@@ -148,8 +152,12 @@ msgstr "Código de vínculo"
 #. placeholder {0}: convite.codigo
 #. placeholder {1}: convite.validade
 #: src/features/vinculo/GerarConviteVinculo.tsx:48
-msgid "Código de vínculo: {0}. Válido até {1}."
-msgstr "Código de vínculo: {0}. Válido hasta {1}."
+#~ msgid "Código de vínculo: {0}. Válido até {1}."
+#~ msgstr "Código de vínculo: {0}. Válido hasta {1}."
+
+#: src/features/vinculo/GerarConviteVinculo.tsx:49
+msgid "Código de vínculo: {codigo}. Válido até {validade}."
+msgstr "Código de vínculo: {codigo}. Válido hasta {validade}."
 
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:188
@@ -242,14 +250,18 @@ msgstr "Crear cuenta"
 msgid "CVV 188 · apoio emocional 24 h"
 msgstr "CVV 188 · apoyo emocional 24 h"
 
-#: src/features/vinculo/DesvincularVinculo.tsx:94
+#: src/features/vinculo/DesvincularVinculo.tsx:95
 msgid "Desvincular"
 msgstr "Desvincular"
 
 #. placeholder {0}: vinculo.patientId
 #: src/features/vinculo/DesvincularVinculo.tsx:91
-msgid "Desvincular vínculo com {0}"
-msgstr "Desvincular de {0}"
+#~ msgid "Desvincular vínculo com {0}"
+#~ msgstr "Desvincular de {0}"
+
+#: src/features/vinculo/DesvincularVinculo.tsx:92
+msgid "Desvincular vínculo com {patientId}"
+msgstr "Desvincular vínculo con {patientId}"
 
 #: src/features/totp-challenge/TotpChallenge.tsx:47
 msgid "Digite o código de 6 dígitos do seu aplicativo autenticador ou um dos seus códigos de backup."
@@ -392,7 +404,7 @@ msgstr "Frase de recuperación inválida. Verifica que hayas escrito todas las p
 msgid "Gerando sua frase de recuperação..."
 msgstr "Generando tu frase de recuperación..."
 
-#: src/features/vinculo/GerarConviteVinculo.tsx:66
+#: src/features/vinculo/GerarConviteVinculo.tsx:67
 msgid "Gerar código de vínculo"
 msgstr "Generar código de vínculo"
 
@@ -478,7 +490,7 @@ msgstr "No se pudo cargar la agenda."
 msgid "Não foi possível carregar a carteira de pacientes. Tente novamente."
 msgstr "No se pudo cargar la cartera de pacientes. Intenta de nuevo."
 
-#: src/features/partilha/EspelhoP6.tsx:187
+#: src/features/partilha/EspelhoP6.tsx:193
 msgid "Não foi possível carregar as sessões."
 msgstr "No se pudieron cargar las sesiones."
 
@@ -486,7 +498,7 @@ msgstr "No se pudieron cargar las sesiones."
 msgid "Não foi possível carregar o painel. Tente novamente."
 msgstr "No se pudo cargar el panel. Intenta de nuevo."
 
-#: src/features/partilha/EspelhoP6.tsx:140
+#: src/features/partilha/EspelhoP6.tsx:142
 msgid "Não foi possível carregar os check-ins compartilhados."
 msgstr "No se pudieron cargar los check-ins compartidos."
 
@@ -547,7 +559,7 @@ msgstr "No hay vínculo con esta cuenta."
 msgid "voice.enrollment_not_found"
 msgstr "No se encontró registro de voz para esta cuenta."
 
-#: src/features/partilha/EspelhoP6.tsx:148
+#: src/features/partilha/EspelhoP6.tsx:150
 msgid "Nenhum check-in compartilhado."
 msgstr "Ningún check-in compartido."
 
@@ -685,7 +697,7 @@ msgstr "SAMU 192"
 msgid "Selecione uma nota na fila."
 msgstr "Seleccione una nota en la cola."
 
-#: src/features/partilha/EspelhoP6.tsx:166
+#: src/features/partilha/EspelhoP6.tsx:170
 msgid "sem check-in"
 msgstr "sin check-in"
 
@@ -702,9 +714,13 @@ msgid "Senha"
 msgstr "Contraseña"
 
 #. placeholder {0}: horaDaSessao(sessao.inicioEm, i18n.locale)
-#: src/features/partilha/EspelhoP6.tsx:177
-msgid "Sessão às {0}"
-msgstr "Sesión a las {0}"
+#: src/features/partilha/EspelhoP6.tsx:179
+#~ msgid "Sessão às {0}"
+#~ msgstr "Sesión a las {0}"
+
+#: src/features/partilha/EspelhoP6.tsx:182
+msgid "Sessão às {inicio}"
+msgstr "Sesión a las {inicio}"
 
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:148
@@ -776,7 +792,7 @@ msgstr "Tipo de cuenta"
 msgid "Tocar áudio de {inicio} a {fim}"
 msgstr "Reproducir audio de {inicio} a {fim}"
 
-#: src/features/partilha/EspelhoP6.tsx:161
+#: src/features/partilha/EspelhoP6.tsx:165
 msgid "Últimos 7 dias"
 msgstr "Últimos 7 días"
 

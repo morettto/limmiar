@@ -125,9 +125,13 @@ msgid "Chaveiro bloqueado. Desbloqueie para ver o painel."
 msgstr "Keychain locked. Unlock it to see the panel."
 
 #. placeholder {0}: grupo.espelho.diasComCheckIn
-#: src/features/partilha/EspelhoP6.tsx:159
-msgid "Check-in compartilhado em {0} de 7 dias"
-msgstr "Check-in shared on {0} of 7 days"
+#: src/features/partilha/EspelhoP6.tsx:161
+#~ msgid "Check-in compartilhado em {0} de 7 dias"
+#~ msgstr "Check-in shared on {0} of 7 days"
+
+#: src/features/partilha/EspelhoP6.tsx:163
+msgid "Check-in compartilhado em {diasComCheckIn} de 7 dias"
+msgstr "Check-in shared on {diasComCheckIn} of 7 days"
 
 #: src/pages/paciente-hoje/PacienteHojePage.tsx:136
 msgid "Check-in salvo neste dispositivo, mas não foi compartilhado."
@@ -148,8 +152,12 @@ msgstr "Link code"
 #. placeholder {0}: convite.codigo
 #. placeholder {1}: convite.validade
 #: src/features/vinculo/GerarConviteVinculo.tsx:48
-msgid "Código de vínculo: {0}. Válido até {1}."
-msgstr "Link code: {0}. Valid until {1}."
+#~ msgid "Código de vínculo: {0}. Válido até {1}."
+#~ msgstr "Link code: {0}. Valid until {1}."
+
+#: src/features/vinculo/GerarConviteVinculo.tsx:49
+msgid "Código de vínculo: {codigo}. Válido até {validade}."
+msgstr "Link code: {codigo}. Valid until {validade}."
 
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:188
@@ -242,14 +250,18 @@ msgstr "Create account"
 msgid "CVV 188 · apoio emocional 24 h"
 msgstr "CVV 188 · emotional support 24 h"
 
-#: src/features/vinculo/DesvincularVinculo.tsx:94
+#: src/features/vinculo/DesvincularVinculo.tsx:95
 msgid "Desvincular"
 msgstr "Unlink"
 
 #. placeholder {0}: vinculo.patientId
 #: src/features/vinculo/DesvincularVinculo.tsx:91
-msgid "Desvincular vínculo com {0}"
-msgstr "Unlink from {0}"
+#~ msgid "Desvincular vínculo com {0}"
+#~ msgstr "Unlink from {0}"
+
+#: src/features/vinculo/DesvincularVinculo.tsx:92
+msgid "Desvincular vínculo com {patientId}"
+msgstr "Unlink from {patientId}"
 
 #: src/features/totp-challenge/TotpChallenge.tsx:47
 msgid "Digite o código de 6 dígitos do seu aplicativo autenticador ou um dos seus códigos de backup."
@@ -392,7 +404,7 @@ msgstr "Invalid recovery phrase. Check that you typed all the words correctly."
 msgid "Gerando sua frase de recuperação..."
 msgstr "Generating your recovery phrase..."
 
-#: src/features/vinculo/GerarConviteVinculo.tsx:66
+#: src/features/vinculo/GerarConviteVinculo.tsx:67
 msgid "Gerar código de vínculo"
 msgstr "Generate link code"
 
@@ -478,7 +490,7 @@ msgstr "Could not load the schedule."
 msgid "Não foi possível carregar a carteira de pacientes. Tente novamente."
 msgstr "Could not load the patient wallet. Try again."
 
-#: src/features/partilha/EspelhoP6.tsx:187
+#: src/features/partilha/EspelhoP6.tsx:193
 msgid "Não foi possível carregar as sessões."
 msgstr "Could not load the sessions."
 
@@ -486,7 +498,7 @@ msgstr "Could not load the sessions."
 msgid "Não foi possível carregar o painel. Tente novamente."
 msgstr "Could not load the panel. Try again."
 
-#: src/features/partilha/EspelhoP6.tsx:140
+#: src/features/partilha/EspelhoP6.tsx:142
 msgid "Não foi possível carregar os check-ins compartilhados."
 msgstr "We could not load the shared check-ins."
 
@@ -547,7 +559,7 @@ msgstr "There is no link with this account."
 msgid "voice.enrollment_not_found"
 msgstr "No voice enrollment found for this account."
 
-#: src/features/partilha/EspelhoP6.tsx:148
+#: src/features/partilha/EspelhoP6.tsx:150
 msgid "Nenhum check-in compartilhado."
 msgstr "No shared check-ins."
 
@@ -685,7 +697,7 @@ msgstr "SAMU 192"
 msgid "Selecione uma nota na fila."
 msgstr "Select a note from the queue."
 
-#: src/features/partilha/EspelhoP6.tsx:166
+#: src/features/partilha/EspelhoP6.tsx:170
 msgid "sem check-in"
 msgstr "no check-in"
 
@@ -702,9 +714,13 @@ msgid "Senha"
 msgstr "Password"
 
 #. placeholder {0}: horaDaSessao(sessao.inicioEm, i18n.locale)
-#: src/features/partilha/EspelhoP6.tsx:177
-msgid "Sessão às {0}"
-msgstr "Session at {0}"
+#: src/features/partilha/EspelhoP6.tsx:179
+#~ msgid "Sessão às {0}"
+#~ msgstr "Session at {0}"
+
+#: src/features/partilha/EspelhoP6.tsx:182
+msgid "Sessão às {inicio}"
+msgstr "Session at {inicio}"
 
 #. js-lingui-explicit-id
 #: src/shared/api/problem-messages.ts:148
@@ -776,7 +792,7 @@ msgstr "Account type"
 msgid "Tocar áudio de {inicio} a {fim}"
 msgstr "Play audio from {inicio} to {fim}"
 
-#: src/features/partilha/EspelhoP6.tsx:161
+#: src/features/partilha/EspelhoP6.tsx:165
 msgid "Últimos 7 dias"
 msgstr "Last 7 days"
 

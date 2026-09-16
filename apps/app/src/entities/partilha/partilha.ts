@@ -1,4 +1,7 @@
+export type { ItemPartilhado } from '../../shared/lib/item-partilhado'
+
 export type TipoPartilhavel = 'checkin'
+
 
 export type EstadoPartilha = Readonly<Record<string, Readonly<Partial<Record<TipoPartilhavel, true>>>>>
 
