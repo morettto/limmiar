@@ -63,6 +63,61 @@ public sealed class MissingConfigurationTests
         Assert.Contains("WebAuthn:ExpectedOrigin", exception.Message);
     }
 
+    /// <summary>Totp:EncryptionKey (checked in AccountsComposition.AddAccounts, after WebAuthn and StaffAccess) is set here so this test reaches the AbacatePay:WebhookSecret guard specifically, not an earlier one.</summary>
+    [Fact]
+    public void CreatingHost_WithoutTotpEncryptionKey_ThrowsInvalidOperationException()
+    {
+        using var factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder =>
+            {
+                builder.UseSetting("ConnectionStrings:AppDb", "Host=127.0.0.1;Port=1;Username=app_role;Password=unused;");
+                builder.UseSetting("StaffAccess:ApiKey", "test-staff-api-key");
+                builder.UseSetting("WebAuthn:RelyingPartyId", "limmiar.test");
+                builder.UseSetting("WebAuthn:ExpectedOrigin", "https://limmiar.test");
+            });
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("Totp:EncryptionKey", exception.Message);
+    }
+
+    [Fact]
+    public void CreatingHost_WithTotpEncryptionKeyNotValidBase64_ThrowsInvalidOperationException()
+    {
+        using var factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder =>
+            {
+                builder.UseSetting("ConnectionStrings:AppDb", "Host=127.0.0.1;Port=1;Username=app_role;Password=unused;");
+                builder.UseSetting("StaffAccess:ApiKey", "test-staff-api-key");
+                builder.UseSetting("WebAuthn:RelyingPartyId", "limmiar.test");
+                builder.UseSetting("WebAuthn:ExpectedOrigin", "https://limmiar.test");
+                builder.UseSetting("Totp:EncryptionKey", "not-valid-base64!!!");
+            });
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("Totp:EncryptionKey must be valid base64", exception.Message);
+    }
+
+    [Fact]
+    public void CreatingHost_WithTotpEncryptionKeyNot32Bytes_ThrowsInvalidOperationException()
+    {
+        using var factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder =>
+            {
+                builder.UseSetting("ConnectionStrings:AppDb", "Host=127.0.0.1;Port=1;Username=app_role;Password=unused;");
+                builder.UseSetting("StaffAccess:ApiKey", "test-staff-api-key");
+                builder.UseSetting("WebAuthn:RelyingPartyId", "limmiar.test");
+                builder.UseSetting("WebAuthn:ExpectedOrigin", "https://limmiar.test");
+                // 16 bytes, valid base64, wrong length.
+                builder.UseSetting("Totp:EncryptionKey", Convert.ToBase64String(new byte[16]));
+            });
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("Totp:EncryptionKey must decode to exactly 32 bytes", exception.Message);
+    }
+
     /// <summary>AbacatePay:WebhookSecret is the last fail-fast guard in Program.Composition.cs (BillingComposition.AddBilling runs after every other AddXxx) -- every earlier guard is set here so this test reaches it specifically.</summary>
     [Fact]
     public void CreatingHost_WithoutAbacatePayWebhookSecret_ThrowsInvalidOperationException()
@@ -74,6 +129,7 @@ public sealed class MissingConfigurationTests
                 builder.UseSetting("StaffAccess:ApiKey", "test-staff-api-key");
                 builder.UseSetting("WebAuthn:RelyingPartyId", "limmiar.test");
                 builder.UseSetting("WebAuthn:ExpectedOrigin", "https://limmiar.test");
+                builder.UseSetting("Totp:EncryptionKey", TotpTestEncryptionKey.Base64);
             });
 
         var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());

@@ -1,6 +1,9 @@
-import { createRootRoute, createRoute, createRouter } from '@tanstack/react-router'
+import { createRootRoute, createRoute, createRouter, Navigate, Outlet } from '@tanstack/react-router'
 import { AuthPage } from '../../pages/auth/AuthPage'
 import { HomePage } from '../../pages/home/HomePage'
+import { PacienteHojePage } from '../../pages/paciente-hoje/PacienteHojePage'
+import { ContactoEmergencia } from '../../widgets/contacto-emergencia/ContactoEmergencia'
+import { E2ePacienteHojeScaffold } from './E2ePacienteHojeScaffold'
 import { MagicLinkCallback } from '../../features/magic-link-auth/MagicLinkCallback'
 import { RecoveryScreen } from '../../features/recovery/RecoveryScreen'
 import { RecoveryPhraseSetupPage } from '../../pages/recovery/RecoveryPhraseSetupPage'
@@ -12,6 +15,8 @@ import { BibliotecaPage } from '../../pages/biblioteca/BibliotecaPage'
 import { parseEstadoConsentimento, type EstadoConsentimento } from '../../entities/consentimento/api'
 import { useSession } from '../../entities/account/session-context'
 import { E2eMicrofoneScaffold } from './E2eMicrofoneScaffold'
+import { E2eVinculoScaffold } from './E2eVinculoScaffold'
+import { E2ePartilhaScaffold } from './E2ePartilhaScaffold'
 
 function readSearchString(search: Record<string, unknown>, key: string): string {
   const value = search[key]
@@ -34,6 +39,11 @@ const rootRoute = createRootRoute()
 // ponytail: sem KeychainProvider ainda, `chaveiro` fica sempre `null` -- painel em "chaveiro
 // bloqueado", falha fechada por decisão humana. `notas` vazia pelo mesmo motivo (sem GET de nota).
 function IndexRouteComponent() {
+  const { sessao } = useSession()
+  // S11-01: o role já chega em produção (validado em entities/account/session.ts), redirect real.
+  if (sessao?.role === 'Patient') {
+    return <Navigate to="/hoje" />
+  }
   return <HomePage chaveiro={null} notas={[]} />
 }
 
@@ -198,6 +208,84 @@ function E2eMicrofoneRouteComponent() {
   return <E2eMicrofoneScaffold consentimento={consentimento} />
 }
 
+// S11-04 fatia 5: sem KeychainProvider ainda (mesmo motivo de e2ePacienteHojeRoute) -- o cenário
+// E2E semeia conta, token e KEK pela query string para alcançar os ecrãs de vínculo.
+interface E2eVinculoSearch {
+  baseUrl: string
+  accountId: string
+  accessToken: string
+  kek: string
+  papel: string
+  patientId: string
+}
+
+const e2eVinculoRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/e2e/vinculo',
+  validateSearch: (search: Record<string, unknown>): E2eVinculoSearch => ({
+    baseUrl: readSearchString(search, 'baseUrl'),
+    accountId: readSearchString(search, 'accountId'),
+    accessToken: readSearchString(search, 'accessToken'),
+    kek: readSearchString(search, 'kek'),
+    papel: readSearchString(search, 'papel'),
+    patientId: readSearchString(search, 'patientId'),
+  }),
+  component: E2eVinculoRouteComponent,
+})
+
+function E2eVinculoRouteComponent() {
+  const { baseUrl, accountId, accessToken, kek, papel, patientId } = e2eVinculoRoute.useSearch()
+  return (
+    <E2eVinculoScaffold
+      baseUrl={baseUrl}
+      accountId={accountId}
+      accessToken={accessToken}
+      kek={kek}
+      papel={papel}
+      patientId={patientId}
+    />
+  )
+}
+
+// S11-02 fatia 6: mesma situação de e2eVinculoRoute -- sem KeychainProvider ainda, o cenário
+// E2E semeia conta, token, KEK e o "agora" dos dois lados pela query string.
+interface E2ePartilhaSearch {
+  baseUrl: string
+  accountId: string
+  accessToken: string
+  kek: string
+  papel: string
+  agora: string
+}
+
+const e2ePartilhaRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/e2e/partilha',
+  validateSearch: (search: Record<string, unknown>): E2ePartilhaSearch => ({
+    baseUrl: readSearchString(search, 'baseUrl'),
+    accountId: readSearchString(search, 'accountId'),
+    accessToken: readSearchString(search, 'accessToken'),
+    kek: readSearchString(search, 'kek'),
+    papel: readSearchString(search, 'papel'),
+    agora: readSearchString(search, 'agora'),
+  }),
+  component: E2ePartilhaRouteComponent,
+})
+
+function E2ePartilhaRouteComponent() {
+  const { baseUrl, accountId, accessToken, kek, papel, agora } = e2ePartilhaRoute.useSearch()
+  return (
+    <E2ePartilhaScaffold
+      baseUrl={baseUrl}
+      accountId={accountId}
+      accessToken={accessToken}
+      kek={kek}
+      papel={papel}
+      agora={agora}
+    />
+  )
+}
+
 // These routes are E2E-only scaffolding and must not ship: each mounts a screen with no guard or
 // reads an accessToken/raw KEK off the query string, and a registered route is shipped and
 // linkable even when unusable.
@@ -245,22 +333,74 @@ const bibliotecaRoute = createRoute({
   component: BibliotecaRouteComponent,
 })
 
+// S11-01: layout pathless (`id`, sem `path`) -- ContactoEmergencia fica montado em TODO ecrã de
+// paciente por ser irmão do `<Outlet/>`, não por repeti-lo em cada página (invariante do ticket:
+// caminho de emergência em todos os ecrãs). Ecrã de paciente futuro entra como filho daqui.
+const pacienteLayoutRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  id: 'paciente',
+  component: PacienteLayoutComponent,
+})
+
+function PacienteLayoutComponent() {
+  return (
+    <>
+      <ContactoEmergencia />
+      <Outlet />
+    </>
+  )
+}
+
+function PacienteHojeRouteComponent() {
+  const { sessao } = useSession()
+  return <PacienteHojePage accountId={sessao?.id ?? null} kek={null} />
+}
+
+// ponytail: `kek` fixo em `null`, mesma situação do `kek={null}` de CopilotKeyPage/NotaPage --
+// sem KeychainProvider ainda. O critério "3 toques" só é provado em E2E (/e2e/paciente-hoje, com
+// uma KEK de teste pela query string), o mesmo precedente de pairPrimaryRoute.
+const pacienteHojeRoute = createRoute({
+  getParentRoute: () => pacienteLayoutRoute,
+  path: '/hoje',
+  component: PacienteHojeRouteComponent,
+})
+
+interface E2ePacienteHojeSearch {
+  accountId: string
+  // Base64 de uma KEK de teste de 32 bytes -- mesmo precedente de pairPrimaryRoute.
+  kek: string
+}
+
+const e2ePacienteHojeRoute = createRoute({
+  getParentRoute: () => pacienteLayoutRoute,
+  path: '/e2e/paciente-hoje',
+  validateSearch: (search: Record<string, unknown>): E2ePacienteHojeSearch => ({
+    accountId: readSearchString(search, 'accountId'),
+    kek: readSearchString(search, 'kek'),
+  }),
+  component: E2ePacienteHojeRouteComponent,
+})
+
+function E2ePacienteHojeRouteComponent() {
+  const { accountId, kek } = e2ePacienteHojeRoute.useSearch()
+  return <E2ePacienteHojeScaffold accountId={accountId} kek={kek} />
+}
+
+const pacienteLayoutWithChildren = pacienteLayoutRoute.addChildren([
+  pacienteHojeRoute,
+  ...(E2E_ROUTES_LIGADAS ? [e2ePacienteHojeRoute] : []),
+])
+
 const routeTree =
-  E2E_ROUTES_LIGADAS
-    ? rootRoute.addChildren([
+  rootRoute.addChildren([
         indexRoute,
         magicLinkCallbackRoute,
         copilotSettingsRoute,
         notaRoute,
         bibliotecaRoute,
-        authScreenE2ERoute,
-        pairPrimaryRoute,
-        pairNewRoute,
-        recoveryScreenE2ERoute,
-        recoveryPhraseSetupE2ERoute,
-        e2eMicrofoneRoute,
+        pacienteLayoutWithChildren,
+        ...(E2E_ROUTES_LIGADAS ? [authScreenE2ERoute, pairPrimaryRoute, pairNewRoute, recoveryScreenE2ERoute, recoveryPhraseSetupE2ERoute, e2eMicrofoneRoute, e2eVinculoRoute, e2ePartilhaRoute] : []),
       ])
-    : rootRoute.addChildren([indexRoute, magicLinkCallbackRoute, copilotSettingsRoute, notaRoute, bibliotecaRoute])
 
 export const router = createRouter({ routeTree })
 

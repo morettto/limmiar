@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Mediator;
 
 namespace Api.Accounts;
@@ -14,8 +15,12 @@ public sealed class RegisterHandler(IAccountStore store, ITwoFactorTicketIssuer 
             return AccountRegistrationResult.Failure(AccountRegistrationFailureReason.EmailAlreadyRegistered);
         }
 
+        // The verifier is already the output of a slow client-side KDF (Argon2id) -- only its
+        // SHA-256 is stored, never the verifier itself, so a store/backup dump cannot be
+        // replayed as a login. IPasswordVerifierComparer's implementation re-hashes what the
+        // client submits before comparing against this.
         var account = new Account(
-            Guid.NewGuid(), normalizedEmail, request.Role, request.PasswordVerifier, GoogleSubjectId: null,
+            Guid.NewGuid(), normalizedEmail, request.Role, SHA256.HashData(request.PasswordVerifier), GoogleSubjectId: null,
             VerificationStatus: InitialVerificationStatus(request.Role));
         await store.InsertAsync(account, cancellationToken);
         return AccountRegistrationResult.Success(account, twoFactorTicketIssuer, sessionTokenIssuer);

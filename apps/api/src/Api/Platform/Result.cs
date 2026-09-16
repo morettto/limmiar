@@ -4,9 +4,8 @@ namespace Api.Platform;
 
 /// <summary>
 /// A store/service boundary result: either a value or a typed failure reason, never both nor
-/// neither. <c>default(Result&lt;TValue, TFailure&gt;)</c> is constructible (it is a struct)
-/// and reads as a failure with reason 0 -- a real, named member in every production failure
-/// enum in this repository.
+/// neither. <c>TFailure</c> is an enum, so callers cannot accidentally use an arbitrary value as
+/// a failure reason.
 /// </summary>
 public readonly record struct Result<TValue, TFailure>
     where TValue : class
@@ -25,7 +24,7 @@ public readonly record struct Result<TValue, TFailure>
 
     public static Result<TValue, TFailure> Failure(TFailure failure) => new(null, failure);
 
-    // Unambiguous because TValue : class and TFailure : struct, Enum can never be the same type.
+    // Unambiguous because TValue : class and TFailure : struct can never be the same type.
     public static implicit operator Result<TValue, TFailure>(TValue value) => Success(value);
 
     public static implicit operator Result<TValue, TFailure>(TFailure failure) => Failure(failure);
@@ -38,6 +37,8 @@ public readonly record struct Result<TValue, TFailure>
         value = this.value;
         return this.value is not null;
     }
+
+    public TFailure FailureReason => failure;
 
     /// <summary>Calls exactly one of the two, never both.</summary>
     public TResult Match<TResult>(Func<TValue, TResult> onSuccess, Func<TFailure, TResult> onFailure) =>

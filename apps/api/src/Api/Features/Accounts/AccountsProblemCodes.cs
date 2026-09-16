@@ -54,4 +54,8 @@ public static class AccountsProblemCodes
     public const string AuthInvalidRecoveryPhrase = "auth.invalid_recovery_phrase";
 
     public const string VoiceEnrollmentNotFound = "voice.enrollment_not_found";
+
+    public const string KeyPairNotFound = "key_pair.not_found";
+
+    public const string KeyPairPublicKeyConflict = "key_pair.public_key_conflict";
 }

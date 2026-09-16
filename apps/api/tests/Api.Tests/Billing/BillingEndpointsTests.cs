@@ -116,6 +116,7 @@ public sealed class BillingEndpointsTests
                 builder.UseSetting("WebAuthn:RelyingPartyId", "limmiar.test");
                 builder.UseSetting("WebAuthn:ExpectedOrigin", "https://limmiar.test");
                 builder.UseSetting("AbacatePay:WebhookSecret", WebhookSecret);
+                builder.UseSetting("Totp:EncryptionKey", TotpTestEncryptionKey.Base64);
             });
 
     private static async Task<HttpResponseMessage> PostRawAsync(HttpClient client, byte[] body, string? signature)

@@ -12,6 +12,10 @@ public static class NpgsqlDataSourceFactory
     public static NpgsqlDataSource Create(string connectionString)
     {
         var builder = new NpgsqlSlimDataSourceBuilder(connectionString);
+        // The slim builder does not wire up array support by default (kept out for AOT/trimming
+        // size); accounts.totp_backup_code_hashes is a text[], the first array column in this
+        // codebase. EnableArrays() is documented AOT-safe (source-generated, no reflection).
+        builder.EnableArrays();
         return builder.Build();
     }
 }

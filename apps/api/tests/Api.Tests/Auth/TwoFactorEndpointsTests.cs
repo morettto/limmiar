@@ -3,18 +3,45 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Api.Accounts;
 using Api.Serialization;
+using Api.Tests.Infrastructure;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
+using Respawn;
 
 namespace Api.Tests.Auth;
 
-/// <summary>S02-03/S02-04 endpoint tests: mandatory TOTP enrollment (begin/confirm), login challenge (code or backup code), and the regression proving no support-side 2FA reset/disable route exists (ADR-S02-04). Every call into begin/confirm/challenge needs a valid two-factor ticket for the target accountId; a handful of tests that only care about a downstream AccountService mapping unreachable by a real ticket use CreateFactoryWithTicketBypass instead.</summary>
-public sealed class TwoFactorEndpointsTests
+/// <summary>S02-03/S02-04 endpoint tests: mandatory TOTP enrollment (begin/confirm), login challenge (code or backup code), and the regression proving no support-side 2FA reset/disable route exists (ADR-S02-04). Every call into begin/confirm/challenge needs a valid two-factor ticket for the target accountId; a handful of tests that only care about a downstream AccountService mapping unreachable by a real ticket use CreateFactoryWithTicketBypass instead. Accounts now live in Postgres (S11-03), hence the real fixture + Respawn reset, same discipline as SchedulingEndpointsTests.</summary>
+[Collection("Database")]
+public sealed class TwoFactorEndpointsTests : IAsyncLifetime
 {
     private static readonly byte[] SomeVerifier = CreateVerifier(0x01);
 
     private const string ValidStubCode = "111111";
+
+    private readonly PostgresContainerFixture _fixture;
+    private Respawner _respawner = null!;
+
+    public TwoFactorEndpointsTests(PostgresContainerFixture fixture)
+    {
+        _fixture = fixture;
+    }
+
+    public async Task InitializeAsync()
+    {
+        await using var adminConnection = new NpgsqlConnection(_fixture.AdminConnectionString);
+        await adminConnection.OpenAsync();
+
+        _respawner = await Respawner.CreateAsync(adminConnection, new RespawnerOptions
+        {
+            SchemasToInclude = ["public"],
+            DbAdapter = DbAdapter.Postgres,
+        });
+        await _respawner.ResetAsync(adminConnection);
+    }
+
+    public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
     public async Task PostTotp_WithProfessionalAccount_Returns200WithSecretAndProvisioningUri()
@@ -441,22 +468,23 @@ public sealed class TwoFactorEndpointsTests
     }
 
     /// <summary>Overrides the production ITotpProvider registration with StubTotpProvider -- TOTP itself is already covered by Api.Tests/Accounts/TotpProviderTests.</summary>
-    private static WebApplicationFactory<Program> CreateFactory() =>
+    private WebApplicationFactory<Program> CreateFactory() =>
         new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>
             {
                 // Same reasoning as AuthEndpointsTests.CreateFactory: never touches Postgres, but
                 // startup still needs a syntactically valid ConnectionStrings:AppDb.
-                builder.UseSetting("ConnectionStrings:AppDb", "Host=127.0.0.1;Port=1;Username=app_role;Password=unused;");
+                builder.UseSetting("ConnectionStrings:AppDb", _fixture.AppRoleConnectionString);
                 builder.UseSetting("StaffAccess:ApiKey", "test-staff-api-key");
                 builder.UseSetting("WebAuthn:RelyingPartyId", "limmiar.test");
                 builder.UseSetting("WebAuthn:ExpectedOrigin", "https://limmiar.test");
                 builder.UseSetting("AbacatePay:WebhookSecret", "whsec_test123");
+                builder.UseSetting("Totp:EncryptionKey", TotpTestEncryptionKey.Base64);
                 builder.ConfigureTestServices(services => services.AddSingleton<ITotpProvider>(new StubTotpProvider()));
             });
 
     /// <summary>For tests that only care about a downstream AccountService mapping a ticket bound to a real account can never reach -- swaps in a stub that treats any ticket as valid.</summary>
-    private static WebApplicationFactory<Program> CreateFactoryWithTicketBypass() =>
+    private WebApplicationFactory<Program> CreateFactoryWithTicketBypass() =>
         CreateFactory().WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services => services.AddSingleton<ITwoFactorTicketIssuer>(new AlwaysValidTwoFactorTicketIssuer())));
 
