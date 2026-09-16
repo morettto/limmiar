@@ -112,7 +112,7 @@ describe('criarConviteVinculo', () => {
 
   it('POSTs with no body and a bearer token, returning codigo + expiraEm on 201', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ code: 'ABCD1234EFGH', expiresAt: '2026-09-21T12:00:00Z' }), {
+      new Response(JSON.stringify({ code: INVITE_CODE, expiresAt: '2026-09-21T12:00:00Z' }), {
         status: 201,
         headers: { 'Content-Type': 'application/json' },
       }),
@@ -121,7 +121,7 @@ describe('criarConviteVinculo', () => {
 
     const result = await criarConviteVinculo('http://api.test', ACCOUNT_ID, ACCESS_TOKEN, PATIENT_ID)
 
-    expect(result).toEqual({ ok: true, codigo: 'ABCD1234EFGH', expiraEm: '2026-09-21T12:00:00Z' })
+    expect(result).toEqual({ ok: true, codigo: INVITE_CODE, expiraEm: '2026-09-21T12:00:00Z' })
     expect(fetchMock).toHaveBeenCalledWith(
       `http://api.test/accounts/${ACCOUNT_ID}/patients/${PATIENT_ID}/link-invites`,
       { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ACCESS_TOKEN}` }, body: undefined },
@@ -176,7 +176,7 @@ describe('resgatarConviteVinculo', () => {
     expect(fetchMock).toHaveBeenCalledWith(`http://api.test/accounts/${PATIENT_ACCOUNT_ID}/links`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ACCESS_TOKEN}` },
-      body: JSON.stringify({ code: 'ABCD1234EFGH' }),
+      body: JSON.stringify({ code: INVITE_CODE }),
     })
   })
 

@@ -94,7 +94,7 @@ describe('ResgatarConviteVinculo', () => {
     resgatarConviteVinculoMock.mockResolvedValue({ ok: false, code: 'link.already_linked', params: {} })
 
     await renderComponent()
-    fireEvent.change(screen.getByLabelText('Código de vínculo'), { target: { value: 'ABCD1234EFGH' } })
+    fireEvent.change(screen.getByLabelText('Código de vínculo'), { target: { value: INVITE_CODE } })
     fireEvent.click(screen.getByRole('button', { name: 'Vincular' }))
 
     expect((await screen.findByRole('alert')).textContent).toBe('Vocês já estão vinculados.')
