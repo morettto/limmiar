@@ -66,6 +66,9 @@ function carregarPartilha(p: {
       profissionalAccountId: p.accountId,
       ciphertext: item.ciphertext,
     })
+    if (String(decifrado.tipo) !== 'checkin') {
+      throw new Error('EspelhoP6: envelope decifrado não é um check-in')
+    }
     return decifrado.checkin
   })
   return { partilha: p.partilha, checkins }
