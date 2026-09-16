@@ -50,7 +50,7 @@ public sealed class AccountKeyPairServiceTests : IAsyncLifetime
         var store = new PostgresAccountStore(_dataSource, SomeTotpSecretCipher);
         var accountId = Guid.NewGuid();
         await store.InsertAsync(SomeAccount(accountId, "keypair-race@example.com"), CancellationToken.None);
-        var service = new AccountKeyPairService(store, _dataSource);
+        var service = new AccountKeyPairService(_dataSource);
 
         var pairA = new AccountKeyPair(SomePublicKey(0x01), SomeBlob(0x02), SomeBlob(0x03));
         var pairB = new AccountKeyPair(SomePublicKey(0x04), SomeBlob(0x05), SomeBlob(0x06));
@@ -70,7 +70,7 @@ public sealed class AccountKeyPairServiceTests : IAsyncLifetime
     public async Task PublishAsync_WithUnknownAccountId_ReturnsAccountNotFound()
     {
         var store = new PostgresAccountStore(_dataSource, SomeTotpSecretCipher);
-        var service = new AccountKeyPairService(store, _dataSource);
+        var service = new AccountKeyPairService(_dataSource);
 
         var result = await service.PublishAsync(
             Guid.NewGuid(), new AccountKeyPair(SomePublicKey(0x01), SomeBlob(0x02), SomeBlob(0x03)), CancellationToken.None);
@@ -93,7 +93,7 @@ public sealed class AccountKeyPairServiceTests : IAsyncLifetime
         var accountId = Guid.NewGuid();
         var account = SomeAccount(accountId, "voice-after-keypair@example.com");
         await store.InsertAsync(account, CancellationToken.None);
-        var service = new AccountKeyPairService(store, _dataSource);
+        var service = new AccountKeyPairService(_dataSource);
         var pair = new AccountKeyPair(SomePublicKey(0x07), SomeBlob(0x08), SomeBlob(0x09));
         await service.PublishAsync(accountId, pair, CancellationToken.None);
 

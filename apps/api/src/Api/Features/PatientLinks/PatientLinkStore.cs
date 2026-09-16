@@ -7,10 +7,14 @@ namespace Api.PatientLinks;
 
 public enum RedeemFailure
 {
+    AccountNotFound,
+    NotAPatient,
     InviteNotFound,
 
     AlreadyLinked,
 }
+
+public sealed record PatientLinkWithPeerKey(PatientLink Link, byte[]? PeerPublicKey);
 
 /// <summary>
 /// Convites, vínculos, envelopes partilhados e preferências de compartilhamento, todos em
@@ -156,6 +160,56 @@ public sealed class PatientLinkStore(NpgsqlDataSource dataSource, Func<DateTimeO
         return links;
     }
 
+    public async Task<IReadOnlyList<PatientLinkWithPeerKey>> ListForWithPeerKeyAsync(Guid accountId, CancellationToken cancellationToken)
+    {
+        await using var scope = await dataSource.OpenTenantScopedTransactionAsync(accountId, cancellationToken);
+        await using var command = scope.Connection.CreateCommand();
+        command.Transaction = scope.Transaction;
+        command.CommandText = """
+            SELECT l.professional_account_id, l.patient_account_id, l.patient_id, l.linked_at, kp.public_key
+            FROM patient_links l
+            LEFT JOIN account_key_pairs_public kp ON kp.account_id =
+                CASE WHEN l.professional_account_id = @accountId THEN l.patient_account_id ELSE l.professional_account_id END
+            WHERE (l.professional_account_id = @accountId OR l.patient_account_id = @accountId) AND l.unlinked_at IS NULL
+            ORDER BY l.linked_at
+            """;
+        command.Parameters.AddWithValue("accountId", accountId);
+        var result = new List<PatientLinkWithPeerKey>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            result.Add(new PatientLinkWithPeerKey(
+                new PatientLink(reader.GetGuid(0), reader.GetGuid(1), reader.GetGuid(2), reader.GetFieldValue<DateTimeOffset>(3)),
+                reader.IsDBNull(4) ? null : reader.GetFieldValue<byte[]>(4)));
+        }
+        await scope.Transaction.CommitAsync(cancellationToken);
+        return result;
+    }
+
+    public async Task<Result<PatientLinkWithPeerKey, RedeemFailure>> RedeemWithPeerKeyAsync(string code, Guid patientAccountId, CancellationToken cancellationToken)
+    {
+        var redeemed = await RedeemAsync(code, patientAccountId, cancellationToken);
+        return await redeemed.Match<Task<Result<PatientLinkWithPeerKey, RedeemFailure>>>(
+            async link =>
+            {
+                await using var scope = await dataSource.OpenTenantScopedTransactionAsync(patientAccountId, cancellationToken);
+                await using var command = scope.Connection.CreateCommand();
+                command.Transaction = scope.Transaction;
+                command.CommandText = """
+                    SELECT kp.public_key FROM patient_links l
+                    LEFT JOIN account_key_pairs_public kp ON kp.account_id = l.professional_account_id
+                    WHERE l.professional_account_id = @professionalAccountId AND l.patient_account_id = @patientAccountId
+                    ORDER BY l.linked_at DESC LIMIT 1
+                    """;
+                command.Parameters.AddWithValue("professionalAccountId", link.ProfessionalAccountId);
+                command.Parameters.AddWithValue("patientAccountId", patientAccountId);
+                var key = await command.ExecuteScalarAsync(cancellationToken) as byte[];
+                await scope.Transaction.CommitAsync(cancellationToken);
+                return new PatientLinkWithPeerKey(link, key);
+            },
+            failure => Task.FromResult<Result<PatientLinkWithPeerKey, RedeemFailure>>(failure));
+    }
+
     /// <summary>Either party may unlink. Soft (<c>unlinked_at = now</c>, S11-03 fatia 9) -- the row survives for the fatia 10 received-shares history, only the two partial unique indexes free up for a new invite. False if no ACTIVE link exists between the two accounts.</summary>
     public async Task<bool> UnlinkAsync(Guid accountId, Guid peerAccountId, CancellationToken cancellationToken)
     {
@@ -222,34 +276,48 @@ public sealed class PatientLinkStore(NpgsqlDataSource dataSource, Func<DateTimeO
     /// <summary>Null if no ACTIVE link exists between the two accounts in this direction; otherwise the items in arrival order, possibly empty. Re-linking after Unlink surfaces whatever was shared before -- the list is keyed by account pair, not by link instance. The link check and the read are two statements (unlike <see cref="ShareAsync"/>): a GET has nothing to race atomically against, it only needs the same 404-after-unlink answer <see cref="SharedItemEndpoints"/> already gives.</summary>
     public async Task<IReadOnlyList<SharedItem>?> ListSharedAsync(Guid professionalAccountId, Guid patientAccountId, CancellationToken cancellationToken)
     {
-        if (!await IsLinkedAsync(patientAccountId, professionalAccountId, professionalAccountId, cancellationToken))
-        {
-            return null;
-        }
-
         await using var scope = await dataSource.OpenTenantScopedTransactionAsync(professionalAccountId, cancellationToken);
 
         await using var selectCommand = scope.Connection.CreateCommand();
         selectCommand.Transaction = scope.Transaction;
         selectCommand.CommandText = """
-            SELECT shared_at, ciphertext FROM shared_items
-            WHERE patient_account_id = @patientAccountId AND professional_account_id = @professionalAccountId
-            ORDER BY id
+            WITH link_state AS (
+                SELECT EXISTS (
+                    SELECT 1 FROM patient_links
+                    WHERE patient_account_id = @patientAccountId
+                      AND professional_account_id = @professionalAccountId
+                      AND unlinked_at IS NULL
+                ) AS is_linked
+            )
+            SELECT link_state.is_linked, si.shared_at, si.ciphertext
+            FROM link_state
+            LEFT JOIN shared_items si ON si.patient_account_id = @patientAccountId
+                AND si.professional_account_id = @professionalAccountId
+            ORDER BY si.id
             """;
         selectCommand.Parameters.AddWithValue("patientAccountId", patientAccountId);
         selectCommand.Parameters.AddWithValue("professionalAccountId", professionalAccountId);
 
         var items = new List<SharedItem>();
+        var linked = false;
         await using (var reader = await selectCommand.ExecuteReaderAsync(cancellationToken))
         {
             while (await reader.ReadAsync(cancellationToken))
             {
-                items.Add(new SharedItem(professionalAccountId, patientAccountId, reader.GetFieldValue<DateTimeOffset>(0), reader.GetFieldValue<byte[]>(1)));
+                if (!reader.GetBoolean(0))
+                {
+                    break;
+                }
+                linked = true;
+                if (!reader.IsDBNull(1))
+                {
+                    items.Add(new SharedItem(professionalAccountId, patientAccountId, reader.GetFieldValue<DateTimeOffset>(1), reader.GetFieldValue<byte[]>(2)));
+                }
             }
         }
 
         await scope.Transaction.CommitAsync(cancellationToken);
-        return items;
+        return linked ? items : null;
     }
 
     /// <summary>
@@ -350,10 +418,9 @@ public sealed class PatientLinkStore(NpgsqlDataSource dataSource, Func<DateTimeO
     /// row exists, and a concurrent winner already advanced it past what this caller expected).
     /// Either shape returns zero rows on a lost race -- the caller then reads the current version
     /// inside the same transaction and reports it as the failure, exactly like the in-memory
-    /// version did under its lock. Proven under concurrent callers racing the same
-    /// expectedVersion by PatientLinkStoreTests.PutPreferencesAsync_ConcurrentSameExpectedVersion_ExactlyOneWins.
+    /// version did under its lock. A conflict is represented by a null result.
     /// </summary>
-    public async Task<Result<SharingPreferences, long>> PutPreferencesAsync(
+    public async Task<SharingPreferences?> PutPreferencesAsync(
         Guid accountId, long expectedVersion, byte[] wrappedDek, byte[] ciphertext, CancellationToken cancellationToken)
     {
         await using var scope = await dataSource.OpenTenantScopedTransactionAsync(accountId, cancellationToken);
@@ -393,46 +460,15 @@ public sealed class PatientLinkStore(NpgsqlDataSource dataSource, Func<DateTimeO
 
         if (updated is null)
         {
-            var currentVersion = await ReadCurrentPreferencesVersionAsync(scope, accountId, cancellationToken);
             await scope.Transaction.CommitAsync(cancellationToken);
-            return Result<SharingPreferences, long>.Failure(currentVersion);
+            return null;
         }
 
         await scope.Transaction.CommitAsync(cancellationToken);
         return updated;
     }
 
-    private static async Task<long> ReadCurrentPreferencesVersionAsync(
-        TenantScopedTransaction scope, Guid accountId, CancellationToken cancellationToken)
-    {
-        await using var selectCommand = scope.Connection.CreateCommand();
-        selectCommand.Transaction = scope.Transaction;
-        selectCommand.CommandText = "SELECT version FROM sharing_preferences WHERE account_id = @accountId";
-        selectCommand.Parameters.AddWithValue("accountId", accountId);
-
-        var currentVersion = await selectCommand.ExecuteScalarAsync(cancellationToken);
-        return currentVersion is long version ? version : 0;
-    }
-
     private static SharingPreferences ReadPreferences(NpgsqlDataReader reader) =>
         new(reader.GetInt64(0), reader.GetFieldValue<byte[]>(1), reader.GetFieldValue<byte[]>(2));
 
-    /// <summary><paramref name="tenantId"/> is whichever side is calling (accountId in the endpoint) -- the RLS policy on patient_links only shows rows where that side matches, so an unrelated caller sees zero rows regardless of the WHERE clause below.</summary>
-    private async Task<bool> IsLinkedAsync(Guid patientAccountId, Guid professionalAccountId, Guid tenantId, CancellationToken cancellationToken)
-    {
-        await using var scope = await dataSource.OpenTenantScopedTransactionAsync(tenantId, cancellationToken);
-
-        await using var selectCommand = scope.Connection.CreateCommand();
-        selectCommand.Transaction = scope.Transaction;
-        selectCommand.CommandText = """
-            SELECT 1 FROM patient_links
-            WHERE patient_account_id = @patientAccountId AND professional_account_id = @professionalAccountId AND unlinked_at IS NULL
-            """;
-        selectCommand.Parameters.AddWithValue("patientAccountId", patientAccountId);
-        selectCommand.Parameters.AddWithValue("professionalAccountId", professionalAccountId);
-
-        var result = await selectCommand.ExecuteScalarAsync(cancellationToken);
-        await scope.Transaction.CommitAsync(cancellationToken);
-        return result is not null;
-    }
 }

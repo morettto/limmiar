@@ -160,7 +160,7 @@ public sealed class PostgresAccountStore(NpgsqlDataSource dataSource, TotpSecret
         command.Parameters.AddWithValue("verificationStatus", account.VerificationStatus.ToString());
         command.Parameters.AddWithValue("rejectionReason", (object?)account.RejectionReason ?? DBNull.Value);
         command.Parameters.AddWithValue("verificationSubmittedAt", (object?)account.VerificationSubmittedAt ?? DBNull.Value);
-        command.Parameters.AddWithValue("totpSecret", account.TotpSecret is { } totpSecret ? totpSecretCipher.Encrypt(totpSecret) : DBNull.Value);
+        command.Parameters.AddWithValue("totpSecret", account.TotpSecret is { } totpSecret ? totpSecretCipher.Encrypt(account.Id, totpSecret) : DBNull.Value);
         command.Parameters.AddWithValue("totpEnabledAt", (object?)account.TotpEnabledAt ?? DBNull.Value);
         command.Parameters.AddWithValue("totpBackupCodeHashes", (object?)account.TotpBackupCodeHashes?.ToArray() ?? DBNull.Value);
         command.Parameters.AddWithValue("webauthnCredentialId", (object?)account.WebAuthnCredentialId ?? DBNull.Value);
@@ -174,26 +174,31 @@ public sealed class PostgresAccountStore(NpgsqlDataSource dataSource, TotpSecret
 
     private Account ReadAccount(NpgsqlDataReader reader)
     {
-        var wrappedDek = reader.IsDBNull(16) ? null : reader.GetFieldValue<byte[]>(16);
-        var sealedEmbedding = reader.IsDBNull(17) ? null : reader.GetFieldValue<byte[]>(17);
+        int Ord(string name) => reader.GetOrdinal(name);
+        var wrappedDek = reader.IsDBNull(Ord("voice_wrapped_dek")) ? null : reader.GetFieldValue<byte[]>(Ord("voice_wrapped_dek"));
+        var sealedEmbedding = reader.IsDBNull(Ord("voice_sealed_embedding")) ? null : reader.GetFieldValue<byte[]>(Ord("voice_sealed_embedding"));
+        if (wrappedDek is not null && sealedEmbedding is null)
+        {
+            throw new InvalidOperationException("An account voice enrollment is missing its sealed embedding.");
+        }
 
         return new Account(
-            Id: reader.GetGuid(0),
-            Email: reader.GetString(1),
-            Role: Enum.Parse<AccountRole>(reader.GetString(2)),
-            PasswordVerifier: reader.IsDBNull(3) ? null : reader.GetFieldValue<byte[]>(3),
-            GoogleSubjectId: reader.IsDBNull(4) ? null : reader.GetString(4),
-            VerificationStatus: Enum.Parse<AccountVerificationStatus>(reader.GetString(5)),
-            RejectionReason: reader.IsDBNull(6) ? null : reader.GetString(6),
-            VerificationSubmittedAt: reader.IsDBNull(7) ? null : reader.GetFieldValue<DateTimeOffset>(7),
-            TotpSecret: reader.IsDBNull(8) ? null : totpSecretCipher.Decrypt(reader.GetFieldValue<byte[]>(8)),
-            TotpEnabledAt: reader.IsDBNull(9) ? null : reader.GetFieldValue<DateTimeOffset>(9),
-            TotpBackupCodeHashes: reader.IsDBNull(10) ? null : reader.GetFieldValue<string[]>(10),
-            WebAuthnCredentialId: reader.IsDBNull(11) ? null : reader.GetFieldValue<byte[]>(11),
-            WebAuthnCosePublicKey: reader.IsDBNull(12) ? null : reader.GetFieldValue<byte[]>(12),
-            WebAuthnSignCount: reader.IsDBNull(13) ? null : (uint)reader.GetInt64(13),
-            WebAuthnAaGuid: reader.IsDBNull(14) ? null : reader.GetGuid(14),
-            RecoveryVerifier: reader.IsDBNull(15) ? null : reader.GetFieldValue<byte[]>(15),
-            VoiceEnrollment: wrappedDek is null ? null : new VoiceEnrollment(wrappedDek, sealedEmbedding!));
+            Id: reader.GetGuid(Ord("id")),
+            Email: reader.GetString(Ord("email")),
+            Role: Enum.Parse<AccountRole>(reader.GetString(Ord("role"))),
+            PasswordVerifier: reader.IsDBNull(Ord("password_verifier_sha256")) ? null : reader.GetFieldValue<byte[]>(Ord("password_verifier_sha256")),
+            GoogleSubjectId: reader.IsDBNull(Ord("google_subject_id")) ? null : reader.GetString(Ord("google_subject_id")),
+            VerificationStatus: Enum.Parse<AccountVerificationStatus>(reader.GetString(Ord("verification_status"))),
+            RejectionReason: reader.IsDBNull(Ord("rejection_reason")) ? null : reader.GetString(Ord("rejection_reason")),
+            VerificationSubmittedAt: reader.IsDBNull(Ord("verification_submitted_at")) ? null : reader.GetFieldValue<DateTimeOffset>(Ord("verification_submitted_at")),
+            TotpSecret: reader.IsDBNull(Ord("totp_secret_encrypted")) ? null : totpSecretCipher.Decrypt(reader.GetGuid(Ord("id")), reader.GetFieldValue<byte[]>(Ord("totp_secret_encrypted"))),
+            TotpEnabledAt: reader.IsDBNull(Ord("totp_enabled_at")) ? null : reader.GetFieldValue<DateTimeOffset>(Ord("totp_enabled_at")),
+            TotpBackupCodeHashes: reader.IsDBNull(Ord("totp_backup_code_hashes")) ? null : reader.GetFieldValue<string[]>(Ord("totp_backup_code_hashes")),
+            WebAuthnCredentialId: reader.IsDBNull(Ord("webauthn_credential_id")) ? null : reader.GetFieldValue<byte[]>(Ord("webauthn_credential_id")),
+            WebAuthnCosePublicKey: reader.IsDBNull(Ord("webauthn_cose_public_key")) ? null : reader.GetFieldValue<byte[]>(Ord("webauthn_cose_public_key")),
+            WebAuthnSignCount: reader.IsDBNull(Ord("webauthn_sign_count")) ? null : (uint)reader.GetInt64(Ord("webauthn_sign_count")),
+            WebAuthnAaGuid: reader.IsDBNull(Ord("webauthn_aaguid")) ? null : reader.GetGuid(Ord("webauthn_aaguid")),
+            RecoveryVerifier: reader.IsDBNull(Ord("recovery_verifier_sha256")) ? null : reader.GetFieldValue<byte[]>(Ord("recovery_verifier_sha256")),
+            VoiceEnrollment: wrappedDek is null ? null : new VoiceEnrollment(wrappedDek, sealedEmbedding ?? throw new InvalidOperationException("An account voice enrollment is missing its sealed embedding.")));
     }
 }

@@ -2,7 +2,6 @@ namespace Api.Accounts;
 
 public static class TwoFactorComposition
 {
-    private const int TotpEncryptionKeyLengthBytes = 32;
 
     public static void AddTwoFactor(this IServiceCollection services, IConfiguration configuration)
     {
@@ -30,11 +29,6 @@ public static class TwoFactorComposition
         catch (FormatException ex)
         {
             throw new InvalidOperationException("Totp:EncryptionKey must be valid base64.", ex);
-        }
-
-        if (key.Length != TotpEncryptionKeyLengthBytes)
-        {
-            throw new InvalidOperationException($"Totp:EncryptionKey must decode to exactly {TotpEncryptionKeyLengthBytes} bytes, got {key.Length}.");
         }
 
         return key;

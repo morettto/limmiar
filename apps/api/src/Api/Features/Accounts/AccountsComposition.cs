@@ -21,7 +21,7 @@ public static class AccountsComposition
         services.AddProfessionalVerification(configuration);
         services.AddVoiceEnrollment();
         services.AddTwoFactor(configuration);
-        services.AddSingleton(sp => new AccountKeyPairService(sp.GetRequiredService<IAccountStore>(), sp.GetRequiredService<NpgsqlDataSource>()));
+        services.AddSingleton(sp => new AccountKeyPairService(sp.GetRequiredService<NpgsqlDataSource>()));
 
         services.ConfigureHttpJsonOptions(options =>
         {

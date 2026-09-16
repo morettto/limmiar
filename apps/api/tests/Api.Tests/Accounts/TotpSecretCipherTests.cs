@@ -12,8 +12,8 @@ public sealed class TotpSecretCipherTests
     {
         var cipher = new TotpSecretCipher(SomeKey);
 
-        var encrypted = cipher.Encrypt("GENERATEDSECRETXYZ");
-        var decrypted = cipher.Decrypt(encrypted);
+        var encrypted = cipher.Encrypt(Guid.Empty, "GENERATEDSECRETXYZ");
+        var decrypted = cipher.Decrypt(Guid.Empty, encrypted);
 
         Assert.Equal("GENERATEDSECRETXYZ", decrypted);
     }
@@ -26,8 +26,8 @@ public sealed class TotpSecretCipherTests
         // visible from a dump alone).
         var cipher = new TotpSecretCipher(SomeKey);
 
-        var first = cipher.Encrypt("GENERATEDSECRETXYZ");
-        var second = cipher.Encrypt("GENERATEDSECRETXYZ");
+        var first = cipher.Encrypt(Guid.Empty, "GENERATEDSECRETXYZ");
+        var second = cipher.Encrypt(Guid.Empty, "GENERATEDSECRETXYZ");
 
         Assert.NotEqual(first, second);
     }
@@ -36,20 +36,20 @@ public sealed class TotpSecretCipherTests
     public void Decrypt_WithTamperedCiphertext_ThrowsCryptographicException()
     {
         var cipher = new TotpSecretCipher(SomeKey);
-        var encrypted = cipher.Encrypt("GENERATEDSECRETXYZ");
+        var encrypted = cipher.Encrypt(Guid.Empty, "GENERATEDSECRETXYZ");
         encrypted[^1] ^= 0xFF;
 
-        Assert.ThrowsAny<CryptographicException>(() => cipher.Decrypt(encrypted));
+        Assert.ThrowsAny<CryptographicException>(() => cipher.Decrypt(Guid.Empty, encrypted));
     }
 
     [Fact]
     public void Decrypt_WithWrongKey_ThrowsCryptographicException()
     {
         var cipher = new TotpSecretCipher(SomeKey);
-        var encrypted = cipher.Encrypt("GENERATEDSECRETXYZ");
+        var encrypted = cipher.Encrypt(Guid.Empty, "GENERATEDSECRETXYZ");
         var otherCipher = new TotpSecretCipher(RandomNumberGenerator.GetBytes(32));
 
-        Assert.ThrowsAny<CryptographicException>(() => otherCipher.Decrypt(encrypted));
+        Assert.ThrowsAny<CryptographicException>(() => otherCipher.Decrypt(Guid.Empty, encrypted));
     }
 
     [Theory]
@@ -71,6 +71,6 @@ public sealed class TotpSecretCipherTests
         var cipher = new TotpSecretCipher(SomeKey);
         var tooShort = new byte[blobLength];
 
-        Assert.Throws<ArgumentException>(() => cipher.Decrypt(tooShort));
+        Assert.Throws<ArgumentException>(() => cipher.Decrypt(Guid.Empty, tooShort));
     }
 }

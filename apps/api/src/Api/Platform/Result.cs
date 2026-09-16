@@ -4,16 +4,12 @@ namespace Api.Platform;
 
 /// <summary>
 /// A store/service boundary result: either a value or a typed failure reason, never both nor
-/// neither. <c>TFailure</c> may be any struct, not only an enum -- e.g. <c>long</c>, the current
-/// version on a CAS conflict. <c>default(Result&lt;TValue, TFailure&gt;)</c> is constructible (it
-/// is a struct) and reads as a failure with reason <c>default(TFailure)</c> -- for every enum
-/// <c>TFailure</c> in this repository that is a real, named member (0); for a non-enum
-/// <c>TFailure</c> such as <c>long</c> (an optimistic-concurrency version number), it is the
-/// type's own default (0).
+/// neither. <c>TFailure</c> is an enum, so callers cannot accidentally use an arbitrary value as
+/// a failure reason.
 /// </summary>
 public readonly record struct Result<TValue, TFailure>
     where TValue : class
-    where TFailure : struct
+    where TFailure : struct, Enum
 {
     private readonly TValue? value;
     private readonly TFailure failure;

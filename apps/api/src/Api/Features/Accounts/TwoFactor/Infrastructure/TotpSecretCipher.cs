@@ -15,6 +15,7 @@ namespace Api.Accounts;
 /// </summary>
 public sealed class TotpSecretCipher
 {
+    private const byte CurrentVersion = 1;
     private const int KeyLengthBytes = 32;
     private const int NonceLengthBytes = 12;
     private const int TagLengthBytes = 16;
@@ -32,7 +33,7 @@ public sealed class TotpSecretCipher
     }
 
     /// <summary>Layout: nonce (12 bytes) || ciphertext (same length as plaintext) || tag (16 bytes) -- one self-contained blob per encryption, a fresh random nonce every call.</summary>
-    public byte[] Encrypt(string plaintextSecret)
+    public byte[] Encrypt(Guid accountId, string plaintextSecret)
     {
         var plaintextBytes = Encoding.ASCII.GetBytes(plaintextSecret);
         var nonce = RandomNumberGenerator.GetBytes(NonceLengthBytes);
@@ -40,18 +41,19 @@ public sealed class TotpSecretCipher
         var tag = new byte[TagLengthBytes];
 
         using var aesGcm = new AesGcm(_key, TagLengthBytes);
-        aesGcm.Encrypt(nonce, plaintextBytes, ciphertext, tag);
+        aesGcm.Encrypt(nonce, plaintextBytes, ciphertext, tag, accountId.ToByteArray());
 
-        var result = new byte[NonceLengthBytes + ciphertext.Length + TagLengthBytes];
-        nonce.CopyTo(result, 0);
-        ciphertext.CopyTo(result, NonceLengthBytes);
-        tag.CopyTo(result, NonceLengthBytes + ciphertext.Length);
+        var result = new byte[1 + NonceLengthBytes + ciphertext.Length + TagLengthBytes];
+        result[0] = CurrentVersion;
+        nonce.CopyTo(result, 1);
+        ciphertext.CopyTo(result, 1 + NonceLengthBytes);
+        tag.CopyTo(result, 1 + NonceLengthBytes + ciphertext.Length);
         return result;
     }
 
-    public string Decrypt(byte[] encrypted)
+    public string Decrypt(Guid accountId, byte[] encrypted)
     {
-        var minimumLengthBytes = NonceLengthBytes + TagLengthBytes;
+        var minimumLengthBytes = 1 + NonceLengthBytes + TagLengthBytes;
         if (encrypted.Length < minimumLengthBytes)
         {
             throw new ArgumentException(
@@ -59,13 +61,18 @@ public sealed class TotpSecretCipher
                 nameof(encrypted));
         }
 
-        var nonce = encrypted.AsSpan(0, NonceLengthBytes);
-        var ciphertext = encrypted.AsSpan(NonceLengthBytes, encrypted.Length - NonceLengthBytes - TagLengthBytes);
+        if (encrypted[0] != CurrentVersion)
+        {
+            throw new CryptographicException($"Unsupported TOTP encryption key version: {encrypted[0]}.");
+        }
+
+        var nonce = encrypted.AsSpan(1, NonceLengthBytes);
+        var ciphertext = encrypted.AsSpan(1 + NonceLengthBytes, encrypted.Length - 1 - NonceLengthBytes - TagLengthBytes);
         var tag = encrypted.AsSpan(encrypted.Length - TagLengthBytes, TagLengthBytes);
 
         var plaintextBytes = new byte[ciphertext.Length];
         using var aesGcm = new AesGcm(_key, TagLengthBytes);
-        aesGcm.Decrypt(nonce, ciphertext, tag, plaintextBytes);
+        aesGcm.Decrypt(nonce, ciphertext, tag, plaintextBytes, accountId.ToByteArray());
 
         return Encoding.ASCII.GetString(plaintextBytes);
     }

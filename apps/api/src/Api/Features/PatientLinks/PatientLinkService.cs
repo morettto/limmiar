@@ -10,17 +10,6 @@ public enum CreateInviteFailure
     NotAuthorized,
 }
 
-public enum RedeemLinkFailure
-{
-    AccountNotFound,
-
-    NotAPatient,
-
-    InviteNotFound,
-
-    AlreadyLinked,
-}
-
 /// <summary>Same shape as <see cref="AccountKeyPair"/>: the fields the client needs to encrypt/decrypt to the peer, never the peer's private material.</summary>
 public sealed record LinkView(Guid ProfessionalAccountId, Guid PatientAccountId, Guid PatientId, DateTimeOffset LinkedAt, byte[]? PeerPublicKey);
 
@@ -28,7 +17,7 @@ public sealed record LinkView(Guid ProfessionalAccountId, Guid PatientAccountId,
 /// Role checks and account lookups around <see cref="PatientLinkStore"/>: the store knows
 /// nothing about accounts or roles, only codes and pairs of ids.
 /// </summary>
-public sealed class PatientLinkService(IAccountStore accounts, PatientLinkStore links, AccountKeyPairService keyPairs)
+public sealed class PatientLinkService(IAccountStore accounts, PatientLinkStore links)
 {
     /// <summary>Same guard as ConsentService.RecordAsync/NoteService.SignAsync: generating an invite for a patientId carries the same authorization risk as creating a patient record.</summary>
     public async Task<Result<LinkInvite, CreateInviteFailure>> CreateInviteAsync(
@@ -48,37 +37,35 @@ public sealed class PatientLinkService(IAccountStore accounts, PatientLinkStore 
         return await links.CreateInviteAsync(professionalAccountId, patientId, cancellationToken);
     }
 
-    public async Task<Result<LinkView, RedeemLinkFailure>> RedeemAsync(
+    public async Task<Result<LinkView, RedeemFailure>> RedeemAsync(
         Guid patientAccountId, string code, CancellationToken cancellationToken)
     {
         var account = await accounts.FindByIdAsync(patientAccountId, cancellationToken);
         if (account is null)
         {
-            return RedeemLinkFailure.AccountNotFound;
+            return RedeemFailure.AccountNotFound;
         }
 
         if (account.Role != AccountRole.Patient)
         {
-            return RedeemLinkFailure.NotAPatient;
+            return RedeemFailure.NotAPatient;
         }
 
-        var redeemResult = await links.RedeemAsync(code, patientAccountId, cancellationToken);
-        return await redeemResult.Match(
+        var redeemResult = await links.RedeemWithPeerKeyAsync(code, patientAccountId, cancellationToken);
+        return await redeemResult.Match<Task<Result<LinkView, RedeemFailure>>>(
             async link =>
             {
-                Result<LinkView, RedeemLinkFailure> view = await ToViewAsync(link, patientAccountId, cancellationToken);
-                return view;
+                return new LinkView(link.Link.ProfessionalAccountId, link.Link.PatientAccountId, link.Link.PatientId, link.Link.LinkedAt, link.PeerPublicKey);
             },
-            failure => Task.FromResult<Result<LinkView, RedeemLinkFailure>>(
-                failure == RedeemFailure.InviteNotFound ? RedeemLinkFailure.InviteNotFound : RedeemLinkFailure.AlreadyLinked));
+            failure => Task.FromResult<Result<LinkView, RedeemFailure>>(failure));
     }
 
     public async Task<IReadOnlyList<LinkView>> ListAsync(Guid accountId, CancellationToken cancellationToken)
     {
         var views = new List<LinkView>();
-        foreach (var link in await links.ListForAsync(accountId, cancellationToken))
+        foreach (var link in await links.ListForWithPeerKeyAsync(accountId, cancellationToken))
         {
-            views.Add(await ToViewAsync(link, accountId, cancellationToken));
+            views.Add(new LinkView(link.Link.ProfessionalAccountId, link.Link.PatientAccountId, link.Link.PatientId, link.Link.LinkedAt, link.PeerPublicKey));
         }
 
         return views;
@@ -87,10 +74,4 @@ public sealed class PatientLinkService(IAccountStore accounts, PatientLinkStore 
     public async Task<bool> UnlinkAsync(Guid accountId, Guid peerAccountId, CancellationToken cancellationToken) =>
         await links.UnlinkAsync(accountId, peerAccountId, cancellationToken);
 
-    private async Task<LinkView> ToViewAsync(PatientLink link, Guid viewerAccountId, CancellationToken cancellationToken)
-    {
-        var peerAccountId = viewerAccountId == link.ProfessionalAccountId ? link.PatientAccountId : link.ProfessionalAccountId;
-        var peerPair = await keyPairs.GetAsync(peerAccountId, cancellationToken);
-        return new LinkView(link.ProfessionalAccountId, link.PatientAccountId, link.PatientId, link.LinkedAt, peerPair?.PublicKey);
-    }
 }

@@ -23,17 +23,11 @@ public enum PublishKeyPairFailure
 /// racing to generate a pair converge on one even across machines/processes (a
 /// <c>SemaphoreSlim</c> only ever serialized one process).
 /// </summary>
-public sealed class AccountKeyPairService(IAccountStore accounts, NpgsqlDataSource dataSource)
+public sealed class AccountKeyPairService(NpgsqlDataSource dataSource)
 {
     public async Task<Result<AccountKeyPair, PublishKeyPairFailure>> PublishAsync(
         Guid accountId, AccountKeyPair pair, CancellationToken cancellationToken)
     {
-        var account = await accounts.FindByIdAsync(accountId, cancellationToken);
-        if (account is null)
-        {
-            return PublishKeyPairFailure.AccountNotFound;
-        }
-
         await using var scope = await dataSource.OpenTenantScopedTransactionAsync(accountId, cancellationToken);
 
         await using var upsertCommand = scope.Connection.CreateCommand();
@@ -54,11 +48,14 @@ public sealed class AccountKeyPairService(IAccountStore accounts, NpgsqlDataSour
         upsertCommand.Parameters.AddWithValue("sealedPrivateKey", pair.SealedPrivateKey);
 
         AccountKeyPair? stored;
-        await using (var reader = await upsertCommand.ExecuteReaderAsync(cancellationToken))
+        try
         {
-            // No row back means the conflicting row's public_key differs from EXCLUDED's --
-            // the WHERE guard on the DO UPDATE skipped the write, so nothing to return.
+            await using var reader = await upsertCommand.ExecuteReaderAsync(cancellationToken);
             stored = await reader.ReadAsync(cancellationToken) ? ReadKeyPair(reader) : null;
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.ForeignKeyViolation)
+        {
+            return PublishKeyPairFailure.AccountNotFound;
         }
 
         if (stored is null)

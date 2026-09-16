@@ -36,7 +36,10 @@ export async function partilharCheckIn(p: {
   const partilhadoCom: string[] = []
   for (const vinculo of dest) {
     // destinatarios() já garante chavePublicaDoPar !== null para cada vínculo devolvido.
-    const publicaProfissional = vinculo.chavePublicaDoPar as Uint8Array
+    if (vinculo.chavePublicaDoPar === null) {
+      throw new Error('partilharCheckIn: vínculo sem chave pública')
+    }
+    const publicaProfissional = vinculo.chavePublicaDoPar
     const ciphertext = cifrarItem({
       privadaPaciente: privateKey,
       publicaProfissional,

@@ -8,7 +8,6 @@ import { decifrarItem } from '../../entities/partilha/cifra'
 import { listarSessoes } from '../../entities/agenda/api'
 import { horaDaSessao, type SessaoAgendada } from '../../entities/agenda/sessao'
 import { janelaDoEspelho, montarEspelho, type Espelho } from './espelho'
-import type { ItemPartilhado } from './partilha'
 
 export interface EspelhoP6Props {
   baseUrl: string
@@ -55,18 +54,19 @@ function carregarPartilha(p: {
   privateKey: Uint8Array
   partilha: PartilhaRecebida
 }): { partilha: PartilhaRecebida; checkins: CheckIn[] } {
+  if (p.partilha.chavePublicaDoPar === null) {
+    throw new Error('EspelhoP6: envelope sem chave pública do par')
+  }
+  const publicaPaciente = p.partilha.chavePublicaDoPar
   const checkins = p.partilha.itens.map((item) => {
     const decifrado = decifrarItem({
       privadaProfissional: p.privateKey,
-      publicaPaciente: p.partilha.chavePublicaDoPar as Uint8Array,
+      publicaPaciente,
       pacienteAccountId: p.partilha.pacienteAccountId,
       profissionalAccountId: p.accountId,
       ciphertext: item.ciphertext,
     })
-    if ((decifrado as { tipo?: unknown } | null)?.tipo !== 'checkin') {
-      throw new Error('EspelhoP6: envelope decifrado não é um check-in')
-    }
-    return (decifrado as ItemPartilhado).checkin
+    return decifrado.checkin
   })
   return { partilha: p.partilha, checkins }
 }
@@ -112,7 +112,7 @@ export function EspelhoP6({ baseUrl, accountId, accessToken, kek, agora }: Espel
   const [carga, setCarga] = useState<Carga>({ status: 'carregando' })
 
   useEffect(() => {
-    let cancelado = false
+    const controller = new AbortController()
     async function carregar() {
       let proxima: Carga
       try {
@@ -120,13 +120,13 @@ export function EspelhoP6({ baseUrl, accountId, accessToken, kek, agora }: Espel
       } catch {
         proxima = { status: 'erro' }
       }
-      if (!cancelado) {
+      if (!controller.signal.aborted) {
         setCarga(proxima)
       }
     }
     void carregar()
     return () => {
-      cancelado = true
+      controller.abort()
     }
   }, [baseUrl, accountId, accessToken, kek, momento])
 

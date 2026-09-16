@@ -91,7 +91,7 @@ describe('EspelhoP6', () => {
       partilhas: [
         { ...PARTILHA_ANA, itens: [{ partilhadoEm: '2026-01-16T10:00:00.000Z', ciphertext: new Uint8Array([1]) }] },
       ],
-    })
+    } as never)
     vi.mocked(decifrarItem).mockReturnValueOnce(itemPartilhado('2026-01-16', 3, 2, 'dia difícil'))
     const inicioSessao = new Date(2026, 0, 16, 9, 0).toISOString()
     vi.mocked(listarSessoes).mockResolvedValue({
@@ -268,7 +268,7 @@ describe('EspelhoP6', () => {
     vi.mocked(decifrarItem).mockReturnValueOnce({
       tipo: 'outro',
       checkin: { dia: '2026-01-16', sono: 5, ansiedade: 5, frase: 'não deveria aparecer' },
-    })
+    } as never)
     vi.mocked(listarSessoes).mockResolvedValue({ ok: true, sessoes: [] })
 
     renderComponente()
@@ -285,7 +285,7 @@ describe('EspelhoP6', () => {
         { ...PARTILHA_ANA, itens: [{ partilhadoEm: '2026-01-16T10:00:00.000Z', ciphertext: new Uint8Array([1]) }] },
       ],
     })
-    vi.mocked(decifrarItem).mockReturnValueOnce(null)
+    vi.mocked(decifrarItem).mockImplementationOnce(() => { throw new Error('invalid envelope') })
     vi.mocked(listarSessoes).mockResolvedValue({ ok: true, sessoes: [] })
 
     renderComponente()

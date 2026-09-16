@@ -386,36 +386,20 @@ function E2ePacienteHojeRouteComponent() {
   return <E2ePacienteHojeScaffold accountId={accountId} kek={kek} />
 }
 
-const pacienteLayoutWithChildren =
-  import.meta.env.VITE_ENABLE_E2E_TEST_ROUTES === 'true'
-    ? pacienteLayoutRoute.addChildren([pacienteHojeRoute, e2ePacienteHojeRoute])
-    : pacienteLayoutRoute.addChildren([pacienteHojeRoute])
+const pacienteLayoutWithChildren = pacienteLayoutRoute.addChildren([
+  pacienteHojeRoute,
+  ...(E2E_ROUTES_LIGADAS ? [e2ePacienteHojeRoute] : []),
+])
 
 const routeTree =
-  E2E_ROUTES_LIGADAS
-    ? rootRoute.addChildren([
+  rootRoute.addChildren([
         indexRoute,
         magicLinkCallbackRoute,
         copilotSettingsRoute,
         notaRoute,
         bibliotecaRoute,
         pacienteLayoutWithChildren,
-        authScreenE2ERoute,
-        pairPrimaryRoute,
-        pairNewRoute,
-        recoveryScreenE2ERoute,
-        recoveryPhraseSetupE2ERoute,
-        e2eMicrofoneRoute,
-        e2eVinculoRoute,
-        e2ePartilhaRoute,
-      ])
-    : rootRoute.addChildren([
-        indexRoute,
-        magicLinkCallbackRoute,
-        copilotSettingsRoute,
-        notaRoute,
-        bibliotecaRoute,
-        pacienteLayoutWithChildren,
+        ...(E2E_ROUTES_LIGADAS ? [authScreenE2ERoute, pairPrimaryRoute, pairNewRoute, recoveryScreenE2ERoute, recoveryPhraseSetupE2ERoute, e2eMicrofoneRoute, e2eVinculoRoute, e2ePartilhaRoute] : []),
       ])
 
 export const router = createRouter({ routeTree })

@@ -11,8 +11,7 @@ public static class PatientLinksComposition
         services.AddSingleton(sp => new PatientLinkStore(sp.GetRequiredService<NpgsqlDataSource>()));
         services.AddSingleton(sp => new PatientLinkService(
             sp.GetRequiredService<IAccountStore>(),
-            sp.GetRequiredService<PatientLinkStore>(),
-            sp.GetRequiredService<AccountKeyPairService>()));
+            sp.GetRequiredService<PatientLinkStore>()));
 
         services.ConfigureHttpJsonOptions(options =>
         {

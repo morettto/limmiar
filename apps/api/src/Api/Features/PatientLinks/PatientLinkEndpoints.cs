@@ -112,7 +112,7 @@ public static class PatientLinkEndpoints
             _ => throw new ArgumentOutOfRangeException(nameof(reason), reason, null),
         };
 
-    // [ExcludeFromCodeCoverage] justification: every named RedeemLinkFailure arm reachable from
+    // [ExcludeFromCodeCoverage] justification: every named RedeemFailure arm reachable from
     // HandleRedeemAsync is exercised by a dedicated test --
     //   AccountNotFound -> Redeem_WithUnknownAccountId_Returns404WithProblemDetails
     //   NotAPatient     -> Redeem_ByProfessionalAccount_Returns403WithProblemDetails
@@ -122,16 +122,16 @@ public static class PatientLinkEndpoints
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage(Justification =
         "Every named case is covered by a dedicated test (see comment above); the remaining " +
         "gap is the compiler-generated unreachable fallback for the switch expression.")]
-    private static JsonHttpResult<LimmiarProblemDetails> MapRedeemFailureToProblem(RedeemLinkFailure reason) =>
+    private static JsonHttpResult<LimmiarProblemDetails> MapRedeemFailureToProblem(RedeemFailure reason) =>
         reason switch
         {
-            RedeemLinkFailure.AccountNotFound =>
+            RedeemFailure.AccountNotFound =>
                 ProblemJson(StatusCodes.Status404NotFound, "Account not found", AccountsProblemCodes.AuthAccountNotFound),
-            RedeemLinkFailure.NotAPatient =>
+            RedeemFailure.NotAPatient =>
                 ProblemJson(StatusCodes.Status403Forbidden, "Account is not a patient", PatientLinksProblemCodes.LinkNotAuthorized),
-            RedeemLinkFailure.InviteNotFound =>
+            RedeemFailure.InviteNotFound =>
                 ProblemJson(StatusCodes.Status404NotFound, "Link invite not found", PatientLinksProblemCodes.LinkInviteNotFound),
-            RedeemLinkFailure.AlreadyLinked =>
+            RedeemFailure.AlreadyLinked =>
                 ProblemJson(StatusCodes.Status409Conflict, "Accounts are already linked", PatientLinksProblemCodes.LinkAlreadyLinked),
             _ => throw new ArgumentOutOfRangeException(nameof(reason), reason, null),
         };

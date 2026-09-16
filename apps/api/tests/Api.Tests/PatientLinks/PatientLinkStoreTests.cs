@@ -448,7 +448,7 @@ public sealed class PatientLinkStoreTests : IAsyncLifetime
     {
         var store = await LinkedStoreAsync();
         var accountStore = new Api.Accounts.PostgresAccountStore(_dataSource, new Api.Accounts.TotpSecretCipher(new byte[32]));
-        var keyPairs = new Api.Accounts.AccountKeyPairService(accountStore, _dataSource);
+        var keyPairs = new Api.Accounts.AccountKeyPairService(_dataSource);
         var publicKey = SomeBlob(0xAB, 32);
         await keyPairs.PublishAsync(
             PatientAccountId,
@@ -491,12 +491,12 @@ public sealed class PatientLinkStoreTests : IAsyncLifetime
 
         var result = await store.PutPreferencesAsync(accountId, 0, SomeCiphertext(0xA0), SomeCiphertext(0xA1), CancellationToken.None);
 
-        Assert.True(result.TryGetValue(out var preferences));
-        Assert.Equal(1, preferences!.Version);
+        Assert.NotNull(result);
+        Assert.Equal(1, result.Version);
         // Assert.Equivalent (not Equal): byte[] is not IEquatable, so record equality on
         // SharingPreferences falls back to reference equality -- same gap fatia 6 hit on
         // PostgresAccountStoreTests round-trips.
-        Assert.Equivalent(preferences, await store.GetPreferencesAsync(accountId, CancellationToken.None));
+        Assert.Equivalent(result, await store.GetPreferencesAsync(accountId, CancellationToken.None));
     }
 
     [Fact]
@@ -508,8 +508,7 @@ public sealed class PatientLinkStoreTests : IAsyncLifetime
 
         var result = await store.PutPreferencesAsync(accountId, 0, SomeCiphertext(0xB0), SomeCiphertext(0xB1), CancellationToken.None);
 
-        var failure = result.Match(_ => (long?)null, currentVersion => currentVersion);
-        Assert.Equal(1, failure);
+        Assert.Null(result);
         Assert.Equal(1, (await store.GetPreferencesAsync(accountId, CancellationToken.None))!.Version);
     }
 
@@ -522,8 +521,7 @@ public sealed class PatientLinkStoreTests : IAsyncLifetime
 
         var result = await store.PutPreferencesAsync(accountId, 5, SomeCiphertext(0xA0), SomeCiphertext(0xA1), CancellationToken.None);
 
-        var failure = result.Match(_ => (long?)null, currentVersion => currentVersion);
-        Assert.Equal(0, failure);
+        Assert.Null(result);
     }
 
     /// <summary>Coverage gap left by fatia 8: every other PutPreferencesAsync test only ever passes expectedVersion 0, so the UPDATE branch (expectedVersion > 0, the row already exists) never ran.</summary>
@@ -536,9 +534,9 @@ public sealed class PatientLinkStoreTests : IAsyncLifetime
 
         var result = await store.PutPreferencesAsync(accountId, 1, SomeCiphertext(0xB0), SomeCiphertext(0xB1), CancellationToken.None);
 
-        Assert.True(result.TryGetValue(out var preferences));
-        Assert.Equal(2, preferences!.Version);
-        Assert.Equivalent(preferences, await store.GetPreferencesAsync(accountId, CancellationToken.None));
+        Assert.NotNull(result);
+        Assert.Equal(2, result.Version);
+        Assert.Equivalent(result, await store.GetPreferencesAsync(accountId, CancellationToken.None));
     }
 
     [Fact]
@@ -551,7 +549,7 @@ public sealed class PatientLinkStoreTests : IAsyncLifetime
         await Task.WhenAll(Enumerable.Range(0, 20).Select(i => Task.Run(async () =>
         {
             var result = await store.PutPreferencesAsync(accountId, 0, SomeCiphertext((byte)i), SomeCiphertext((byte)i), CancellationToken.None);
-            if (result.TryGetValue(out _))
+            if (result is not null)
             {
                 Interlocked.Increment(ref successCount);
             }

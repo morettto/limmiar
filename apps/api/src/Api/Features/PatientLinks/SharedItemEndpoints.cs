@@ -144,10 +144,10 @@ public static class SharedItemEndpoints
             return ciphertextProblem;
         }
 
-        var result = await store.PutPreferencesAsync(accountId, request.ExpectedVersion, request.WrappedDek, request.Ciphertext, cancellationToken);
-        return result.Match<Results<Ok<SharingPreferencesVersionView>, JsonHttpResult<LimmiarProblemDetails>>>(
-            updated => TypedResults.Ok(new SharingPreferencesVersionView(updated.Version)),
-            _ => ProblemJson(StatusCodes.Status409Conflict, "Sharing preferences version conflict", PatientLinksProblemCodes.SharingVersionConflict));
+        var updated = await store.PutPreferencesAsync(accountId, request.ExpectedVersion, request.WrappedDek, request.Ciphertext, cancellationToken);
+        return updated is null
+            ? ProblemJson(StatusCodes.Status409Conflict, "Sharing preferences version conflict", PatientLinksProblemCodes.SharingVersionConflict)
+            : TypedResults.Ok(new SharingPreferencesVersionView(updated.Version));
     }
 
     private static SharingPreferencesView ToView(SharingPreferences preferences) =>

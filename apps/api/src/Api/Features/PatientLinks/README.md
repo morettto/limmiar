@@ -93,7 +93,7 @@ link.not_authorized` cobre tanto "não é profissional ativa" (convite) quanto "
   de `patient_links` do par, ativa ou desfeita), com a pública atual da paciente e todo envelope
   já trocado -- a leitura que `EspelhoP6` usa desde a fatia 11 em vez de `GET links` + `GET
   shared-items` por vínculo, que continuam a dar 404 depois de desvincular.
-- `PutPreferencesAsync` é concorrência otimista como garantia de banco (S11-03 fatia 8): só
+- `PutPreferencesAsync` é concorrência otimista como garantia de banco: só
   grava se `expectedVersion` bater com a versão atual da conta (0 = nunca gravado, via `INSERT
   ... ON CONFLICT DO NOTHING`; caso contrário via `UPDATE ... WHERE version = @esperado`), e
   sempre avança exatamente 1 no sucesso. Em conflito devolve a versão atual lida na mesma
@@ -105,7 +105,7 @@ link.not_authorized` cobre tanto "não é profissional ativa" (convite) quanto "
 - `ponytail`: `ListReceivedSharesAsync` não pagina -- teto = memória do processo e tamanho da
   resposta HTTP. Upgrade: paginar por `patient_account_id` (abordagem (e), E1).
 - `Api.Platform.Result<TValue, TFailure>` relaxou a constraint de `TFailure` de `struct, Enum`
-  para `struct` (S11-02) para que `PutPreferencesAsync` pudesse devolver
+  O conflito devolve `null`; `Result` mantém a restrição
   `Result<SharingPreferences, long>` -- a razão de falha é o próprio número de versão atual, não
   um enum nomeado. Toda constraint anterior (`enum : struct, Enum`) continua satisfazendo
   `struct`, nenhum chamador existente muda de comportamento.

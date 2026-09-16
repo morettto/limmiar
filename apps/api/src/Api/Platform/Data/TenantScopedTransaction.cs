@@ -15,6 +15,14 @@ public sealed class TenantScopedTransaction : IAsyncDisposable
 
     public required NpgsqlTransaction Transaction { get; init; }
 
+    public NpgsqlCommand CreateCommand(string sql)
+    {
+        var command = Connection.CreateCommand();
+        command.Transaction = Transaction;
+        command.CommandText = sql;
+        return command;
+    }
+
     public async ValueTask DisposeAsync()
     {
         await Transaction.DisposeAsync();
