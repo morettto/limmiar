@@ -3,7 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Api.Accounts;
-using Api.Scheduling;
+using Api.Patients;
 using Api.Scheduling;
 using Api.Serialization;
 using Api.Tests.Infrastructure;
@@ -66,9 +66,10 @@ public sealed class SchedulingEndpointsTests : IAsyncLifetime
         using var client = factory.CreateClient();
         var accountId = await RegisterActiveProfessionalAsync(client, "sched-concurrent@example.com");
         var schedulingService = factory.Services.GetRequiredService<SchedulingService>();
+        var patientId = await CreatePatientAsync(client, accountId);
 
-        var first = Task.Run(() => schedulingService.ScheduleAsync(accountId, Guid.NewGuid(), SomeStart, 50, CancellationToken.None));
-        var second = Task.Run(() => schedulingService.ScheduleAsync(accountId, Guid.NewGuid(), SomeStart, 50, CancellationToken.None));
+        var first = Task.Run(() => schedulingService.ScheduleAsync(accountId, patientId, SomeStart, 50, CancellationToken.None));
+        var second = Task.Run(() => schedulingService.ScheduleAsync(accountId, patientId, SomeStart, 50, CancellationToken.None));
         var results = await Task.WhenAll(first, second);
 
         var winner = Assert.Single(results, r => r.TryGetValue(out _));
@@ -183,7 +184,7 @@ public sealed class SchedulingEndpointsTests : IAsyncLifetime
 
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/agenda/sessions",
-            new ScheduleSessionRequest(Guid.NewGuid(), SomeStart, 45),
+            new ScheduleSessionRequest(await CreatePatientAsync(client, accountId), SomeStart, 45),
             SchedulingJsonContext.Default.ScheduleSessionRequest);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
@@ -335,7 +336,7 @@ public sealed class SchedulingEndpointsTests : IAsyncLifetime
 
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/agenda/sessions",
-            new ScheduleSessionRequest(Guid.NewGuid(), SomeStart, 30),
+            new ScheduleSessionRequest(await CreatePatientAsync(client, accountId), SomeStart, 30),
             SchedulingJsonContext.Default.ScheduleSessionRequest);
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
@@ -350,7 +351,7 @@ public sealed class SchedulingEndpointsTests : IAsyncLifetime
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
         var accountId = await RegisterActiveProfessionalAsync(client, "sched-create-success@example.com");
-        var patientId = Guid.NewGuid();
+        var patientId = await CreatePatientAsync(client, accountId);
 
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/agenda/sessions",
@@ -809,10 +810,44 @@ public sealed class SchedulingEndpointsTests : IAsyncLifetime
     {
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/agenda/sessions",
-            new ScheduleSessionRequest(Guid.NewGuid(), startsAt, durationMinutes),
+            new ScheduleSessionRequest(await CreatePatientAsync(client, accountId), startsAt, durationMinutes),
             SchedulingJsonContext.Default.ScheduleSessionRequest);
         var created = await response.Content.ReadFromJsonAsync(SchedulingJsonContext.Default.ScheduledSessionResponse);
         return created!.SessionId;
+    }
+
+    private static async Task<Guid> CreatePatientAsync(HttpClient client, Guid accountId)
+    {
+        var patientId = Guid.NewGuid();
+        var response = await client.PostAsJsonAsync($"/accounts/{accountId}/patients",
+            new CreatePatientRequest(patientId, new byte[60], new byte[60]), PatientsJsonContext.Default.CreatePatientRequest);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        return patientId;
+    }
+
+    [Fact]
+    public async Task Schedule_UnknownAndOtherProfessionalsPatients_ReturnSame404AndPersistNothing()
+    {
+        using var factory = CreateFactory();
+        using var clientA = factory.CreateClient();
+        using var clientB = factory.CreateClient();
+        var accountA = await RegisterActiveProfessionalAsync(clientA, "agenda-owned-a@example.com");
+        var accountB = await RegisterActiveProfessionalAsync(clientB, "agenda-owned-b@example.com");
+        var patientB = await CreatePatientAsync(clientB, accountB);
+        var bodies = new List<string>();
+        foreach (var patientId in new[] { Guid.NewGuid(), patientB })
+        {
+            var response = await clientA.PostAsJsonAsync($"/accounts/{accountA}/agenda/sessions",
+                new ScheduleSessionRequest(patientId, SomeStart, 50), SchedulingJsonContext.Default.ScheduleSessionRequest);
+            Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+            bodies.Add(await response.Content.ReadAsStringAsync());
+        }
+        Assert.Equal(bodies[0], bodies[1]);
+        using var problem = JsonDocument.Parse(bodies[0]);
+        Assert.Equal("agenda.patient_not_found", problem.RootElement.GetProperty("code").GetString());
+        var sessions = await factory.Services.GetRequiredService<ScheduledSessionStore>()
+            .ListLiveAsync(accountA, SomeStart, SomeStart.AddDays(1), CancellationToken.None);
+        Assert.Empty(sessions);
     }
 
     /// <summary>
@@ -904,7 +939,9 @@ public sealed class SchedulingEndpointsTests : IAsyncLifetime
 
         public RefreshSessionResult Refresh(string refreshToken) => throw new NotSupportedException("not needed by the tests that use this stub");
 
-        public Guid? ValidateAccess(string accessToken) => Guid.TryParse(accessToken, out var accountId) ? accountId : null;
+        public AccessSession? Revoke(string refreshToken) => throw new NotSupportedException("not needed by these tests");
+
+        public AccessSession? ValidateAccess(string accessToken) => Guid.TryParse(accessToken, out var accountId) ? new AccessSession(accountId, accountId) : null;
     }
 
     private sealed class StubTotpProvider : ITotpProvider

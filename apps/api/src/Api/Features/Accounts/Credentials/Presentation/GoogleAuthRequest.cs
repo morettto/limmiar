@@ -4,7 +4,7 @@ public sealed record GoogleAuthRequest(string IdToken, AccountRole RequestedRole
 
 public sealed record GoogleAuthResponse(
     Guid Id,
-    string Email,
+    string? Email,
     AccountRole Role,
     bool IsNewAccount,
     TwoFactorRequirement TwoFactorRequirement,

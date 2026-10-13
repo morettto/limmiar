@@ -98,7 +98,7 @@ public sealed class AccountKeyPairServiceTests : IAsyncLifetime
         await service.PublishAsync(accountId, pair, CancellationToken.None);
 
         var withVoice = account with { VoiceEnrollment = new VoiceEnrollment(SomeBlob(0x0A), SomeBlob(0x0B)) };
-        await store.UpdateAsync(withVoice, CancellationToken.None);
+        await store.MutateAsync(withVoice.Id, _ => withVoice, CancellationToken.None);
 
         var stillThere = await service.GetAsync(accountId, CancellationToken.None);
         Assert.NotNull(stillThere);
@@ -108,7 +108,7 @@ public sealed class AccountKeyPairServiceTests : IAsyncLifetime
     }
 
     private static Account SomeAccount(Guid id, string email) =>
-        new(id, email, AccountRole.Patient, PasswordVerifier: null, GoogleSubjectId: null);
+        new(id, null, AccountRole.Patient, PasswordVerifier: null, GoogleSubjectId: null);
 
     private static byte[] SomePublicKey(byte fill)
     {

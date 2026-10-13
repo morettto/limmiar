@@ -8,6 +8,30 @@ public sealed class AccountServiceTotpTests
     private static readonly byte[] SomeVerifier = CreateVerifier(0x01);
 
     [Fact]
+    public async Task BeginTotpEnrollment_ReusesTheExistingPendingSecret()
+    {
+        var account = ProfessionalAccount("pending-idempotent@example.com") with { TotpSecret = "EXISTINGSECRET" };
+        var store = new FakeAccountStore(account);
+        var service = CreateService(store);
+        var first = await service.BeginTotpEnrollmentAsync(account.Id, CancellationToken.None);
+        var second = await service.BeginTotpEnrollmentAsync(account.Id, CancellationToken.None);
+        Assert.True(first.Succeeded);
+        Assert.Equal("EXISTINGSECRET", first.Secret);
+        Assert.Equal(first.Secret, second.Secret);
+    }
+
+    [Fact]
+    public async Task BeginTotpEnrollment_RefusesInitializationWhenAnotherRequestAlreadyEnabledTotp()
+    {
+        var account = ProfessionalAccount("pending-enabled-race@example.com") with { TotpSecret = "EXISTINGSECRET" };
+        var store = new FakeAccountStore(account) { EnableBeforePending = true };
+        var result = await CreateService(store).BeginTotpEnrollmentAsync(account.Id, CancellationToken.None);
+        Assert.False(result.Succeeded);
+        Assert.Equal(BeginTotpEnrollmentFailureReason.AlreadyEnabled, result.FailureReason);
+        Assert.Equal("EXISTINGSECRET", (await store.FindByIdAsync(account.Id, CancellationToken.None))!.TotpSecret);
+    }
+
+    [Fact]
     public async Task BeginTotpEnrollmentAsync_WithProfessionalAccount_GeneratesSecretAndProvisioningUri()
     {
         var account = ProfessionalAccount("pro@example.com");
@@ -269,7 +293,9 @@ public sealed class AccountServiceTotpTests
 
         var result = await service.RegisterAsync("patient@example.com", SomeVerifier, AccountRole.Patient, CancellationToken.None);
 
-        Assert.Equal(TwoFactorRequirement.NotApplicable, result.TwoFactorRequirement);
+        Assert.False(result.Succeeded);
+        Assert.Null(result.Account);
+        Assert.Null(result.Session);
     }
 
     [Fact]
@@ -280,7 +306,9 @@ public sealed class AccountServiceTotpTests
 
         var result = await service.RegisterAsync("patient-no-ticket@example.com", SomeVerifier, AccountRole.Patient, CancellationToken.None);
 
-        Assert.Null(result.TwoFactorTicket);
+        Assert.False(result.Succeeded);
+        Assert.Null(result.Account);
+        Assert.Null(result.Session);
     }
 
     [Fact]
@@ -336,7 +364,7 @@ public sealed class AccountServiceTotpTests
     }
 
     [Fact]
-    public async Task LoginAsync_WithPatientAccount_ReturnsNotApplicable()
+    public async Task LoginAsync_WithPatientAccount_RejectsEmailLogin()
     {
         var account = new Account(Guid.NewGuid(), "patient-login@example.com", AccountRole.Patient, SomeVerifier, null);
         var store = new FakeAccountStore(account);
@@ -344,8 +372,7 @@ public sealed class AccountServiceTotpTests
 
         var result = await service.LoginAsync(account.Email, SomeVerifier, CancellationToken.None);
 
-        Assert.True(result.TryGetValue(out var success));
-        Assert.Equal(TwoFactorRequirement.NotApplicable, success.TwoFactorRequirement);
+        Assert.False(result.TryGetValue(out _));
     }
 
     [Fact]
@@ -357,8 +384,7 @@ public sealed class AccountServiceTotpTests
 
         var result = await service.LoginAsync(account.Email, SomeVerifier, CancellationToken.None);
 
-        Assert.True(result.TryGetValue(out var success));
-        Assert.Null(success.TwoFactorTicket);
+        Assert.False(result.TryGetValue(out _));
     }
 
     [Fact]
@@ -398,8 +424,7 @@ public sealed class AccountServiceTotpTests
 
         var result = await service.GoogleAuthAsync("valid-id-token", AccountRole.Patient, CancellationToken.None);
 
-        Assert.True(result.TryGetValue(out var success));
-        Assert.Equal(TwoFactorRequirement.NotApplicable, success.TwoFactorRequirement);
+        Assert.False(result.TryGetValue(out _));
     }
 
     [Fact]
@@ -411,8 +436,7 @@ public sealed class AccountServiceTotpTests
 
         var result = await service.GoogleAuthAsync("valid-id-token", AccountRole.Patient, CancellationToken.None);
 
-        Assert.True(result.TryGetValue(out var success));
-        Assert.Null(success.TwoFactorTicket);
+        Assert.False(result.TryGetValue(out _));
     }
 
     [Fact]
@@ -424,7 +448,7 @@ public sealed class AccountServiceTotpTests
         var ticketIssuer = new TwoFactorTicketIssuer();
         var service = CreateService(store, googleIdentity: identity, ticketIssuer: ticketIssuer);
 
-        var result = await service.GoogleAuthAsync("valid-id-token", AccountRole.Patient, CancellationToken.None);
+        var result = await service.GoogleAuthAsync("valid-id-token", AccountRole.Professional, CancellationToken.None);
 
         Assert.True(result.TryGetValue(out var success));
         Assert.NotNull(success.TwoFactorTicket);
@@ -432,16 +456,16 @@ public sealed class AccountServiceTotpTests
     }
 
     [Fact]
-    public async Task RegisterAsync_WithPatientRole_IssuesSession()
+    public async Task RegisterAsync_WithPatientRole_DoesNotIssueSession()
     {
         var store = new FakeAccountStore();
         var service = CreateService(store);
 
         var result = await service.RegisterAsync("patient-session@example.com", SomeVerifier, AccountRole.Patient, CancellationToken.None);
 
-        Assert.NotNull(result.Session);
-        Assert.NotEmpty(result.Session!.AccessToken);
-        Assert.NotEmpty(result.Session.RefreshToken);
+        Assert.False(result.Succeeded);
+        Assert.Null(result.Account);
+        Assert.Null(result.Session);
     }
 
     [Fact]
@@ -456,7 +480,7 @@ public sealed class AccountServiceTotpTests
     }
 
     [Fact]
-    public async Task LoginAsync_WithPatientAccount_IssuesSession()
+    public async Task LoginAsync_WithPatientAccount_DoesNotIssueSession()
     {
         var account = new Account(Guid.NewGuid(), "patient-login-session@example.com", AccountRole.Patient, SomeVerifier, null);
         var store = new FakeAccountStore(account);
@@ -464,8 +488,7 @@ public sealed class AccountServiceTotpTests
 
         var result = await service.LoginAsync(account.Email, SomeVerifier, CancellationToken.None);
 
-        Assert.True(result.TryGetValue(out var success));
-        Assert.NotNull(success.Session);
+        Assert.False(result.TryGetValue(out _));
     }
 
     [Fact]
@@ -482,7 +505,7 @@ public sealed class AccountServiceTotpTests
     }
 
     [Fact]
-    public async Task GoogleAuthAsync_WithNewPatientAccount_IssuesSession()
+    public async Task GoogleAuthAsync_WithNewPatientAccount_DoesNotIssueSession()
     {
         var store = new FakeAccountStore();
         var identity = new GoogleIdentity("new-patient-google-session@example.com", "google-subject-session");
@@ -490,8 +513,7 @@ public sealed class AccountServiceTotpTests
 
         var result = await service.GoogleAuthAsync("valid-id-token", AccountRole.Patient, CancellationToken.None);
 
-        Assert.True(result.TryGetValue(out var success));
-        Assert.NotNull(success.Session);
+        Assert.False(result.TryGetValue(out _));
     }
 
     [Fact]
@@ -518,7 +540,7 @@ public sealed class AccountServiceTotpTests
         var result = await service.ConfirmTotpEnrollmentAsync(account.Id, "123456", CancellationToken.None);
 
         Assert.NotNull(result.Session);
-        Assert.Equal(account.Id, sessionTokenIssuer.ValidateAccess(result.Session!.AccessToken));
+        Assert.Equal(account.Id, sessionTokenIssuer.ValidateAccess(result.Session!.AccessToken)?.AccountId);
     }
 
     [Fact]
@@ -532,7 +554,7 @@ public sealed class AccountServiceTotpTests
         var result = await service.VerifyTotpChallengeAsync(account.Id, code: "123456", backupCode: null, CancellationToken.None);
 
         Assert.NotNull(result.Session);
-        Assert.Equal(account.Id, sessionTokenIssuer.ValidateAccess(result.Session!.AccessToken));
+        Assert.Equal(account.Id, sessionTokenIssuer.ValidateAccess(result.Session!.AccessToken)?.AccountId);
     }
 
     [Fact]
@@ -632,6 +654,7 @@ public sealed class AccountServiceTotpTests
 
     private sealed class FakeAccountStore : IAccountStore
     {
+        public bool EnableBeforePending { get; init; }
         private readonly Dictionary<Guid, Account> _accountsById = new();
 
         public FakeAccountStore(params Account[] seed)
@@ -648,16 +671,32 @@ public sealed class AccountServiceTotpTests
         public Task<Account?> FindByIdAsync(Guid id, CancellationToken cancellationToken) =>
             Task.FromResult(_accountsById.GetValueOrDefault(id));
 
+        public async Task<string?> GetOrCreatePendingTotpSecretAsync(Guid id, string candidate, CancellationToken cancellationToken)
+        {
+            var account = await FindByIdAsync(id, cancellationToken);
+            if (EnableBeforePending && account is not null)
+            {
+                account = account with { TotpEnabledAt = DateTimeOffset.UtcNow };
+                await MutateAsync(account.Id, _ => account, cancellationToken);
+            }
+            if (account is null || account.Role != AccountRole.Professional || account.TotpEnabledAt is not null) return null;
+            var secret = account.TotpSecret ?? candidate;
+            await MutateAsync(account.Id, current => current with { TotpSecret = secret }, cancellationToken);
+            return secret;
+        }
+
         public Task InsertAsync(Account account, CancellationToken cancellationToken)
         {
             _accountsById[account.Id] = account;
             return Task.CompletedTask;
         }
 
-        public Task UpdateAsync(Account account, CancellationToken cancellationToken)
+        public Task<Account?> MutateAsync(Guid id, Func<Account, Account?> mutation, CancellationToken cancellationToken)
         {
-            _accountsById[account.Id] = account;
-            return Task.CompletedTask;
+            if (!_accountsById.TryGetValue(id, out var current)) return Task.FromResult<Account?>(null);
+            var updated = mutation(current);
+            if (updated is not null) _accountsById[id] = updated;
+            return Task.FromResult(updated);
         }
 
         public Task<IReadOnlyList<Account>> ListPendingDocumentReviewAsync(CancellationToken cancellationToken) =>

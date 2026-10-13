@@ -35,6 +35,19 @@ public sealed class PatientLinkStore(NpgsqlDataSource dataSource, Func<DateTimeO
 
     internal NpgsqlDataSource DataSource => dataSource;
 
+    public async Task<bool> RevokeInvitesAsync(Guid professionalAccountId, Guid patientId, CancellationToken cancellationToken)
+    {
+        await using var scope = await dataSource.OpenTenantScopedTransactionAsync(professionalAccountId, cancellationToken);
+        await using var command = scope.CreateCommand("""
+            DELETE FROM patient_link_invites WHERE professional_account_id = @professionalId AND patient_id = @patientId
+            """);
+        command.Parameters.AddWithValue("professionalId", professionalAccountId);
+        command.Parameters.AddWithValue("patientId", patientId);
+        var deleted = await command.ExecuteNonQueryAsync(cancellationToken);
+        await scope.Transaction.CommitAsync(cancellationToken);
+        return deleted > 0;
+    }
+
     /// <summary>Row inserted with <c>professional_account_id = me</c> (S11-03 fatia 9, migration 0012) -- the FK to accounts means an invite for an unknown professional account id is now rejected by the database, not just unreachable through the API.</summary>
     public async Task<LinkInvite> CreateInviteAsync(Guid professionalAccountId, Guid patientId, CancellationToken cancellationToken)
     {
@@ -205,13 +218,18 @@ public sealed class PatientLinkStore(NpgsqlDataSource dataSource, Func<DateTimeO
         await using var updateCommand = scope.CreateCommand();
         updateCommand.Transaction = scope.Transaction;
         updateCommand.CommandText = """
-            UPDATE patient_links
-            SET unlinked_at = @unlinkedAt
-            WHERE unlinked_at IS NULL
-              AND ((professional_account_id = @accountId AND patient_account_id = @peerAccountId)
-                OR (professional_account_id = @peerAccountId AND patient_account_id = @accountId))
+            WITH active_link AS MATERIALIZED (
+                SELECT id FROM patient_links
+                WHERE unlinked_at IS NULL
+                  AND ((professional_account_id = @accountId AND patient_account_id = @peerAccountId)
+                    OR (professional_account_id = @peerAccountId AND patient_account_id = @accountId))
+                FOR UPDATE
+            )
+            UPDATE patient_links AS link
+            SET unlinked_at = clock_timestamp()
+            FROM active_link
+            WHERE link.id = active_link.id
             """;
-        updateCommand.Parameters.AddWithValue("unlinkedAt", _clock());
         updateCommand.Parameters.AddWithValue("accountId", accountId);
         updateCommand.Parameters.AddWithValue("peerAccountId", peerAccountId);
 

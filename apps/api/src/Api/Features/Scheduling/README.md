@@ -12,6 +12,9 @@ concorrência real (ver `docs/adr/ADR-S04-02-horario-em-claro-servidor-zero-know
 ## Fluxo principal
 
 - `ScheduledSessionStore` -- único ponto de acesso a `scheduled_sessions`. `InsertAsync`
+  inclui a existência do prontuário de sequência 1 na própria instrução
+  `INSERT ... SELECT ... WHERE EXISTS`, sob RLS e a mesma transação. ID inexistente
+  ou pertencente a outra carteira devolve `agenda.patient_not_found` e não cria sessão.
   confia inteiramente no índice único parcial `scheduled_sessions_live_slot_uq`
   (`(tenant_id, starts_at) WHERE cancelled_at IS NULL`) para decidir quem vence uma corrida
   pelo mesmo horário -- não há verificação otimista em aplicação antes do INSERT.

@@ -16,6 +16,7 @@ public enum SchedulingFailureReason
 {
     AccountNotFound,
     NotAuthorizedToSchedule,
+    PatientNotFound,
     SessionNotFound,
     SessionCancelled,
     RecordingActive,
@@ -37,7 +38,7 @@ public sealed class SchedulingService(IAccountStore accounts, ScheduledSessionSt
         {
             // timestamptz requires a zero-offset (UTC) value from Npgsql.
             var session = await store.InsertAsync(professionalId, patientId, startsAt.ToUniversalTime(), durationMinutes, cancellationToken);
-            return session;
+            return session is null ? SchedulingFailureReason.PatientNotFound : session;
         }
         catch (ScheduledSessionSlotConflictException)
         {

@@ -10,7 +10,7 @@ public sealed class RecoverAccessHandler(IAccountStore store, IPasswordVerifierC
         var normalizedEmail = AccountEmail.Normalize(request.Email);
         var account = await store.FindByEmailAsync(normalizedEmail, cancellationToken);
 
-        var hasRealVerifier = account?.RecoveryVerifier is not null;
+        var hasRealVerifier = account?.RecoveryVerifier is not null && account.RecoveryEnvelope is not null;
         var storedVerifier = account?.RecoveryVerifier ?? AccountVerifierLengths.Dummy;
         var matches = comparer.Matches(request.RecoveryVerifier, storedVerifier);
 

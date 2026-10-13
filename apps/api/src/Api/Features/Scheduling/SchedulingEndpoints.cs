@@ -197,6 +197,8 @@ public static class SchedulingEndpoints
                 ProblemJson(StatusCodes.Status409Conflict, "Session has an active recording", SchedulingProblemCodes.AgendaRecordingActive),
             SchedulingFailureReason.SlotTaken =>
                 ProblemJson(StatusCodes.Status409Conflict, "Slot already taken", SchedulingProblemCodes.AgendaSlotTaken),
+            SchedulingFailureReason.PatientNotFound =>
+                ProblemJson(StatusCodes.Status404NotFound, "Patient not found", SchedulingProblemCodes.AgendaPatientNotFound),
             _ => throw new ArgumentOutOfRangeException(nameof(reason), reason, null),
         };
 }

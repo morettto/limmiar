@@ -138,16 +138,16 @@ critério 4) que o desenho já fechou.
   valor seguinte com `CheckViolation` -- mantém o `CHECK` da migração e o enum em sincronia por
   construção, não por disciplina.
 
-## Fora de âmbito do ticket S10-01 (as sete fatias fecharam)
+## Produtores e superfície HTTP (V1, 7 de outubro de 2026)
 
-- **Produtor real de evento e superfície HTTP** -- nada chama `AppendAsync` fora dos testes:
-  sem `AuditService`, sem endpoint, sem registo em DI, sem `JsonContext`, sem problem code.
-  `AddAudit()` são três linhas quando o primeiro produtor chegar.
-- **Timer ou `IHostedService` da âncora** -- `CaptureAnchorAsync` existe e é o único produtor,
-  mas quem o invoca hoje é o teste. Agendá-lo é uma linha em `Program.cs` no dia em que houver
-  eventos reais para ancorar.
-- `actor_id`, `subject_id`, filtro por data/autor, exportação, consentimento, `hash_version`,
-  Ed25519/chave pública -- todos explicitamente fora do ticket S10-01, ver a secção "O que não
-  entra" do ticket para o argumento de cada um. Se a assinatura assimétrica entrar depois, o
-  seam é assinar a **âncora** (uma coluna `anchor_signature` em `audit_anchors`), não cada
-  entrada.
+- `AuditRecorder` é o único produtor: tenant = conta, `device_id` = família da sessão
+  (`AccessSession.SessionId`). Esgotar as retentativas de `AppendAsync` lança: perder uma
+  entrada é perda de dados. A cada `AnchorEvery` (50) entradas, captura uma âncora.
+- `SignIn` no primeiro uso de uma sessão (`AuditSignInMiddleware`, logo após
+  `RequireAccountAccessMiddleware`, que anexa a sessão ao pedido); `SignOut` em `/auth/logout`;
+  `RecordOpened`/`RecordAppended` nas rotas de prontuário; `NoteSigned` na assinatura de nota.
+- `GET /accounts/{id}/audit?from&to` verifica a cadeia inteira e as âncoras, depois filtra
+  `[from, to)`. `POST /accounts/{id}/audit/exports` regista `ExportRequested` antes de ler, para
+  a exportação já conter o próprio registo. O cliente (`features/audit-trail`) gera o CSV.
+- Fora da V1: `actor_id`/`subject_id` (a conta é o único ator do próprio tenant) e assinatura
+  assimétrica da âncora.

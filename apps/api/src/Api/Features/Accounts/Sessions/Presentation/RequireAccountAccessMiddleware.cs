@@ -97,7 +97,7 @@ public sealed class RequireAccountAccessMiddleware(RequestDelegate next, ISessio
 
         var authorizationHeader = context.Request.Headers.Authorization.ToString();
         if (!authorizationHeader.StartsWith(BearerPrefix, StringComparison.OrdinalIgnoreCase)
-            || sessionTokenIssuer.ValidateAccess(authorizationHeader[BearerPrefix.Length..]) is not { } tokenAccountId)
+            || sessionTokenIssuer.ValidateAccess(authorizationHeader[BearerPrefix.Length..]) is not { } session)
         {
             await AccessTokenUnauthorizedProblem(context).ExecuteAsync(context);
             return;
@@ -106,12 +106,13 @@ public sealed class RequireAccountAccessMiddleware(RequestDelegate next, ISessio
         // Every {accountId} route pins it with the :guid route constraint, so routing itself
         // never selects this endpoint for a non-guid segment -- TryParse only defends a future
         // route that forgets the constraint, failing closed (403) instead of a 500.
-        if (!TryGetAccountIdRouteValue(context, out var accountId) || tokenAccountId != accountId)
+        if (!TryGetAccountIdRouteValue(context, out var accountId) || session.AccountId != accountId)
         {
             await ForbiddenProblem().ExecuteAsync(context);
             return;
         }
 
+        Api.Audit.AuditRecorder.Attach(context, session);
         await next(context);
     }
 

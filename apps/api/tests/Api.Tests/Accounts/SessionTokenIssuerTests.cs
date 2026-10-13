@@ -5,6 +5,102 @@ namespace Api.Tests.Accounts;
 public sealed class SessionTokenIssuerTests
 {
     [Fact]
+    public void Revoke_ExchangedTokenInvalidatesAllGenerationsAndPreservesOtherFamilies()
+    {
+        var issuer = new SessionTokenIssuer();
+        var accountId = Guid.NewGuid();
+        var first = issuer.IssuePair(accountId);
+        var second = issuer.Refresh(first.RefreshToken).TokenPair!;
+        var third = issuer.Refresh(second.RefreshToken).TokenPair!;
+        var other = issuer.IssuePair(accountId);
+
+        issuer.Revoke(first.RefreshToken);
+        issuer.Revoke(first.RefreshToken);
+        issuer.Revoke("never-issued");
+
+        foreach (var pair in new[] { first, second, third })
+        {
+            Assert.Null(issuer.ValidateAccess(pair.AccessToken));
+            Assert.False(issuer.Refresh(pair.RefreshToken).Succeeded);
+        }
+        Assert.Equal(accountId, issuer.ValidateAccess(other.AccessToken)?.AccountId);
+        Assert.True(issuer.Refresh(other.RefreshToken).Succeeded);
+    }
+
+    [Fact]
+    public void Revoke_ExpiredTokenStillInvalidatesNewTokensInTheSameFamily()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var issuer = new SessionTokenIssuer(() => now);
+        var first = issuer.IssuePair(Guid.NewGuid());
+        now += SessionTokenIssuer.RefreshTokenLifetime - TimeSpan.FromDays(1);
+        var current = issuer.Refresh(first.RefreshToken).TokenPair!;
+        now += TimeSpan.FromDays(2);
+
+        issuer.Revoke(first.RefreshToken);
+
+        Assert.Null(issuer.ValidateAccess(current.AccessToken));
+        Assert.False(issuer.Refresh(current.RefreshToken).Succeeded);
+    }
+
+    [Fact]
+    public async Task Revoke_DuringRefreshDoesNotLetNewTokensEscapeTheRevokedFamily()
+    {
+        using var refreshing = new ManualResetEventSlim();
+        using var proceed = new ManualResetEventSlim();
+        var clockReads = 0;
+        var issuer = new SessionTokenIssuer(() =>
+        {
+            if (Interlocked.Increment(ref clockReads) == 2)
+            {
+                refreshing.Set();
+                Assert.True(proceed.Wait(TimeSpan.FromSeconds(10)));
+            }
+            return DateTimeOffset.UtcNow;
+        });
+        var first = issuer.IssuePair(Guid.NewGuid());
+        var attempt = Task.Run(() => issuer.Refresh(first.RefreshToken));
+        Assert.True(refreshing.Wait(TimeSpan.FromSeconds(10)));
+        issuer.Revoke(first.RefreshToken);
+        proceed.Set();
+        var result = await attempt;
+
+        Assert.Null(issuer.ValidateAccess(first.AccessToken));
+        Assert.True(result.Succeeded);
+        Assert.Null(issuer.ValidateAccess(result.TokenPair!.AccessToken));
+        Assert.False(issuer.Refresh(result.TokenPair.RefreshToken).Succeeded);
+    }
+
+    [Fact]
+    public async Task Refresh_ConcurrentPresentations_ExchangeOnceAndRevokeTheFamily()
+    {
+        using var bothReadToken = new Barrier(2);
+        var now = DateTimeOffset.UtcNow;
+        var refreshing = 0;
+        var clockReads = 0;
+        var issuer = new SessionTokenIssuer(clock: () =>
+        {
+            if (Volatile.Read(ref refreshing) == 1 && Interlocked.Increment(ref clockReads) <= 2)
+            {
+                Assert.True(bothReadToken.SignalAndWait(TimeSpan.FromSeconds(10)));
+            }
+            return now;
+        });
+        var pair = issuer.IssuePair(Guid.NewGuid());
+        Volatile.Write(ref refreshing, 1);
+        var attempts = Enumerable.Range(0, 2).Select(_ => Task.Factory.StartNew(
+            () => issuer.Refresh(pair.RefreshToken), CancellationToken.None,
+            TaskCreationOptions.LongRunning, TaskScheduler.Default));
+
+        var results = await Task.WhenAll(attempts);
+
+        var accepted = Assert.Single(results, result => result.Succeeded);
+        Assert.Null(issuer.ValidateAccess(accepted.TokenPair!.AccessToken));
+        Assert.Null(issuer.ValidateAccess(pair.AccessToken));
+        Assert.False(issuer.Refresh(accepted.TokenPair.RefreshToken).Succeeded);
+    }
+
+    [Fact]
     public void IssuePair_ReturnsDistinctNonEmptyTokens()
     {
         var issuer = new SessionTokenIssuer();
@@ -155,7 +251,7 @@ public sealed class SessionTokenIssuerTests
         var issuer = new SessionTokenIssuer();
         var issued = issuer.IssuePair(accountId);
 
-        Assert.Equal(accountId, issuer.ValidateAccess(issued.AccessToken));
+        Assert.Equal(accountId, issuer.ValidateAccess(issued.AccessToken)?.AccountId);
     }
 
     [Fact]

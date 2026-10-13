@@ -15,6 +15,17 @@ public sealed class TenantScopedTransaction : IAsyncDisposable
 
     public required NpgsqlTransaction Transaction { get; init; }
 
+    public Task SetTenantAsync(Guid tenantId, CancellationToken cancellationToken) =>
+        SetLookupKeyAsync("app.tenant_id", tenantId.ToString(), cancellationToken);
+
+    internal async Task SetLookupKeyAsync(string name, string value, CancellationToken cancellationToken)
+    {
+        await using var command = CreateCommand("SELECT set_config(@name, @value, true)");
+        command.Parameters.AddWithValue("name", name);
+        command.Parameters.AddWithValue("value", value);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
     public NpgsqlCommand CreateCommand(string sql)
     {
         var command = Connection.CreateCommand();
@@ -91,17 +102,13 @@ public static class NpgsqlDataSourceTenantExtensions
     {
         var connection = await dataSource.OpenConnectionAsync(cancellationToken);
         var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        var scope = new TenantScopedTransaction { Connection = connection, Transaction = transaction };
 
         foreach (var (name, value) in gucs)
         {
-            await using var setConfigCommand = connection.CreateCommand();
-            setConfigCommand.Transaction = transaction;
-            setConfigCommand.CommandText = "SELECT set_config(@name, @value, true)";
-            setConfigCommand.Parameters.AddWithValue("name", name);
-            setConfigCommand.Parameters.AddWithValue("value", value);
-            await setConfigCommand.ExecuteNonQueryAsync(cancellationToken);
+            await scope.SetLookupKeyAsync(name, value, cancellationToken);
         }
 
-        return new TenantScopedTransaction { Connection = connection, Transaction = transaction };
+        return scope;
     }
 }

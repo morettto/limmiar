@@ -201,6 +201,8 @@ public sealed class RequireAccountAccessMiddlewareTests
 
         public RefreshSessionResult Refresh(string refreshToken) => throw new NotSupportedException("not needed by these tests");
 
-        public Guid? ValidateAccess(string accessToken) => resolvesTo;
+        public AccessSession? Revoke(string refreshToken) => throw new NotSupportedException("not needed by these tests");
+
+        public AccessSession? ValidateAccess(string accessToken) => resolvesTo is { } accountId ? new AccessSession(accountId, accountId) : null;
     }
 }

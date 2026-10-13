@@ -7,6 +7,7 @@ public sealed class CompleteMagicLinkWebAuthnHandler(
     IMagicLinkIssuer magicLinkIssuer,
     IWebAuthnCeremonyVerifier webAuthnCeremonyVerifier,
     IAccountStore store,
+    IAnonymousPatientAccessStore accessStore,
     ISessionTokenIssuer sessionTokenIssuer,
     WebAuthnRelyingPartyOptions relyingPartyOptions) : IRequestHandler<CompleteMagicLinkWebAuthnCommand, CompleteMagicLinkResult>
 {
@@ -45,8 +46,8 @@ public sealed class CompleteMagicLinkWebAuthnHandler(
 
             var credential = registrationResult.Credential!;
             var newAccount = new Account(
-                Guid.NewGuid(),
-                ticketData.Email,
+                ticketData.AccountId,
+                null,
                 AccountRole.Patient,
                 PasswordVerifier: null,
                 GoogleSubjectId: null,
@@ -55,18 +56,20 @@ public sealed class CompleteMagicLinkWebAuthnHandler(
                 WebAuthnCosePublicKey: credential.CosePublicKey,
                 WebAuthnSignCount: credential.SignCount,
                 WebAuthnAaGuid: credential.AaGuid);
-            await store.InsertAsync(newAccount, cancellationToken);
+            if (!await accessStore.RegisterAsync(ticketData.Invitation, newAccount, cancellationToken)) return CompleteMagicLinkResult.Failure();
             return CompleteMagicLinkResult.Success(newAccount, sessionTokenIssuer.IssuePair(newAccount.Id));
         }
 
-        if (request.AuthenticatorData is null || request.Signature is null || ticketData.AccountId is null
+        if (request.AuthenticatorData is null || request.Signature is null
             || ticketData.CredentialId is null || ticketData.StoredCosePublicKey is null || ticketData.StoredSignCount is null)
         {
             return CompleteMagicLinkResult.Failure();
         }
 
-        var account = await store.FindByIdAsync(ticketData.AccountId.Value, cancellationToken);
-        if (account is null)
+        var account = await store.FindByIdAsync(ticketData.AccountId, cancellationToken);
+        if (account is null || account.Role != AccountRole.Patient || account.Email is not null
+            || account.VerificationStatus != AccountVerificationStatus.Active
+            || !request.CredentialId.AsSpan().SequenceEqual(ticketData.CredentialId))
         {
             return CompleteMagicLinkResult.Failure();
         }
@@ -91,7 +94,8 @@ public sealed class CompleteMagicLinkWebAuthnHandler(
         }
 
         var updatedAccount = account with { WebAuthnSignCount = assertionResult.NewSignCount };
-        await store.UpdateAsync(updatedAccount, cancellationToken);
+        if (!await accessStore.AssertAsync(ticketData.Invitation, updatedAccount, ticketData.StoredSignCount.Value, cancellationToken))
+            return CompleteMagicLinkResult.Failure();
         return CompleteMagicLinkResult.Success(updatedAccount, sessionTokenIssuer.IssuePair(updatedAccount.Id));
     }
 }

@@ -1,5 +1,6 @@
 using Api.Accounts;
 using Api.Problems;
+using Api.Patients;
 using Microsoft.AspNetCore.Http.HttpResults;
 using static Api.Problems.ProblemResults;
 
@@ -9,6 +10,11 @@ public static class PatientLinkEndpoints
 {
     public static void MapPatientLinkEndpoints(this IEndpointRouteBuilder app)
     {
+        app.MapDelete("/accounts/{accountId:guid}/patients/{patientId:guid}/link-invites", HandleRevokeInvitesAsync)
+            .WithName("RevokeLinkInvites")
+            .WithSummary("Revoke all pending access invitations for this owned patient record")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces<LimmiarProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json");
         app.MapPost("/accounts/{accountId:guid}/patients/{patientId:guid}/link-invites", HandleCreateInviteAsync)
             .WithName("CreateLinkInvite")
             .WithSummary("Generate a single-use code linking a patientId to a paciente account")
@@ -50,6 +56,16 @@ public static class PatientLinkEndpoints
             invite => TypedResults.Created(
                 $"/accounts/{accountId}/patients/{patientId}/link-invites",
                 new CreateLinkInviteResponse(invite.Code, invite.ExpiresAt)),
+            reason => MapCreateInviteFailureToProblem(reason));
+    }
+
+    private static async Task<Results<NoContent, JsonHttpResult<LimmiarProblemDetails>>> HandleRevokeInvitesAsync(
+        Guid accountId, Guid patientId, PatientLinkService linkService, CancellationToken cancellationToken)
+    {
+        var result = await linkService.RevokeInvitesAsync(accountId, patientId, cancellationToken);
+        return result.Match<Results<NoContent, JsonHttpResult<LimmiarProblemDetails>>>(
+            result => result.Revoked ? TypedResults.NoContent()
+                : ProblemJson(StatusCodes.Status404NotFound, "Link invite not found", PatientLinksProblemCodes.LinkInviteNotFound),
             reason => MapCreateInviteFailureToProblem(reason));
     }
 
@@ -109,6 +125,8 @@ public static class PatientLinkEndpoints
                 ProblemJson(StatusCodes.Status404NotFound, "Account not found", AccountsProblemCodes.AuthAccountNotFound),
             CreateInviteFailure.NotAuthorized =>
                 ProblemJson(StatusCodes.Status403Forbidden, "Account is not authorized to create link invites", PatientLinksProblemCodes.LinkNotAuthorized),
+            CreateInviteFailure.PatientNotFound =>
+                ProblemJson(StatusCodes.Status404NotFound, "Patient record not found", PatientsProblemCodes.PatientsNotFound),
             _ => throw new ArgumentOutOfRangeException(nameof(reason), reason, null),
         };
 

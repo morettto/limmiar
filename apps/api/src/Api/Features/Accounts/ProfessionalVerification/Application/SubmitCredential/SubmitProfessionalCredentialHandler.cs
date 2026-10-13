@@ -27,24 +27,24 @@ public sealed class SubmitProfessionalCredentialHandler(IAccountStore store, ICo
 
         if (request.Type == ProfessionalCredentialType.Document)
         {
-            var inReview = account with
+            var inReview = await store.MutateAsync(account.Id, current => current.VerificationStatus is not (AccountVerificationStatus.Pending or AccountVerificationStatus.Rejected) ? null : current with
             {
                 VerificationStatus = AccountVerificationStatus.InReview,
                 RejectionReason = null,
                 VerificationSubmittedAt = DateTimeOffset.UtcNow,
-            };
-            await store.UpdateAsync(inReview, cancellationToken);
-            return SubmitProfessionalCredentialResult.Success(inReview, DocumentReviewSlaBusinessDays);
+            }, cancellationToken);
+            return inReview is null ? SubmitProfessionalCredentialResult.Failure(SubmitProfessionalCredentialFailureReason.InvalidStateForSubmission)
+                : SubmitProfessionalCredentialResult.Success(inReview, DocumentReviewSlaBusinessDays);
         }
 
         var verification = await councilRegistryVerifier.VerifyAsync(request.Type, request.RegistryNumber!, request.RegistryUf!, cancellationToken);
-        var decided = account with
+        var decided = await store.MutateAsync(account.Id, current => current.VerificationStatus is not (AccountVerificationStatus.Pending or AccountVerificationStatus.Rejected) ? null : current with
         {
             VerificationStatus = verification.Verified ? AccountVerificationStatus.Active : AccountVerificationStatus.Rejected,
             RejectionReason = verification.FailureReason,
             VerificationSubmittedAt = DateTimeOffset.UtcNow,
-        };
-        await store.UpdateAsync(decided, cancellationToken);
-        return SubmitProfessionalCredentialResult.Success(decided);
+        }, cancellationToken);
+        return decided is null ? SubmitProfessionalCredentialResult.Failure(SubmitProfessionalCredentialFailureReason.InvalidStateForSubmission)
+            : SubmitProfessionalCredentialResult.Success(decided);
     }
 }

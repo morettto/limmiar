@@ -2,9 +2,10 @@
 
 ## Responsabilidade
 
-Vínculo 1:1 profissional-paciente (sem equipa, sem muitos-para-muitos) por código de uso único,
-e a superfície HTTP das 4 rotas (fatias 2-3 do ticket S11-04; fatia 1, o par de chaves X25519,
-mora em `Accounts/KeyPair` -- ver `apps/api/README.md`). Desde S11-03 (fatias 7-9,
+Uma conta opaca do paciente pode ter vários profissionais. Cada par profissional–paciente
+tem um prontuário próprio, sem acesso automático às outras carteiras. Convites são de uso único
+e nascem de prontuário existente na carteira autenticada. O par de chaves X25519
+mora em `Accounts/KeyPair` — ver `apps/api/README.md`. Desde S11-03 (fatias 7-9,
 `.harness/abordagem/S11-03.md`), convites, vínculos e preferências de compartilhamento vivem em
 Postgres com RLS (migração `0012_create_patient_links_and_sharing.sql`), não em memória.
 
@@ -16,9 +17,14 @@ recebeu, inclusive de pares já desfeitos.
 
 ## Contrato público
 
+- `DELETE /accounts/{accountId}/patients/{patientId}/link-invites` revoga todos os convites pendentes desse prontuário. Exige profissional ativo, token da conta e propriedade do prontuário; 204 ao remover, 404 se não há convite. Não desfaz vínculo já concluído.
+- `/auth/magic-link/verify` resolve o convite, sem e-mail. `/auth/magic-link/webauthn/complete` exige passkey e consome convite, cria/vincula a conta e atualiza contador atomicamente. Paciente tem `email: null`, sem senha/Google. O ID recebido para reutilizar conta não substitui a prova de posse da passkey.
+
 - `POST /accounts/{accountId}/patients/{patientId}/link-invites` -- a profissional (conta ativa,
   `AccountAuthorizationGuard.CanCreatePatientRecords`) gera um código para um `patientId` da sua
-  carteira. `201 { code, expiresAt }`.
+  carteira. A existência é consultada sob RLS e a mesma conta; IDs desconhecidos
+  e prontuários de outro profissional retornam o mesmo `404 patients.not_found`.
+  `201 { code, expiresAt }` apenas após autorização e confirmação de propriedade.
 - `POST /accounts/{accountId}/links` -- a paciente resgata o código. `201 LinkView` com a
   pública do par da profissional (`PeerPublicKey`), se ela já a publicou.
 - `GET /accounts/{accountId}/links` -- lista os vínculos de quem pede, cada um com a pública do
@@ -89,6 +95,10 @@ link.not_authorized` cobre tanto "não é profissional ativa" (convite) quanto "
   (`GRANT SELECT, INSERT` sem `UPDATE`/`DELETE`, migração `0012`) -- falha na base, não só na API.
   Duas políticas SELECT permissivas (0012 + 0013) somam com OR: profissional e paciente do par
   leem a linha, uma terceira conta não lê.
+- O instante de desvinculação é calculado no banco depois de obter `FOR UPDATE` na linha
+  ativa. Um relógio lido antes da espera podia datar a revogação antes das partilhas que
+  ainda estavam terminando. `clock_timestamp()` representa o instante de execução;
+  `now()` fica no início da transação ([PostgreSQL 17](https://www.postgresql.org/docs/17/functions-datetime.html#FUNCTIONS-DATETIME-CURRENT)).
 - `ListReceivedSharesAsync` agrupa por `patient_account_id` com `DISTINCT ON` (linha mais recente
   de `patient_links` do par, ativa ou desfeita), com a pública atual da paciente e todo envelope
   já trocado -- a leitura que `EspelhoP6` usa desde a fatia 11 em vez de `GET links` + `GET
@@ -109,8 +119,8 @@ link.not_authorized` cobre tanto "não é profissional ativa" (convite) quanto "
   `Result<SharingPreferences, long>` -- a razão de falha é o próprio número de versão atual, não
   um enum nomeado. Toda constraint anterior (`enum : struct, Enum`) continua satisfazendo
   `struct`, nenhum chamador existente muda de comportamento.
-- `patientId` nunca é validado contra `patient_record_entries` -- um `patientId` errado só
-  prejudica a própria profissional que o digitou, não abre acesso a ninguém.
+- `patientId` é validado contra `patient_record_entries` da carteira sob RLS antes do convite.
+  IDs desconhecidos e de terceiros retornam o mesmo 404, sem expor existência global.
 - `PatientLinkService.ToViewAsync` degrada a pública do par para `null` só se o par nunca
   publicou chave -- a FK em `patient_links` torna "conta inexistente" impossível desde a fatia 9.
 

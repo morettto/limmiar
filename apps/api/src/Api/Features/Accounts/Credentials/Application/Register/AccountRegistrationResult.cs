@@ -5,6 +5,7 @@ namespace Api.Accounts;
 public enum AccountRegistrationFailureReason
 {
     EmailAlreadyRegistered,
+    ProfessionalAccountRequired,
 }
 
 /// <remarks>

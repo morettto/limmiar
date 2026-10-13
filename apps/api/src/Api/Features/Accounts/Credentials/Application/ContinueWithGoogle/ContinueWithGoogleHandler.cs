@@ -59,6 +59,7 @@ public sealed class ContinueWithGoogleHandler(
 {
     public async ValueTask<Result<AccountGoogleAuthSuccess, AccountGoogleAuthFailureReason>> Handle(ContinueWithGoogleCommand request, CancellationToken cancellationToken)
     {
+        if (request.RequestedRole != AccountRole.Professional) return AccountGoogleAuthFailureReason.InvalidGoogleToken;
         var identity = await googleIdentityProvider.VerifyIdTokenAsync(request.IdToken, cancellationToken);
         if (identity is null)
         {
@@ -67,20 +68,19 @@ public sealed class ContinueWithGoogleHandler(
 
         var normalizedEmail = AccountEmail.Normalize(identity.Email);
         var existing = await store.FindByEmailAsync(normalizedEmail, cancellationToken);
-        var account = existing ?? await CreateAccountAsync(normalizedEmail, request.RequestedRole, identity.SubjectId, store, cancellationToken);
+        if (existing is not null && existing.Role != AccountRole.Professional) return AccountGoogleAuthFailureReason.InvalidGoogleToken;
+        var account = existing ?? await CreateAccountAsync(normalizedEmail, identity.SubjectId, store, cancellationToken);
         return AccountGoogleAuthSuccess.For(account, isNewAccount: existing is null, twoFactorTicketIssuer, sessionTokenIssuer);
     }
 
     private static async Task<Account> CreateAccountAsync(
-        string normalizedEmail, AccountRole requestedRole, string googleSubjectId, IAccountStore store, CancellationToken cancellationToken)
+        string normalizedEmail, string googleSubjectId, IAccountStore store, CancellationToken cancellationToken)
     {
         var account = new Account(
-            Guid.NewGuid(), normalizedEmail, requestedRole, PasswordVerifier: null, googleSubjectId,
-            VerificationStatus: InitialVerificationStatus(requestedRole));
+            Guid.NewGuid(), normalizedEmail, AccountRole.Professional, PasswordVerifier: null, googleSubjectId,
+            VerificationStatus: AccountVerificationStatus.Pending);
         await store.InsertAsync(account, cancellationToken);
         return account;
     }
 
-    private static AccountVerificationStatus InitialVerificationStatus(AccountRole role) =>
-        role == AccountRole.Professional ? AccountVerificationStatus.Pending : AccountVerificationStatus.Active;
 }

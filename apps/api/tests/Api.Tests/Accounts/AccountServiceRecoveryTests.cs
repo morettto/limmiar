@@ -6,6 +6,19 @@ namespace Api.Tests.Accounts;
 public sealed class AccountServiceRecoveryTests
 {
     private static readonly byte[] SomeVerifier = CreateVerifier(0x01);
+    private static readonly byte[] SomeEnvelope = Enumerable.Repeat((byte)0x07, 120).ToArray();
+
+    [Fact]
+    public async Task RecoverAccess_WithoutClinicalKeyEnvelope_DoesNotPretendToRestoreAccess()
+    {
+        var account = new Account(Guid.NewGuid(), "old@example.com", AccountRole.Professional, SomeVerifier, null,
+            RecoveryVerifier: CreateVerifier(0x02));
+        var handler = CreateRecoverAccessHandler(new FakeAccountStore(account), new StubPasswordVerifierComparer(alwaysMatches: true));
+        var result = await handler.Handle(new RecoverAccessCommand(account.Email, CreateVerifier(0x02)), CancellationToken.None);
+        Assert.False(result.Succeeded);
+        Assert.Null(result.Account);
+        Assert.Null(result.Session);
+    }
 
     [Fact]
     public async Task RecoverAccessAsync_WithUnknownEmail_ReturnsInvalidRecoveryPhrase()
@@ -38,7 +51,7 @@ public sealed class AccountServiceRecoveryTests
     {
         var account = new Account(
             Guid.NewGuid(), "known@example.com", AccountRole.Professional, SomeVerifier, null,
-            RecoveryVerifier: CreateVerifier(0x02));
+            RecoveryVerifier: CreateVerifier(0x02), RecoveryEnvelope: SomeEnvelope);
         var store = new FakeAccountStore(account);
         var handler = CreateRecoverAccessHandler(store, new StubPasswordVerifierComparer(alwaysMatches: false));
 
@@ -66,7 +79,7 @@ public sealed class AccountServiceRecoveryTests
     {
         var account = new Account(
             Guid.NewGuid(), "patient@example.com", AccountRole.Patient, SomeVerifier, null,
-            RecoveryVerifier: CreateVerifier(0x02));
+            RecoveryVerifier: CreateVerifier(0x02), RecoveryEnvelope: SomeEnvelope);
         var store = new FakeAccountStore(account);
         var handler = CreateRecoverAccessHandler(store, new StubPasswordVerifierComparer(alwaysMatches: true));
 
@@ -83,7 +96,7 @@ public sealed class AccountServiceRecoveryTests
     {
         var account = new Account(
             Guid.NewGuid(), "pro@example.com", AccountRole.Professional, SomeVerifier, null,
-            RecoveryVerifier: CreateVerifier(0x02));
+            RecoveryVerifier: CreateVerifier(0x02), RecoveryEnvelope: SomeEnvelope);
         var store = new FakeAccountStore(account);
         var handler = CreateRecoverAccessHandler(store, new StubPasswordVerifierComparer(alwaysMatches: true));
 
@@ -101,7 +114,7 @@ public sealed class AccountServiceRecoveryTests
         var store = new FakeAccountStore();
         var handler = new RegisterRecoveryVerifierHandler(store);
 
-        var result = await handler.Handle(new RegisterRecoveryVerifierCommand(Guid.NewGuid(), SomeVerifier), CancellationToken.None);
+        var result = await handler.Handle(new RegisterRecoveryVerifierCommand(Guid.NewGuid(), SomeVerifier, SomeEnvelope), CancellationToken.None);
 
         Assert.False(result.Succeeded);
         Assert.Equal(RegisterRecoveryVerifierFailureReason.AccountNotFound, result.FailureReason);
@@ -114,7 +127,7 @@ public sealed class AccountServiceRecoveryTests
         var store = new FakeAccountStore(account);
         var handler = new RegisterRecoveryVerifierHandler(store);
 
-        var result = await handler.Handle(new RegisterRecoveryVerifierCommand(account.Id, SomeVerifier), CancellationToken.None);
+        var result = await handler.Handle(new RegisterRecoveryVerifierCommand(account.Id, SomeVerifier, SomeEnvelope), CancellationToken.None);
 
         Assert.False(result.Succeeded);
         Assert.Equal(RegisterRecoveryVerifierFailureReason.NotAProfessionalAccount, result.FailureReason);
@@ -127,13 +140,14 @@ public sealed class AccountServiceRecoveryTests
         var store = new FakeAccountStore(account);
         var handler = new RegisterRecoveryVerifierHandler(store);
 
-        var result = await handler.Handle(new RegisterRecoveryVerifierCommand(account.Id, SomeVerifier), CancellationToken.None);
+        var result = await handler.Handle(new RegisterRecoveryVerifierCommand(account.Id, SomeVerifier, SomeEnvelope), CancellationToken.None);
 
         Assert.True(result.Succeeded);
         Assert.Equal(SHA256.HashData(SomeVerifier), result.Account!.RecoveryVerifier);
 
         var stored = await store.FindByIdAsync(account.Id, CancellationToken.None);
         Assert.Equal(SHA256.HashData(SomeVerifier), stored!.RecoveryVerifier);
+        Assert.Equal(SomeEnvelope, stored.RecoveryEnvelope);
     }
 
     // Same discipline as RegisterHandler: a store dump must never contain the recovery
@@ -145,7 +159,7 @@ public sealed class AccountServiceRecoveryTests
         var store = new FakeAccountStore(account);
         var handler = new RegisterRecoveryVerifierHandler(store);
 
-        var result = await handler.Handle(new RegisterRecoveryVerifierCommand(account.Id, SomeVerifier), CancellationToken.None);
+        var result = await handler.Handle(new RegisterRecoveryVerifierCommand(account.Id, SomeVerifier, SomeEnvelope), CancellationToken.None);
 
         Assert.NotEqual(SomeVerifier, result.Account!.RecoveryVerifier);
         Assert.Equal(SHA256.HashData(SomeVerifier), result.Account.RecoveryVerifier);
@@ -160,8 +174,8 @@ public sealed class AccountServiceRecoveryTests
         var firstVerifier = CreateVerifier(0x02);
         var secondVerifier = CreateVerifier(0x03);
 
-        await handler.Handle(new RegisterRecoveryVerifierCommand(account.Id, firstVerifier), CancellationToken.None);
-        var result = await handler.Handle(new RegisterRecoveryVerifierCommand(account.Id, secondVerifier), CancellationToken.None);
+        await handler.Handle(new RegisterRecoveryVerifierCommand(account.Id, firstVerifier, SomeEnvelope), CancellationToken.None);
+        var result = await handler.Handle(new RegisterRecoveryVerifierCommand(account.Id, secondVerifier, SomeEnvelope), CancellationToken.None);
 
         Assert.True(result.Succeeded);
         Assert.Equal(SHA256.HashData(secondVerifier), result.Account!.RecoveryVerifier);
@@ -179,32 +193,43 @@ public sealed class AccountServiceRecoveryTests
 
     private sealed class FakeAccountStore : IAccountStore
     {
-        private readonly Dictionary<string, Account> _accountsByEmail = new(StringComparer.Ordinal);
+        private readonly Dictionary<Guid, Account> _accountsByEmail = new();
 
         public FakeAccountStore(params Account[] seed)
         {
             foreach (var account in seed)
             {
-                _accountsByEmail[account.Email] = account;
+                _accountsByEmail[account.Id] = account;
             }
         }
 
         public Task<Account?> FindByEmailAsync(string normalizedEmail, CancellationToken cancellationToken) =>
-            Task.FromResult(_accountsByEmail.GetValueOrDefault(normalizedEmail));
+            Task.FromResult(_accountsByEmail.Values.FirstOrDefault(account => account.Email == normalizedEmail));
 
         public Task<Account?> FindByIdAsync(Guid id, CancellationToken cancellationToken) =>
             Task.FromResult(_accountsByEmail.Values.FirstOrDefault(account => account.Id == id));
 
+        public async Task<string?> GetOrCreatePendingTotpSecretAsync(Guid id, string candidate, CancellationToken cancellationToken)
+        {
+            var account = await FindByIdAsync(id, cancellationToken);
+            if (account is null || account.Role != AccountRole.Professional || account.TotpEnabledAt is not null) return null;
+            var secret = account.TotpSecret ?? candidate;
+            await MutateAsync(account.Id, current => current with { TotpSecret = secret }, cancellationToken);
+            return secret;
+        }
+
         public Task InsertAsync(Account account, CancellationToken cancellationToken)
         {
-            _accountsByEmail[account.Email] = account;
+            _accountsByEmail[account.Id] = account;
             return Task.CompletedTask;
         }
 
-        public Task UpdateAsync(Account account, CancellationToken cancellationToken)
+        public Task<Account?> MutateAsync(Guid id, Func<Account, Account?> mutation, CancellationToken cancellationToken)
         {
-            _accountsByEmail[account.Email] = account;
-            return Task.CompletedTask;
+            if (!_accountsByEmail.TryGetValue(id, out var current)) return Task.FromResult<Account?>(null);
+            var updated = mutation(current);
+            if (updated is not null) _accountsByEmail[id] = updated;
+            return Task.FromResult(updated);
         }
 
         public Task<IReadOnlyList<Account>> ListPendingDocumentReviewAsync(CancellationToken cancellationToken) =>

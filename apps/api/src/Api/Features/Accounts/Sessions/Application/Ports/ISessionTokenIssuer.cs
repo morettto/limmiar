@@ -6,5 +6,8 @@ public interface ISessionTokenIssuer
 
     RefreshSessionResult Refresh(string refreshToken);
 
-    Guid? ValidateAccess(string accessToken);
+    AccessSession? ValidateAccess(string accessToken);
+
+    /// <summary>Revokes the token's family and returns its session, or null for an unknown token.</summary>
+    AccessSession? Revoke(string refreshToken);
 }

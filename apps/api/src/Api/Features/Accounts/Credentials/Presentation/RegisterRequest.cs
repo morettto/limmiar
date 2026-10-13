@@ -4,7 +4,7 @@ public sealed record RegisterRequest(string Email, byte[] PasswordVerifier, Acco
 
 public sealed record RegisterResponse(
     Guid Id,
-    string Email,
+    string? Email,
     AccountRole Role,
     TwoFactorRequirement TwoFactorRequirement,
     string? TwoFactorTicket = null,

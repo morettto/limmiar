@@ -62,7 +62,7 @@ public sealed class LoginHandler(IAccountStore store, IPasswordVerifierComparer 
         var storedVerifier = account?.PasswordVerifier ?? AccountVerifierLengths.Dummy;
         var matches = comparer.Matches(request.PasswordVerifier, storedVerifier);
 
-        if (account is null || !hasRealVerifier || !matches)
+        if (account is null || account.Role != AccountRole.Professional || !hasRealVerifier || !matches)
         {
             return AccountLoginFailureReason.InvalidCredentials;
         }

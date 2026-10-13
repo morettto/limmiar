@@ -1,16 +1,21 @@
 using Api.Accounts;
+using Api.Audit;
 using Api.Billing;
 using Api.Consent;
 using Api.Data;
 using Api.Health;
 using Api.ExceptionHandling;
 using Api.Notes;
+using Api.Materials;
 using Api.Patients;
 using Api.PatientLinks;
+using Api.OnlineSessions;
+using Api.RateLimiting;
 using Api.Scheduling;
 using Api.Serialization;
 using Mediator;
 using Microsoft.AspNetCore.Cors.Infrastructure;
+using Microsoft.AspNetCore.HttpOverrides;
 
 public partial class Program
 {
@@ -52,6 +57,21 @@ public partial class Program
 
         builder.Services.AddExceptionHandler<GlobalProblemExceptionHandler>();
 
+        // Fly's proxy terminates TLS and is the only way in, so its Fly-Client-IP is the real client (the rate limit key) and its X-Forwarded-Proto is what lets UseHsts see https. Not safe on a host reachable directly: the headers would be client-supplied.
+        builder.Services.Configure<ForwardedHeadersOptions>(options =>
+        {
+            options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+            options.ForwardedForHeaderName = "Fly-Client-IP";
+            options.KnownIPNetworks.Clear();
+            options.KnownProxies.Clear();
+        });
+        builder.Services.AddHsts(options =>
+        {
+            options.MaxAge = TimeSpan.FromDays(365);
+            options.IncludeSubDomains = true;
+        });
+        builder.Services.AddRateLimiting(builder.Configuration);
+
         // Mediator (martinothamar), not MediatR: handlers are resolved through source-generated
         // dispatch, zero reflection, safe under PublishAot=true (Directory.Build.props treats
         // IL2026/IL3050 as errors, which MediatR's runtime assembly scanning would trip).
@@ -60,27 +80,44 @@ public partial class Program
         builder.Services.AddAccounts(builder.Configuration);
 
         builder.Services.AddPatients();
+        builder.Services.AddMaterials();
         builder.Services.AddScheduling();
         builder.Services.AddNotes();
         builder.Services.AddConsent();
+        builder.Services.AddAudit();
         builder.Services.AddPatientLinks();
+        builder.Services.AddOnlineSessions();
         builder.Services.AddBilling(builder.Configuration);
 
         var app = builder.Build();
 
+        app.UseForwardedHeaders();
+
         if (app.Environment.IsDevelopment())
         {
             app.MapOpenApi();
+        }
+        else
+        {
+            app.UseHsts();
         }
 
         app.UseExceptionHandler(_ => { });
 
         app.UseCors();
 
+        var webSockets = new WebSocketOptions();
+        foreach (var origin in corsAllowedOrigins) webSockets.AllowedOrigins.Add(origin);
+        app.UseWebSockets(webSockets);
+
+        // After CORS so a 429 still carries the CORS headers the browser needs to read it.
+        app.UseRateLimiter();
+
         // Runs after routing has selected an endpoint and before that endpoint's own request
         // delegate -- including its parameter binding -- ever executes. See
         // Accounts.Sessions/README.md.
         app.UseMiddleware<RequireAccountAccessMiddleware>();
+        app.UseMiddleware<AuditSignInMiddleware>();
 
         // Every Map*Endpoints call below funnels through this one root group so the 401/403
         // OpenAPI responses get declared on every {accountId} route exactly once, with no
@@ -90,11 +127,14 @@ public partial class Program
         routes.MapHealthEndpoints();
         routes.MapAccounts();
         routes.MapPatients();
+        routes.MapMaterials();
         routes.MapScheduling();
         routes.MapNotes();
         routes.MapConsent();
+        routes.MapAudit();
         routes.MapBilling();
         routes.MapPatientLinks();
+        routes.MapOnlineSessions();
 
         return app;
     }

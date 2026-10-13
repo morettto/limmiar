@@ -47,8 +47,8 @@ public sealed class PatientLinksRlsTests : IAsyncLifetime
         seedCommand.CommandText = """
             INSERT INTO accounts (id, email, role, verification_status) VALUES
                 (@professionalId, @professionalEmail, 'Professional', 'Active'),
-                (@patientId, @patientEmail, 'Patient', 'Active'),
-                (@thirdId, @thirdEmail, 'Patient', 'Active');
+                (@patientId, NULL, 'Patient', 'Active'),
+                (@thirdId, NULL, 'Patient', 'Active');
 
             INSERT INTO account_key_pairs (account_id, public_key, wrapped_dek, sealed_private_key) VALUES
                 (@professionalId, @publicKey, @wrappedDek, @sealedPrivateKey);

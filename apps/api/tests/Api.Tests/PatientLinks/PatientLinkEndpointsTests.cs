@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Api.Accounts;
 using Api.PatientLinks;
+using Api.Patients;
 using Api.Tests.Infrastructure;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -23,6 +24,51 @@ namespace Api.Tests.PatientLinks;
 public sealed class PatientLinkEndpointsTests : IAsyncLifetime
 {
     private const string ValidStubCode = "111111";
+
+    [Fact]
+    public async Task RevokeInvites_RemovesPendingAccessAndRejectsAnotherProfessional()
+    {
+        using var factory = CreateFactory();
+        using var owner = factory.CreateClient();
+        var ownerId = await RegisterActiveProfessionalAsync(owner, "revoke-owner@example.test");
+        var patientId = Guid.NewGuid();
+        await CreateRecordAsync(owner, ownerId, patientId);
+        var path = $"/accounts/{ownerId}/patients/{patientId}/link-invites";
+        var issued = await owner.PostAsync(path, null);
+        var invitation = await issued.Content.ReadFromJsonAsync(PatientLinksJsonContext.Default.CreateLinkInviteResponse);
+        using var other = factory.CreateClient();
+        var otherId = await RegisterActiveProfessionalAsync(other, "revoke-other@example.test");
+        Assert.Equal(HttpStatusCode.Forbidden, (await other.DeleteAsync(path)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await other.DeleteAsync($"/accounts/{otherId}/patients/{patientId}/link-invites")).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await owner.DeleteAsync(path)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await owner.DeleteAsync(path)).StatusCode);
+        using var guest = factory.CreateClient();
+        var verify = await guest.PostAsJsonAsync("/auth/magic-link/verify", new { token = invitation!.Code });
+        Assert.Equal(HttpStatusCode.Unauthorized, verify.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await guest.DeleteAsync(path)).StatusCode);
+    }
+
+    [Fact]
+    public async Task RevokeInvites_WithUnknownAuthenticatedAccount_Returns404()
+    {
+        using var factory = CreateFactoryWithSessionBypass();
+        using var client = factory.CreateClient();
+        var accountId = Guid.NewGuid();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accountId.ToString());
+        Assert.Equal(HttpStatusCode.NotFound, (await client.DeleteAsync($"/accounts/{accountId}/patients/{Guid.NewGuid()}/link-invites")).StatusCode);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task RevokeInvites_PatientAndUnverifiedProfessionalAreForbidden(bool patient)
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        var accountId = patient ? await RegisterPatientAsync(factory, client, "unused")
+            : await RegisterProfessionalWithoutVerificationAsync(client, "revoke-unverified@example.test");
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.DeleteAsync($"/accounts/{accountId}/patients/{Guid.NewGuid()}/link-invites")).StatusCode);
+    }
 
     private readonly PostgresContainerFixture _fixture;
     private Respawner _respawner = null!;
@@ -58,10 +104,11 @@ public sealed class PatientLinkEndpointsTests : IAsyncLifetime
         await PublishKeyPairAsync(professionalClient, professionalId, 0xA1);
 
         using var patientClient = factory.CreateClient();
-        var patientAccountId = await RegisterPatientAsync(patientClient, "link-patient@example.com");
+        var patientAccountId = await RegisterPatientAsync(factory, patientClient, "link-patient@example.com");
         await PublishKeyPairAsync(patientClient, patientAccountId, 0xB2);
 
         var patientId = Guid.NewGuid();
+        await CreateRecordAsync(professionalClient, professionalId, patientId);
         var inviteResponse = await professionalClient.PostAsync(
             $"/accounts/{professionalId}/patients/{patientId}/link-invites", null);
         Assert.Equal(HttpStatusCode.Created, inviteResponse.StatusCode);
@@ -111,7 +158,7 @@ public sealed class PatientLinkEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        var accountId = await RegisterPatientAsync(client, "link-invite-patient@example.com");
+        var accountId = await RegisterPatientAsync(factory, client, "link-invite-patient@example.com");
 
         var response = await client.PostAsync($"/accounts/{accountId}/patients/{Guid.NewGuid()}/link-invites", null);
 
@@ -168,7 +215,7 @@ public sealed class PatientLinkEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        var patientAccountId = await RegisterPatientAsync(client, "link-redeem-empty@example.com");
+        var patientAccountId = await RegisterPatientAsync(factory, client, "link-redeem-empty@example.com");
 
         var response = await client.PostAsJsonAsync(
             $"/accounts/{patientAccountId}/links",
@@ -201,10 +248,10 @@ public sealed class PatientLinkEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        await RegisterPatientAsync(client, "link-redeem-wrong-owner@example.com");
+        await RegisterPatientAsync(factory, client, "link-redeem-wrong-owner@example.com");
 
         using var otherClient = factory.CreateClient();
-        var otherAccountId = await RegisterPatientAsync(otherClient, "link-redeem-wrong-owner-target@example.com");
+        var otherAccountId = await RegisterPatientAsync(factory, otherClient, "link-redeem-wrong-owner-target@example.com");
 
         var response = await client.PostAsJsonAsync(
             $"/accounts/{otherAccountId}/links",
@@ -238,7 +285,7 @@ public sealed class PatientLinkEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        var patientAccountId = await RegisterPatientAsync(client, "link-redeem-unknown@example.com");
+        var patientAccountId = await RegisterPatientAsync(factory, client, "link-redeem-unknown@example.com");
 
         var response = await client.PostAsJsonAsync(
             $"/accounts/{patientAccountId}/links",
@@ -278,7 +325,7 @@ public sealed class PatientLinkEndpointsTests : IAsyncLifetime
         var professionalId = await RegisterActiveProfessionalAsync(professionalClient, "link-conflict-professional@example.com");
 
         using var patientClient = factory.CreateClient();
-        var patientAccountId = await RegisterPatientAsync(patientClient, "link-conflict-patient@example.com");
+        var patientAccountId = await RegisterPatientAsync(factory, patientClient, "link-conflict-patient@example.com");
 
         var patientId = Guid.NewGuid();
         var firstInvite = await CreateInviteAsync(professionalClient, professionalId, patientId);
@@ -315,10 +362,10 @@ public sealed class PatientLinkEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        await RegisterPatientAsync(client, "link-get-wrong-owner@example.com");
+        await RegisterPatientAsync(factory, client, "link-get-wrong-owner@example.com");
 
         using var otherClient = factory.CreateClient();
-        var otherAccountId = await RegisterPatientAsync(otherClient, "link-get-wrong-owner-target@example.com");
+        var otherAccountId = await RegisterPatientAsync(factory, otherClient, "link-get-wrong-owner-target@example.com");
 
         var response = await client.GetAsync($"/accounts/{otherAccountId}/links");
 
@@ -330,7 +377,7 @@ public sealed class PatientLinkEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        var accountId = await RegisterPatientAsync(client, "link-get-empty@example.com");
+        var accountId = await RegisterPatientAsync(factory, client, "link-get-empty@example.com");
 
         var links = await GetLinksAsync(client, accountId);
 
@@ -345,7 +392,7 @@ public sealed class PatientLinkEndpointsTests : IAsyncLifetime
         var professionalId = await RegisterActiveProfessionalAsync(professionalClient, "link-delete-professional@example.com");
 
         using var patientClient = factory.CreateClient();
-        var patientAccountId = await RegisterPatientAsync(patientClient, "link-delete-patient@example.com");
+        var patientAccountId = await RegisterPatientAsync(factory, patientClient, "link-delete-patient@example.com");
 
         var invite = await CreateInviteAsync(professionalClient, professionalId, Guid.NewGuid());
         await patientClient.PostAsJsonAsync(
@@ -383,10 +430,10 @@ public sealed class PatientLinkEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        await RegisterPatientAsync(client, "link-delete-wrong-owner@example.com");
+        await RegisterPatientAsync(factory, client, "link-delete-wrong-owner@example.com");
 
         using var otherClient = factory.CreateClient();
-        var otherAccountId = await RegisterPatientAsync(otherClient, "link-delete-wrong-owner-target@example.com");
+        var otherAccountId = await RegisterPatientAsync(factory, otherClient, "link-delete-wrong-owner-target@example.com");
 
         var response = await client.DeleteAsync($"/accounts/{otherAccountId}/links/{Guid.NewGuid()}");
 
@@ -395,9 +442,47 @@ public sealed class PatientLinkEndpointsTests : IAsyncLifetime
 
     private static async Task<CreateLinkInviteResponse> CreateInviteAsync(HttpClient professionalClient, Guid professionalId, Guid patientId)
     {
+        await CreateRecordAsync(professionalClient, professionalId, patientId);
         var response = await professionalClient.PostAsync($"/accounts/{professionalId}/patients/{patientId}/link-invites", null);
         var invite = await response.Content.ReadFromJsonAsync(PatientLinksJsonContext.Default.CreateLinkInviteResponse);
         return invite!;
+    }
+
+    private static async Task CreateRecordAsync(HttpClient client, Guid professionalId, Guid patientId)
+    {
+        var response = await client.PostAsJsonAsync($"/accounts/{professionalId}/patients",
+            new CreatePatientRequest(patientId, new byte[60], new byte[28]), PatientsJsonContext.Default.CreatePatientRequest);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateInvite_WithUnknownRecord_Returns404()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        var professionalId = await RegisterActiveProfessionalAsync(client, "invite-missing-record@example.com");
+        var response = await client.PostAsync($"/accounts/{professionalId}/patients/{Guid.NewGuid()}/link-invites", null);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("patients.not_found", body.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task CreateInvite_WithRecordOfAnotherProfessional_ReturnsSame404()
+    {
+        using var factory = CreateFactory();
+        using var owner = factory.CreateClient();
+        var ownerId = await RegisterActiveProfessionalAsync(owner, "invite-record-owner@example.com");
+        var patientId = Guid.NewGuid();
+        await CreateRecordAsync(owner, ownerId, patientId);
+        using var other = factory.CreateClient();
+        var otherId = await RegisterActiveProfessionalAsync(other, "invite-record-other@example.com");
+        var response = await other.PostAsync($"/accounts/{otherId}/patients/{patientId}/link-invites", null);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("patients.not_found", body.RootElement.GetProperty("code").GetString());
+        var authorized = await owner.PostAsync($"/accounts/{ownerId}/patients/{patientId}/link-invites", null);
+        Assert.Equal(HttpStatusCode.Created, authorized.StatusCode);
     }
 
     private static async Task<IReadOnlyList<LinkView>> GetLinksAsync(HttpClient client, Guid accountId)
@@ -467,13 +552,9 @@ public sealed class PatientLinkEndpointsTests : IAsyncLifetime
     }
 
     /// <summary>A Patient owes no 2FA (ADR-S02-03): register alone returns a usable access token.</summary>
-    private static async Task<Guid> RegisterPatientAsync(HttpClient client, string email)
+    private static async Task<Guid> RegisterPatientAsync(WebApplicationFactory<Program> factory, HttpClient client, string email)
     {
-        var registerResponse = await client.PostAsJsonAsync(
-            "/auth/register",
-            new RegisterRequest(email, SomeVerifier, AccountRole.Patient),
-            AccountsJsonContext.Default.RegisterRequest);
-        var registered = await registerResponse.Content.ReadFromJsonAsync(AccountsJsonContext.Default.RegisterResponse);
+        var registered = await AnonymousAccountFixture.CreateAsync(factory.Services);
 
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", registered!.AccessToken);
         return registered.Id;
@@ -530,6 +611,8 @@ public sealed class PatientLinkEndpointsTests : IAsyncLifetime
 
         public RefreshSessionResult Refresh(string refreshToken) => throw new NotSupportedException("not needed by the tests that use this stub");
 
-        public Guid? ValidateAccess(string accessToken) => Guid.TryParse(accessToken, out var accountId) ? accountId : null;
+        public AccessSession? Revoke(string refreshToken) => throw new NotSupportedException("not needed by these tests");
+
+        public AccessSession? ValidateAccess(string accessToken) => Guid.TryParse(accessToken, out var accountId) ? new AccessSession(accountId, accountId) : null;
     }
 }

@@ -1,3 +1,4 @@
+using Api.Audit;
 using Api.Accounts;
 using Api.Problems;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -72,6 +73,8 @@ public static class PatientEndpoints
         Guid patientId,
         AppendPatientEntryRequest request,
         PatientService patientService,
+        HttpContext context,
+        AuditRecorder auditRecorder,
         CancellationToken cancellationToken)
     {
         if (!TryValidateSealedBlobShape(request.Ciphertext, "ciphertext", out var ciphertextProblem))
@@ -81,6 +84,11 @@ public static class PatientEndpoints
 
         var result = await patientService.AppendEntryAsync(
             accountId, patientId, request.Sequence, request.Ciphertext, cancellationToken);
+        if (result.TryGetValue(out _))
+        {
+            await auditRecorder.RecordAsync(context, AuditAction.RecordAppended, cancellationToken);
+        }
+
         return result.Match<Results<Created<AppendPatientEntryResponse>, JsonHttpResult<LimmiarProblemDetails>>>(
             entry => TypedResults.Created(
                 $"/accounts/{accountId}/patients/{patientId}/entries/{entry.Id}",
@@ -92,6 +100,8 @@ public static class PatientEndpoints
         Guid accountId,
         Guid patientId,
         PatientService patientService,
+        HttpContext context,
+        AuditRecorder auditRecorder,
         CancellationToken cancellationToken)
     {
         var record = await patientService.GetPatientAsync(accountId, patientId, cancellationToken);
@@ -99,6 +109,8 @@ public static class PatientEndpoints
         {
             return ProblemJson(StatusCodes.Status404NotFound, "Patient not found", PatientsProblemCodes.PatientsNotFound);
         }
+
+        await auditRecorder.RecordAsync(context, AuditAction.RecordOpened, cancellationToken);
 
         return TypedResults.Ok(new PatientRecordResponse(
             record.PatientId,

@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using Api.Accounts;
+using Api.Patients;
 using Npgsql;
 
 namespace Api.PatientLinks;
@@ -13,7 +14,8 @@ public static class PatientLinksComposition
         services.AddSingleton(sp => new SharingPreferencesStore(sp.GetRequiredService<NpgsqlDataSource>()));
         services.AddSingleton(sp => new PatientLinkService(
             sp.GetRequiredService<IAccountStore>(),
-            sp.GetRequiredService<PatientLinkStore>()));
+            sp.GetRequiredService<PatientLinkStore>(),
+            sp.GetRequiredService<PatientRecordStore>()));
 
         services.ConfigureHttpJsonOptions(options =>
         {

@@ -18,12 +18,12 @@ public sealed class DecideProfessionalVerificationHandler(IAccountStore store)
             return ProfessionalVerificationDecisionResult.Failure(ProfessionalVerificationDecisionFailureReason.NotInReview);
         }
 
-        var decided = account with
+        var decided = await store.MutateAsync(account.Id, current => current.VerificationStatus != AccountVerificationStatus.InReview ? null : current with
         {
             VerificationStatus = request.Approved ? AccountVerificationStatus.Active : AccountVerificationStatus.Rejected,
             RejectionReason = request.Approved ? null : request.RejectionReason,
-        };
-        await store.UpdateAsync(decided, cancellationToken);
-        return ProfessionalVerificationDecisionResult.Success(decided);
+        }, cancellationToken);
+        return decided is null ? ProfessionalVerificationDecisionResult.Failure(ProfessionalVerificationDecisionFailureReason.NotInReview)
+            : ProfessionalVerificationDecisionResult.Success(decided);
     }
 }

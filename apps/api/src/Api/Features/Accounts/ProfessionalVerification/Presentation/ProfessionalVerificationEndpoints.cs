@@ -12,6 +12,13 @@ public static class ProfessionalVerificationEndpoints
 {
     public static void MapProfessionalVerificationEndpoints(this IEndpointRouteBuilder app)
     {
+        app.MapGet("/accounts/{accountId:guid}/professional-verification", HandleGetStatusAsync)
+            .WithName("GetProfessionalVerification")
+            .WithSummary("Read the account's professional verification status")
+            .Produces<SubmitProfessionalCredentialResponse>(StatusCodes.Status200OK)
+            .Produces<LimmiarProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")
+            .Produces<LimmiarProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json");
+
         app.MapPost("/accounts/{accountId:guid}/professional-verification", HandleSubmitAsync)
             .WithName("PostProfessionalVerification")
             .WithSummary("Submit (or resubmit) a professional credential")
@@ -39,6 +46,27 @@ public static class ProfessionalVerificationEndpoints
             .Produces<LimmiarProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status409Conflict, "application/problem+json");
+    }
+
+    private static async Task<Results<Ok<SubmitProfessionalCredentialResponse>, JsonHttpResult<LimmiarProblemDetails>>> HandleGetStatusAsync(
+        Guid accountId, IAccountStore store, CancellationToken cancellationToken)
+    {
+        var account = await store.FindByIdAsync(accountId, cancellationToken);
+        if (account is null)
+        {
+            return ProblemJson(StatusCodes.Status404NotFound, "Account not found", AccountsProblemCodes.AuthAccountNotFound);
+        }
+
+        if (account.Role != AccountRole.Professional)
+        {
+            return ProblemJson(StatusCodes.Status409Conflict, "Account is not a professional account", AccountsProblemCodes.AuthNotAProfessionalAccount);
+        }
+
+        return TypedResults.Ok(new SubmitProfessionalCredentialResponse(
+            account.Id, account.VerificationStatus, account.RejectionReason,
+            account.VerificationStatus == AccountVerificationStatus.InReview
+                ? SubmitProfessionalCredentialHandler.DocumentReviewSlaBusinessDays
+                : null));
     }
 
     private static async Task<Results<Ok<SubmitProfessionalCredentialResponse>, JsonHttpResult<LimmiarProblemDetails>>> HandleSubmitAsync(
@@ -83,7 +111,7 @@ public static class ProfessionalVerificationEndpoints
 
         var queue = await store.ListPendingDocumentReviewAsync(cancellationToken);
         IReadOnlyList<ProfessionalVerificationQueueEntry> entries = queue
-            .Select(account => new ProfessionalVerificationQueueEntry(account.Id, account.Email, account.VerificationSubmittedAt!.Value))
+            .Select(account => new ProfessionalVerificationQueueEntry(account.Id, account.Email!, account.VerificationSubmittedAt!.Value))
             .ToList();
         return TypedResults.Ok(entries);
     }
