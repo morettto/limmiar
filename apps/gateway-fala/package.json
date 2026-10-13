@@ -1,0 +1,28 @@
+{
+  "name": "gateway-fala",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "start": "node src/main.ts",
+    "lint": "oxlint",
+    "typecheck": "tsc",
+    "test:unit": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@limmiar/diarization": "workspace:*",
+    "sherpa-onnx-node": "1.13.8",
+    "ws": "^8.21.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "@types/ws": "^8.18.1",
+    "@vitest/coverage-istanbul": "4.1.10",
+    "oxlint": "^1.76.0",
+    "typescript": "~6.0.3",
+    "vitest": "4.1.10"
+  }
+}

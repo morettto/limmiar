@@ -1,0 +1,25 @@
+name: Deploy copiloto (ambiente de teste)
+
+# Só manual: o ambiente de teste não recebe deploy a cada push (docs/ambiente-de-teste.md).
+on:
+  workflow_dispatch:
+
+concurrency: deploy-copiloto
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Build + deploy mvp-copiloto
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: superfly/flyctl-actions/setup-flyctl@v1
+
+      # O contexto do Dockerfile é a pasta do orquestrador; os modelos são baixados no build remoto.
+      - name: Deploy to Fly.io
+        working-directory: mvp-copiloto
+        run: flyctl deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

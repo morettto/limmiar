@@ -52,7 +52,7 @@ só lá, para não haver duas versões dela.
 
 - `apps/app/package.json` e `pnpm-lock.yaml` não mudam neste ticket. O diff de S08-17 é
   documentação e a regra em `AGENTS.md`.
-- `/build:deps` tem de tratar `minisearch` fora do agrupamento. Um agente que agrupe por
+- a revisão de dependências tem de tratar `minisearch` fora do agrupamento. Um agente que agrupe por
   hábito viola `AGENTS.md`, que é carregado em toda a tarefa.
 
 ## Revisão
@@ -65,6 +65,6 @@ consumidor que instale o pacote a partir do manifesto), o `^` deixa de ser inert
 inverte-se.
 
 A premissa muda ao ritmo da configuração de CI, não ao das releases da lib, e seis meses é o
-horizonte em que a etapa 5 do `/build:deps` diz que já ninguém distingue "velha por decisão"
+horizonte em que o processo de revisão de dependências considera que já ninguém distingue "velha por decisão"
 de "velha por esquecimento". Se na data de revisão do cabeçalho a premissa se mantiver, a
 revisão é ler dois ficheiros e renovar essa data.

@@ -1,12 +1,10 @@
-name: Deploy API to Fly.io
+name: Deploy API (ambiente de teste)
 
+# Só manual: o ambiente de teste não recebe deploy a cada push (docs/ambiente-de-teste.md).
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "apps/api/**"
-      - ".github/workflows/deploy-api.yml"
+  workflow_dispatch:
+
+concurrency: deploy-api
 
 jobs:
   deploy:

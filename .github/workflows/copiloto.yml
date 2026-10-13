@@ -1,0 +1,61 @@
+name: Copiloto
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "mvp-copiloto/**"
+      - ".github/workflows/copiloto.yml"
+  push:
+    branches: [main]
+    paths:
+      - "mvp-copiloto/**"
+      - ".github/workflows/copiloto.yml"
+
+jobs:
+  testes-leves:
+    name: "Testes leves (sem modelos)"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: mvp-copiloto
+    env:
+      PYTHONPATH: src:scripts
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Só o que estes testes importam. torch, sentence-transformers e ctranslate2 ficam de fora de propósito:
+      # test_confiabilidade, test_frase, test_triagem_frase, test_triagem_rbf e test_benchmark_final100_cpu os carregam.
+      - name: Install dependencies
+        run: pip install fastapi httpx numpy pypdf python-multipart rank-bm25
+
+      - name: Unit tests
+        run: |
+          python -m unittest \
+            scripts/test_acervo_profissional.py \
+            scripts/test_api_produto.py \
+            scripts/test_avaliar_limite_parcial.py \
+            scripts/test_avaliar_portao.py \
+            scripts/test_calibrar_contexto.py \
+            scripts/test_calibrar_triagem_frase.py \
+            scripts/test_ciclo_juiz.py \
+            scripts/test_citacoes.py \
+            scripts/test_continuacao.py \
+            scripts/test_finalizar_qualificacao.py \
+            scripts/test_fontes_dev.py \
+            scripts/test_juiz_llm.py \
+            scripts/test_metadados.py \
+            scripts/test_niveis_cartao.py \
+            scripts/test_qualificacao.py \
+            scripts/test_qualificacao5k.py \
+            scripts/test_qualificar_revisado.py \
+            scripts/test_revisao_fontes.py \
+            scripts/test_trecho.py \
+            scripts/test_triagem_balanceada.py \
+            scripts/test_votos_api.py

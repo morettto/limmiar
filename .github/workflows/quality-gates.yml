@@ -700,6 +700,33 @@ jobs:
       - name: Run gitleaks detect
         run: gitleaks detect --source . --redact --exit-code 1
 
+  # Orçamento de bundle: o gzip de dist/assets não passa dos tetos de apps/app/scripts/check-bundle.mjs.
+  bundle-budget:
+    name: "Bundle budget (gzip)"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm --filter app build
+
+      - name: Check bundle budget
+        run: pnpm --filter app check:bundle
+
   dast:
     name: "DAST (ZAP baseline)"
     runs-on: ubuntu-latest

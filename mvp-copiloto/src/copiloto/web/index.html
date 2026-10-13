@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Limmiar — bancada de pesquisa</title>
+<style>
+:root{--bg:#0f1115;--card:#171a21;--linha:#262b36;--txt:#e6e8ee;--fraco:#99a1b3;--ac:#6ea8fe;--ok:#4ade80;--erro:#f87171;--marca:#3b3217}
+@media(prefers-color-scheme:light){:root{--bg:#f6f7f9;--card:#fff;--linha:#e3e6ec;--txt:#161922;--fraco:#5c6577;--ac:#2563eb;--marca:#fff4c2}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.5 system-ui,Segoe UI,sans-serif}
+.wrap{max-width:1180px;margin:0 auto;padding:20px 16px 60px}
+header{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+h1{font-size:19px;margin:0}
+.fraco{color:var(--fraco);font-size:12px}
+.grid{display:grid;grid-template-columns:380px 1fr;gap:16px;align-items:start}
+@media(max-width:900px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--linha);border-radius:10px;padding:14px;margin-bottom:16px}
+.card h2{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--fraco);margin:0 0 10px;display:flex;justify-content:space-between}
+label{display:block;font-size:12px;color:var(--fraco);margin:8px 0 3px}
+input,select,button{font:inherit;color:var(--txt);background:var(--bg);border:1px solid var(--linha);border-radius:6px;padding:7px 10px;width:100%}
+button{background:var(--ac);color:#06101f;border:0;font-weight:600;cursor:pointer}
+button:disabled{opacity:.5;cursor:not-allowed}
+button.sec{background:transparent;border:1px solid var(--linha);color:var(--txt);font-weight:400}
+.linha{display:flex;gap:8px;align-items:center}
+.obra{display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--linha)}
+.obra:last-child{border-bottom:0}
+.obra input{width:16px;margin-top:3px;flex:0 0 auto}
+.obra .meta{flex:1;min-width:0;font-size:13px}
+.obra .tit{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tag{display:inline-block;font-size:10px;padding:0 6px;border-radius:99px;border:1px solid var(--linha);color:var(--fraco);margin-right:4px}
+.tag.pronto{color:var(--ok);border-color:var(--ok)}
+.tag.falhou{color:var(--erro);border-color:var(--erro)}
+.fala{border:1px solid var(--linha);border-radius:10px;padding:12px;margin-bottom:12px;background:var(--card)}
+.fala .frase{background:var(--marca);padding:2px 6px;border-radius:4px;font-size:15px}
+.fala .trad{font-size:12px;color:var(--fraco);margin:6px 0 10px}
+.cit{border-left:3px solid var(--ac);padding:6px 10px;margin-top:8px}
+.cit .fonte{font-weight:600;font-size:13px}
+.cit .loc{font-size:12px;color:var(--fraco)}
+.cit .txt{font-size:13px;margin-top:3px}
+.cit .sc{float:right;font-size:11px;color:var(--fraco)}
+.vazio{color:var(--fraco);font-size:13px;padding:6px 0}
+.fala.terapeuta .frase{background:transparent;border:1px dashed var(--linha)}
+.silencio{font-size:12px;color:var(--fraco);margin-top:6px}
+.risco{margin-top:8px;padding:6px 10px;border-radius:6px;border:1px solid var(--erro);color:var(--erro);font-size:12px}
+.cit .disse{font-size:12px;color:var(--fraco);margin:4px 0}
+.cit mark{background:var(--marca);color:inherit;padding:0 2px}
+</style>
+</head>
+<body><div class="wrap">
+<header>
+  <h1>Limmiar — bancada de pesquisa</h1>
+  <span class="fraco" id="saude"></span>
+</header>
+
+<div class="grid">
+<div>
+  <div class="card">
+    <h2><span>Corpus de pesquisa</span><span id="contagem"></span></h2>
+    <p class="fraco">Materiais pessoais são gerenciados no acervo do consultório autenticado.</p>
+    <div class="linha" style="margin-bottom:6px">
+      <button class="sec" id="todos">Marcar todos</button>
+      <button class="sec" id="nenhum">Desmarcar</button>
+    </div>
+    <div class="fraco" style="margin-bottom:6px">Marque as obras desta consulta de pesquisa.</div>
+    <div id="lista"><div class="vazio">Acervo vazio.</div></div>
+  </div>
+</div>
+
+<div>
+  <div class="card">
+    <h2>Consulta de pesquisa</h2>
+    <div class="linha">
+      <select id="idiomaFala" style="flex:1">
+        <option value="pt-BR">Frase em português</option>
+        <option value="es">Frase en español</option>
+        <option value="en-US">Statement in English</option>
+      </select>
+      <select id="falante" style="flex:0 0 150px">
+        <option value="paciente">Quem fala: paciente</option>
+        <option value="terapeuta">Quem fala: terapeuta</option>
+      </select>
+    </div>
+    <div class="linha" style="margin-top:8px">
+      <input id="manual" placeholder="Escreva a fala revisada e aperte Enter">
+      <button class="sec" id="buscar" style="flex:0 0 90px">Buscar</button>
+    </div>
+  </div>
+  <div id="feed"><div class="vazio">Escreva uma fala revisada. Cada fala aparece aqui com as referências encontradas.</div></div>
+</div>
+</div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const selecionadas = new Set();
+let acervo = [];
+
+function escapar(s) {
+  return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+
+async function api(rota, opcoes) {
+  const r = await fetch(rota, opcoes);
+  if (!r.ok) {
+    const corpo = await r.json().catch(() => ({ detail: r.statusText }));
+    throw new Error(typeof corpo.detail === 'string' ? corpo.detail : JSON.stringify(corpo.detail));
+  }
+  return r.json();
+}
+
+async function carregarAcervo() {
+  try {
+    acervo = await api('/api/acervo');
+    const saude = await api('/api/saude');
+    $('#saude').textContent = saude.trechos_no_indice + ' trechos · ' + saude.modelo.split('/').pop() + ' · decisor ' + saude.decisor + (saude.decisor === 'local' ? ' · modelo local ' + (saude.juiz_no_ar ? 'no ar' : 'fora do ar') : '');
+  } catch (e) {
+    $('#saude').textContent = 'servidor indisponível';
+    return;
+  }
+  const prontas = acervo.filter(o => o.status === 'pronto').length;
+  $('#contagem').textContent = prontas + ' prontas' + (selecionadas.size ? ' · ' + selecionadas.size + ' marcadas' : '');
+  if (!acervo.length) { $('#lista').innerHTML = '<div class="vazio">Acervo vazio.</div>'; return; }
+  $('#lista').innerHTML = acervo.map(o => {
+    const m = o.metricas;
+    const avaliacao = (m && m.recall_em_5 !== undefined) ? 'autoteste: Recall@5 ' + m.recall_em_5 + ', MRR ' + m.mrr_em_10 : escapar(o.erro || '');
+    return '<div class="obra">'
+      + '<input type="checkbox" data-id="' + o.id + '"' + (selecionadas.has(o.id) ? ' checked' : '') + (o.status !== 'pronto' ? ' disabled' : '') + '>'
+      + '<div class="meta"><div class="tit" title="' + escapar(o.titulo) + '">' + escapar(o.titulo) + '</div>'
+      + '<div class="fraco"><span class="tag ' + o.status + '">' + o.status + '</span><span class="tag">' + o.idioma + '</span>'
+      + escapar(o.autor) + (o.ano ? ', ' + o.ano : '') + ' · ' + o.paginas + ' pág · ' + o.trechos + ' trechos</div>'
+      + '<div class="fraco">' + avaliacao + '</div></div></div>';
+  }).join('');
+  document.querySelectorAll('#lista input[type=checkbox]').forEach(c => c.onchange = e => {
+    if (e.target.checked) selecionadas.add(e.target.dataset.id); else selecionadas.delete(e.target.dataset.id);
+    carregarAcervo();
+  });
+}
+
+$('#todos').onclick = () => { acervo.filter(o => o.status === 'pronto').forEach(o => selecionadas.add(o.id)); carregarAcervo(); };
+$('#nenhum').onclick = () => { selecionadas.clear(); carregarAcervo(); };
+
+const historico = [];
+
+function destacar(texto, citacao) {
+  const seguro = escapar(texto);
+  const alvo = escapar(citacao || '').trim();
+  if (!alvo) return seguro;
+  const i = seguro.toLowerCase().indexOf(alvo.toLowerCase());
+  if (i < 0) return seguro;
+  return seguro.slice(0, i) + '<mark>' + seguro.slice(i, i + alvo.length) + '</mark>' + seguro.slice(i + alvo.length);
+}
+
+async function consultar(frase, idioma) {
+  frase = (frase || '').trim();
+  if (!frase) return;
+  const falante = $('#falante').value;
+  const vazio = document.querySelector('#feed .vazio');
+  if (vazio) vazio.remove();
+  const bloco = document.createElement('div');
+  bloco.className = 'fala' + (falante === 'terapeuta' ? ' terapeuta' : '');
+  bloco.innerHTML = '<span class="frase">' + (falante === 'terapeuta' ? 'Terapeuta: ' : '') + escapar(frase) + '</span><div class="silencio">a analisar...</div>';
+  $('#feed').prepend(bloco);
+  const corpo = { frase: frase, idioma: idioma, falante: falante, contexto: historico.slice(-5), obras_ids: Array.from(selecionadas) };
+  if (falante === 'paciente') historico.push(frase);
+  const inicio = performance.now();
+  try {
+    const r = await api('/api/consultar', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(corpo) });
+    const segundos = ((performance.now() - inicio) / 1000).toFixed(1);
+    const estado = bloco.querySelector('.silencio');
+    let html = '';
+    if (r.alerta_risco) {
+      html += '<div class="risco">' + (r.clarificar
+        ? 'Fala ambígua em tema de risco. Pode valer uma pergunta de clarificação.'
+        : 'Possível tema de risco nesta fala.') + '</div>';
+    }
+    const fontes = new Map();
+    for (const c of r.cartoes) {
+      if (!fontes.has(c.obra_id)) fontes.set(c.obra_id, []);
+      fontes.get(c.obra_id).push(c);
+    }
+    for (const passagens of fontes.values()) {
+      html += '<div class="cit"><div class="fonte">' + escapar(passagens[0].titulo) + '</div>'
+        + '<div class="loc">' + escapar(passagens[0].autor) + ' · ' + passagens[0].idioma + '</div>';
+      for (const c of passagens) {
+      html += '<div class="loc">Página ' + c.pagina + ', parágrafo ' + c.paragrafo + '</div>'
+        + '<div class="disse">Contexto do paciente: ' + escapar(c.contexto_paciente.join(' / ')) + '</div>'
+        + (c.fenomeno_na_fala || c.fenomeno_no_trecho ? '<div class="disse">Na fala: ' + escapar(c.fenomeno_na_fala) + ' · No texto: ' + escapar(c.fenomeno_no_trecho) + '</div>' : '')
+        + '<blockquote class="txt">' + escapar(c.citacao_literal) + '</blockquote>'
+        + '<details><summary>Passagem completa</summary><div class="txt">' + destacar(c.texto, c.citacao_literal) + '</div></details>';
+      }
+      html += '</div>';
+    }
+    if (r.cartoes.length) {
+      estado.textContent = fontes.size + ' fonte(s), ' + r.cartoes.length + ' passagem(ns) · ' + segundos + ' s';
+    } else {
+      estado.textContent = 'sem referência (' + (r.motivo_silencio || 'sem motivo') + ') · ' + segundos + ' s';
+    }
+    if (html) estado.insertAdjacentHTML('beforebegin', html);
+  } catch (e) {
+    bloco.querySelector('.silencio').textContent = 'erro: ' + e.message;
+  }
+}
+
+$('#buscar').onclick = () => { consultar($('#manual').value, $('#idiomaFala').value); $('#manual').value = ''; };
+$('#manual').onkeydown = e => { if (e.key === 'Enter') { consultar(e.target.value, $('#idiomaFala').value); e.target.value = ''; } };
+
+carregarAcervo();
+setInterval(carregarAcervo, 10000);
+</script>
+</body></html>

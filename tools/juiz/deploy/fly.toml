@@ -1,0 +1,27 @@
+# Juiz no ambiente de teste (tools/juiz/README.md, "Ambiente de teste"). Nome de app Fly é global: se estiver
+# tomado, troque aqui, em publicar.sh (JUIZ_APP) e em docs/ambiente-de-teste.md. A chave vem de `fly secrets`.
+app = "limmiar-juiz-teste"
+# Região com GPU, não necessariamente o Brasil: só dados sintéticos (docs/plano-fechamento-v1.md, D3).
+primary_region = "ord"
+
+# A imagem é publicada por publicar.sh; não há [build] aqui.
+# A máquina para sozinha sem requisições e a próxima requisição a religa, mas o vLLM só abre a porta depois de
+# carregar o modelo (minutos): acorde com `curl /health` antes de cada sessão de teste.
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[http_service.checks]]
+  grace_period = "10m"
+  interval = "30s"
+  timeout = "5s"
+  method = "GET"
+  path = "/health"
+  protocol = "http"
+
+# Confirme o nome do tamanho com `flyctl platform vm-sizes` antes do primeiro deploy.
+[[vm]]
+  size = "l40s"
