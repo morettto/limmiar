@@ -1,5 +1,5 @@
-import type { PalavraAtribuida } from './merge'
-import type { RotuloLocutor } from './classify'
+import type { PalavraAtribuida } from './palavra.ts'
+import type { RotuloLocutor } from './classify.ts'
 
 export interface TrechoCanonico {
   locutor: RotuloLocutor

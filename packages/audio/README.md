@@ -1,5 +1,12 @@
 # @limmiar/audio
 
+`codificarWav(pcm: Float32Array, sampleRate = 16000): Uint8Array<ArrayBuffer>`
+codifica PCM mono em RIFF/WAVE PCM16 little-endian para o serviço Nemotron
+local. Não decodifica nem reamostra: o chamador entrega a taxa real do PCM.
+Valida taxas de 8–96 kHz e amostras finitas, limita amplitude a `[-1, 1]` e
+rejeita gravações que excedem o limite de tamanho do RIFF. O teste lê o
+cabeçalho e as amostras, além de verificar entradas inválidas.
+
 ## Responsabilidade
 
 Núcleo puro e testável em Node do caminho de áudio: o buffer partilhado que

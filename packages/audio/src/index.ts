@@ -11,6 +11,7 @@ export {
 } from './ring-buffer.ts'
 
 export { DEFAULT_SILENCE_RMS, isSilent, rms } from './gate.ts'
+export { codificarWav } from './wav.ts'
 
 export type { TranscriptionEngine, TranscriptionSegment } from './transcription-engine.ts'
 

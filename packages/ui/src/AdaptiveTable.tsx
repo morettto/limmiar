@@ -35,7 +35,7 @@ export function AdaptiveTable({ columns, rows, caption }: AdaptiveTableProps) {
         <thead>
           <tr>
             {columns.map((column) => (
-              <th key={column.key} scope="col" className="border-b border-neutral-300 p-2 text-xs text-neutral-500">
+              <th key={column.key} scope="col" className="border-b border-neutral-300 p-2 text-left font-mono text-xs text-neutral-600">
                 {column.header}
               </th>
             ))}
@@ -43,7 +43,7 @@ export function AdaptiveTable({ columns, rows, caption }: AdaptiveTableProps) {
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.key} className="border-b border-neutral-200 pointer-coarse:h-11">
+            <tr key={row.key} className="border-b border-neutral-300 pointer-coarse:h-11">
               {row.cells.map((cell, index) => (
                 <td key={columns[index].key} className="p-2">
                   {cell}
@@ -70,14 +70,14 @@ export function AdaptiveTable({ columns, rows, caption }: AdaptiveTableProps) {
       {rows.map((row) => (
         // min-h-16 (64px) matches the wireframe's own P2.1-M annotation:
         // "card inteiro é o alvo (≥64px)".
-        <li key={row.key} className="min-h-16 rounded-lg border border-neutral-300 p-3">
+        <li key={row.key} className="editorial-card min-h-16 p-3">
           <div className="flex flex-wrap gap-x-2">
             {primaryIndexes.map((index) => (
               <span key={columns[index].key}>{row.cells[index]}</span>
             ))}
           </div>
           {secondaryIndexes.length > 0 && (
-            <div className="mt-1 flex flex-wrap gap-x-2 text-sm text-neutral-500">
+            <div className="mt-1 flex flex-wrap gap-x-2 text-sm text-neutral-600">
               {secondaryIndexes.map((index) => (
                 <span key={columns[index].key}>{row.cells[index]}</span>
               ))}

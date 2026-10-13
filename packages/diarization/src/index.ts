@@ -1,13 +1,3 @@
-export {
-  atribuirLocutores,
-  type TurnoLocutor,
-  type PalavraAsr,
-  type PalavraAtribuida,
-} from './merge'
-export {
-  classificarLocutores,
-  type RotuloLocutor,
-  type LocutorCandidato,
-} from './classify'
-export { montarTranscricaoCanonica, type TrechoCanonico } from './canonico'
-export { processarDiarizacao } from './pipeline'
+export type { PalavraAtribuida } from './palavra.ts'
+export { LIMIAR_MESMA_VOZ, similaridadeCosseno, type RotuloLocutor } from './classify.ts'
+export { montarTranscricaoCanonica, type TrechoCanonico } from './canonico.ts'

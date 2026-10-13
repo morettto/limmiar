@@ -1,0 +1,151 @@
+@font-face {
+  font-family: Fraunces;
+  font-style: normal;
+  font-weight: 300 400;
+  font-display: swap;
+  src: url('./fonts/fraunces-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: Fraunces;
+  font-style: normal;
+  font-weight: 300 400;
+  font-display: swap;
+  src: url('./fonts/fraunces-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./fonts/ibm-plex-mono-400-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./fonts/ibm-plex-mono-400-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('./fonts/ibm-plex-mono-500-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('./fonts/ibm-plex-mono-500-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+:root {
+  color-scheme: light;
+  font-family: var(--font-interface);
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+  letter-spacing: var(--tracking-body);
+  color: var(--color-ink);
+  background: var(--color-vellum);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  --color-vellum: #f6f6f4;
+  --color-paper: #ffffff;
+  --color-ink: #000000;
+  --color-carbon: #2c2c26;
+  --color-ash: #d0d0c8;
+  --color-olive-char: #57584b;
+  --color-lichen: #6d6e5e;
+  --color-sage: #979886;
+  --color-moss: #aaab9c;
+  --color-bone: #e8e7d9;
+  --color-highlighter-yellow: #fff347;
+  --color-khaki-olive: #aaa674;
+  --font-editorial: 'Fraunces', Georgia, serif;
+  --font-interface: 'IBM Plex Mono', Consolas, monospace;
+  --font-weight-light: 300;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --text-caption: 12px;
+  --leading-caption: 17px;
+  --tracking-caption: -0.8px;
+  --text-body-sm: 14px;
+  --leading-body-sm: 19px;
+  --tracking-body-sm: -0.94px;
+  --text-body: 16px;
+  --leading-body: 24px;
+  --tracking-body: -1.07px;
+  --text-subheading: 20px;
+  --leading-subheading: 30px;
+  --tracking-subheading: -0.5px;
+  --text-heading-sm: 24px;
+  --leading-heading-sm: 24px;
+  --tracking-heading-sm: -1.2px;
+  --text-heading: 32px;
+  --leading-heading: 32px;
+  --tracking-heading: -1.6px;
+  --text-heading-lg: 48px;
+  --leading-heading-lg: 54px;
+  --tracking-heading-lg: -2.4px;
+  --text-display-sm: 64px;
+  --leading-display-sm: 64px;
+  --tracking-display-sm: -3.2px;
+  --text-display: 96px;
+  --leading-display: 90px;
+  --tracking-display: -4.8px;
+  --spacing-unit: 4px;
+  --element-gap: 8px;
+  --radius-sm: 3px;
+  --radius-lg: 8px;
+  --radius-nav: 3px;
+  --radius-tags: 3px;
+  --radius-cards: 8px;
+  --radius-buttons: 3px;
+  --page-max-width: 1200px;
+  --section-gap: 80px;
+  --card-padding: 24px;
+  --surface-vellum: #f6f6f4;
+  --surface-paper: #ffffff;
+  --surface-carbon: #2c2c26;
+  --surface-highlighter: #fff347;
+  --surface-bone: #e8e7d9;
+  --spacing-4: 4px;
+  --spacing-8: 8px;
+  --spacing-12: 12px;
+  --spacing-16: 16px;
+  --spacing-24: 24px;
+  --spacing-32: 32px;
+  --spacing-64: 64px;
+  --spacing-80: 80px;
+  --spacing-128: 128px;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; color: var(--color-ink); background: var(--color-vellum); }
+button, input, select, textarea { font: inherit; }
+:where(button, a, input, select, textarea):focus-visible { outline: 2px solid var(--color-ink); outline-offset: 3px; }
+
+.editorial-page { width: min(100%, var(--page-max-width)); margin-inline: auto; padding: clamp(24px, 6vw, 80px) clamp(16px, 4vw, 32px); }
+.editorial-card { border: 1px solid var(--color-ash); border-radius: var(--radius-lg); background: var(--color-paper); padding: var(--card-padding); }
+.editorial-eyebrow { color: var(--color-lichen); font: 500 12px/17px var(--font-interface); letter-spacing: -0.067em; text-transform: uppercase; }
+.editorial-title { color: var(--color-ink); font: 300 clamp(40px, 8vw, 96px)/0.98 var(--font-editorial); letter-spacing: -0.05em; }
+.editorial-badge { display: inline-flex; align-items: center; border: 1px solid var(--color-khaki-olive); border-radius: var(--radius-sm); background: var(--color-bone); padding: 4px 8px; color: var(--color-lichen); font: 500 12px/17px var(--font-interface); }
+.button-primary, .button-secondary { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; border: 1px solid var(--color-carbon); border-radius: var(--radius-sm); padding: 8px 16px; font: 500 14px/20px var(--font-interface); text-decoration: none; box-shadow: none; }
+.button-primary { color: var(--color-paper); background: var(--color-carbon); }
+.button-secondary { color: var(--color-ink); background: transparent; }
+button.button-primary.fixed.inset-x-4 { min-height: 48px; }

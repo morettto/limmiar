@@ -20,7 +20,7 @@ export default defineConfig({
   },
   use: {
     trace: 'on-first-retry',
-    ctPort: 3100,
+    ctPort: 53100,
     ctViteConfig: {
       plugins: [tailwindcss()],
     },

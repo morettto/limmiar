@@ -23,7 +23,7 @@ export function Columns({ content, alert, action, actionLabel = 'Mais' }: Column
 
   if (breakpoint === 'sm') {
     return (
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-6">
         <div>{action}</div>
         <div>{alert}</div>
         <div>{content}</div>
@@ -33,7 +33,7 @@ export function Columns({ content, alert, action, actionLabel = 'Mais' }: Column
 
   if (breakpoint === 'xl') {
     return (
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-6">
         <div>{content}</div>
         <div>{alert}</div>
         <div>{action}</div>
@@ -43,19 +43,19 @@ export function Columns({ content, alert, action, actionLabel = 'Mais' }: Column
 
   // md/lg (T): the 3rd column becomes a 40%-width on-demand drawer.
   return (
-    <div className="relative flex gap-4">
+    <div className="relative flex gap-6">
       <div className="min-w-0 flex-1">{content}</div>
       <div className="min-w-0 flex-1">{alert}</div>
       <button
         {...triggerProps}
-        className="min-h-11 min-w-11 self-start rounded-md border border-neutral-300 px-3"
+        className="button-secondary min-h-11 min-w-11 self-start rounded-sm border border-neutral-300 px-3"
       >
         {actionLabel}
       </button>
       {isDrawerOpen && (
         <div
           id={drawerId}
-          className="absolute inset-y-0 right-0 w-2/5 border-l border-neutral-300 bg-white p-3 shadow-lg"
+          className="absolute inset-y-0 right-0 w-2/5 border-l border-neutral-300 bg-white p-3"
         >
           {action}
         </div>

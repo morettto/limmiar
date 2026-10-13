@@ -51,7 +51,7 @@ export function CalendarViewport({
         <label className="flex min-h-11 items-center gap-2 text-sm">
           Dia
           <select
-            className="min-h-11 flex-1 rounded-md border border-neutral-300 px-2"
+            className="min-h-11 flex-1 rounded-sm border border-neutral-300 bg-white px-2"
             value={focusedDayIndex}
             onChange={(event) => onFocusedDayIndexChange?.(Number(event.target.value))}
           >
@@ -65,8 +65,8 @@ export function CalendarViewport({
       )}
       <div role="group" aria-label="Dias" className="flex gap-2 overflow-x-auto">
         {visibleDays.map((day, index) => (
-          <div key={day.toISOString()} className="min-w-0 flex-1">
-            <div className="text-xs text-neutral-500">{formatDayLabel(day)}</div>
+          <div key={day.toISOString()} className="min-w-0 flex-1 border-t border-neutral-300 pt-2">
+            <div className="editorial-eyebrow">{formatDayLabel(day)}</div>
             {visibleContent[index]}
           </div>
         ))}

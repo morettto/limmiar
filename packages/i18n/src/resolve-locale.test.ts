@@ -19,38 +19,29 @@ function fakeStore(initial: unknown = null): LocaleStore & { value: unknown } {
 }
 
 describe('resolveLocale', () => {
-  it('profile store wins over everything else when it holds a valid locale', async () => {
+  it('profile store wins over the device store when it holds a valid locale', async () => {
     const profileStore = fakeStore('it-IT')
     const deviceStore = fakeStore('en-US')
 
-    const result = await resolveLocale({ profileStore, deviceStore, preferences: 'es-419' })
+    const result = await resolveLocale({ profileStore, deviceStore })
 
     expect(result).toBe('it-IT')
   })
 
-  it('device store wins over navigator preferences when profile has nothing', async () => {
+  it('device store wins when profile has nothing', async () => {
     const profileStore = fakeStore(null)
     const deviceStore = fakeStore('en-US')
 
-    const result = await resolveLocale({ profileStore, deviceStore, preferences: 'it-IT' })
+    const result = await resolveLocale({ profileStore, deviceStore })
 
     expect(result).toBe('en-US')
   })
 
-  it('falls through to negotiateLocale(preferences) when both stores are empty', async () => {
+  it('falls through to the pt-BR base locale when both stores are empty', async () => {
     const profileStore = fakeStore(null)
     const deviceStore = fakeStore(null)
 
-    const result = await resolveLocale({ profileStore, deviceStore, preferences: 'it-IT' })
-
-    expect(result).toBe('it-IT')
-  })
-
-  it('falls through to base locale when both stores are empty and preferences match nothing', async () => {
-    const profileStore = fakeStore(null)
-    const deviceStore = fakeStore(null)
-
-    const result = await resolveLocale({ profileStore, deviceStore, preferences: null })
+    const result = await resolveLocale({ profileStore, deviceStore })
 
     expect(result).toBe('pt-BR')
   })
@@ -59,18 +50,18 @@ describe('resolveLocale', () => {
     const profileStore = fakeStore('not-a-real-locale')
     const deviceStore = fakeStore('it-IT')
 
-    const result = await resolveLocale({ profileStore, deviceStore, preferences: 'en-US' })
+    const result = await resolveLocale({ profileStore, deviceStore })
 
     expect(result).toBe('it-IT')
   })
 
-  it('ignores an invalid/corrupted value in the device store and falls through to negotiateLocale', async () => {
+  it('ignores an invalid/corrupted value in the device store and falls through to the base locale', async () => {
     const profileStore = fakeStore(null)
     const deviceStore = fakeStore('{corrupted}')
 
-    const result = await resolveLocale({ profileStore, deviceStore, preferences: 'en-US' })
+    const result = await resolveLocale({ profileStore, deviceStore })
 
-    expect(result).toBe('en-US')
+    expect(result).toBe('pt-BR')
   })
 
   it('supports stores whose get() is itself async (a real profile backend, e.g. an HTTP-backed store)', async () => {
@@ -80,7 +71,7 @@ describe('resolveLocale', () => {
     }
     const deviceStore = fakeStore('it-IT')
 
-    const result = await resolveLocale({ profileStore, deviceStore, preferences: null })
+    const result = await resolveLocale({ profileStore, deviceStore })
 
     expect(result).toBe('en-US')
   })

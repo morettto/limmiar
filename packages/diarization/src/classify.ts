@@ -1,11 +1,11 @@
 export type RotuloLocutor = 'voce' | 'paciente'
 
-export interface LocutorCandidato {
-  locutor: string // mesmo id opaco de TurnoLocutor.locutor
-  embedding: readonly number[]
-}
+// Não calibrado com voz humana ainda: 0,7 (o padrão do NeMo verify_speakers) recusou uma leitura real no Zen,
+// e vozes distintas ficam abaixo de 0,4 em TitaNet. Vale para o cadastro no aparelho e para o gateway de fala.
+export const LIMIAR_MESMA_VOZ = 0.5
 
-function similaridadeCosseno(a: readonly number[], b: readonly number[]): number {
+export function similaridadeCosseno(a: readonly number[], b: readonly number[]): number {
+  if (a.length === 0 || a.length !== b.length || !a.every(Number.isFinite) || !b.every(Number.isFinite)) return NaN
   let produto = 0
   let normaA = 0
   let normaB = 0
@@ -15,32 +15,4 @@ function similaridadeCosseno(a: readonly number[], b: readonly number[]): number
     normaB += b[i]! * b[i]!
   }
   return produto / (Math.sqrt(normaA) * Math.sqrt(normaB))
-}
-
-export function classificarLocutores(
-  cadastrado: readonly number[],
-  candidatos: readonly LocutorCandidato[],
-  margemMinima = 0.05,
-): Map<string, RotuloLocutor | null> {
-  const resultado = new Map<string, RotuloLocutor | null>()
-  // Guarda por clareza: sem ela o corpo devolveria o mesmo mapa vazio, por isso
-  // é um mutante equivalente que a mutação nunca mata.
-  if (candidatos.length === 0) return resultado
-
-  const pontuados = candidatos.map((c) => ({
-    locutor: c.locutor,
-    score: similaridadeCosseno(cadastrado, c.embedding),
-  }))
-  const scoresOrdenados = pontuados.map((p) => p.score).sort((a, b) => b - a)
-  const maior = scoresOrdenados[0]!
-  const segundo = scoresOrdenados[1] ?? -Infinity
-  // negar a comparação (em vez de `<`) faz NaN (score sem norma, ou tamanhos
-  // incompatíveis) cair no branch ambíguo — `NaN < x` e `NaN >= x` são ambos
-  // `false`, mas só o segundo, negado, marca ambiguo=true por omissão.
-  const ambiguo = !(maior - segundo >= margemMinima)
-
-  for (const { locutor, score } of pontuados) {
-    resultado.set(locutor, ambiguo ? null : score === maior ? 'voce' : 'paciente')
-  }
-  return resultado
 }
