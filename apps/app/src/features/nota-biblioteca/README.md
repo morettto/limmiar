@@ -1,196 +1,33 @@
-# features/nota-biblioteca
+# Biblioteca de notas e busca local
 
-## Responsabilidade
+`carregar-biblioteca.ts` recebe conta, token e KEK. Carrega os pacientes da conta,
+decifra nomes e prontuários no cliente e recupera as notas com `abrirNotas`.
+Somente a última revisão de cada nota entra na biblioteca; assinaturas são
+verificadas com a DEK do paciente. Falha de autenticação, cifra ou assinatura
+rejeita o carregamento, em vez de aparentar uma biblioteca vazia.
 
-Biblioteca de notas assinadas/pendentes da spec S08 (ticket S08-02). Três partes puras,
-sem UI e sem router: agrupar a fila de assinatura por paciente (`biblioteca.ts`), o índice
-de busca full-text sobre o texto das notas (`indice.ts`, via `minisearch`) e a persistência
-desse índice cifrado em OPFS (`indice-crypto.ts` + `indice-store.ts`). Mesma disciplina do
-resto do monorepo: entra e sai por parâmetro/retorno, zero estado global, zero primitiva de
-cifra própria. Desde a fatia 5, tem chamador real: `pages/biblioteca/BibliotecaPage.tsx` é
-o único lugar que compõe as três partes com UI (`widgets/biblioteca/BibliotecaNotas.tsx`) --
-ver os READMEs dos dois para o fluxo de composição.
+`biblioteca.ts` agrupa notas por paciente, preservando a ordem dos grupos e
+colocando rascunhos antes das assinadas. `indice.ts` usa MiniSearch já instalado:
+indexa texto das frases, busca localmente e distingue preparação, busca ociosa
+e resultado pronto. Um resultado pronto vazio significa ausência de notas
+correspondentes. O termo pesquisado nunca sai pela rede.
 
-## Fluxo principal
+O índice serializado contém a impressão ordenada `id:revisao`. Restaurar um
+índice com impressão diferente o descarta e reconstrói com as notas atuais.
+`OPCOES_INDICE` é compartilhada pela construção e restauração, para os campos
+não divergirem.
 
-1. `agruparPorPaciente(itens: readonly Nota[])` (`biblioteca.ts`) -- agrupa os itens da
-   fila de assinatura (`Nota[]`, cada uma já com o seu `estado`) por `patientId`. Grupos
-   saem na ordem da primeira ocorrência de cada `patientId` em `itens` (`Map` preserva
-   ordem de inserção); dentro de cada grupo, os itens com `estado === ESTADO_PENDENTE`
-   (rascunho) vêm primeiro, e a ordem relativa dentro de cada partição (rascunhos entre si,
-   assinadas entre si) é a de entrada -- `Array.prototype.filter` é estável, sem
-   comparador de sort próprio. É o critério de aceite 3 ("rascunhos em destaque no topo").
-2. `notaParaDoc(nota: Nota)` (`indice.ts`) -- concatena o texto de todas as frases da nota
-   (`nota.frases.map(f => f.texto).join(' ')`) num único `DocNota` buscável.
-3. `construirIndice(docs)` cria um `MiniSearch<DocNota>` configurado por `OPCOES_INDICE`
-   (`fields: ['texto']`, `storeFields: ['patientId']`) e indexa `docs`.
-4. `impressaoDigital(notas)` (`indice.ts`, ticket S08-09) -- `id:revisao` de cada nota,
-   ordenados e unidos por `|`, num único valor que resume "que notas (e que versão de cada
-   uma) o índice cobre". A ordem de `notas` não muda a impressão (`sort()` antes do `join`).
-5. `serializarIndice(indice, impressao)`/`carregarIndice(json, impressao)` (ticket S08-09)
-   fazem o roundtrip por um envelope `{ impressao, indice: indice.toJSON() }` (JSON, bytes
-   UTF-8). `carregarIndice` compara `envelope.impressao` com a `impressao` recebida antes de
-   reidratar -- se não bater (nota nova/editada/apagada desde a última gravação, **ou** um
-   blob antigo sem envelope, `impressao === undefined`), devolve `null` em vez de adotar um
-   índice obsoleto; senão `MiniSearch.loadJS(envelope.indice, OPCOES_INDICE)` (`loadJS`, não
-   `loadJSON` -- o objeto já foi parseado, não volta a `JSON.stringify`). Ver Decisões,
-   "envelope com impressão, não compatibilidade com blobs antigos".
-6. `buscar(indice, termo)` devolve um de três estados (`ResultadoBusca`): `a-preparar`
-   (`indice === null`, ainda não construído/restaurado), `ocioso` (termo vazio -- mostra a
-   biblioteca toda) ou `pronto` com `ids` (pode ser `[]`, sem resultados). Ver Decisões,
-   "os três estados não colapsam em dois".
-7. `chaveIndiceDaConta(kek)` (`indice-crypto.ts`, ticket S08-10) é a única porta de
-   `ChaveIndiceBusca` -- um tipo marcado (`unique symbol`) que só ela produz, depois de
-   confirmar em runtime que `kek` tem usages de KEK (`wrapKey`/`unwrapKey`); uma DEK de
-   paciente (usages `encrypt`/`decrypt`) lança, e não compila onde `ChaveIndiceBusca` é
-   esperado. `selarIndice(chave, accountId, json)` gera uma DEK fresca por gravação
-   (`webcrypto.generateWrappedDek`), embrulhada por `chave` sob a AAD de
-   `indiceBuscaDekAad(accountId)` (`limmiar/note-index-dek/v1|{accountId}`, distinta da AAD
-   do conteúdo), cifra `json` sob essa DEK com `indiceBuscaAad(accountId)`
-   (`limmiar/note-index/v1|{accountId}`) e devolve `wrappedDek(60 bytes) || ciphertext`.
-   `abrirIndice(chave, accountId, selado)` é o inverso: corta os 60 bytes, desembrulha a
-   DEK, decifra o resto -- rejeita se `chave` não for a KEK que embrulhou, ou se
-   `accountId` não bater em qualquer uma das duas AAD. Ver Decisões, "DEK de conta, não DEK
-   de paciente, para o índice cross-paciente".
-8. `opfsIndice(dir)` (`indice-store.ts`) devolve `{ ler, gravar, apagar }`, o único trio
-   autorizado a tocar a API OPFS para o índice de busca (um ficheiro fixo, `indice-busca`,
-   por diretório já escopado à conta pelo chamador). `ler` devolve `null` quando o ficheiro
-   ainda não existe (apanha só `NotFoundError`; qualquer outro erro propaga). `apagar`
-   (ticket S08-09) faz `dir.removeEntry(ARQUIVO_INDICE)`.
-9. `persistirIndice(gravar, chave, accountId, indice, impressao)` (parâmetro solto, `gravar`
-   sozinho -- só usa esse campo) e `restaurarIndice(store, chave, accountId, impressao)`
-   (`store: { ler, apagar }` inteiro -- os dois precisam de andar juntos) compõem os passos
-   5+7+8: serializar (com a impressão) → selar → gravar, e ler → abrir → carregar (com a
-   impressão). `gravar` nunca recebe o JSON em claro, só o blob selado. `restaurarIndice`:
-   sem blob (`ler()` devolve `null`) devolve `null` sem chamar `apagar` -- não há o que
-   apagar; blob presente mas `carregarIndice` devolve `null` (impressão não bate) chama
-   `store.apagar()` antes de devolver `null` -- o blob obsoleto é apagado, não só ignorado (o
-   texto em claro de uma nota corrigida/apagada não sobrevive no disco). Uma rejeição desse
-   `apagar` é ignorada de propósito (ver Decisões, "blob obsoleto é apagado, não só
-   ignorado").
+`indice-crypto.ts` exige uma KEK com usages `wrapKey`/`unwrapKey`, marcada por
+`chaveIndiceDaConta`. Cada gravação gera uma DEK fresca. O formato é DEK
+embrulhada de 60 bytes seguida do conteúdo cifrado, com AAD próprias vinculadas
+ao `accountId` para embrulho e conteúdo. Nenhum JSON do índice chega ao disco
+em claro.
 
-## Pontos de entrada
+`indice-store.ts` lê e grava o blob cifrado em `indice-busca`, dentro do
+diretório OPFS da conta fornecido pelo chamador. Arquivo ausente retorna `null`;
+outros erros propagam. A purga ao sair apaga a árvore da conta pelo módulo
+`entities/account/opfs-conta.ts`. OPFS aqui armazena somente o índice de texto;
+não existe armazenamento de áudio de sessão.
 
-- `agruparPorPaciente(itens: readonly Nota[]): GrupoPaciente[]` (`biblioteca.ts`); `Nota`
-  vem de `entities/nota/nota.ts` (desde o ticket S08-06, `agruparPorPaciente` recebe
-  `Nota[]` em vez de `ItemFila[]` -- `GrupoPaciente.itens` mantém o nome, muda o tipo).
-- `DocNota`, `OPCOES_INDICE`, `notaParaDoc(nota: Nota): DocNota`,
-  `construirIndice(docs: readonly DocNota[]): MiniSearch<DocNota>`,
-  `impressaoDigital(notas: readonly Nota[]): string`,
-  `serializarIndice(indice, impressao: string): Uint8Array<ArrayBuffer>`,
-  `carregarIndice(json, impressao: string): MiniSearch<DocNota> | null`,
-  `ResultadoBusca`, `buscar(indice: MiniSearch<DocNota> | null, termo: string): ResultadoBusca`
-  (`indice.ts`).
-- `ChaveIndiceBusca` (tipo marcado, `CryptoKey` de branding própria),
-  `chaveIndiceDaConta(kek: CryptoKey): ChaveIndiceBusca` (única porta de produção; lança se
-  `kek` não tiver usages `wrapKey`+`unwrapKey`), `indiceBuscaAad(accountId): Uint8Array<ArrayBuffer>`,
-  `indiceBuscaDekAad(accountId): Uint8Array<ArrayBuffer>`,
-  `selarIndice(chave: ChaveIndiceBusca, accountId, json): Promise<Uint8Array<ArrayBuffer>>`,
-  `abrirIndice(chave: ChaveIndiceBusca, accountId, selado): Promise<Uint8Array<ArrayBuffer>>`
-  (`indice-crypto.ts`).
-- `LerSelado`, `GravarSelado`, `ApagarSelado`, `opfsIndice(dir): { ler, gravar, apagar }`,
-  `persistirIndice(gravar: GravarSelado, chave: ChaveIndiceBusca, accountId, indice, impressao): Promise<void>`,
-  `restaurarIndice(store: { ler, apagar }, chave: ChaveIndiceBusca, accountId, impressao): Promise<MiniSearch<DocNota> | null>`
-  (`indice-store.ts`).
-- Chamador (fatias 4-5): `widgets/biblioteca/BibliotecaNotas.tsx` renderiza `GrupoPaciente[]`
-  e `ResultadoBusca`; `pages/biblioteca/BibliotecaPage.tsx` é quem chama
-  `agruparPorPaciente`/`buscar`/`persistirIndice`/`restaurarIndice` de facto, na rota
-  `/biblioteca`.
-
-## Decisões desta fatia
-
-- **DEK de conta, não DEK de paciente, para o índice cross-paciente (ticket S08-10).** Chave
-  de conta (`ChaveIndiceBusca`, via `chaveIndiceDaConta(kek)`), DEK fresca por gravação
-  embrulhada e prefixada ao próprio blob selado. Wire format, alternativa rejeitada e
-  consequências: `docs/adr/ADR-S08-10-chave-de-conta-para-o-indice-de-busca.md`.
-- **OPFS, não Dexie, para persistir o índice.** A spec original apontava Dexie, mas o
-  índice de busca não é um dado relacional/consultável por campo -- é um blob opaco
-  (`MiniSearch.toJSON()` serializado) que só precisa de ser lido e escrito inteiro, de novo
-  a novo. `features/live-session`/`features/nota-audio` já usam exatamente esse padrão
-  (blob cifrado por ficheiro OPFS) para os chunks de áudio e agora para a nota assinada
-  (`entities/nota`); manter OPFS aqui evita introduzir uma segunda tecnologia de
-  persistência local só para um caso que a primeira já cobre, e reusa o par
-  ler/gravar-com-`NotFoundError`-vira-`null` que `opfsWriter` já estabeleceu como
-  convenção do módulo.
-- **MiniSearch, não `String.includes`.** Busca por substring simples não cobre o critério
-  de aceite (termos multi-palavra, tokenização, resultados por relevância) sem reimplementar
-  um tokenizador e um índice invertido à mão -- exatamente o trabalho que uma lib já
-  instalada (`minisearch@^7.2.0`, dependência de produção já presente em `package.json`)
-  resolve. Subir a escada: não há utilitário do repo nem da stdlib que cubra isto, e a
-  lib já estava instalada -- não foi adicionada para esta fatia.
-- **O intervalo `^7.2.0` fica (ticket S08-17), não se fixa a versão exata.** `pnpm-lock.yaml`
-  está versionado e já fixa `minisearch@7.2.0` com integridade; todo o `pnpm install` de CI
-  corre `--frozen-lockfile`, portanto o `^` só se move num `pnpm update` deliberado. Motivo
-  completo, data de revisão e regra de lote: ADR-0010, em
-  `docs/adr/0010-minisearch-fica-em-intervalo-o-lockfile-e-o-pin.md`.
-- **`OPCOES_INDICE` é uma única constante exportada, reusada literalmente por
-  `construirIndice` e `carregarIndice`.** `minisearch` serializa a estrutura do índice
-  (`fieldIds`, `storedFields`) mas continua a precisar de `fields`/`storeFields` no
-  `loadJSON` para reidratar corretamente -- se os dois lados declarassem opções separadas
-  (mesmo com os mesmos valores, por descuido de manutenção futura), um campo novo
-  adicionado só de um lado quebraria o roundtrip em silêncio (buscar por um termo que só
-  existe fora do campo agora indexado passaria a devolver algo diferente do que devolvia
-  antes de serializar). O teste de roundtrip (`indice.test.ts`) é o que trava esse
-  invariante. `Options<DocNota>` sem `as const`: os tipos de `minisearch` querem
-  `fields`/`storeFields` mutáveis (`string[]`), e uma tupla `readonly` não é atribuível a
-  isso -- a constante continua única, só o tipo muda.
-- **Os três estados de `ResultadoBusca` não colapsam em dois.** `a-preparar` (índice ainda
-  não existe) e `pronto` com `ids: []` (índice existe, buscou, não achou nada) pareceriam
-  a mesma coisa numa UI ingênua ("nada para mostrar"), mas confundi-los é o "sem resultados
-  enganoso" que o critério de aceite 2 proíbe explicitamente -- mostrar "nenhuma nota
-  encontrada" enquanto o índice ainda está a carregar do OPFS engana o utilizador sobre se
-  a busca de facto correu.
-- **`opfsIndice` é a única função autorizada a tocar a API OPFS para o índice**, mesmo
-  padrão de `opfsWriter` em `features/live-session/chunk-store.ts`: todo o resto passa por
-  `persistirIndice`/`restaurarIndice`, que nunca veem `getFileHandle`/`createWritable`
-  diretamente.
-- **Duplo de OPFS extraído para `apps/app/src/test-support/fake-opfs.ts`.** Esta é a
-  terceira vez que um `FakeDirectoryHandle` nasce num teste deste app
-  (`chunk-store.test.ts`, depois `reprodutor.test.ts`, agora `indice-store.test.ts` --
-  que precisava dos dois lados, leitura e escrita, ao contrário dos outros dois que só
-  precisavam de um). Extraído em vez de copiado uma terceira vez; `chunk-store.test.ts` e
-  `reprodutor.test.ts` foram atualizados para reusar o mesmo duplo (sem mudança de
-  comportamento -- os dois continuam verdes). Ver os READMEs de `features/live-session` e
-  `features/nota-audio` para o antes/depois.
-- **Envelope com impressão, não compatibilidade com blobs antigos (ticket S08-09).** O blob
-  selado não guardava nada sobre que notas cobria -- depois da primeira gravação, uma nota
-  nova ou editada nunca entrava no índice, e a busca ficava presa num "nenhuma nota
-  encontrada" indistinguível de uma busca legitimamente vazia. `impressaoDigital(notas)`
-  (`id:revisao` de cada nota, ordenados) resolve isso sem hash, sem async e sem dependência
-  nova -- o valor vive dentro do próprio blob selado (`{ impressao, indice }`), nunca vaza.
-  Um blob já persistido antes desta fatia não tem campo `impressao` (`undefined`); em vez de
-  um ramo especial para "formato antigo", o `!==` entre `undefined` e a impressão atual já
-  cai no mesmo caminho de `null` -- por instrução explícita (`AGENTS.md`: "Do not preserve
-  backward compatibility"), não há tentativa de ler esse formato.
-- **Blob obsoleto é apagado, não só ignorado.** Detetar a impressão errada e devolver `null`
-  sem apagar deixaria o texto em claro de uma nota corrigida ou apagada sobreviver no disco
-  do profissional por tempo indefinido -- não é só UX, é retenção de dado num produto
-  clínico com dever de retirada. `restaurarIndice` chama `store.apagar()` antes de devolver
-  `null` nesse caso; `opfsIndice(dir).apagar` é `dir.removeEntry(ARQUIVO_INDICE)`, mesmo
-  ficheiro fixo que `ler`/`gravar` já usam. Uma rejeição desse `apagar` (OPFS negada, cheia,
-  disco corrompido) é ignorada, não propagada -- `restaurarIndice` já está no caminho de
-  recuperação de um índice obsoleto, e propagar mataria a página exatamente no passo que a
-  resolveria: `null` faz `BibliotecaPage` reconstruir e chamar `persistirIndice`, cujo
-  `gravar` (via `createWritable()`) trunca e sobrescreve o mesmo ficheiro de qualquer forma.
-  Só a rejeição de `apagar` é engolida -- `ler` e `abrirIndice` continuam a propagar como
-  antes; um erro nesses dois passos não tem um passo seguinte que o corrija sozinho.
-
-- **`dirIndiceDaConta`/`purgarIndiceBusca` foram apagados (ticket S18-15), revertendo a decisão
-  do S18-12 registada aqui antes.** O argumento que este módulo tinha contra apagar a árvore
-  inteira da conta ("o diretório da conta pode vir a guardar dados de outros módulos") deixou
-  de valer: o dono do desenho decidiu que purgar `<raiz OPFS>/<accountId>` inteira é o
-  invariante certo, precisamente porque um blob fora do índice de busca (um chunk de
-  `features/live-session/chunk-store.ts`) sobrevivia ao logout sob o guarda antigo. Ver
-  `entities/account/README.md` e `app/providers/README.md` para o desenho novo
-  (`purgarOpfsDaConta`) -- este módulo só perdeu um chamador de purga próprio, `opfsIndice`
-  continua a única porta OPFS do índice de busca em si.
-
-## Fora de âmbito
-
-- Manter o índice atualizado quando uma nota é assinada/editada fora do ciclo de vida de
-  `BibliotecaPage` (reindexar, persistir de novo a partir de outra tela, ex.:
-  `pages/notas/NotaPage.tsx`) -- este módulo só sabe construir/(re)carregar/persistir um
-  índice já montado, não decide quando isso deve acontecer; ver `pages/biblioteca/README.md`,
-  "Fora de âmbito".
-- Qualquer mudança em `entities/nota`, `nota-fila` -- fora deste diff por instrução
-  explícita do ticket.
+Decisões: ADR-S08-10 (chave de conta para busca), ADR-S18-01 (purga da árvore) e
+ADR-0010 (atualização isolada de MiniSearch com leitura de changelog).

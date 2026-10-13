@@ -1,7 +1,7 @@
 import { test, expect, type Browser, type BrowserContext, type Page } from '@playwright/test'
 import { webcrypto, type CryptoKey } from '@limmiar/crypto'
 import { API_BASE_URL } from '../playwright.config'
-import { registrarPaciente, registrarProfissionalVerificada, contaTestKek, type ContaTeste } from './fixtures/contas'
+import { criarPacienteNaCarteira, registrarPaciente, registrarProfissionalVerificada, contaTestKek, type ContaTeste } from './fixtures/contas'
 import { garantirParDeChaves } from '../src/entities/vinculo/par-de-chaves'
 import { criarConviteVinculo, resgatarConviteVinculo } from '../src/entities/vinculo/api'
 import { decifrarItem } from '../src/entities/partilha/cifra'
@@ -56,7 +56,7 @@ function newActorContext(browser: Browser): Promise<BrowserContext> {
 test.beforeAll(async ({ browser, request }) => {
   ;[marta, ana] = await Promise.all([
     registrarProfissionalVerificada(request, 'marta-partilha'),
-    registrarPaciente(request, 'ana-partilha'),
+    registrarPaciente(browser, request, 'ana-partilha'),
   ])
   martaKekRaw = contaTestKek(41)
   anaKekRaw = contaTestKek(42)
@@ -70,7 +70,7 @@ test.beforeAll(async ({ browser, request }) => {
   martaPrivateKey = martaPar.privateKey
   anaPublicKey = anaPar.publicKey
 
-  patientId = crypto.randomUUID()
+  patientId = await criarPacienteNaCarteira(request, marta)
   const invite = await criarConviteVinculo(API_BASE_URL, marta.accountId, marta.accessToken, patientId)
   if (!invite.ok) {
     throw new Error(`prep: falha ao criar convite (${invite.code})`)

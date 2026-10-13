@@ -1,158 +1,147 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { I18nProvider } from '@lingui/react'
+import { webcrypto } from '@limmiar/crypto'
 import { i18n, dynamicActivate } from '../../shared/i18n'
 import * as accountApi from '../../entities/account/api'
+import * as keys from '../../entities/account/account-keys'
 import * as crypto from '@limmiar/crypto'
 import { deriveEmailSalt } from '../../entities/account/password-verifier'
 import { deriveRecoveryVerifier } from '../../entities/account/recovery-verifier'
 import { RecoveryPhraseSetup } from './RecoveryPhraseSetup'
 
-vi.mock('../../entities/account/api', async () => {
-  const actual = await vi.importActual<typeof import('../../entities/account/api')>('../../entities/account/api')
-  return {
-    ...actual,
-    registerRecoveryPhrase: vi.fn(),
-  }
-})
+vi.mock('../../entities/account/api', async () => ({
+  ...await vi.importActual<typeof import('../../entities/account/api')>('../../entities/account/api'),
+  registerRecoveryPhrase: vi.fn(),
+}))
+vi.mock('../../entities/account/account-keys', async () => ({
+  ...await vi.importActual<typeof import('../../entities/account/account-keys')>('../../entities/account/account-keys'),
+  createRecoveryEnvelope: vi.fn(),
+}))
+vi.mock('@limmiar/crypto', async () => ({
+  ...await vi.importActual<typeof import('@limmiar/crypto')>('@limmiar/crypto'), generateMnemonic: vi.fn(),
+}))
 
-vi.mock('@limmiar/crypto', async () => {
-  const actual = await vi.importActual<typeof import('@limmiar/crypto')>('@limmiar/crypto')
-  return {
-    ...actual,
-    generateMnemonic: vi.fn(),
-  }
-})
-
-const registerRecoveryPhraseMock = vi.mocked(accountApi.registerRecoveryPhrase)
-const generateMnemonicMock = vi.mocked(crypto.generateMnemonic)
-
+const registerMock = vi.mocked(accountApi.registerRecoveryPhrase)
+const sealMock = vi.mocked(keys.createRecoveryEnvelope)
+const generateMock = vi.mocked(crypto.generateMnemonic)
 const ACCOUNT_ID = '11111111-1111-1111-1111-111111111111'
-const ACCESS_TOKEN = 'access-token-abc'
 const EMAIL = 'pro@example.com'
-const FIXED_MNEMONIC =
-  'letter advice cage absurd amount doctor acoustic avoid letter advice cage absurd amount doctor acoustic avoid letter always'
+const TOKEN = 'access-token-abc'
+const ENVELOPE = new Uint8Array(120).fill(7)
+const PHRASE = 'letter advice cage absurd amount doctor acoustic avoid letter advice cage absurd amount doctor acoustic avoid letter always'
+let kek: CryptoKey
 
-function renderRecoveryPhraseSetup(onDone: () => void = vi.fn()) {
-  return render(
-    <I18nProvider i18n={i18n}>
-      <RecoveryPhraseSetup
-        baseUrl="http://api.test"
-        accountId={ACCOUNT_ID}
-        email={EMAIL}
-        accessToken={ACCESS_TOKEN}
-        onDone={onDone}
-      />
-    </I18nProvider>,
-  )
+function mount(onDone = vi.fn()) {
+  generateMock.mockReturnValue(PHRASE)
+  sealMock.mockResolvedValue(ENVELOPE)
+  return render(<I18nProvider i18n={i18n}><RecoveryPhraseSetup baseUrl="http://api.test" accountId={ACCOUNT_ID} email={EMAIL} accessToken={TOKEN} kek={kek} onDone={onDone} /></I18nProvider>)
+}
+function generate() {
+  fireEvent.change(screen.getByLabelText('Senha atual'), { target: { value: 'senha-atual' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Gerar frase de recuperação' }))
+}
+async function save() {
+  fireEvent.click(await screen.findByRole('button', { name: 'Guardei minha frase' }))
 }
 
 describe('RecoveryPhraseSetup', () => {
   beforeAll(async () => {
     await dynamicActivate('pt-BR')
+    kek = await webcrypto.importKek(new Uint8Array(32).fill(3))
   })
+  afterEach(() => { cleanup(); vi.resetAllMocks() })
 
-  afterEach(() => {
-    cleanup()
-    vi.clearAllMocks()
-  })
-
-  it('shows a generating status before setup completes, with no duplicate list-item keys once ready', async () => {
-    generateMnemonicMock.mockReturnValue(FIXED_MNEMONIC)
-    let resolveRegister: (result: { ok: true }) => void = () => {}
-    registerRecoveryPhraseMock.mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          resolveRegister = resolve
-        }),
-    )
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-
-    renderRecoveryPhraseSetup()
-    expect(screen.getByRole('status').textContent).toBe('Gerando sua frase de recuperação...')
-
-    await waitFor(() => expect(registerRecoveryPhraseMock).toHaveBeenCalled())
-    resolveRegister({ ok: true })
-    await screen.findAllByRole('listitem')
-
-    expect(
-      consoleErrorSpy.mock.calls.some((call) => String(call[0]).includes('same key')),
-    ).toBe(false)
-    consoleErrorSpy.mockRestore()
-  }, 15000)
-
-  it('generates a mnemonic, registers its verifier, and shows the phrase as a numbered word grid', async () => {
-    generateMnemonicMock.mockReturnValue(FIXED_MNEMONIC)
-    registerRecoveryPhraseMock.mockResolvedValue({ ok: true })
-    renderRecoveryPhraseSetup()
-
-    await waitFor(() => expect(registerRecoveryPhraseMock).toHaveBeenCalledTimes(1))
-
-    expect(screen.getByRole('heading', { name: 'Guarde sua frase de recuperação' })).toBeTruthy()
-
-    const call = registerRecoveryPhraseMock.mock.calls[0]
-    expect(call?.[0]).toBe('http://api.test')
-    expect(call?.[1]).toBe(ACCOUNT_ID)
-    expect(call?.[2]).toBe(ACCESS_TOKEN)
-
-    const expectedSalt = await deriveEmailSalt(EMAIL)
-    const expectedVerifier = await deriveRecoveryVerifier(FIXED_MNEMONIC, expectedSalt)
-    expect(call?.[3]).toEqual(expectedVerifier)
-
-    // getByText would fail here: FIXED_MNEMONIC repeats several words (a real BIP39 phrase
-    // can do that), so each numbered list item is asserted by position instead.
-    const words = FIXED_MNEMONIC.split(' ')
-    const items = await screen.findAllByRole('listitem')
-    expect(items).toHaveLength(words.length)
-    for (const [index, word] of words.entries()) {
-      expect(items[index]?.textContent).toBe(`${index + 1}.${word}`)
-    }
-
-    // Never the plaintext mnemonic sent verbatim as the verifier -- neither the raw string
-    // nor its UTF-8 bytes appear anywhere in what was actually sent.
-    expect(new TextDecoder().decode(call?.[3] as Uint8Array)).not.toContain('letter advice')
-  }, 15000)
-
-  it('does not update state after unmounting while setup is still pending', async () => {
-    generateMnemonicMock.mockReturnValue(FIXED_MNEMONIC)
-    let resolveRegister: (result: { ok: true }) => void = () => {}
-    registerRecoveryPhraseMock.mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          resolveRegister = resolve
-        }),
-    )
-    const { unmount } = renderRecoveryPhraseSetup()
-
-    await waitFor(() => expect(registerRecoveryPhraseMock).toHaveBeenCalled())
-    unmount()
-
-    expect(() => resolveRegister({ ok: true })).not.toThrow()
-  }, 15000)
-
-  it('shows a translated error when registering the recovery phrase fails, and never shows the phrase', async () => {
-    generateMnemonicMock.mockReturnValue(FIXED_MNEMONIC)
-    registerRecoveryPhraseMock.mockResolvedValue({
-      ok: false,
-      code: 'auth.not_a_professional_account',
-      params: {},
-    })
-    renderRecoveryPhraseSetup()
-
-    expect((await screen.findByRole('alert')).textContent).toBe(
-      'Esta ação está disponível apenas para contas de profissional.',
-    )
-    expect(screen.queryByText('letter')).toBeNull()
-  }, 15000)
-
-  it('clicking "Guardei minha frase" calls onDone', async () => {
-    generateMnemonicMock.mockReturnValue(FIXED_MNEMONIC)
-    registerRecoveryPhraseMock.mockResolvedValue({ ok: true })
+  it('só registra o verificador e a cifra depois de confirmar que a frase foi guardada', async () => {
     const onDone = vi.fn()
-    renderRecoveryPhraseSetup(onDone)
+    registerMock.mockResolvedValue({ ok: true })
+    mount(onDone)
+    expect(registerMock).not.toHaveBeenCalled()
+    generate()
+    expect(screen.getByRole('status').textContent).toBe('Gerando sua frase de recuperação...')
+    const items = await screen.findAllByRole('listitem')
+    expect(generateMock).toHaveBeenCalledWith(256)
+    expect(items.map((item) => item.textContent)).toEqual(PHRASE.split(' ').map((word, i) => `${i + 1}.${word}`))
+    expect(registerMock).not.toHaveBeenCalled()
+    expect(sealMock).toHaveBeenCalledWith('senha-atual', EMAIL, ACCOUNT_ID, PHRASE, kek)
+    await save()
+    await waitFor(() => expect(onDone).toHaveBeenCalledOnce())
+    const expectedVerifier = await deriveRecoveryVerifier(PHRASE, await deriveEmailSalt(EMAIL))
+    expect(registerMock).toHaveBeenCalledWith('http://api.test', ACCOUNT_ID, TOKEN, expectedVerifier, ENVELOPE)
+    expect(new TextDecoder().decode(registerMock.mock.lastCall![3])).not.toContain('letter advice')
+  }, 15000)
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Guardei minha frase' }))
+  it('abre com a senha vazia e sem aviso, e a lista de palavras não repete chaves', async () => {
+    const erro = vi.spyOn(console, 'error').mockImplementation(() => {})
+    mount()
+    expect((screen.getByLabelText('Senha atual') as HTMLInputElement).value).toBe('')
+    expect(screen.queryByRole('alert')).toBeNull()
+    generate()
+    await screen.findAllByRole('listitem')
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(erro).not.toHaveBeenCalled()
+    erro.mockRestore()
+  }, 15000)
 
-    expect(onDone).toHaveBeenCalledTimes(1)
+  it('recusa senha errada sem enviar nem exibir frase e permite tentar novamente', async () => {
+    mount()
+    sealMock.mockRejectedValueOnce(new Error('senha'))
+    generate()
+    expect((await screen.findByRole('alert')).textContent).toBe('Não foi possível proteger a chave. Verifique sua senha e tente novamente.')
+    expect((screen.getByLabelText('Senha atual') as HTMLInputElement).value).toBe('')
+    expect(screen.queryByRole('list')).toBeNull()
+    expect(registerMock).not.toHaveBeenCalled()
+    generate()
+    await screen.findByRole('list')
+  }, 15000)
+
+  it('mantém a mesma frase para repetir um registro que falhou', async () => {
+    const onDone = vi.fn()
+    mount(onDone)
+    registerMock.mockResolvedValueOnce({ ok: false, code: 'auth.not_a_professional_account', params: {} }).mockResolvedValueOnce({ ok: true })
+    generate()
+    await save()
+    expect((await screen.findByRole('alert')).textContent).toBe('Esta ação está disponível apenas para contas de profissional.')
+    expect(onDone).not.toHaveBeenCalled()
+    await save()
+    await waitFor(() => expect(onDone).toHaveBeenCalledOnce())
+    expect(registerMock.mock.calls[1]).toEqual(registerMock.mock.calls[0])
+    expect(generateMock).toHaveBeenCalledOnce()
+  }, 15000)
+
+  it.each([new Error('rede'), 'rede'])('permite repetir a gravação após falha de rede: %s', async (error) => {
+    mount()
+    registerMock.mockRejectedValueOnce(error)
+    generate()
+    await save()
+    expect((await screen.findByRole('alert')).textContent).toBe(error instanceof Error ? 'rede' : 'Não foi possível conectar. Tente novamente.')
+    expect((screen.getByRole('button', { name: 'Guardei minha frase' }) as HTMLButtonElement).disabled).toBe(false)
+  }, 15000)
+
+  it.each([false, true])('ignora conclusão da derivação depois de desmontar: falha=%s', async (failure) => {
+    const { unmount } = mount()
+    let resolve!: (value: Uint8Array<ArrayBuffer>) => void
+    let reject!: (error: Error) => void
+    sealMock.mockImplementationOnce(() => new Promise((a, b) => { resolve = a; reject = b }))
+    generate()
+    unmount()
+    if (failure) reject(new Error('chave')); else resolve(ENVELOPE)
+    await vi.waitFor(() => expect(sealMock).toHaveBeenCalledOnce())
+    expect(registerMock).not.toHaveBeenCalled()
+  }, 15000)
+
+  it.each([false, true])('ignora conclusão do registro depois de desmontar: falha=%s', async (failure) => {
+    const onDone = vi.fn()
+    const { unmount } = mount(onDone)
+    let resolve!: (value: { ok: true }) => void
+    let reject!: (error: Error) => void
+    registerMock.mockImplementationOnce(() => new Promise((a, b) => { resolve = a; reject = b }))
+    generate()
+    await save()
+    expect((screen.getByRole('button', { name: 'Guardei minha frase' }) as HTMLButtonElement).disabled).toBe(true)
+    unmount()
+    if (failure) reject(new Error('rede')); else resolve({ ok: true })
+    await Promise.resolve()
+    expect(onDone).not.toHaveBeenCalled()
   }, 15000)
 })

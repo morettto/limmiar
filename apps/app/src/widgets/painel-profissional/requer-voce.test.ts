@@ -14,6 +14,7 @@ function nota(overrides: Partial<Nota> = {}): Nota {
   return {
     id: 'nota-1',
     patientId: 'p-1',
+    atendimentoId: 'a-1',
     revisao: 0,
     frases: ORDEM_SECOES.map((secao) => ({ id: `${secao}-0`, secao, texto: '', ancoras: [] })),
     estado: ESTADO_PENDENTE,
@@ -40,7 +41,7 @@ describe('itensDeAssinatura', () => {
   it('gera um item por nota pendente de assinatura', () => {
     const notas: Nota[] = [nota({ id: 'n-1' }), nota({ id: 'n-2', estado: ESTADO_ASSINADA })]
     expect(itensDeAssinatura(notas)).toEqual([
-      { id: 'assinatura:n-1', fonte: 'assinatura', referencia: 'n-1', patientId: 'p-1' },
+      { id: 'assinatura:n-1', fonte: 'assinatura', referencia: 'n-1', patientId: 'p-1', atendimentoId: 'a-1' },
     ])
   })
 })

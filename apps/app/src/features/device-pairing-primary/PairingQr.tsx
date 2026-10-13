@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import QRCode from 'qrcode'
-import { translateProblemCode } from '../../shared/api'
+import type { MessageDescriptor } from '@lingui/core'
+import { problemMessage } from '../../shared/api'
 import { createPairingSession, getPairingClaimStatus, type PairingQrPayload } from '../../entities/device'
 
 export interface PairingQrProps {
@@ -20,7 +21,7 @@ type PairingQrState =
   | { status: 'displaying'; sessionId: string; qrDataUrl: string; payloadText: string; expiresAt: string }
   | { status: 'claimed' }
   | { status: 'expired' }
-  | { status: 'error'; message: string }
+  | { status: 'error'; message: MessageDescriptor }
 
 export function PairingQr({
   baseUrl,
@@ -43,7 +44,7 @@ export function PairingQr({
       }
 
       if (!result.ok) {
-        setState({ status: 'error', message: translateProblemCode(result.code, result.params, i18n) })
+        setState({ status: 'error', message: problemMessage(result.code, result.params) })
         return
       }
 
@@ -63,16 +64,14 @@ export function PairingQr({
     return () => {
       cancelled = true
     }
-  }, [baseUrl, accountId, accessToken, primaryPublicKeyBase64, i18n])
-
-  const sessionId = state.status === 'displaying' ? state.sessionId : undefined
-  const expiresAt = state.status === 'displaying' ? state.expiresAt : undefined
+  }, [baseUrl, accountId, accessToken, primaryPublicKeyBase64])
 
   useEffect(() => {
-    if (sessionId === undefined || expiresAt === undefined) {
+    if (state.status !== 'displaying') {
       return
     }
 
+    const { sessionId, expiresAt } = state
     const intervalId = setInterval(() => {
       if (Date.now() >= new Date(expiresAt).getTime()) {
         clearInterval(intervalId)
@@ -86,7 +85,7 @@ export function PairingQr({
 
         if (!result.ok) {
           clearInterval(intervalId)
-          setState({ status: 'error', message: translateProblemCode(result.code, result.params, i18n) })
+          setState({ status: 'error', message: problemMessage(result.code, result.params) })
           return
         }
 
@@ -101,7 +100,7 @@ export function PairingQr({
     return () => {
       clearInterval(intervalId)
     }
-  }, [sessionId, expiresAt, baseUrl, accountId, accessToken, i18n, onClaimed, onExpired])
+  }, [state, baseUrl, accountId, accessToken, onClaimed, onExpired])
 
   if (state.status === 'creating') {
     return (
@@ -117,7 +116,7 @@ export function PairingQr({
     return (
       <div className="mx-auto max-w-sm p-4">
         <p role="alert" className="text-sm text-red-700">
-          {state.message}
+          {i18n._(state.message)}
         </p>
       </div>
     )
@@ -159,6 +158,7 @@ export function PairingQr({
         data-pairing-payload={state.payloadText}
         className="mx-auto h-auto w-full max-w-xs"
       />
+      <label><Trans>Código de pareamento</Trans><textarea readOnly value={state.payloadText} /></label>
     </div>
   )
 }

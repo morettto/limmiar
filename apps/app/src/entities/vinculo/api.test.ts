@@ -7,6 +7,7 @@ import {
   obterParDeChaves,
   publicarParDeChaves,
   resgatarConviteVinculo,
+  revogarConvitesVinculo,
 } from './api'
 
 const ACCOUNT_ID = '11111111-1111-1111-1111-111111111111'
@@ -18,6 +19,20 @@ const PUBLIC_KEY = new Uint8Array(32).fill(1)
 const WRAPPED_DEK = new Uint8Array(44).fill(2)
 const SEALED_PRIVATE_KEY = new Uint8Array(60).fill(3)
 const PEER_PUBLIC_KEY = new Uint8Array(32).fill(4)
+
+describe('revogarConvitesVinculo', () => {
+  afterEach(() => vi.unstubAllGlobals())
+  it.each([204, 404])('revoga somente os convites do prontuário autenticado, HTTP %i', async (status) => {
+    const problem = { status: 404, title: 'Invite not found', code: 'link.invite_not_found', params: {} }
+    const fetchMock = vi.fn().mockResolvedValue(status === 204 ? new Response(null, { status })
+      : new Response(JSON.stringify(problem), { status, headers: { 'Content-Type': 'application/problem+json' } }))
+    vi.stubGlobal('fetch', fetchMock)
+    expect(await revogarConvitesVinculo('http://api.test', ACCOUNT_ID, ACCESS_TOKEN, PATIENT_ID)).toEqual(status === 204 ? { ok: true } : { ok: false, code: problem.code, params: {} })
+    expect(fetchMock).toHaveBeenCalledWith(`http://api.test/accounts/${ACCOUNT_ID}/patients/${PATIENT_ID}/link-invites`, {
+      method: 'DELETE', headers: { Authorization: `Bearer ${ACCESS_TOKEN}` },
+    })
+  })
+})
 
 describe('publicarParDeChaves', () => {
   afterEach(() => {

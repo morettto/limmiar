@@ -34,9 +34,9 @@ de propósito (ver `entities/partilha/README.md`). `EspelhoP6` (lado da profissi
   no dispositivo (`garantirParDeChaves` + `decifrarItem`), e as sessões da semana (`entities/
   agenda`) marcadas no dia local de início. Uma única chamada a `listarPartilhasRecebidas`
   (`entities/partilha/api.ts`) substitui `listarVinculos` + `listarItensPartilhados` por vínculo.
-  Props `{ baseUrl; accountId; accessToken; kek; agora?: Date }`. Nenhum dos dois ecrãs tem
-  montagem de produção ainda -- sem `KeychainProvider`, só alcançáveis por `/e2e/partilha`
-  (`app/routing/E2ePartilhaScaffold.tsx`).
+  Props `{ baseUrl; accountId; accessToken; kek; agora?: Date }`. Montagem de produção:
+  `PartilhaCheckIns` abaixo do check-in em `/hoje` (paciente) e `EspelhoP6` em `/espelho`
+  (profissional), ambos com a KEK da sessão. `/e2e/partilha` continua como andaime de E2E.
 - `montarEspelho(p): Espelho` / `janelaDoEspelho(agora): { de; ate }` (`espelho.ts`, S11-03, puro,
   sem React) -- `Espelho = { dias: DiaDoEspelho[]; diasComCheckIn: number }`, `dias.length === 7` do
   mais antigo a hoje. Reúne `serieComLacunas` (`entities/checkin`, lacuna explícita, nunca

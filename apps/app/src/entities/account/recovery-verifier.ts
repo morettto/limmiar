@@ -5,5 +5,7 @@ import { ACCOUNT_VERIFIER_PARAMS } from './argon2-params'
 // is sent to the backend.
 export async function deriveRecoveryVerifier(mnemonic: string, salt: Uint8Array): Promise<Uint8Array> {
   const mnemonicBytes = new TextEncoder().encode(mnemonic)
-  return deriveKey(mnemonicBytes, salt, ACCOUNT_VERIFIER_PARAMS)
+  try {
+    return await deriveKey(mnemonicBytes, salt, ACCOUNT_VERIFIER_PARAMS)
+  } finally { mnemonicBytes.fill(0) }
 }

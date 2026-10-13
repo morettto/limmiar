@@ -5,7 +5,11 @@ import { ACCOUNT_VERIFIER_PARAMS } from './argon2-params'
 // verifier is sent to the backend.
 export async function deriveEmailPasswordVerifier(password: string, salt: Uint8Array): Promise<Uint8Array> {
   const passwordBytes = new TextEncoder().encode(password)
-  return deriveKey(passwordBytes, salt, ACCOUNT_VERIFIER_PARAMS)
+  try {
+    return await deriveKey(passwordBytes, salt, ACCOUNT_VERIFIER_PARAMS)
+  } finally {
+    passwordBytes.fill(0)
+  }
 }
 
 // The backend stores no salt and login must re-derive the verifier from (email, password) with

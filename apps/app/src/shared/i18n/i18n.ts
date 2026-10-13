@@ -1,22 +1,24 @@
 import { i18n } from '@lingui/core'
-import { noopProfileLocaleStore, persistLocale, resolveLocale, type Locale } from '@limmiar/i18n'
+import { LOCALES, noopProfileLocaleStore, persistLocale, resolveLocale, type Locale } from '@limmiar/i18n'
 import { localStorageLocaleStore } from './locale/local-storage-locale-store'
 import { syncDocumentLang } from './locale/document-lang-sync'
 
 export { i18n }
 
-// The 2 store-backed levels of ADR-S00.5-05's order (profile, device, navigator, base). There is
-// no auth/profile backend yet (S02), so profileStore is the no-op seam from packages/i18n and
+// Resolution order: profile, device, pt-BR base; the browser's language is never consulted. There
+// is no auth/profile backend yet (S02), so profileStore is the no-op seam from packages/i18n and
 // deviceStore is the real localStorage-backed store.
 const localeStores = { profileStore: noopProfileLocaleStore, deviceStore: localStorageLocaleStore }
 
 export async function initialLocale(): Promise<Locale> {
-  return resolveLocale({ ...localeStores, preferences: navigator.languages })
+  return resolveLocale(localeStores)
 }
+
+const loadCatalog = (locale: Locale) => import(`../../locales/${locale}/messages.po`)
 
 export async function dynamicActivate(locale: Locale): Promise<void> {
   try {
-    const { messages } = await import(`../../locales/${locale}/messages.po`)
+    const { messages } = await loadCatalog(locale)
     i18n.loadAndActivate({ locale, messages })
   } catch (error) {
     // AC: a catalog load failure (network down, 404, bad chunk — anything
@@ -35,28 +37,14 @@ export async function setLocale(locale: Locale): Promise<void> {
 }
 
 // Boot-time composition of the two halves above: resolve which locale wins
-// per the 4-level order, then activate it.
+// (profile, device, base), then activate it.
 export async function bootLocale(): Promise<void> {
   await dynamicActivate(await initialLocale())
+  // Every catalog enters the module cache once the UI is up, so the first switch skips the network.
+  await Promise.allSettled(LOCALES.map(loadCatalog))
 }
 
 // Keeps document.documentElement.lang in sync with i18n's active locale
 // across boot, every later switch, and (by construction — see
 // document-lang-sync.ts) never on a failed fallback.
 syncDocumentLang(i18n)
-
-declare global {
-  interface Window {
-    limmiarI18n?: {
-      setLocale: typeof setLocale
-      dynamicActivate: typeof dynamicActivate
-    }
-  }
-}
-
-// Deliberate E2E seam, not a leftover debug hook: with no locale-switcher UI yet, a browser test
-// has no other way to trigger a live locale switch or a fallback. Remove in favor of driving the
-// UI once a real switcher exists.
-if (typeof window !== 'undefined') {
-  window.limmiarI18n = { setLocale, dynamicActivate }
-}

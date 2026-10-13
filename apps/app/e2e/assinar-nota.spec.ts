@@ -1,49 +1,35 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect } from '@playwright/test'
+import { abrirAbaDaSessao, abrirCarteira, iniciarSessaoAgora, registrarProfissionalNaInterface } from './fixtures/profissional-interface'
 
-// S08-01 fatia 5: percurso só-teclado do editor SOAP -- Tab até à listbox, j/k, Enter, Tab,
-// escrever e ⌘↵/Ctrl+↵ para assinar. Com `kek={null}` (router.tsx), `aoAssinar` guarda cedo:
-// o que se prova aqui é o desfecho "sem sessão", determinístico e sem tocar no Postgres.
-
-async function tabAteListbox(page: Page): Promise<void> {
-  for (let tentativa = 0; tentativa < 10; tentativa++) {
-    const role = await page.evaluate(() => document.activeElement?.getAttribute('role'))
-    if (role === 'listbox') {
-      return
-    }
-    await page.keyboard.press('Tab')
-  }
-  throw new Error('Tab não alcançou a listbox da fila de assinatura em 10 tentativas')
-}
+// S08-01: o editor SOAP assina só com teclado -- escrever e Ctrl+Enter, sem tocar no botão. O
+// profissional entra pela interface, abre a pasta pelo link da carteira e inicia uma sessão agora: a
+// KEK vive só na memória da página, então um `page.goto('/pacientes/...')` cairia no login.
 
 test.describe('Editor SOAP -- assinar só com teclado (S08-01)', () => {
   test.use({ locale: 'pt-BR' })
 
-  test('Tab até à listbox, j/k, Enter, Tab para o editor, escrever e Ctrl+Enter para assinar', async ({ page }) => {
-    await page.goto('/notas')
+  test('escrever no editor e Ctrl+Enter assinam a nota gravada no prontuário', async ({ page, request }) => {
+    await registrarProfissionalNaInterface(page, request)
+    await abrirCarteira(page)
 
-    await tabAteListbox(page)
+    const nome = `ASSINATURA-TECLADO-${crypto.randomUUID()}`
+    const carteira = page.getByRole('region', { name: 'Pacientes', exact: true })
+    await carteira.locator('details.patient-add > summary').click()
+    await carteira.getByLabel('Nome do paciente', { exact: true }).fill(nome)
+    await carteira.getByRole('button', { name: 'Adicionar paciente', exact: true }).click()
+    await carteira.getByRole('link', { name: nome, exact: true }).click()
+    await iniciarSessaoAgora(page)
+    await abrirAbaDaSessao(page, 'Nota')
 
-    // j/k navegam a listbox -- um único item na fixture desta fatia, então o cursor fica no
-    // mesmo (e único) item, mas o atalho de teclado em si é o que este e2e prova.
-    await page.keyboard.press('j')
-    await page.keyboard.press('k')
-    await page.keyboard.press('Enter')
-
-    await expect(page.getByRole('option', { selected: true })).toBeVisible()
-
-    await page.keyboard.press('Tab')
-    const editorAtivo = await page.evaluate(() => document.activeElement?.getAttribute('aria-label'))
-    expect(editorAtivo).toBe('Subjetivo 1')
-
+    const nota = page.getByRole('region', { name: 'Nota da sessão', exact: true })
+    const subjetivo = nota.getByRole('textbox', { name: 'Subjetivo 1', exact: true })
+    await subjetivo.focus()
     await page.keyboard.type('Paciente relata melhora dos sintomas.')
     await page.keyboard.press('Control+Enter')
 
-    const alerta = page.getByRole('alert')
-    await expect(alerta).toBeVisible()
-    await expect(alerta).toHaveText('Sem sessão ativa. Não é possível assinar.')
-
-    // O item continua na aba "Pendentes" -- a guarda de sessão interrompeu antes de
-    // qualquer chamada à cadeia real, então nada foi marcado como assinado.
-    await expect(page.getByRole('tab', { name: 'Pendentes', selected: true })).toBeVisible()
+    await expect(nota.getByRole('status')).toHaveText('Nota assinada e salva no prontuário.')
+    await expect(subjetivo).toHaveValue('Paciente relata melhora dos sintomas.')
+    await expect(subjetivo).toHaveAttribute('readonly', '')
+    await expect(nota.getByRole('button', { name: 'Assinar nota', exact: true })).toBeDisabled()
   })
 })

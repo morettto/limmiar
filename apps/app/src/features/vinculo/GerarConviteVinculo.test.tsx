@@ -1,8 +1,9 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { I18nProvider } from '@lingui/react'
-import { webcrypto } from '@limmiar/crypto'
+import { webcrypto, type CryptoKey } from '@limmiar/crypto'
 import { i18n, dynamicActivate } from '../../shared/i18n'
+import { deferred } from '../../test-support/deferred'
 import * as vinculoApi from '../../entities/vinculo/api'
 import * as parDeChavesModule from '../../entities/vinculo/par-de-chaves'
 import { GerarConviteVinculo } from './GerarConviteVinculo'
@@ -23,10 +24,14 @@ const PATIENT_ID = 'paciente-ana'
 
 async function renderComponent() {
   const kek = await webcrypto.importKek(new Uint8Array(32).fill(1))
-  return render(
+  return render(componente(kek, ACCESS_TOKEN))
+}
+
+function componente(kek: CryptoKey, accessToken: string) {
+  return (
     <I18nProvider i18n={i18n}>
-      <GerarConviteVinculo baseUrl={BASE_URL} accountId={ACCOUNT_ID} accessToken={ACCESS_TOKEN} kek={kek} patientId={PATIENT_ID} />
-    </I18nProvider>,
+      <GerarConviteVinculo baseUrl={BASE_URL} accountId={ACCOUNT_ID} accessToken={accessToken} kek={kek} patientId={PATIENT_ID} />
+    </I18nProvider>
   )
 }
 
@@ -45,6 +50,8 @@ describe('GerarConviteVinculo', () => {
 
     await renderComponent()
 
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Gerar código de vínculo' })).toHaveProperty('disabled', false)
     expect(garantirParDeChavesMock).toHaveBeenCalledTimes(1)
     expect(garantirParDeChavesMock.mock.calls[0]![0]).toMatchObject({
       baseUrl: BASE_URL,
@@ -84,8 +91,34 @@ describe('GerarConviteVinculo', () => {
 
     await renderComponent()
     await vi.waitFor(() => expect(consoleErrorSpy).toHaveBeenCalledTimes(1))
+    expect(consoleErrorSpy).toHaveBeenCalledWith('GerarConviteVinculo: falha ao garantir o par de chaves', new Error('kek trancado'))
 
     expect(screen.getByRole('button', { name: 'Gerar código de vínculo' })).toBeTruthy()
     consoleErrorSpy.mockRestore()
+  })
+
+  it('bloqueia o botão enquanto gera o convite', async () => {
+    garantirParDeChavesMock.mockResolvedValue({ publicKey: new Uint8Array(32), privateKey: new Uint8Array(32) })
+    const convite = deferred<vinculoApi.CriarConviteVinculoResult>()
+    criarConviteVinculoMock.mockReturnValue(convite.promise)
+
+    await renderComponent()
+    fireEvent.click(screen.getByRole('button', { name: 'Gerar código de vínculo' }))
+
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Gerar código de vínculo' })).toHaveProperty('disabled', true))
+    await act(async () => convite.resolve({ ok: false, code: 'auth.forbidden', params: {} }))
+    expect(screen.getByRole('button', { name: 'Gerar código de vínculo' })).toHaveProperty('disabled', false)
+  })
+
+  it('publica o par de chaves de novo quando a sessão ou a chave mudam', async () => {
+    garantirParDeChavesMock.mockResolvedValue({ publicKey: new Uint8Array(32), privateKey: new Uint8Array(32) })
+    const kek = await webcrypto.importKek(new Uint8Array(32).fill(1))
+    const view = render(componente(kek, ACCESS_TOKEN))
+    view.rerender(componente(kek, ACCESS_TOKEN))
+    expect(garantirParDeChavesMock).toHaveBeenCalledTimes(1)
+
+    view.rerender(componente(kek, 'token-novo'))
+    expect(garantirParDeChavesMock).toHaveBeenCalledTimes(2)
+    expect(garantirParDeChavesMock.mock.calls[1]![0]).toMatchObject({ accessToken: 'token-novo' })
   })
 })

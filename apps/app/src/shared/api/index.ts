@@ -1,2 +1,2 @@
 export * from './client'
-export { translateProblemCode } from './problem-messages'
+export { problemMessage, translateProblemCode } from './problem-messages'

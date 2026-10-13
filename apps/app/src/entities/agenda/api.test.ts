@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { listarSessoes } from './api'
+import { agendarSessao, remarcarSessao, cancelarSessao, listarSessoes } from './api'
 
 const ACCOUNT_ID = '44444444-4444-4444-4444-444444444444'
 const ACCESS_TOKEN = 'access-token-xyz'
@@ -61,4 +61,28 @@ describe('listarSessoes', () => {
 
     expect(result).toEqual({ ok: false, code: 'auth.forbidden', params: {} })
   })
+})
+
+it('agenda envia métodos, IDs opacos e horários para as rotas autenticadas', async () => {
+  const fetch = vi.fn().mockImplementation(async (_url: string, opcoes: { method: string }) =>
+    opcoes.method === 'POST' ? new Response(JSON.stringify({ sessionId: 'sessao-nova' }), { status: 201 }) : new Response(null, { status: 204 }))
+  vi.stubGlobal('fetch', fetch)
+  try {
+    expect(await agendarSessao('', 'conta', 'token', 'paciente', '2026-10-04T14:00:00Z', 50)).toEqual({ ok: true, sessionId: 'sessao-nova' })
+    await remarcarSessao('', 'conta', 'token', 'sessao', '2026-10-04T15:00:00Z', 30)
+    await cancelarSessao('', 'conta', 'token', 'sessao')
+    expect(fetch.mock.calls.map(([url, opcoes]) => [url, opcoes.method, opcoes.headers.Authorization,
+      opcoes.body ? JSON.parse(opcoes.body) : null])).toEqual([
+      ['/accounts/conta/agenda/sessions', 'POST', 'Bearer token', { patientId: 'paciente', startsAt: '2026-10-04T14:00:00Z', durationMinutes: 50 }],
+      ['/accounts/conta/agenda/sessions/sessao', 'PATCH', 'Bearer token', { startsAt: '2026-10-04T15:00:00Z', durationMinutes: 30 }],
+      ['/accounts/conta/agenda/sessions/sessao', 'DELETE', 'Bearer token', null],
+    ])
+  } finally { vi.unstubAllGlobals() }
+})
+
+it('agendar devolve o problema da API sem sessionId', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ code: 'agenda.slot_taken', params: {} }), { status: 409 })))
+  try {
+    expect(await agendarSessao('', 'conta', 'token', 'paciente', '2026-10-04T14:00:00Z', 50)).toMatchObject({ ok: false, code: 'agenda.slot_taken' })
+  } finally { vi.unstubAllGlobals() }
 })

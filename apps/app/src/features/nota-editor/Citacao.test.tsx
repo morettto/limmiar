@@ -11,6 +11,13 @@ describe('Citacao', () => {
 
   afterEach(() => cleanup())
 
+  it('desabilita a reprodução quando a gravação original está indisponível', () => {
+    render(<I18nProvider i18n={i18n}><Citacao ancora={{ inicioMs: 0, fimMs: 1000 }} /></I18nProvider>)
+    const botao = screen.getByRole('button') as HTMLButtonElement
+    expect(botao.disabled).toBe(true)
+    expect(botao.title).toBe('Gravação original indisponível')
+  })
+
   it('mostra o intervalo formatado mm:ss–mm:ss', () => {
     render(
       <I18nProvider i18n={i18n}>
@@ -74,5 +81,18 @@ describe('Citacao', () => {
     )
 
     expect(screen.getByRole('button').getAttribute('aria-label')).toBe('Tocar áudio de 0:00 a 0:01')
+  })
+
+  it('sem reprodutor, focar ou passar o rato no botão travado não falha', () => {
+    render(<I18nProvider i18n={i18n}><Citacao ancora={{ inicioMs: 0, fimMs: 1000 }} /></I18nProvider>)
+    const botao = screen.getByRole('button')
+    expect(() => { fireEvent.focus(botao); fireEvent.mouseEnter(botao); fireEvent.click(botao) }).not.toThrow()
+  })
+
+  it('com reprodutor disponível não mostra o aviso de gravação indisponível', () => {
+    render(<I18nProvider i18n={i18n}><Citacao ancora={{ inicioMs: 0, fimMs: 1000 }} aoTocar={vi.fn()} /></I18nProvider>)
+    const botao = screen.getByRole('button') as HTMLButtonElement
+    expect(botao.disabled).toBe(false)
+    expect(botao.hasAttribute('title')).toBe(false)
   })
 })

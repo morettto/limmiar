@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
-import { useLingui } from '@lingui/react/macro'
+import { Trans, useLingui } from '@lingui/react/macro'
+import type { MessageDescriptor } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
 import type MiniSearch from 'minisearch'
 import type { Nota } from '../../entities/nota/nota'
 import { useSession } from '../../entities/account/session-context'
@@ -17,6 +19,7 @@ import { BibliotecaNotas } from '../../widgets/biblioteca/BibliotecaNotas'
 
 export interface BibliotecaPageProps {
   notas: readonly Nota[]
+  nomesPacientes: ReadonlyMap<string, string>
   chaveIndice: ChaveIndiceBusca | null
   store: { ler: LerSelado; gravar: GravarSelado; apagar: ApagarSelado }
 }
@@ -26,17 +29,13 @@ export interface BibliotecaPageProps {
  * chave do índice; ver README, "Fluxo principal". O índice nunca sai por rede: `buscar` é
  * local e `persistirIndice`/`restaurarIndice` só tocam OPFS (critério de aceite 1).
  */
-export function BibliotecaPage({ notas, chaveIndice, store }: BibliotecaPageProps) {
+export function BibliotecaPage({ notas, nomesPacientes, chaveIndice, store }: BibliotecaPageProps) {
   const { sessao } = useSession()
   const accountId = sessao?.id ?? null
-  const { t } = useLingui()
-  // `t` só é rastreável pelo extrator do Lingui numa chamada direta aqui -- lido do closure do
-  // efeito sem entrar na dependency array. Recalculada a cada render, o efeito ainda vê o
-  // locale atual mesmo se o `catch` disparar após uma troca.
-  const mensagemErroBusca = t`Não foi possível preparar a busca. Tente novamente.`
+  const { i18n } = useLingui()
   const [indice, setIndice] = useState<MiniSearch<DocNota> | null>(null)
   const [termo, setTermo] = useState('')
-  const [erro, setErro] = useState<string | null>(null)
+  const [erro, setErro] = useState<MessageDescriptor | null>(null)
   const impressao = impressaoDigital(notas)
 
   useEffect(() => {
@@ -66,7 +65,7 @@ export function BibliotecaPage({ notas, chaveIndice, store }: BibliotecaPageProp
     // `PatientWallet.tsx` (`load(kek).catch(...)`), mesmo `role="alert"`.
     preparar(chaveIndice, accountId).catch(() => {
       if (!cancelado) {
-        setErro(mensagemErroBusca)
+        setErro(msg`Não foi possível preparar a busca. Tente novamente.`)
       }
     })
     return () => {
@@ -74,22 +73,22 @@ export function BibliotecaPage({ notas, chaveIndice, store }: BibliotecaPageProp
     }
   }, [chaveIndice, accountId, impressao])
 
-  if (erro !== null) {
-    return (
+  return <main className="workspace">
+    <header><h1><Trans>Biblioteca de notas</Trans></h1></header>
+    {erro !== null ? (
       <div className="mx-auto max-w-sm p-4">
         <p role="alert" className="text-sm text-red-700">
-          {erro}
+          {i18n._(erro)}
         </p>
       </div>
-    )
-  }
-
-  return (
+    ) : (
     <BibliotecaNotas
       grupos={agruparPorPaciente(notas)}
+      nomesPacientes={nomesPacientes}
       termo={termo}
       onTermoChange={setTermo}
       resultado={buscar(indice, termo)}
     />
-  )
+    )}
+  </main>
 }

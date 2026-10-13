@@ -9,6 +9,7 @@ function nota(id: string, patientId: string): Nota {
   return {
     id,
     patientId,
+    atendimentoId: `atendimento-${id}`,
     revisao: 0,
     frases: [{ id: `${id}-S-0`, secao: 'S', texto: `texto de ${id}`, ancoras: [] }],
     estado: ESTADO_PENDENTE,

@@ -151,4 +151,23 @@ describe('sealNewPatient / openRecord', () => {
       ),
     ).rejects.toThrow(/gap or duplicate/)
   })
+
+  it('abre as entradas na ordem da sequência mesmo que cheguem fora de ordem', async () => {
+    const kek = await makeKek()
+    const sealed = await sealNewPatient(kek, PATIENT_ID, new TextEncoder().encode('um'))
+    const dois = await sealEntry(sealed.dek, PATIENT_ID, 2, new TextEncoder().encode('dois'))
+    const tres = await sealEntry(sealed.dek, PATIENT_ID, 3, new TextEncoder().encode('três'))
+    const { plaintexts } = await openRecord(kek, { wrappedDek: sealed.wrappedDek, entries: [
+      { sequence: 3, ciphertext: tres }, { sequence: 1, ciphertext: sealed.ciphertext }, { sequence: 2, ciphertext: dois },
+    ] }, PATIENT_ID)
+    expect(plaintexts.map((bytes) => new TextDecoder().decode(bytes))).toEqual(['um', 'dois', 'três'])
+  })
+
+  it('diz em que posição a sequência falha e o que recebeu no lugar', async () => {
+    const kek = await makeKek()
+    const sealed = await sealNewPatient(kek, PATIENT_ID, new TextEncoder().encode('um'))
+    await expect(openRecord(kek, { wrappedDek: sealed.wrappedDek, entries: [
+      { sequence: 1, ciphertext: sealed.ciphertext }, { sequence: 3, ciphertext: sealed.ciphertext },
+    ] }, PATIENT_ID)).rejects.toThrow('patient record has a gap or duplicate at sequence 2 (got 3)')
+  })
 })

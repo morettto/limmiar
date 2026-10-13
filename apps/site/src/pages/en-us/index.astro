@@ -5,6 +5,4 @@ import { content } from '../../lib/content'
 const { title, body } = content['en-US']
 ---
 
-<BaseLayout locale="en-US" title={title}>
-  <p>{body}</p>
-</BaseLayout>
+<BaseLayout locale="en-US" title={title} message={body} />

@@ -1,121 +1,50 @@
 # widgets/painel-profissional
 
-## Responsabilidade
+Painel inicial da Home profissional: próxima sessão nomeada, pacientes ativos,
+sessões da semana, encontros de hoje e dos próximos dias, e fila Requer você.
+Nomes são decifrados no cliente; requisições usam apenas IDs opacos da carteira.
 
-Painel inicial do profissional: a ação principal ("iniciar próxima sessão"),
-dois KPIs e a fila "Requer você". É o único ponto do app que junta paciente
-(`entities/patient`), consentimento (`entities/consentimento`), nota
-(`entities/nota`) e agenda (`entities/agenda`) — nenhuma dessas entidades
-sabe da outra; a composição e o isolamento de falha por fonte vivem só aqui.
+## Fontes e ações
 
-## Fluxo principal
+A Home monta o painel após verificação ativa, com conta, token e KEK reais.
+O painel carrega agenda, sumários cifrados e consentimentos. A Home fornece notas
+recuperadas pelo mesmo carregarBiblioteca usado pela biblioteca, que verifica
+revisões e assinaturas. Falha de leitura aparece com ação para repetir; não
+representa uma fila de assinaturas vazia validada.
 
-1. O render decide "bloqueado" direto da prop: `chaveiro === null` → mostra
-   "Chaveiro bloqueado..." (`role="status"`), sem tocar no `useEffect` nem no
-   estado interno. Nenhum pedido sai. `chaveiro: { kek, accountId, accessToken
-   } | null` é uma única prop — não há como só uma das três partes faltar, a
-   narrowing `!== null` do TypeScript basta, sem guarda própria.
-2. Chaveiro destrancado: o `useEffect` carrega duas fontes em paralelo via
-   `Promise.all`: `carregarPacientes` (`listPatients` → `openSummaries`, Web
-   Worker, default `openSummariesInWorker`, injetável por prop para teste, →
-   `obterConsentimentos` por paciente) e `carregarSessoes` (`listarSessoes`
-   com a janela `[agora, agora + 7 dias)` montada aqui, `SETE_DIAS_MS`
-   privada ao widget). Cada uma tem o seu próprio `.catch` que absorve
-   qualquer rejeição e a converte no mesmo `ResultadoFonte<T>` que um
-   `ProblemResult` já produz — nenhuma das duas rejeita para o `Promise.all`,
-   senão a falha de uma derrubaria a outra. O efeito depende só de
-   `chaveiro?.kek`, `chaveiro?.accountId`, `baseUrl`, `openSummaries` — nem
-   `accessToken` nem `i18n`/`t` entram nas deps, ver "Decisões".
-3. Com os pacientes resolvidos, um `obterConsentimentos` por paciente em
-   paralelo (`Promise.all`, cada chamada com `.catch(() => null)`); o
-   paciente cujo pedido falhar (resolvido `{ok:false}` ou rejeitado) cai da
-   lista de consentimentos, os outros continuam de pé.
-4. O cleanup do efeito (dispara ao trocar de conta, trancar o chaveiro ou
-   desmontar) marca `cancelled`, aborta o `AbortController` e repõe
-   `{status:'a-carregar'}` — a próxima conta nunca herda os dados "pronto" da
-   anterior.
-5. Render, chaveiro destrancado: `proximaSessao(sessoes.dados, new Date())`
-   (só quando `sessoes.ok`, senão `null`) decide a sessão da ação principal;
-   o nome vem do sumário decifrado casado por `patientId` — nunca o
-   `patientId` cru quando o sumário falta ou não decifrou. `juntarRequerVoce`
-   agrega risco+assinatura+consentimento sem duplicar nem perder item;
-   exatamente dois `KpiStrip.Item` — nenhuma métrica de vaidade. Se
-   `listPatients` falhar, KPI "Pacientes ativos" mostra "—" e um
-   `role="alert"` (texto de `traduzirFalha`, ver "Decisões") aparece; se
-   `listarSessoes` falhar, KPI "Sessões na semana" mostra "—" e um segundo
-   `role="alert"`, irmão do primeiro.
+onStart(patientId, agendamentoId) abre a pasta do paciente com o agendamento
+destacado; é lá que a sessão começa. Captura exige a ação explícita do
+profissional e os consentimentos existentes. Abertura de pasta não solicita
+microfone nem inicia reconhecimento. onOpenItem(patientId, atendimentoId?) abre a
+nota da sessão quando a pendência é uma assinatura (a pendência carrega o
+atendimentoId da nota) e a pasta do paciente nos demais casos.
+Sem sumário decifrado, a agenda não habilita abertura de paciente desconhecido.
 
-## Pontos de entrada
+O painel não trava nada: gravação e transcrição pendentes vivem na página da
+sessão. versao recarrega fontes após cadastro, consentimento, nota ou mudança de agenda.
+Notas atualizadas são entregues pela prop; não há cópia persistida no painel.
 
-- `PainelProfissional` (`PainelProfissional.tsx`) — componente React. Props:
-  `baseUrl`, `chaveiro: { kek: CryptoKey; accountId: string; accessToken:
-  string } | null`, `notas: readonly Nota[]`, `openSummaries?` (seam de
-  teste).
-- `itensDeRisco`, `itensDeAssinatura`, `itensDeConsentimento`,
-  `juntarRequerVoce`, `ConsentimentosPorPaciente` (`requer-voce.ts`) — puros,
-  testados isoladamente do React em `requer-voce.test.ts`.
-- Consumido por `pages/home/HomePage.tsx`, que repassa a prop `chaveiro` sem
-  transformação; montada por `IndexRouteComponent` (`app/routing/router.tsx`),
-  que monta o `chaveiro` (sempre `null` em produção enquanto não existir
-  `KeychainProvider`) e passa `notas=[]` (sem o `GET` de nota ainda).
+## Isolamento e ciclo de vida
 
-## Decisões desta fatia
+- Chaveiro null bloqueia nomes e pedidos diretamente no render.
+- Agenda e pacientes têm resultados independentes: a falha de uma fonte não
+  derruba a outra. Códigos são traduzidos no render; trocar idioma não repete leitura.
+- O efeito depende de conta, KEK, origem, decifrador e versão. Token renovado é
+  lido por ref antes de cada pedido; renovação não exige nova decifragem.
+- Cleanup aborta o worker, descarta respostas anteriores e limpa o estado. Os
+  endpoints de leitura ainda não recebem AbortSignal: respostas de rede em voo
+  terminam e são descartadas, sem atravessar a troca de conta.
+- Consentimentos são recuperados por paciente. Falha individual não é tratada
+  como concessão e não fabrica uma pendência confirmada.
+- O painel não classifica risco clínico. Usa a avaliação registrada pelo
+  profissional no sumário cifrado e as pendências efetivas do prontuário.
 
-- **`EstadoPainel` só tem `'a-carregar' | 'pronto'`.** "Bloqueado" nunca foi
-  um estado assíncrono — é uma função pura das props, decidida no render.
-  Guardar no estado obrigava um `estadoInicial` exportado só para os testes e
-  duplicava a mesma guarda no `useEffect`.
-- **O cleanup do efeito é o único lugar que repõe `'a-carregar'`.** Antes o
-  reset acontecia solto no início do corpo do efeito; centralizá-lo no
-  cleanup garante que ele corre em toda troca de deps (conta, kek) e no
-  unmount, sem depender de alguém lembrar de repetir a linha.
-- **`openSummaries` é sempre chamado, mesmo depois de cancelar — quem barra é
-  o `signal.aborted` do próprio `worker-client.ts`.** `carregarPacientes` faz
-  só `await openSummaries(kek, items, abortController.signal)`; se o efeito
-  já tiver sido cancelado o `signal` chega abortado, e é
-  `openSummariesInWorker` quem rejeita sem nunca criar o `Worker` (ver
-  `entities/patient/README.md`/`worker-client.test.ts`). Nem `{ok:false,
-  motivo:''}` fabricado nem `throw` aqui — quem decide se o resultado conta é
-  só `carregar`, com o `if (cancelled) return` que já precede o `setEstado` —
-  o único freio contra um `setEstado` tardio de uma conta já trocada (prova:
-  teste "acc-1 ainda em voo...", que fica vermelho por mutação se essa linha
-  sair).
-- **`ponytail:`** o `AbortSignal` só chega a `openSummaries` (o worker);
-  `listPatients`, `obterConsentimentos` e `listarSessoes` não o recebem — os
-  fetches em voo terminam e são descartados. Upgrade natural é propagar o
-  `signal` a eles quando o desperdício de rede virar o problema visível.
-- **A falha de uma fonte fica crua no estado (`ProblemResult` ou `null` para
-  "sem código"); só o render traduz, via `traduzirFalha`.** `i18n`/`t` saem
-  das deps do efeito — traduzir lá dentro capturava a data do pedido, não a
-  do render; trocar de idioma depois de já ter falhado agora atualiza o texto
-  do alert sem recarregar nada.
-- **`accessToken` também sai das deps — lido de novo a cada pedido, via
-  `chaveiroRef` (`useRef` atualizado em todo render).** Só `kek`/`accountId`
-  mudam a identidade de "que conta carregar"; renovar o token não é motivo
-  para voltar a "Carregando painel..." nem redecifrar. O valor capturado no
-  início do efeito (`tokenAoEntrar`) é só o *fallback* de `tokenAtual()` para
-  quando um pedido em voo sobrevive a um cleanup que já zerou o `chaveiro`
-  (trancado ou trocado) — sem ele `tokenAtual()` quebraria nesse instante.
-- **`ItemRequerVoce` nunca carrega o nome do paciente.** O nome só existe
-  decifrado em `SummaryResult`; o render resolve por `patientId` a cada
-  renderização — nenhum nome em claro é copiado para uma segunda estrutura.
-- **`ResultadoFonte<T>` (local a `PainelProfissional.tsx`) em vez de lançar
-  para o React.** `{ok:true,dados}|{ok:false,falha}` isola a falha de uma
-  fonte sem derrubar a árvore inteira (uma `ErrorBoundary` apanharia o throw
-  de render, não uma promessa rejeitada, e desmontaria tudo). Fonte única: o
-  estado `pronto` tem um só `pacientes: ResultadoFonte<{sumarios,
-  consentimentos}>` — nascem e falham juntos.
-- **`ponytail:`** `obterConsentimentos` por paciente é um fan-out N+1; o
-  upgrade natural é um endpoint em lote quando a lista de pacientes ativos
-  virar o gargalo visível.
-- **Um `agora = new Date()` só, partilhado por `proximaSessao` e
-  `contarPorComecar`.** Duas chamadas a `new Date()` no mesmo render podiam
-  discordar numa fronteira de segundo entre o botão de ação e o KPI.
+## Verificação
 
-## Fora de âmbito
-
-- Nenhuma listagem real de notas: `notas` chega por prop, hoje sempre `[]` a
-  partir do router.
-- Nada de mover/cancelar sessão, nada de "hoje" separado da semana além da
-  contagem, nada de `KeychainProvider` — o painel monta sempre em "chaveiro
-  bloqueado" em produção.
+Testes cobrem falhas parciais, tradução, renovação de token, troca de conta,
+respostas tardias, isolamento da nota e bloqueio durante captura. A prova real
+em .local/painel-v1-prova.json confirmou pasta e nota corretas, atualização após
+assinatura, consentimento e cancelamento, zero identidade ou conteúdo clínico
+em claro nas mutações, zero pedidos de microfone ao abrir pasta e acessibilidade
+em desktop e 375 px. Notas sintéticas são cifradas de verdade; a prova não usa
+hooks de produção ou KEK na URL.

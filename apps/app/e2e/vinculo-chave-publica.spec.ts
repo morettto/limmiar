@@ -1,7 +1,7 @@
 import { test, expect, type APIRequestContext } from '@playwright/test'
 import { webcrypto, getPublicKey } from '@limmiar/crypto'
 import { API_BASE_URL } from '../playwright.config'
-import { contaTestKek, registrarPaciente, registrarProfissionalVerificada, type ContaTeste } from './fixtures/contas'
+import { contaTestKek, criarConvite, criarPacienteNaCarteira, registrarPaciente, registrarProfissionalVerificada, type ContaTeste } from './fixtures/contas'
 
 // S11-04: um teste por passo do Cenário E2E (Specs/S11 Partilha e espelho P6.md), com o nome
 // exato de cada "Teste:". Os passos 6-8 (partilha/revogação) são do S11-02, em partilha-checkin.spec.ts.
@@ -68,15 +68,15 @@ let martaPublicKey: Uint8Array
 let anaPublicKey: Uint8Array
 let codigoConviteAna: string
 
-test.beforeAll(async ({ request }) => {
+test.beforeAll(async ({ browser, request }) => {
   ;[marta, rui] = await Promise.all([
     registrarProfissionalVerificada(request, 'marta'),
     registrarProfissionalVerificada(request, 'rui'),
   ])
-  ;[ana, beatriz] = await Promise.all([registrarPaciente(request, 'ana'), registrarPaciente(request, 'beatriz')])
+  ;[ana, beatriz] = await Promise.all([registrarPaciente(browser, request, 'ana'), registrarPaciente(browser, request, 'beatriz')])
   martaKek = contaTestKek(1)
   anaKek = contaTestKek(2)
-  patientIdAna = crypto.randomUUID()
+  patientIdAna = await criarPacienteNaCarteira(request, marta)
 })
 
 test.describe('S11-04 · Vínculo profissional-paciente + chave pública da conta', () => {
@@ -263,10 +263,7 @@ test.describe('S11-04 · Vínculo profissional-paciente + chave pública da cont
   })
 
   test('a profissional desvincula do lado dela e repetir dá 404', async ({ request }) => {
-    const inviteResponse = await request.post(`${API_BASE_URL}/accounts/${marta.accountId}/patients/${crypto.randomUUID()}/link-invites`, {
-      headers: { Authorization: `Bearer ${marta.accessToken}` },
-    })
-    const { code } = (await inviteResponse.json()) as { code: string }
+    const code = await criarConvite(request, marta, await criarPacienteNaCarteira(request, marta))
     const redeemResponse = await request.post(`${API_BASE_URL}/accounts/${beatriz.accountId}/links`, {
       headers: { Authorization: `Bearer ${beatriz.accessToken}` },
       data: { code },

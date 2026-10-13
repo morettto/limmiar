@@ -17,7 +17,7 @@ export interface PacienteHojePageProps {
 const DIAS_SERIE = 7
 const NIVEIS: readonly Nivel[] = [1, 2, 3, 4, 5]
 
-type Estado = { status: 'idle' } | { status: 'salvo' } | { status: 'salvo-sem-partilha' } | { status: 'erro' }
+type Estado = { status: 'salvo' } | { status: 'salvo-sem-partilha' } | { status: 'erro' }
 
 function NivelFieldset({
   titulo,
@@ -48,7 +48,7 @@ export function PacienteHojePage({ accountId, kek, agora = new Date(), partilha 
   const [sono, setSono] = useState<Nivel | null>(null)
   const [ansiedade, setAnsiedade] = useState<Nivel | null>(null)
   const [frase, setFrase] = useState('')
-  const [estado, setEstado] = useState<Estado>({ status: 'idle' })
+  const [estado, setEstado] = useState<Estado | null>(null)
   const [serie, setSerie] = useState<ReadonlyArray<{ dia: string; checkin: CheckIn | null }>>([])
 
   const hoje = diaLocal(agora)
@@ -76,9 +76,12 @@ export function PacienteHojePage({ accountId, kek, agora = new Date(), partilha 
 
   if (kek === null || accountId === null) {
     return (
-      <p role="status">
-        <Trans>Chaveiro bloqueado. Desbloqueie para registrar o check-in de hoje.</Trans>
-      </p>
+      <section className="workspace-card mx-auto max-w-sm">
+        <h1><Trans>Hoje: como você está agora?</Trans></h1>
+        <p role="status">
+          <Trans>Chaveiro bloqueado. Desbloqueie para registrar o check-in de hoje.</Trans>
+        </p>
+      </section>
     )
   }
 
@@ -112,11 +115,11 @@ export function PacienteHojePage({ accountId, kek, agora = new Date(), partilha 
   }
 
   return (
-    <div>
+    <div className="workspace workspace-card">
       <h1>
         <Trans>Hoje: como você está agora?</Trans>
       </h1>
-      {estado.status === 'erro' ? (
+      {estado?.status === 'erro' ? (
         <p role="alert">
           <Trans>Não foi possível salvar o check-in. Tente novamente.</Trans>
         </p>
@@ -130,8 +133,8 @@ export function PacienteHojePage({ accountId, kek, agora = new Date(), partilha 
       <button type="button" onClick={() => void guardar()}>
         {t`Guardar`}
       </button>
-      {estado.status === 'salvo' ? <p role="status">{t`Guardado`}</p> : null}
-      {estado.status === 'salvo-sem-partilha' ? (
+      {estado?.status === 'salvo' ? <p role="status">{t`Guardado`}</p> : null}
+      {estado?.status === 'salvo-sem-partilha' ? (
         <p role="status">
           <Trans>Check-in salvo neste dispositivo, mas não foi compartilhado.</Trans>
         </p>

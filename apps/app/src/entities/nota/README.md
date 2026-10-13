@@ -1,5 +1,30 @@
 # entities/nota
 
+Contrato atual: `abrirNotas` recupera a última revisão por nota e confere a
+assinatura com a DEK do paciente. Prontuário e Biblioteca compartilham essa
+verificação. As âncoras referem-se aos tempos da transcrição; o histórico não
+armazena áudio. Um reprodutor só pode existir durante a revisão temporária da
+sessão atual.
+
+## Referências aprovadas
+
+`referencia.ts` acrescenta uma fonte à avaliação SOAP somente após confirmação
+do profissional. A proposta precisa corresponder ao prontuário, à revisão salva
+e aos tempos da frase do paciente. Uma nota assinada ou vinculada a outra sessão
+não recebe a proposta. A confirmação preserva o texto escrito e não grava na API;
+salvar ou assinar acrescenta a revisão cifrada.
+
+Cada referência guarda título, autor, página, parágrafo, citação literal,
+identificador da fonte, transcrição, revisão e frase original. `ler-nota` valida
+esses campos; `serializarFrases` inclui todos no conteúdo canônico da assinatura.
+Editar a avaliação mantém a proveniência. O editor abre a revisão exata da fala,
+sem inferir uma sessão pela data ou substituir a escrita por diagnóstico.
+
+Os testes cobrem confirmação, cancelamento, repetição, consentimento, origem,
+cifra, reabertura e adulteração da referência. O cenário permanente
+`e2e/referencia-aprovada.spec.ts` usa conta, prontuário e assinatura reais com
+respostas sintéticas de fala e bibliografia; não qualifica o juiz clínico.
+
 ## Responsabilidade
 
 Domínio puro da nota clínica SOAP (spec S08). Modela a nota como frases distribuídas
@@ -47,7 +72,7 @@ ticket S08-06, `Nota` também é dona do seu `estado` (`EstadoNota`, `ESTADO_PEN
 - `digestNota(nota: Nota): Promise<Uint8Array<ArrayBuffer>>`
 - `ORDEM_SECOES: readonly SecaoSoap[]` -- `['S', 'O', 'A', 'P']`. Exportada desde a fatia 2
   (S08-01) para `apps/app/src/features/nota-editor/EditorSoap.tsx` e
-  `apps/app/src/pages/notas/NotaPage.tsx` a reusarem em vez de redeclararem o literal (um
+  `apps/app/src/features/nota-editor/NotaDoAtendimento.tsx` a reusarem em vez de redeclararem o literal (um
   `.tsx` a repeti-lo dispararia `lingui/no-unlocalized-strings`, que varre todo `.tsx` à
   procura de texto visível não traduzido; este ficheiro, puro `.ts`, está fora do seu
   alcance). Sem mudança de comportamento nem de cobertura -- só a keyword `export`.
@@ -175,20 +200,20 @@ ticket S08-06, `Nota` também é dona do seu `estado` (`EstadoNota`, `ESTADO_PEN
 - UI de edição da nota, e a captura/transcrição de áudio — nenhuma delas é tocada aqui.
 - Ligar `selarAssinatura`/`assinarNota` ao ecrã (gravar no prontuário antes de assinar,
   reagir a 409/falha de rede, marcar a nota como assinada na fila) -- isso é
-  `pages/notas/NotaPage.tsx` (fatia 5), ver o README desse módulo.
+  `features/nota-editor/NotaDoAtendimento.tsx`, ver o README desse módulo.
 
 ## Removido (S08-02), reposto no S08-11
 
 - **`obterAssinatura`/`ObterAssinaturaResult`** (`api.ts`) foram apagados no S08-02: nasceram
   na fatia 5 do S08-01 sem chamador ("fica pronto para..."), e continuaram sem nenhum até
   esse ticket -- reabrir uma nota já assinada era fluxo que ainda não existia em lado nenhum
-  da app. O S08-11 repôs a função **com chamador**: `pages/notas/NotaPage.tsx` pergunta ao
-  servidor no mount se a nota já está assinada, para o editor abrir em leitura apenas sem
-  depender só do estado local (ver README de `pages/notas`). `GET
+  da app. O S08-11 repôs a função **com chamador**: `abrirNotas` pergunta ao
+  servidor, ao abrir o prontuário, se cada nota já está assinada, para o editor abrir em leitura
+  apenas sem depender só do estado local. `GET
   /accounts/{accountId}/notes/{noteId}/signature` -- 404 `notes.signature_not_found` é o caso
   normal (nota por assinar).
   - `obterAssinatura(baseUrl: string, accountId: string, accessToken: string, noteId: string): Promise<ObterAssinaturaResult>`
-    -- `ObterAssinaturaResult = { ok: true; noteId: string; revision: number; signedAt: string } | ProblemResult`.
-    O blob `signature` do body é lido e descartado de propósito: decodificá-lo só serviria a
-    uma verificação client-side que nenhum critério pede e nenhum chamador faz. Molde literal
-    de `assinarNota`, logo acima no mesmo ficheiro.
+    -- `ObterAssinaturaResult = { ok: true; noteId: string; revision: number; signedAt: string; signature: Uint8Array<ArrayBuffer> } | ProblemResult`.
+    O cliente decodifica `signature` e `abrirNotas` confere o digest selado com
+    `verificarAssinatura(dek, nota, signature)` antes de marcar a nota como assinada.
+    Uma revisão igual com conteúdo diferente não passa na conferência.

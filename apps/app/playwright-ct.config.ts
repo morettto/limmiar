@@ -22,9 +22,8 @@ export default defineConfig({
   },
   use: {
     trace: 'on-first-retry',
-    // Different port from packages/ui's ctPort (3100) so both packages'
-    // CT suites could in principle run concurrently without colliding.
-    ctPort: 3101,
+    // A high port avoids Windows' reserved ranges and packages/ui's CT server.
+    ctPort: 53101,
     ctViteConfig: {
       plugins: [lingui(), babel({ presets: [linguiTransformerBabelPreset()] }), tailwindcss()],
     },

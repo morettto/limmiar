@@ -63,7 +63,7 @@ prop -- buscá-los de um servidor é a fatia 4. Sem áudio, sem edição de nota
   esse teste, a garantia ficaria só na leitura do código.
 - **Índice ativo sobrevive a `itens` que encolhem "por fora" (mesma aba, sem `trocarAba`).**
   `itens` é uma prop controlada pelo widget-pai; ele pode mudar de tamanho sob a aba já
-  ativa (ex.: `aoAssinar` em `NotaPage` marca a única nota pendente como assinada,
+  ativa (ex.: `aoAssinar` do chamador marca a única nota pendente como assinada,
   `filtrados` encolhe de 1 para 0 na aba "pendente" sem que a aba mude). `indiceAtivo`
   guardado em estado não é reclampado sozinho nesse caso -- por isso toda leitura passa
   por `indiceClampado(indiceAtivo, filtrados.length)` (devolve `-1` para lista vazia,
@@ -86,11 +86,9 @@ prop -- buscá-los de um servidor é a fatia 4. Sem áudio, sem edição de nota
 ## Fora de âmbito (fatias seguintes da spec S08)
 
 - Buscar `itens` de um backend real (fila com múltiplas notas/pacientes) -- continua fora
-  de âmbito; `pages/notas/NotaPage.tsx` continua a montar com uma única nota fixa em
-  memória (ver o seu README). Isto é distinto de assinar de facto (linha abaixo), que já
+  de âmbito; nenhuma página monta a fila hoje (a nota da sessão é `NotaDoAtendimento`). Isto é distinto de assinar de facto (linha abaixo), que já
   está feito.
 - Assinatura de facto (fatia 5, feita): este módulo continua a só saber navegar/selecionar
   -- assinar é `EditorSoap`/`FilaEEditor` chamando `aoAssinar`, hoje implementado a sério
-  em `pages/notas/NotaPage.tsx` (grava no prontuário, assina, marca só o item da nota
-  assinada). `ESTADO_PENDENTE`/`ESTADO_ASSINADA` continuam a única coisa que este módulo
+  em `features/nota-editor/NotaDoAtendimento.tsx` (grava no prontuário e assina). `ESTADO_PENDENTE`/`ESTADO_ASSINADA` continuam a única coisa que este módulo
   sabe sobre esse resultado -- em qual aba um item aparece.

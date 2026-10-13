@@ -13,7 +13,7 @@ export interface PartilhaCheckInsProps {
   kek: CryptoKey
 }
 
-type Status = 'carregando' | 'pronta' | 'erro-leitura'
+type Status = 'pronta' | 'erro-leitura'
 
 interface Carga {
   status: Status
@@ -27,7 +27,12 @@ async function carregarEstado(p: {
   accessToken: string
   kek: CryptoKey
 }): Promise<Carga> {
-  const vinculosResultado = await listarVinculos(p.baseUrl, p.accountId, p.accessToken)
+  let vinculosResultado: Awaited<ReturnType<typeof listarVinculos>>
+  try {
+    vinculosResultado = await listarVinculos(p.baseUrl, p.accountId, p.accessToken)
+  } catch {
+    return { status: 'erro-leitura', vinculos: [], partilha: {} }
+  }
   if (!vinculosResultado.ok) {
     return { status: 'erro-leitura', vinculos: [], partilha: {} }
   }
@@ -63,7 +68,7 @@ function TextoDoEstado({ ativa }: { ativa: boolean }) {
 // Falha de leitura é fail-closed (checkbox desativada); falha de escrita não é otimista -- o
 // checkbox é controlado só pelo estado confirmado pelo servidor, então "reverte" sozinho.
 export function PartilhaCheckIns({ baseUrl, accountId, accessToken, kek }: PartilhaCheckInsProps) {
-  const [carga, setCarga] = useState<Carga>({ status: 'carregando', vinculos: [], partilha: {} })
+  const [carga, setCarga] = useState<Carga | null>(null)
   const [pendentes, setPendentes] = useState<Record<string, boolean>>({})
   const [erros, setErros] = useState<Record<string, boolean>>({})
 
@@ -85,7 +90,7 @@ export function PartilhaCheckIns({ baseUrl, accountId, accessToken, kek }: Parti
     setErros((atual) => ({ ...atual, [chave]: false }))
     try {
       const novoEstado = await definirPartilha({ baseUrl, accountId, accessToken, kek, chave, tipo: 'checkin', ativa })
-      setCarga((atual) => ({ ...atual, partilha: novoEstado }))
+      setCarga((atual) => atual && { ...atual, partilha: novoEstado })
     } catch {
       setErros((atual) => ({ ...atual, [chave]: true }))
     } finally {
@@ -93,7 +98,7 @@ export function PartilhaCheckIns({ baseUrl, accountId, accessToken, kek }: Parti
     }
   }
 
-  if (carga.status === 'carregando') {
+  if (carga === null) {
     return null
   }
 

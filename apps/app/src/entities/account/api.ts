@@ -1,6 +1,6 @@
-import { encodeBase64 } from '../../shared/lib/base64'
+import { encodeBase64, decodeBase64 } from '../../shared/lib/base64'
 import { request, type ProblemResult } from '../../shared/api/client'
-import type { Account, AccountRole } from './account'
+import type { Account, AccountRole, SessionTokens } from './account'
 
 export type RegisterResult = { ok: true; account: Account } | ProblemResult
 export type LoginResult = { ok: true; account: Account } | ProblemResult
@@ -73,7 +73,7 @@ export async function beginTotpEnrollment(
   return { ok: true, secret: body.secret, provisioningUri: body.provisioningUri }
 }
 
-export type ConfirmTotpEnrollmentResult = { ok: true; backupCodes: string[] } | ProblemResult
+export type ConfirmTotpEnrollmentResult = ({ ok: true; backupCodes: string[] } & SessionTokens) | ProblemResult
 
 export async function confirmTotpEnrollment(
   baseUrl: string,
@@ -86,8 +86,21 @@ export async function confirmTotpEnrollment(
     return result
   }
 
-  const body = (await result.response.json()) as { backupCodes: string[] }
-  return { ok: true, backupCodes: body.backupCodes }
+  const body = (await result.response.json()) as { backupCodes: string[] } & SessionTokens
+  return { ok: true, ...body }
+}
+
+export async function refreshSession(baseUrl: string, refreshToken: string): Promise<({ ok: true } & SessionTokens) | ProblemResult> {
+  const result = await request(baseUrl, 'POST', '/auth/refresh', { refreshToken })
+  if (!result.ok) return result
+  return { ok: true, ...(await result.response.json() as SessionTokens) }
+}
+
+export async function logoutSession(baseUrl: string, refreshToken: string): Promise<{ ok: true } | ProblemResult> {
+  const result = await request(baseUrl, 'POST', '/auth/logout', { refreshToken })
+  if (!result.ok) return result
+  if (result.response.status !== 204) throw new Error('Invalid logout response')
+  return { ok: true }
 }
 
 export type TotpChallengeResult = { ok: true; account: Account } | ProblemResult
@@ -109,17 +122,6 @@ export async function verifyTotpChallenge(
 
 export type MagicLinkCeremonyType = 'Register' | 'Assert'
 
-export type RequestMagicLinkResult = { ok: true } | ProblemResult
-
-export async function requestMagicLink(baseUrl: string, params: { email: string }): Promise<RequestMagicLinkResult> {
-  const result = await request(baseUrl, 'POST', '/auth/magic-link/request', { email: params.email })
-  if (!result.ok) {
-    return result
-  }
-
-  return { ok: true }
-}
-
 export type VerifyMagicLinkResult =
   | {
       ok: true
@@ -128,11 +130,12 @@ export type VerifyMagicLinkResult =
       challenge: string
       relyingPartyId: string
       credentialId: string | null
+      accountId: string
     }
   | ProblemResult
 
-export async function verifyMagicLink(baseUrl: string, params: { token: string }): Promise<VerifyMagicLinkResult> {
-  const result = await request(baseUrl, 'POST', '/auth/magic-link/verify', { token: params.token })
+export async function verifyMagicLink(baseUrl: string, params: { token: string; patientAccountId?: string }): Promise<VerifyMagicLinkResult> {
+  const result = await request(baseUrl, 'POST', '/auth/magic-link/verify', { token: params.token, ...(params.patientAccountId ? { patientAccountId: params.patientAccountId } : {}) })
   if (!result.ok) {
     return result
   }
@@ -143,6 +146,7 @@ export async function verifyMagicLink(baseUrl: string, params: { token: string }
     challenge: string
     relyingPartyId: string
     credentialId: string | null
+    accountId: string
   }
   return {
     ok: true,
@@ -151,6 +155,7 @@ export async function verifyMagicLink(baseUrl: string, params: { token: string }
     challenge: body.challenge,
     relyingPartyId: body.relyingPartyId,
     credentialId: body.credentialId,
+    accountId: body.accountId,
   }
 }
 
@@ -159,7 +164,7 @@ export async function verifyMagicLink(baseUrl: string, params: { token: string }
 export async function recoverAccess(
   baseUrl: string,
   params: { email: string; recoveryVerifier: Uint8Array },
-): Promise<LoginResult> {
+): Promise<({ ok: true; account: Account; recoveryEnvelope: Uint8Array<ArrayBuffer> } | ProblemResult)> {
   const result = await request(baseUrl, 'POST', '/auth/recover', {
     email: params.email,
     recoveryVerifier: encodeBase64(params.recoveryVerifier),
@@ -168,8 +173,8 @@ export async function recoverAccess(
     return result
   }
 
-  const account = (await result.response.json()) as Account
-  return { ok: true, account }
+  const { recoveryEnvelope, ...account } = (await result.response.json()) as Account & { recoveryEnvelope: string }
+  return { ok: true, account, recoveryEnvelope: decodeBase64(recoveryEnvelope) }
 }
 
 export type RegisterRecoveryPhraseResult = { ok: true } | ProblemResult
@@ -179,12 +184,13 @@ export async function registerRecoveryPhrase(
   accountId: string,
   accessToken: string,
   recoveryVerifier: Uint8Array,
+  recoveryEnvelope: Uint8Array,
 ): Promise<RegisterRecoveryPhraseResult> {
   const result = await request(
     baseUrl,
     'POST',
     `/accounts/${accountId}/recovery-phrase`,
-    { recoveryVerifier: encodeBase64(recoveryVerifier) },
+    { recoveryVerifier: encodeBase64(recoveryVerifier), recoveryEnvelope: encodeBase64(recoveryEnvelope) },
     accessToken,
   )
   if (!result.ok) {
@@ -196,8 +202,8 @@ export async function registerRecoveryPhrase(
 
 export interface MagicLinkAccount {
   id: string
-  email: string
-  role: AccountRole
+  email: null
+  role: 'Patient'
   accessToken: string
   refreshToken: string
   accessTokenExpiresAt: string

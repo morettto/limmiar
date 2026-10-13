@@ -2,10 +2,12 @@
 import { getRelativeLocaleUrl } from 'astro:i18n'
 import type { Locale } from '@limmiar/i18n'
 import { buildHreflangAlternates } from '../lib/hreflang'
+import '../../../../packages/ui/tokens.css'
 
 export interface Props {
   locale: Locale
   title: string
+  message: string
   // Explicit prop rather than parsed from Astro.url — deliberate seam: this
   // ticket only ever renders single-segment locale root pages (path === ''),
   // but a later Spec (S16, real site content) will add nested paths and can
@@ -31,6 +33,39 @@ const alternates = buildHreflangAlternates(urlForLocale)
     {alternates.map(({ hreflang, href }) => <link rel="alternate" hreflang={hreflang} href={href} />)}
   </head>
   <body>
-    <slot />
+    <div class="site-shell">
+      <header class="site-header">
+        <div class="site-header-inner">
+          <a class="site-wordmark" href={urlForLocale(locale)} aria-label="Limmiar">Limmiar</a>
+        </div>
+      </header>
+      <main class="site-main">
+        <p class="site-eyebrow">Limmiar</p>
+        <h1>{Astro.props.message}</h1>
+      </main>
+      <footer class="site-footer">
+        <div class="site-footer-inner"><span>Limmiar</span></div>
+      </footer>
+    </div>
   </body>
 </html>
+
+<style is:global>
+  html { min-width: 320px; background: var(--color-vellum); }
+  body { min-width: 320px; color: var(--color-ink); font: 400 14px/1.5 var(--font-interface); }
+  .site-shell { display: grid; min-height: 100svh; grid-template-rows: 56px 1fr auto; }
+  .site-header { border-bottom: 1px solid var(--color-ash); }
+  .site-header-inner, .site-footer-inner { display: flex; width: min(100%, var(--page-max-width)); height: 100%; align-items: center; justify-content: space-between; margin-inline: auto; padding-inline: 24px; }
+  .site-wordmark { color: var(--color-ink); font: 500 14px/20px var(--font-interface); letter-spacing: -0.067em; text-decoration: none; }
+  .site-main { display: flex; min-height: 60vh; flex-direction: column; align-items: center; justify-content: center; padding: 64px 24px 80px; text-align: center; }
+  .site-eyebrow { margin: 0 0 16px; color: var(--color-lichen); font: 500 12px/17px var(--font-interface); letter-spacing: -0.067em; text-transform: uppercase; }
+  .site-eyebrow::after { display: block; width: 40px; height: 4px; margin: 16px auto 0; background: var(--color-highlighter-yellow); content: ''; }
+  .site-main h1 { max-width: 1000px; margin: 0; color: var(--color-ink); font: 300 clamp(48px, 10vw, 96px)/0.98 var(--font-editorial); letter-spacing: -0.05em; }
+  .site-footer { min-height: 112px; color: var(--color-paper); background: var(--color-carbon); }
+  .site-footer-inner { padding-block: var(--spacing-64); color: var(--color-paper); font: 500 14px/20px var(--font-interface); }
+  @media (max-width: 600px) {
+    .site-main { min-height: 56vh; padding: 48px 16px 64px; }
+    .site-header-inner, .site-footer-inner { padding-inline: 16px; }
+    .site-footer { min-height: 96px; }
+  }
+</style>

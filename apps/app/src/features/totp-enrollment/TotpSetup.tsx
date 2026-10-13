@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react'
 import { Trans, useLingui } from '@lingui/react/macro'
-import { translateProblemCode } from '../../shared/api'
-import { beginTotpEnrollment, confirmTotpEnrollment } from '../../entities/account'
+import QRCode from 'qrcode'
+import type { MessageDescriptor } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
+import { problemMessage } from '../../shared/api'
+import { beginTotpEnrollment, confirmTotpEnrollment, type SessionTokens } from '../../entities/account'
 
 export interface TotpSetupProps {
   baseUrl: string
   accountId: string
   ticket: string
-  onDone: () => void
+  onDone: (tokens: SessionTokens) => void
 }
 
 // Wrapped in `{ status }` instead of a bare string-literal union: eslint's
@@ -15,37 +18,49 @@ export interface TotpSetupProps {
 // `status` property name, not a bare literal passed to useState/setStep.
 type Step =
   | { status: 'loading' }
-  | { status: 'begin-error' }
+  | { status: 'begin-error'; message: MessageDescriptor }
   | { status: 'enter-code' }
   | { status: 'confirming' }
-  | { status: 'confirm-error' }
+  | { status: 'confirm-error'; message: MessageDescriptor }
   | { status: 'backup-codes' }
 
 export function TotpSetup({ baseUrl, accountId, ticket, onDone }: TotpSetupProps) {
-  const { i18n } = useLingui()
+  const { i18n, t } = useLingui()
   const [step, setStep] = useState<Step>({ status: 'loading' })
   const [secret, setSecret] = useState('')
   const [provisioningUri, setProvisioningUri] = useState('')
-  const [errorMessage, setErrorMessage] = useState('')
+  const [qrDataUrl, setQrDataUrl] = useState('')
   const [backupCodes, setBackupCodes] = useState<string[]>([])
+  const [tokens, setTokens] = useState<SessionTokens | null>(null)
   const [code, setCode] = useState('')
 
   useEffect(() => {
     let cancelled = false
 
     async function begin() {
+      try {
       const result = await beginTotpEnrollment(baseUrl, accountId, ticket)
       if (cancelled) {
         return
       }
 
       if (result.ok) {
+        // Sem QR o código secreto continua valendo: digitá-lo no autenticador é o caminho de reserva.
+        const qr = await QRCode.toDataURL(result.provisioningUri).catch(() => '')
+        if (cancelled) {
+          return
+        }
         setSecret(result.secret)
         setProvisioningUri(result.provisioningUri)
+        setQrDataUrl(qr)
         setStep({ status: 'enter-code' })
       } else {
-        setErrorMessage(translateProblemCode(result.code, result.params, i18n))
-        setStep({ status: 'begin-error' })
+        setStep({ status: 'begin-error', message: problemMessage(result.code, result.params) })
+      }
+      } catch {
+        if (!cancelled) {
+          setStep({ status: 'begin-error', message: msg`Não foi possível conectar. Tente novamente.` })
+        }
       }
     }
 
@@ -54,20 +69,23 @@ export function TotpSetup({ baseUrl, accountId, ticket, onDone }: TotpSetupProps
     return () => {
       cancelled = true
     }
-  }, [baseUrl, accountId, ticket, i18n])
+  }, [baseUrl, accountId, ticket])
 
   async function handleConfirm(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setStep({ status: 'confirming' })
-
+    try {
     const result = await confirmTotpEnrollment(baseUrl, accountId, ticket, code)
 
     if (result.ok) {
       setBackupCodes(result.backupCodes)
+      setTokens({ accessToken: result.accessToken, refreshToken: result.refreshToken, accessTokenExpiresAt: result.accessTokenExpiresAt })
       setStep({ status: 'backup-codes' })
     } else {
-      setErrorMessage(translateProblemCode(result.code, result.params, i18n))
-      setStep({ status: 'confirm-error' })
+      setStep({ status: 'confirm-error', message: problemMessage(result.code, result.params) })
+    }
+    } catch {
+      setStep({ status: 'confirm-error', message: msg`Não foi possível conectar. Tente novamente.` })
     }
   }
 
@@ -85,7 +103,7 @@ export function TotpSetup({ baseUrl, accountId, ticket, onDone }: TotpSetupProps
     return (
       <div className="mx-auto max-w-sm p-4">
         <p role="alert" className="text-sm text-red-700">
-          {errorMessage}
+          {i18n._(step.message)}
         </p>
       </div>
     )
@@ -110,7 +128,7 @@ export function TotpSetup({ baseUrl, accountId, ticket, onDone }: TotpSetupProps
             </li>
           ))}
         </ul>
-        <button type="button" onClick={onDone} className="w-full rounded-md bg-neutral-900 px-4 py-2 text-white">
+        <button type="button" onClick={() => onDone(tokens!)} className="w-full rounded-md bg-neutral-900 px-4 py-2 text-white">
           <Trans>Guardei meus códigos</Trans>
         </button>
       </div>
@@ -127,6 +145,9 @@ export function TotpSetup({ baseUrl, accountId, ticket, onDone }: TotpSetupProps
       <p className="mb-2 text-sm text-neutral-600">
         <Trans>Adicione esta conta no seu aplicativo autenticador, usando as informações abaixo.</Trans>
       </p>
+      {qrDataUrl === '' ? null : (
+        <img src={qrDataUrl} alt={t`Código QR para adicionar esta conta ao aplicativo autenticador`} className="mx-auto mb-4 h-auto w-full max-w-[12rem]" />
+      )}
       <label className="mb-2 block">
         <span className="mb-1 block text-sm font-medium">
           <Trans>Código secreto</Trans>
@@ -170,7 +191,7 @@ export function TotpSetup({ baseUrl, accountId, ticket, onDone }: TotpSetupProps
 
         {step.status === 'confirm-error' ? (
           <p role="alert" className="mb-4 text-sm text-red-700">
-            {errorMessage}
+            {i18n._(step.message)}
           </p>
         ) : null}
 

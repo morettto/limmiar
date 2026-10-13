@@ -1,0 +1,243 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { FalhaServicoInsight } from './falha-insight'
+import { criarFilaInsights } from './fila-insights'
+import type { ConsultaInsight, ResultadoInsight } from './insight'
+
+const fala: ConsultaInsight = { id: 'fala', frase: 'Não durmo.', contexto: [] }
+const resultado: ResultadoInsight = { cartoes: [], clarificar: false, alerta_risco: false, completo: true, juiz: 'v1' }
+const cursor = 'A'.repeat(48)
+beforeEach(() => vi.useFakeTimers())
+afterEach(() => vi.useRealTimers())
+describe('fila de insights ao vivo', () => {
+  it('prioriza fala nova entre lotes e retoma fontes anteriores sem reiniciar', async () => {
+    let resolver!: (resultado: ResultadoInsight) => void
+    const consultar = vi.fn<(consulta: ConsultaInsight, signal: AbortSignal, atualizar: (r: ResultadoInsight) => void, cursor?: string) => Promise<ResultadoInsight>>()
+      .mockImplementationOnce(() => new Promise((resolve) => { resolver = resolve }))
+      .mockResolvedValue(resultado)
+    const fila = criarFilaInsights(consultar, vi.fn(), vi.fn())
+    fila.atualizar([fala]); await vi.advanceTimersByTimeAsync(500)
+    fila.atualizar([fala, { ...fala, id: 'nova', frase: 'Acordo assustada.' }])
+    expect(consultar.mock.calls[0]![1].aborted).toBe(false)
+    resolver({ ...resultado, completo: false, cursor }); await Promise.resolve(); await Promise.resolve()
+    await vi.advanceTimersByTimeAsync(500)
+    expect(consultar.mock.calls[1]![0].id).toBe('nova')
+    await vi.advanceTimersByTimeAsync(500)
+    expect(consultar.mock.calls[2]![0].id).toBe('fala')
+    expect(consultar.mock.calls[2]![3]).toBe(cursor)
+    fila.encerrar()
+  })
+  it('alterna lotes entre falas e acumula todas as fontes sem duplicar a passagem', async () => {
+    const fonte = { trecho_id: 'a', titulo: 'Livro', autor: 'Autor', pagina: 1, paragrafo: 1, citacao_literal: 'Citação.', fenomeno_na_fala: '', fenomeno_no_trecho: '' }
+    const consultar = vi.fn().mockResolvedValueOnce({ ...resultado, completo: false, cursor, cartoes: [fonte] })
+      .mockResolvedValueOnce({ ...resultado, completo: false, cursor, cartoes: [] })
+      .mockResolvedValueOnce({ ...resultado, cartoes: [fonte, { ...fonte, trecho_id: 'b', titulo: 'Artigo' }] })
+      .mockResolvedValueOnce(resultado)
+    const atualizar = vi.fn()
+    const fila = criarFilaInsights(consultar, atualizar, vi.fn())
+    fila.atualizar([fala, { ...fala, id: 'nova' }])
+    await vi.advanceTimersByTimeAsync(600)
+    expect(consultar.mock.calls.map(([q]) => q.id)).toEqual(['fala', 'nova', 'fala', 'nova'])
+    expect(atualizar.mock.calls.findLast(([id, r]) => id === 'fala' && r?.completo)![1].cartoes.map((f: typeof fonte) => f.trecho_id)).toEqual(['a', 'b'])
+    fila.encerrar()
+  })
+  it('cada frase e continuação recebe sua vez durante a chegada contínua de novas falas', async () => {
+    const resolver: ((r: ResultadoInsight) => void)[] = []
+    const consultar = vi.fn((_q: ConsultaInsight) => new Promise<ResultadoInsight>(resolve => resolver.push(resolve)))
+    const atualizar = vi.fn()
+    const fila = criarFilaInsights(consultar, atualizar, vi.fn())
+    const falas = [fala, { ...fala, id: 'segunda' }]
+    fila.atualizar(falas)
+    await vi.advanceTimersByTimeAsync(500)
+    for (let i = 0; i < 6; i++) {
+      falas.push({ ...fala, id: `nova-${i}` })
+      fila.atualizar(falas)
+      resolver[i]!({ ...resultado, completo: false, cursor: String(i).repeat(48) })
+      await vi.advanceTimersByTimeAsync(1)
+    }
+    expect(consultar.mock.calls.map(([q]) => q.id)).toEqual(['fala', 'segunda', 'nova-0', 'fala', 'nova-1', 'segunda', 'nova-2'])
+    expect(consultar.mock.calls[3]).toHaveLength(4)
+    expect(atualizar.mock.calls.filter(([id]) => id === 'fala')).toHaveLength(2)
+    fila.encerrar()
+    fila.atualizar([{ ...fala, frase: 'Esta fala não deve ficar retida após encerrar.' }])
+    resolver[6]!(resultado)
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(consultar).toHaveBeenCalledTimes(7)
+  })
+  it('retira todas as fontes acumuladas ao corrigir o contexto ou falhar a continuação', async () => {
+    const consultar = vi.fn().mockResolvedValueOnce({ ...resultado, completo: false, cursor })
+      .mockRejectedValueOnce(new Error('continuação inválida'))
+      .mockResolvedValueOnce(resultado)
+    const atualizar = vi.fn()
+    const falhar = vi.fn()
+    const fila = criarFilaInsights(consultar, atualizar, falhar)
+    fila.atualizar([fala]); await vi.advanceTimersByTimeAsync(600)
+    expect(atualizar.mock.lastCall![1]).toBeNull()
+    expect(falhar).toHaveBeenCalledExactlyOnceWith('sem_analise', fala)
+    fila.atualizar([{ ...fala, contexto: ['Eu citava outra pessoa.'] }])
+    await vi.advanceTimersByTimeAsync(500)
+    expect(consultar.mock.lastCall![3]).toBeUndefined()
+    fila.encerrar()
+  })
+  it('interrompe continuação que repete o cursor e não publica fontes indefinidamente', async () => {
+    const consultar = vi.fn().mockResolvedValue({ ...resultado, completo: false, cursor })
+    const atualizar = vi.fn()
+    const falhar = vi.fn()
+    const fila = criarFilaInsights(consultar, atualizar, falhar)
+    fila.atualizar([fala]); await vi.advanceTimersByTimeAsync(600)
+    expect(consultar).toHaveBeenCalledTimes(2)
+    expect(falhar).toHaveBeenCalledExactlyOnceWith('sem_analise', fala)
+    expect(atualizar.mock.lastCall![1]).toBeNull()
+    fila.encerrar()
+  })
+  it('mostra fontes enquanto a consulta prossegue e cancela a hipótese substituída', async () => {
+    let publicar!: (parcial: ResultadoInsight) => void
+    let resolver!: (resultado: ResultadoInsight) => void
+    const consultar = vi.fn((_c: ConsultaInsight, _s: AbortSignal, atualizar: typeof publicar) => {
+      publicar = atualizar
+      return new Promise<ResultadoInsight>((resolve) => { resolver = resolve })
+    })
+    const atualizar = vi.fn()
+    const fila = criarFilaInsights(consultar, atualizar, vi.fn())
+    fila.atualizar([fala]); await vi.advanceTimersByTimeAsync(500)
+    publicar(resultado)
+    expect(atualizar).toHaveBeenLastCalledWith(fala.id, resultado, fala)
+    fila.atualizar([{ ...fala, frase: 'Na verdade eu estava citando minha irmã.' }])
+    expect(consultar.mock.calls[0]![1].aborted).toBe(true)
+    publicar(resultado)
+    expect(atualizar.mock.lastCall![1]).toBeNull()
+    resolver(resultado); await Promise.resolve(); await Promise.resolve()
+    fila.encerrar()
+  })
+  it('coalesce atualizações e consulta apenas uma vez a mesma fala e contexto', async () => {
+    const consultar = vi.fn(async () => resultado)
+    const atualizar = vi.fn()
+    const fila = criarFilaInsights(consultar, atualizar, vi.fn())
+    fila.atualizar([fala])
+    fila.atualizar([{ ...fala, frase: 'Não durmo bem.' }])
+    await vi.advanceTimersByTimeAsync(500)
+    expect(consultar).toHaveBeenCalledOnce()
+    expect(atualizar.mock.lastCall?.[1]).toEqual(resultado)
+    fila.atualizar([{ ...fala, frase: 'Não durmo bem.' }])
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(consultar).toHaveBeenCalledOnce()
+    fila.encerrar()
+  })
+  it('descarta resposta e erro obsoletos e não enfileira todos os prefixos falados', async () => {
+    let resolver!: (resultado: ResultadoInsight) => void
+    const consultar = vi.fn<(consulta: ConsultaInsight, signal: AbortSignal) => Promise<ResultadoInsight>>()
+      .mockImplementationOnce(() => new Promise((resolve) => { resolver = resolve }))
+      .mockResolvedValue(resultado)
+    const atualizar = vi.fn()
+    const falhar = vi.fn()
+    const fila = criarFilaInsights(consultar, atualizar, falhar)
+    fila.atualizar([fala]); await vi.advanceTimersByTimeAsync(500)
+    fila.atualizar([{ ...fala, frase: 'Não durmo bem' }])
+    fila.atualizar([{ ...fala, frase: 'Não durmo bem desde ontem' }])
+    resolver(resultado); await Promise.resolve(); await Promise.resolve()
+    expect(atualizar.mock.calls.every(([, item]) => item === null)).toBe(true)
+    await vi.advanceTimersByTimeAsync(500)
+    expect(consultar).toHaveBeenCalledTimes(2)
+    expect(consultar.mock.lastCall?.[0].frase).toBe('Não durmo bem desde ontem')
+    expect(falhar).not.toHaveBeenCalled()
+    fila.encerrar()
+  })
+  it.each(['retirada', 'encerrar', 'erro-obsoleto'])('cancela análise e não publica resultados ao %s', async (modo) => {
+    let resolver!: (resultado: ResultadoInsight) => void
+    let rejeitar!: (erro: Error) => void
+    const consultar = vi.fn<(consulta: ConsultaInsight, signal: AbortSignal) => Promise<ResultadoInsight>>()
+      .mockImplementation(() => new Promise((resolve, reject) => { resolver = resolve; rejeitar = reject }))
+    const atualizar = vi.fn()
+    const falhar = vi.fn()
+    const fila = criarFilaInsights(consultar, atualizar, falhar)
+    fila.atualizar([fala]); await vi.advanceTimersByTimeAsync(500)
+    if (modo === 'encerrar') fila.encerrar()
+    else fila.atualizar([])
+    expect(consultar.mock.calls[0]![1].aborted).toBe(true)
+    if (modo === 'erro-obsoleto') rejeitar(new Error('antigo'))
+    else resolver(resultado)
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(atualizar.mock.calls.every(([, item]) => item === null)).toBe(true)
+    expect(falhar).not.toHaveBeenCalled()
+    fila.encerrar()
+  })
+  it('informa falha vigente sem repetir indefinidamente a mesma consulta', async () => {
+    const consultar = vi.fn().mockRejectedValue(new Error('indisponível'))
+    const falhar = vi.fn()
+    const fila = criarFilaInsights(consultar, vi.fn(), falhar)
+    fila.atualizar([fala]); await vi.advanceTimersByTimeAsync(1500)
+    fila.atualizar([fala]); await vi.advanceTimersByTimeAsync(1500)
+    expect(falhar).toHaveBeenCalledExactlyOnceWith('sem_analise', fala)
+    expect(consultar).toHaveBeenCalledOnce()
+    fila.encerrar()
+  })
+})
+
+describe('falhas do serviço', () => {
+  const fora = () => new FalhaServicoInsight('fora')
+  const chamadas = (consultar: { mock: { calls: unknown[][] } }) => consultar.mock.calls.length
+
+  it('serviço fora: tenta a mesma fala de novo com espera crescente, limitada a 30 s', async () => {
+    const consultar = vi.fn().mockRejectedValue(fora())
+    const atualizar = vi.fn()
+    const falhar = vi.fn()
+    const fila = criarFilaInsights(consultar, atualizar, falhar)
+    fila.atualizar([fala]); await vi.advanceTimersByTimeAsync(500)
+    expect(chamadas(consultar)).toBe(1)
+    for (const [espera, total] of [[1000, 2], [2000, 3], [4000, 4], [8000, 5], [16000, 6], [30000, 7], [30000, 8]] as const) {
+      await vi.advanceTimersByTimeAsync(espera - 1)
+      expect(chamadas(consultar)).toBe(total - 1)
+      await vi.advanceTimersByTimeAsync(1)
+      expect(chamadas(consultar)).toBe(total)
+    }
+    expect(falhar).toHaveBeenCalledTimes(8)
+    expect(falhar).toHaveBeenLastCalledWith('fora', fala)
+    expect(atualizar).not.toHaveBeenCalled()
+    fila.encerrar()
+  })
+
+  it('depois de uma resposta do serviço a espera recomeça de 1 s', async () => {
+    const consultar = vi.fn().mockRejectedValueOnce(fora()).mockRejectedValueOnce(fora()).mockResolvedValueOnce(resultado)
+      .mockRejectedValueOnce(fora()).mockResolvedValue(resultado)
+    const fila = criarFilaInsights(consultar, vi.fn(), vi.fn())
+    const apos = async (ms: number, total: number) => { await vi.advanceTimersByTimeAsync(ms); expect(chamadas(consultar)).toBe(total) }
+    fila.atualizar([fala])
+    await apos(500, 1); await apos(1000, 2); await apos(2000, 3)
+    fila.atualizar([fala, { ...fala, id: 'nova' }])
+    await apos(1, 4); await apos(999, 4); await apos(1, 5)
+    fila.encerrar()
+  })
+
+  it('a fala retomada depois de uma falha de serviço continua do cursor em que parou', async () => {
+    const consultar = vi.fn().mockResolvedValueOnce({ ...resultado, completo: false, cursor }).mockRejectedValueOnce(fora()).mockResolvedValue(resultado)
+    const fila = criarFilaInsights(consultar, vi.fn(), vi.fn())
+    fila.atualizar([fala]); await vi.advanceTimersByTimeAsync(501 + 1000)
+    expect(consultar.mock.calls.map((chamada) => chamada[3])).toEqual([undefined, cursor, cursor])
+    fila.encerrar()
+  })
+
+  it('fala nova durante a espera não fura a espera', async () => {
+    const consultar = vi.fn().mockRejectedValueOnce(fora()).mockResolvedValue(resultado)
+    const fila = criarFilaInsights(consultar, vi.fn(), vi.fn())
+    fila.atualizar([fala]); await vi.advanceTimersByTimeAsync(500)
+    fila.atualizar([fala, { ...fala, id: 'nova' }])
+    await vi.advanceTimersByTimeAsync(999)
+    expect(chamadas(consultar)).toBe(1)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(chamadas(consultar)).toBe(2)
+    fila.encerrar()
+  })
+
+  it('copiloto não liberado: não repete a fala, retira o resultado e avisa; a fala seguinte tenta de novo', async () => {
+    const consultar = vi.fn().mockRejectedValueOnce(new FalhaServicoInsight('nao_liberado')).mockResolvedValue(resultado)
+    const atualizar = vi.fn()
+    const falhar = vi.fn()
+    const fila = criarFilaInsights(consultar, atualizar, falhar)
+    fila.atualizar([fala]); await vi.advanceTimersByTimeAsync(40_000)
+    expect(chamadas(consultar)).toBe(1)
+    expect(falhar).toHaveBeenCalledExactlyOnceWith('nao_liberado', fala)
+    expect(atualizar).toHaveBeenLastCalledWith('fala', null, fala)
+    fila.atualizar([fala, { ...fala, id: 'nova' }]); await vi.advanceTimersByTimeAsync(500)
+    expect(consultar.mock.lastCall![0].id).toBe('nova')
+    fila.encerrar()
+  })
+})

@@ -1,15 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
 import { Trans, useLingui } from '@lingui/react/macro'
-import { decrypt, deriveChannelKey, getSharedSecret, generateKeyPair } from '@limmiar/crypto'
-import { translateProblemCode } from '../../shared/api'
+import { decrypt, generateKeyPair } from '@limmiar/crypto'
+import type { MessageDescriptor } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
+import { problemMessage } from '../../shared/api'
 import { fetchPairingPayload } from '../../entities/device'
 import { decodeBase64, encodeBase64 } from '../../shared/lib/base64'
 import { PairingScan } from '../qr-scan/PairingScan'
+import { preparePairingChannel } from '../../entities/device/pairing-channel'
 
 export interface PairNewDeviceProps {
   baseUrl: string
   decode?: () => Promise<string>
-  onKekAdopted: (kek: Uint8Array) => void
+  onKekAdopted: (kek: Uint8Array) => void | Promise<void>
 }
 
 // The payload endpoint returns the same 404 whether the primary has not submitted yet or the
@@ -19,28 +22,44 @@ const PAYLOAD_POLL_INTERVAL_MS = 1000
 const PAYLOAD_POLL_TIMEOUT_MS = 2 * 60 * 1000
 
 type AdoptionState =
-  | { status: 'awaiting-scan' }
-  | { status: 'awaiting-payload' }
+  | { status: 'awaiting-payload'; code: string }
   | { status: 'adopted' }
-  | { status: 'error'; message: string }
+  | { status: 'error'; message: MessageDescriptor }
 
 export function PairNewDevice({ baseUrl, decode, onKekAdopted }: PairNewDeviceProps) {
-  const { i18n, t } = useLingui()
+  const { i18n } = useLingui()
   const [keyPair] = useState(() => generateKeyPair())
-  const [state, setState] = useState<AdoptionState>({ status: 'awaiting-scan' })
+  const [state, setState] = useState<AdoptionState | null>(null)
   const channelRef = useRef<{ sessionId: string; channelKey: Uint8Array } | null>(null)
+  // Stryker disable next-line BooleanLiteral: equivalent, the effect below sets the flag before any async work.
+  const active = useRef(true)
+  // Stryker disable ArrayDeclaration: equivalent, any constant dependency list runs the effect once.
+  useEffect(() => {
+    active.current = true
+    return () => { active.current = false; channelRef.current?.channelKey.fill(0); channelRef.current = null }
+  }, [])
+  // Stryker restore ArrayDeclaration
 
   useEffect(() => {
-    if (state.status !== 'awaiting-payload' || channelRef.current === null) {
+    if (state?.status !== 'awaiting-payload') {
       return
     }
-    const { sessionId, channelKey } = channelRef.current
+    const { sessionId, channelKey } = channelRef.current!
     const salt = new TextEncoder().encode(sessionId)
     const deadline = Date.now() + PAYLOAD_POLL_TIMEOUT_MS
     let cancelled = false
+    let timer: ReturnType<typeof setTimeout> | undefined
 
     async function poll() {
-      const result = await fetchPairingPayload(baseUrl, sessionId)
+      let result: Awaited<ReturnType<typeof fetchPairingPayload>>
+      try { result = await fetchPairingPayload(baseUrl, sessionId) }
+      catch {
+        if (!cancelled) {
+          channelKey.fill(0)
+          setState({ status: 'error', message: msg`Não foi possível concluir o pareamento com segurança. Tente novamente.` })
+        }
+        return
+      }
       if (cancelled) {
         return
       }
@@ -48,43 +67,53 @@ export function PairNewDevice({ baseUrl, decode, onKekAdopted }: PairNewDevicePr
       if (result.ok) {
         try {
           const kek = decrypt(channelKey, decodeBase64(result.encryptedKek), salt)
-          setState({ status: 'adopted' })
-          onKekAdopted(kek)
+          try {
+            if (kek.length !== 32) throw new RangeError()
+            await onKekAdopted(kek)
+            if (!cancelled) setState({ status: 'adopted' })
+          } finally { kek.fill(0) }
         } catch {
-          setState({
+          if (!cancelled) setState({
             status: 'error',
-            message: t`Não foi possível decifrar a chave recebida. Tente parear novamente.`,
+            message: msg`Não foi possível decifrar a chave recebida. Tente parear novamente.`,
           })
-        }
+        } finally { channelKey.fill(0) }
         return
       }
 
       if (Date.now() >= deadline) {
-        setState({ status: 'error', message: translateProblemCode(result.code, result.params, i18n) })
+        channelKey.fill(0)
+        setState({ status: 'error', message: problemMessage(result.code, result.params) })
         return
       }
 
-      setTimeout(() => void poll(), PAYLOAD_POLL_INTERVAL_MS)
+      timer = setTimeout(() => void poll(), PAYLOAD_POLL_INTERVAL_MS)
     }
 
     void poll()
 
     return () => {
       cancelled = true
+      clearTimeout(timer)
     }
-  }, [state.status, baseUrl, i18n, t, onKekAdopted])
+  }, [state?.status, baseUrl, onKekAdopted])
 
-  function handleClaimed(primaryPublicKeyBase64: string, sessionId: string) {
-    const primaryPublicKey = decodeBase64(primaryPublicKeyBase64)
-    const sharedSecret = getSharedSecret(keyPair.privateKey, primaryPublicKey)
-    const channelKey = deriveChannelKey(sharedSecret, new TextEncoder().encode(sessionId))
-    channelRef.current = { sessionId, channelKey }
-    setState({ status: 'awaiting-payload' })
+  async function handleClaimed(primaryPublicKeyBase64: string, sessionId: string) {
+    try {
+      const { channelKey, code } = await preparePairingChannel(keyPair.privateKey, primaryPublicKeyBase64, sessionId)
+      if (!active.current) { channelKey.fill(0); return }
+      channelRef.current = { sessionId, channelKey }
+      setState({ status: 'awaiting-payload', code })
+    } catch {
+      setState({ status: 'error', message: msg`Não foi possível concluir o pareamento com segurança. Tente novamente.` })
+    }
   }
 
-  if (state.status === 'awaiting-payload') {
+  if (state?.status === 'awaiting-payload') {
     return (
       <div className="mx-auto max-w-sm p-4">
+        <p><Trans>Compare o código nos dois dispositivos antes de liberar o acesso.</Trans></p>
+        <p className="font-mono text-xl" data-testid="pairing-confirmation">{state.code}</p>
         <p role="status">
           <Trans>Aguardando o outro dispositivo enviar a chave...</Trans>
         </p>
@@ -92,7 +121,7 @@ export function PairNewDevice({ baseUrl, decode, onKekAdopted }: PairNewDevicePr
     )
   }
 
-  if (state.status === 'adopted') {
+  if (state?.status === 'adopted') {
     return (
       <div className="mx-auto max-w-sm p-4">
         <p role="status">
@@ -102,11 +131,11 @@ export function PairNewDevice({ baseUrl, decode, onKekAdopted }: PairNewDevicePr
     )
   }
 
-  if (state.status === 'error') {
+  if (state?.status === 'error') {
     return (
       <div className="mx-auto max-w-sm p-4">
         <p role="alert" className="text-sm text-red-700">
-          {state.message}
+          {i18n._(state.message)}
         </p>
       </div>
     )
@@ -114,9 +143,10 @@ export function PairNewDevice({ baseUrl, decode, onKekAdopted }: PairNewDevicePr
 
   return (
     <PairingScan
+      baseUrl={baseUrl}
       decode={decode}
       newDevicePublicKeyBase64={encodeBase64(keyPair.publicKey)}
-      onClaimed={handleClaimed}
+      onClaimed={(key, sessionId) => { void handleClaimed(key, sessionId) }}
     />
   )
 }

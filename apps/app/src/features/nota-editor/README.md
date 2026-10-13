@@ -8,7 +8,15 @@ uma citação por âncora temporal que toca o áudio ao passar o rato ou ganhar 
 teclado, e o atalho de teclado para assinar. Totalmente controlado pelo chamador
 (`nota`/`onChange`/`aoTocar` por prop) -- este módulo não guarda a nota em estado próprio,
 nem chama backend, nem sabe de onde vem o áudio (isso é `features/nota-audio`, ligado
-pelo chamador -- hoje `pages/notas/NotaPage.tsx`).
+pelo chamador -- hoje `NotaDoAtendimento`, abaixo).
+
+`NotaDoAtendimento` (`NotaDoAtendimento.tsx`) é o chamador desta feature: a nota da sessão,
+uma por `atendimentoId`. Abre a nota já gravada (ou uma em branco), grava cada revisão
+cifrada no prontuário (`sealEntry`), assina (`selarAssinatura` + `assinarNota`), valida e
+inclui a referência proposta a partir de um insight e avisa a página (`onSaved`) para reler
+o prontuário. Recebe só as revisões da transcrição *desta* sessão; "Ver fala da referência"
+chama `onAbrirTranscricao` se a revisão existe entre elas. Quem a monta é
+`pages/atendimento`.
 
 ## Fluxo principal
 
@@ -73,14 +81,13 @@ pelo chamador -- hoje `pages/notas/NotaPage.tsx`).
   com `readOnly` o browser nunca emite `input`, uma guarda em JS seria um ramo inalcançável
   (e sem cobertura possível). **O atalho `⌘↵`/`Ctrl+↵` não é travado aqui** -- `aoTeclar`
   continua a chamar `aoAssinar(nota)` mesmo com a nota assinada; a guarda vive em
-  `pages/notas/NotaPage.tsx` (`aoAssinar`, funil único de assinatura -- `FilaAssinatura` não
+  `NotaDoAtendimento` (`aoAssinar`, funil único de assinatura -- `FilaAssinatura` não
   chama `aoAssinar` diretamente), porque é aí que se decide o que fazer com uma tentativa de
   assinar de novo (mensagem de erro), não neste componente controlado que só repassa a nota
   atual.
-- **`aoTocar` já é real (fatia 3): `criarReprodutor`/`abrirSessaoComoBlob` de
-  `features/nota-audio`, ligado pelo chamador.** Este módulo continua sem saber de onde
-  vem o áudio -- só garante que o gatilho certo (clique, hover, foco) chama `aoTocar` com
-  a âncora certa.
+- **`aoTocar` aceita somente um reprodutor temporário da sessão atual.** O histórico
+  conserva texto e âncoras temporais; áudio não é armazenado nem recuperado do disco.
+  Este componente repassa a âncora ao chamador quando há um callback disponível.
 - **`aoAssinar` recebe a nota atual (`(nota: Nota) => void`), não é chamado sem argumento.**
   A spec desenha o atalho como `aoAssinar()`, mas quem for assinar de facto (fatia 4)
   precisa da nota **como está no momento do atalho** (com todas as edições já feitas) --
@@ -105,7 +112,7 @@ pelo chamador -- hoje `pages/notas/NotaPage.tsx`).
 
 - Assinatura de facto, persistência da nota editada -- fatia 5 (feita). `onChange`/
   `aoAssinar` continuam a só devolver/repassar a nota; quem grava no prontuário e assina de
-  facto é o chamador (`pages/notas/NotaPage.tsx`, ver o seu README) -- este módulo continua
+  facto é o chamador (`NotaDoAtendimento`) -- este módulo continua
   sem saber de rede, crypto ou persistência, só de que `aoAssinar(nota)` é a nota como está
   no momento do atalho.
 - Carregar o áudio real de uma sessão (`dir`/`dek`/`sessionId` vindos de um backend) --

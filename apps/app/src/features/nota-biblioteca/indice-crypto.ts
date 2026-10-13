@@ -1,8 +1,6 @@
 import { type CryptoKey, webcrypto } from '@limmiar/crypto'
 
-// Mesma disciplina de entities/gravacao/audio-crypto.ts: prefixo com versão, AAD
-// vinculada ao dono do conteúdo (aqui a conta, não a sessão) -- se o formato mudar um dia,
-// um novo prefixo evita colidir com índices já selados sob o `v1`.
+// A AAD vincula o índice à conta e à versão do formato.
 const NOTE_INDEX_AAD_PREFIX = 'limmiar/note-index/v1|'
 // AAD do embrulho da DEK (distinta da AAD do conteúdo acima) -- mesmo padrão de
 // copilot-crypto.ts/voice-crypto.ts, uma AAD por uso.
@@ -48,7 +46,7 @@ function concat(a: Uint8Array<ArrayBuffer>, b: Uint8Array<ArrayBuffer>): Uint8Ar
 
 /**
  * Sela o índice sob uma DEK fresca por gravação, embrulhada pela KEK da conta -- mesmo
- * padrão de `saveApiKey` (copilot-byok/key-store.ts). Wire format: wrappedDek(60) ||
+ * padrão de `guardarVoto` (entities/insight/voto-store.ts). Wire format: wrappedDek(60) ||
  * iv(12) || ciphertext || tag(16). A DEK nunca sai desta função.
  */
 export async function selarIndice(

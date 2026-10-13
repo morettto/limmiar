@@ -11,6 +11,18 @@ aqui: `SessionProvider` só monta `<SessionContext.Provider>` com o valor que ca
 
 ## Fluxo principal
 
+Na saída e na troca de conta, o provider revoga a família da sessão anterior pela
+API. A KEK e a conta saem do estado imediatamente; a purga local também é disparada
+sem esperar a rede. Falha de revogação aparece em um aviso traduzido, com nova
+tentativa. Os refresh tokens pendentes ficam somente em memória, sem registro em
+logs ou armazenamento adicional. Uma resposta de renovação recebida depois da saída
+não restaura a sessão. O cliente exige HTTP 204 para confirmar a revogação.
+
+Antes de sair da conta anterior, `iniciarSessao` valida e registra a autenticação
+completa. Uma autenticação incompleta ou uma falha no sessionStorage não purga nem
+revoga a conta atual. `sessaoDaConta` admite somente autenticações com access e
+refresh tokens presentes, por isso o provider pode usar o refresh da sessão aceita.
+
 1. `AppProviders` dispara `bootLocale()` no mount e embrulha `children` em `I18nProvider` por
    fora, `SessionProvider` por dentro -- único ponto de montagem em produção
    (`App.tsx` -> `AppProviders`).
@@ -18,17 +30,16 @@ aqui: `SessionProvider` só monta `<SessionContext.Provider>` com o valor que ca
    e `terminarSessao` gravam/apagam via `sessaoDaConta` e dão trigger a `purgarConta`
    (`purgar-conta.ts`, ficheiro irmão -- extraído de dentro de `SessionProvider.tsx` para não ter
    JSX nenhum, portão `lint:i18n`), sobre a lista módulo-scoped não exportada `PURGAS`: entradas
-   `[nome, purga]` -- `['clearApiKey', clearApiKey]`, `['purgarOpfsDaConta', purgarOpfsDaConta]`
-   (`entities/account/opfs-conta.ts`, S18-15; antes `purgarIndiceBusca`, ver Decisões). Desde
-   S18-05 corre as purgas num `for-of` sequencial com `try/catch` por purga -- uma que falhe não
-   trava as outras nem o logout/troca de sessão, provado pelo teste que faz `clearApiKey`
-   rebentar e confirma que `purgarOpfsDaConta` (a purga seguinte na lista) ainda apaga a árvore
-   OPFS da conta que sai. Essa garantia o `Promise.allSettled` anterior também dava (S18-14): o
-   que o `for-of` traz é legibilidade do rasto por nome, ao par com o `console.error` nomeado
-   abaixo, a custo de latência irrelevante num logout. Desde S18-08, o `catch` também deixa
-   rasto: `console.error` com o `nome` literal da purga (não `purga.name` -- minificação em
-   produção apagaria o nome) e o `accountId`, provado pelo teste que força `clearApiKey` a
-   rejeitar e verifica a mensagem.
+   `[nome, purga]` -- hoje só `['purgarOpfsDaConta', purgarOpfsDaConta]`
+   (`entities/account/opfs-conta.ts`, S18-15; antes `purgarIndiceBusca`, ver Decisões). A chave
+   de API do BYOK (`clearApiKey`) saiu da lista com a retirada do BYOK. Corre
+   as purgas num `for-of` sequencial com `try/catch` por purga -- uma que falhe não trava as
+   outras nem o logout/troca de sessão, provado pelo teste que faz `purgarOpfsDaConta` rebentar
+   e confirma que o logout termina. O `for-of` dá legibilidade do rasto por nome, ao par com o
+   `console.error` nomeado abaixo, a custo de latência irrelevante num logout. Desde S18-08, o
+   `catch` também deixa rasto: `console.error` com o `nome` literal da purga (não `purga.name` --
+   minificação em produção apagaria o nome) e o `accountId`, provado pelo teste que força
+   `purgarOpfsDaConta` a rejeitar e verifica a mensagem.
 3. `useSession()` (`entities/account/session-context.tsx`) lê o `SessionContext` React. Fora de
    um `<SessionProvider>` ancestral, lança (`useSession: nenhum <SessionProvider> ancestral`) em
    vez de devolver um default silencioso (S18-03) -- um erro de montagem em produção deixa de
@@ -61,8 +72,8 @@ aqui: `SessionProvider` só monta `<SessionContext.Provider>` com o valor que ca
 - **Purga recursiva da árvore OPFS da conta, não mais um apagar de blob a blob (S18-15).**
   Até ao S18-14, `PURGAS` continha `['purgarIndiceBusca', purgarIndiceBusca]`
   (`features/nota-biblioteca/indice-store.ts`), que só apagava o ficheiro `indice-busca` --
-  qualquer outro blob escrito sob `<raiz OPFS>/<accountId>` (por exemplo, um chunk de
-  `features/live-session/chunk-store.ts`) sobrevivia ao logout, exatamente o defeito que o
+  qualquer outro blob escrito sob `<raiz OPFS>/<accountId>` (incluindo artefatos
+  de versões antigas) sobrevivia ao logout, exatamente o defeito que o
   S18-15 fecha. Agora `PURGAS` tem `['purgarOpfsDaConta', purgarOpfsDaConta]`
   (`entities/account/opfs-conta.ts`): `raiz.removeEntry(accountId, { recursive: true })`, uma
   única chamada que apaga o diretório inteiro. `dirIndiceDaConta`/`purgarIndiceBusca` foram
@@ -74,11 +85,10 @@ aqui: `SessionProvider` só monta `<SessionContext.Provider>` com o valor que ca
 - **O guarda de arquitetura do S18-12 (`arch.test.ts`, "purgas de conta cobrem quem abre a raiz
   OPFS") foi apagado, não substituído (S18-15).** Porquê, e qual o risco residual nomeado e
   aceite: `docs/adr/ADR-S18-01-purga-recursiva-da-arvore-opfs-da-conta.md`.
-- **Na troca de conta, a purga da conta anterior é disparada antes de registar a nova, mas não
-  esperada (S08-20).** `iniciarSessao` continua síncrona e faz `void purgarConta(anterior)` antes
-  de `sessaoDaConta.registar(account)`. Como `purgarConta` é `async`, só a primeira purga da lista
-  (`clearApiKey`, síncrona) corre de facto antes do registo; `purgarOpfsDaConta` corre depois do
-  primeiro `await`, portanto depois de a sessão nova estar montada. Isso é seguro porque a árvore
+- **Na troca de conta, a purga da conta anterior é disparada depois de validar e registar a nova,
+  sem esperar pela conclusão (S08-20).** `iniciarSessao` continua síncrona. `purgarConta` é
+  assíncrona, por isso a árvore OPFS pode terminar de ser removida depois de a sessão nova
+  estar montada. Isso é seguro porque a árvore
   de uma conta vive em `<raiz OPFS>/<accountId>` e os diretórios das duas contas são disjuntos: a
   purga de A não toca em nada que a sessão de B abra. A alternativa -- esperar pela purga --
   tornava `iniciarSessao` assíncrona, propagava a promessa para `onAuthenticated` em

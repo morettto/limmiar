@@ -1,19 +1,50 @@
-// Extension kept explicit: this file is also pulled into tsconfig.node.json's graph (module
-// nodenext) because vite.config.ts imports it -- drop the .ts here and SUPPORTED_PROVIDERS
-// degrades to `any` under that config, silently. Do not "clean up" this extension.
-import { SUPPORTED_PROVIDERS } from './src/features/copilot-byok/provider-registry.ts'
+// connect-src is 'self' unless the build names other hosts (app on Cloudflare; API, copilot and speech service elsewhere).
+// Each origin gets its ws:/wss: twin, because http: does not cover WebSockets (the speech service is one).
+// The juiz is called by the copilot orchestrator, not the browser: leave its variable unset unless that changes.
+export const ORIGIN_VARIABLES = ['VITE_API_BASE_URL', 'VITE_COPILOTO_BASE_URL', 'VITE_SPEECH_BASE_URL', 'VITE_JUIZ_BASE_URL'] as const
 
-// connect-src derives from SUPPORTED_PROVIDERS, so the whitelist is never written twice by hand.
-// ponytail: `'self'` only holds while the .NET API shares this origin — the day it gets its own,
-// it has to be added here. The other directives stay out on purpose (ZAP 10055, see .zap/rules.tsv).
-const CONTENT_SECURITY_POLICY = `connect-src 'self' ${SUPPORTED_PROVIDERS.map((provider) => provider.baseUrl).join(' ')}; object-src 'none'; form-action 'self'; base-uri 'self'; frame-ancestors 'none'`
+type BuildEnv = Readonly<Record<string, string | undefined>>
 
-// Build-layer policy: this file sits at the app root, not inside src/features/copilot-byok. Only the
-// connect-src whitelist is data owned by that slice; which headers and directives to send is
-// app-wide and has nothing to do with BYOK.
-export const SECURITY_HEADERS = {
-  'Cross-Origin-Opener-Policy': 'same-origin',
-  'Cross-Origin-Embedder-Policy': 'credentialless',
-  'X-Content-Type-Options': 'nosniff',
-  'Content-Security-Policy': CONTENT_SECURITY_POLICY,
-} as const
+const BASELINE_CONNECT_SRC = "connect-src 'self'"
+
+export function connectSrc(env: BuildEnv): string {
+  const origins = ORIGIN_VARIABLES.flatMap((name) => {
+    const value = env[name]
+    if (!value) return []
+    const { origin } = new URL(value)
+    return [origin, origin.replace(/^http/, 'ws')]
+  })
+  return ["'self'", ...new Set(origins)].join(' ')
+}
+
+// public/_headers carries the baseline; the build rewrites its copy in the output directory.
+export function withHostedOrigins(headersFile: string, env: BuildEnv): string {
+  if (!headersFile.includes(BASELINE_CONNECT_SRC)) throw new Error(`${BASELINE_CONNECT_SRC} not found in _headers`)
+  return headersFile.replace(BASELINE_CONNECT_SRC, `connect-src ${connectSrc(env)}`)
+}
+
+export function securityHeaders(env: BuildEnv) {
+  return {
+    'Cross-Origin-Opener-Policy': 'same-origin',
+    'Cross-Origin-Embedder-Policy': 'credentialless',
+    'X-Content-Type-Options': 'nosniff',
+    'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+    'Referrer-Policy': 'no-referrer',
+    'Permissions-Policy': 'microphone=(self), camera=(self), geolocation=()',
+    // img-src data: is the pairing QR (PairingQr.tsx); media-src blob: is the recorded session audio.
+    'Content-Security-Policy': [
+      "default-src 'self'",
+      "script-src 'self' 'wasm-unsafe-eval'",
+      "worker-src 'self' blob:",
+      "media-src blob:",
+      "img-src 'self' data:",
+      `connect-src ${connectSrc(env)}`,
+      "object-src 'none'",
+      "form-action 'self'",
+      "base-uri 'self'",
+      "frame-ancestors 'none'",
+    ].join('; '),
+  } as const
+}
+
+export const SECURITY_HEADERS = securityHeaders({})

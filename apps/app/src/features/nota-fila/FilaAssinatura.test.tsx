@@ -6,7 +6,7 @@ import { ESTADO_ASSINADA, ESTADO_PENDENTE, type Nota } from '../../entities/nota
 import { FilaAssinatura } from './FilaAssinatura'
 
 function nota(id: string, patientId: string, estado: Nota['estado']): Nota {
-  return { id, patientId, revisao: 0, frases: [], estado }
+  return { id, patientId, atendimentoId: `atendimento-${id}`, revisao: 0, frases: [], estado }
 }
 
 const ITENS: readonly Nota[] = [

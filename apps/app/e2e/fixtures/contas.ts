@@ -1,5 +1,6 @@
-import { expect, type APIRequestContext } from '@playwright/test'
+import { expect, type APIRequestContext, type Browser } from '@playwright/test'
 import { API_BASE_URL } from '../../playwright.config'
+import { instalarAutenticadorVirtual, ORIGEM_PASSKEY } from './passkey'
 import { computeTotpCode } from './totp'
 
 // S11-04: setup helpers shared by vinculo-chave-publica.spec.ts -- registering and, for
@@ -23,25 +24,62 @@ export function contaTestKek(seed: number): Uint8Array {
 export interface ContaTeste {
   accountId: string
   accessToken: string
-  email: string
 }
 
-/** POST /auth/register (Patient role) -- a Patient account never needs TOTP enrollment (ADR-S02-03/S02-04), so registration alone returns a real session. */
-export async function registrarPaciente(request: APIRequestContext, label: string): Promise<ContaTeste> {
-  const email = `vinculo-e2e-${label}-${crypto.randomUUID()}@example.com`
-  const response = await request.post(`${API_BASE_URL}/auth/register`, {
-    data: {
-      email,
-      // 32 zero bytes, base64 -- shape-valid (AccountService.PasswordVerifierLength), not a
-      // real Argon2id output. This fixture never logs in with a password again.
-      passwordVerifier: toBase64(new Uint8Array(32)),
-      role: 'Patient',
-    },
+function bearer(conta: ContaTeste): { Authorization: string } {
+  return { Authorization: `Bearer ${conta.accessToken}` }
+}
+
+// Shape-valid noise (28-byte AES-GCM floor): the server stores sealed blobs and never opens them.
+const SEALED_BLOB_SHAPE = toBase64(new Uint8Array(32).fill(1))
+
+/** POST /accounts/{id}/patients -- a professional's wallet entry, the only thing a link invite can point at. */
+export async function criarPacienteNaCarteira(request: APIRequestContext, profissional: ContaTeste): Promise<string> {
+  const patientId = crypto.randomUUID()
+  const response = await request.post(`${API_BASE_URL}/accounts/${profissional.accountId}/patients`, {
+    headers: bearer(profissional),
+    data: { patientId, wrappedDek: SEALED_BLOB_SHAPE, ciphertext: SEALED_BLOB_SHAPE },
   })
-  expect(response.ok(), `POST /auth/register (Patient) failed: ${response.status()} ${await response.text()}`).toBe(true)
-  const body = (await response.json()) as { id: string; accessToken: string | null }
-  expect(body.accessToken, 'Patient registration must return a session immediately').not.toBeNull()
-  return { accountId: body.id, accessToken: body.accessToken!, email }
+  expect(response.ok(), `POST /accounts/${profissional.accountId}/patients failed: ${response.status()} ${await response.text()}`).toBe(true)
+  return patientId
+}
+
+/** POST .../patients/{patientId}/link-invites -- the single-use code the professional hands to the patient. */
+export async function criarConvite(request: APIRequestContext, profissional: ContaTeste, patientId: string): Promise<string> {
+  const response = await request.post(`${API_BASE_URL}/accounts/${profissional.accountId}/patients/${patientId}/link-invites`, {
+    headers: bearer(profissional),
+  })
+  expect(response.ok(), `POST .../link-invites failed: ${response.status()} ${await response.text()}`).toBe(true)
+  return ((await response.json()) as { code: string }).code
+}
+
+/**
+ * An anonymous Patient account only exists once an invite is redeemed with a passkey, so this runs
+ * the real ceremony in a throwaway context, then unlinks the issuing professional: the account
+ * starts with no link, ready for the invite a spec wants to exercise.
+ */
+export async function registrarPaciente(browser: Browser, request: APIRequestContext, label: string): Promise<ContaTeste> {
+  const convidante = await registrarProfissionalVerificada(request, `convite-${label}`)
+  const codigo = await criarConvite(request, convidante, await criarPacienteNaCarteira(request, convidante))
+
+  const context = await browser.newContext({ baseURL: ORIGEM_PASSKEY, locale: 'pt-BR' })
+  try {
+    const page = await context.newPage()
+    await page.goto('/')
+    await instalarAutenticadorVirtual(page)
+    await page.goto(`/auth/magic-link?${new URLSearchParams({ token: codigo }).toString()}`)
+    await page.getByRole('button', { name: 'Confirmar meu acesso' }).click()
+    await expect(page.getByRole('status')).toHaveText('Login realizado com sucesso.')
+    const raw = await page.evaluate(() => window.sessionStorage.getItem('limmiar:account'))
+    const { id, accessToken } = JSON.parse(raw!) as { id: string; accessToken: string }
+    const conta = { accountId: id, accessToken }
+
+    const unlink = await request.delete(`${API_BASE_URL}/accounts/${id}/links/${convidante.accountId}`, { headers: bearer(conta) })
+    expect(unlink.status(), `DELETE .../links/${convidante.accountId} failed: ${await unlink.text()}`).toBe(204)
+    return conta
+  } finally {
+    await context.close()
+  }
 }
 
 // Document + staff approval, not CRP/CRM: against the real webServer,
@@ -85,5 +123,5 @@ export async function registrarProfissionalVerificada(request: APIRequestContext
   const decided = (await decisionResponse.json()) as { status: string }
   expect(decided.status).toBe('Active')
 
-  return { accountId, accessToken, email }
+  return { accountId, accessToken }
 }

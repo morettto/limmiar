@@ -3,16 +3,19 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { webcrypto as limmiarWebcrypto } from '@limmiar/crypto'
 import type { Account } from '../../entities/account'
-import { COPILOT_KEY_STORAGE_KEY } from '../../features/copilot-byok/key-store'
 import { chaveIndiceDaConta, type ChaveIndiceBusca } from '../../features/nota-biblioteca/indice-crypto'
 import { construirIndice } from '../../features/nota-biblioteca/indice'
 import { opfsIndice, persistirIndice } from '../../features/nota-biblioteca/indice-store'
-import { opfsWriter } from '../../features/live-session/chunk-store'
-import { FakeDirectoryHandle, stubOpfsRoot } from '../../test-support/fake-opfs'
+import { FakeDirectoryHandle, FakeFileHandle, stubOpfsRoot } from '../../test-support/fake-opfs'
 import { useSession } from '../../entities/account/session-context'
 import { SessionProvider } from './SessionProvider'
 
-const ACCOUNT: Account = {
+vi.mock('../../entities/account', async () => ({
+  ...await vi.importActual<typeof import('../../entities/account')>('../../entities/account'),
+  logoutSession: vi.fn().mockResolvedValue({ ok: true }),
+}))
+
+const ACCOUNT: Account = {accessToken: 'test-access', refreshToken: 'test-refresh', accessTokenExpiresAt: '2099-01-01T00:00:00Z',
   id: '11111111-1111-1111-1111-111111111111',
   email: 'user@example.com',
   role: 'Professional',
@@ -20,7 +23,7 @@ const ACCOUNT: Account = {
   twoFactorTicket: null,
 }
 
-const OUTRA_CONTA: Account = {
+const OUTRA_CONTA: Account = {accessToken: 'test-access', refreshToken: 'test-refresh', accessTokenExpiresAt: '2099-01-01T00:00:00Z',
   id: '22222222-2222-2222-2222-222222222222',
   email: 'outra@example.com',
   role: 'Professional',
@@ -39,27 +42,12 @@ function contaPersistidaJson(account: Account): string {
   return JSON.stringify(semTicket)
 }
 
-function copilotKeyStorageKeyFor(accountId: string): string {
-  return `${COPILOT_KEY_STORAGE_KEY}:${accountId}`
-}
-
-// Semeia uma entrada real de localStorage (não um mock) no formato que key-store.ts grava --
-// prova o efeito real de clearApiKey, não uma chamada espiada.
-function seedCopilotKeyEnvelope(accountId: string) {
-  window.localStorage.setItem(
-    copilotKeyStorageKeyFor(accountId),
-    JSON.stringify({ providerId: 'openai', wrappedDek: 'x', ciphertext: 'y' }),
-  )
-}
-
 async function makeChave(): Promise<ChaveIndiceBusca> {
   const kek = await limmiarWebcrypto.importKek(crypto.getRandomValues(new Uint8Array(32)))
   return chaveIndiceDaConta(kek)
 }
 
-// Semeia `raiz/<accountId>/indice-busca` (via opfsIndice) e `raiz/<accountId>/0` (via
-// opfsWriter, um chunk de sessão ao vivo) -- os dois trios de produção que escrevem sob o
-// diretório da conta. Devolve o diretório para quem ainda precisa de inspecionar `.files`.
+// A purga deve retirar também artefatos obsoletos de versões anteriores.
 async function seedContaOpfs(raiz: FakeDirectoryHandle, accountId: string): Promise<FakeDirectoryHandle> {
   const chave = await makeChave()
   const dir = await raiz.getDirectoryHandle(accountId, { create: true })
@@ -67,7 +55,7 @@ async function seedContaOpfs(raiz: FakeDirectoryHandle, accountId: string): Prom
   const { gravar } = opfsIndice(dirHandle)
   const indice = construirIndice([{ id: '1', patientId: 'p1', texto: 'febre' }])
   await persistirIndice(gravar, chave, accountId, indice, '1:0')
-  await opfsWriter(dirHandle)('sessao-1', 0, new Uint8Array([1, 2, 3]))
+  dir.files.set('0', new FakeFileHandle(new Uint8Array([1, 2, 3])))
   return dir
 }
 
@@ -102,13 +90,13 @@ function ValueCapturer({ onValue }: { onValue: (value: ReturnType<typeof useSess
   return null
 }
 
-const KEY_STORE = '../../features/copilot-byok/key-store'
+const OPFS_CONTA = '../../entities/account/opfs-conta'
 
-// Monta o provider com `clearApiKey` mockado. Pegadinha de `renderRouter` em router.test.tsx:
+// Monta o provider com `purgarOpfsDaConta` mockado. Pegadinha de `renderRouter` em router.test.tsx:
 // `SessionContext` fresco tem de vir do mesmo registo de módulos que o `SessionProvider`
 // fresco, daí os dois virem de import dinâmico depois do mesmo `vi.resetModules()`.
-async function montarComPurgaMockada(clearApiKey: (accountId: string) => unknown): Promise<void> {
-  vi.doMock(KEY_STORE, () => ({ clearApiKey: vi.fn(clearApiKey) }))
+async function montarComPurgaMockada(purgarOpfsDaConta: (accountId: string) => unknown): Promise<void> {
+  vi.doMock(OPFS_CONTA, () => ({ purgarOpfsDaConta: vi.fn(purgarOpfsDaConta) }))
   vi.resetModules()
   const { SessionProvider: SessionProviderComMockDePurga } = await import('./SessionProvider')
   const { useSession: useSessionFresco } = await import('../../entities/account/session-context')
@@ -139,7 +127,7 @@ describe('SessionProvider', () => {
     window.sessionStorage.clear()
     window.localStorage.clear()
     vi.restoreAllMocks()
-    vi.doUnmock(KEY_STORE)
+    vi.doUnmock(OPFS_CONTA)
     vi.resetModules()
     restoreOpfsRoot?.()
     restoreOpfsRoot = null
@@ -168,12 +156,11 @@ describe('SessionProvider', () => {
     fireEvent.click(screen.getByRole('button', { name: 'iniciar' }))
 
     expect(screen.getByTestId('sessao').textContent).toBe(ACCOUNT.id)
-    expect(window.sessionStorage.getItem('limmiar:account')).toBe(contaPersistidaJson(ACCOUNT))
+    expect(JSON.parse(window.sessionStorage.getItem('limmiar:account')!)).toEqual(JSON.parse(contaPersistidaJson(ACCOUNT)))
   })
 
-  it('terminarSessao clears storage and state, and purges the departing account (clearApiKey removes its copilot key)', async () => {
+  it('terminarSessao clears storage and state', () => {
     seedStoredAccount(ACCOUNT)
-    seedCopilotKeyEnvelope(ACCOUNT.id)
     render(
       <SessionProvider>
         <Consumer />
@@ -185,15 +172,9 @@ describe('SessionProvider', () => {
 
     expect(screen.getByTestId('sessao').textContent).toBe('sem-sessao')
     expect(window.sessionStorage.getItem('limmiar:account')).toBeNull()
-    await waitFor(() => {
-      expect(window.localStorage.getItem(copilotKeyStorageKeyFor(ACCOUNT.id))).toBeNull()
-    })
   })
 
-  // Vermelho do S18-15: `chunk-store.ts` nunca escreve `indice-busca`, só a árvore inteira
-  // apanha os dois. As asserções pré-purga provam que os artefactos existem mesmo -- sem
-  // elas, um `seedContaOpfs` partido passava por vazio.
-  it('terminarSessao apaga toda a arvore OPFS da conta que sai (indice e chunk)', async () => {
+  it('terminarSessao apaga toda a arvore OPFS da conta que sai, incluindo artefatos obsoletos', async () => {
     const raiz = new FakeDirectoryHandle()
     const dirConta = await seedContaOpfs(raiz, ACCOUNT.id)
     restoreOpfsRoot = stubOpfsRoot(raiz)
@@ -230,8 +211,10 @@ describe('SessionProvider', () => {
   })
 
   it('iniciarSessao with the same account already registered re-registers it without purging (A -> A)', async () => {
+    const raiz = new FakeDirectoryHandle()
+    await seedContaOpfs(raiz, ACCOUNT.id)
+    restoreOpfsRoot = stubOpfsRoot(raiz)
     seedStoredAccount(ACCOUNT)
-    seedCopilotKeyEnvelope(ACCOUNT.id)
     render(
       <SessionProvider>
         <Consumer />
@@ -242,15 +225,14 @@ describe('SessionProvider', () => {
     fireEvent.click(screen.getByRole('button', { name: 'iniciar' }))
 
     expect(screen.getByTestId('sessao').textContent).toBe(ACCOUNT.id)
-    expect(window.sessionStorage.getItem('limmiar:account')).toBe(contaPersistidaJson(ACCOUNT))
+    expect(JSON.parse(window.sessionStorage.getItem('limmiar:account')!)).toEqual(JSON.parse(contaPersistidaJson(ACCOUNT)))
     // Dá tempo a uma purga indevida correr, se o código a disparasse por engano.
     await new Promise((resolve) => setTimeout(resolve, 0))
-    expect(window.localStorage.getItem(copilotKeyStorageKeyFor(ACCOUNT.id))).not.toBeNull()
+    expect(raiz.dirs.has(ACCOUNT.id)).toBe(true)
   })
 
-  it('iniciarSessao with a different account purges the previous one before mounting the new one (A -> B)', async () => {
+  it('iniciarSessao with a different account registers the new one in place of the previous (A -> B)', () => {
     seedStoredAccount(ACCOUNT)
-    seedCopilotKeyEnvelope(ACCOUNT.id)
     render(
       <SessionProvider>
         <Consumer />
@@ -261,10 +243,7 @@ describe('SessionProvider', () => {
     fireEvent.click(screen.getByRole('button', { name: 'iniciar-outra' }))
 
     expect(screen.getByTestId('sessao').textContent).toBe(OUTRA_CONTA.id)
-    expect(window.sessionStorage.getItem('limmiar:account')).toBe(contaPersistidaJson(OUTRA_CONTA))
-    await waitFor(() => {
-      expect(window.localStorage.getItem(copilotKeyStorageKeyFor(ACCOUNT.id))).toBeNull()
-    })
+    expect(JSON.parse(window.sessionStorage.getItem('limmiar:account')!)).toEqual(JSON.parse(contaPersistidaJson(OUTRA_CONTA)))
   })
 
   it('trocar de conta (A -> B) apaga o indice de A e deixa o de B intacto', async () => {
@@ -302,13 +281,10 @@ describe('SessionProvider', () => {
     expect(screen.getByTestId('sessao').textContent).toBe(ACCOUNT.id)
   })
 
-  it('a purge that throws synchronously does not stop terminarSessao from clearing the session, nor the next purge in the list (o indice ainda e apagado)', async () => {
-    // Prova que purgarConta não deixa um throw síncrono de clearApiKey escapar para terminarSessao
-    // (que chama purgarConta em fire-and-forget, sem esperar por ela), e que a purga seguinte
-    // na lista (purgarOpfsDaConta) ainda corre -- README `app/providers`, "Fluxo principal".
-    const raiz = new FakeDirectoryHandle()
-    await seedContaOpfs(raiz, ACCOUNT.id)
-    restoreOpfsRoot = stubOpfsRoot(raiz)
+  it('a purge that throws synchronously does not stop terminarSessao from clearing the session', async () => {
+    // Prova que purgarConta não deixa um throw síncrono de purgarOpfsDaConta escapar para
+    // terminarSessao (que chama purgarConta em fire-and-forget, sem esperar por ela).
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
     await montarComPurgaMockada(() => {
       throw new Error('purge boom')
     })
@@ -318,14 +294,10 @@ describe('SessionProvider', () => {
 
     expect(screen.getByTestId('sessao').textContent).toBe('sem-sessao')
     expect(window.sessionStorage.getItem('limmiar:account')).toBeNull()
-    await waitFor(() => {
-      expect(raiz.dirs.has(ACCOUNT.id)).toBe(false)
-    })
+    await waitFor(() => expect(consoleError).toHaveBeenCalled())
   })
 
   it('uma purga que rejeita deixa rasto no console com o nome da purga e o accountId, sem conteudo do blob nem chave', async () => {
-    const raiz = new FakeDirectoryHandle()
-    restoreOpfsRoot = stubOpfsRoot(raiz)
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
     await montarComPurgaMockada(() => Promise.reject(new Error('purge boom')))
 
@@ -333,7 +305,7 @@ describe('SessionProvider', () => {
 
     await waitFor(() => {
       expect(consoleError).toHaveBeenCalledWith(
-        expect.stringContaining('clearApiKey'),
+        expect.stringContaining('purgarOpfsDaConta'),
         expect.any(Error),
       )
     })

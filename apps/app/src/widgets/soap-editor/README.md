@@ -30,11 +30,9 @@ uma da outra.
 
 - `FilaEEditor` (`FilaEEditor.tsx`) -- componente React, props `notas: readonly Nota[]`,
   `onChangeNota`, `aoTocar`, `aoAssinar`.
-- Consumido por `pages/notas/NotaPage.tsx` (rota `/notas`, ver
-  `app/routing/router.tsx`) -- ponto de entrada de produto para este widget, fora dele
-  (camada `pages`/`app`). `NotaPage` ganhou README próprio na fatia 5 (`pages/notas/README.md`):
-  deixou de ser fina de mais assim que `aoAssinar` passou a gravar no prontuário e assinar
-  de facto, em vez de só mexer em estado local.
+- Sem página que o monte hoje: a rota `/notas` e `pages/notas` foram removidas quando a nota
+  passou a ser da sessão (`features/nota-editor/NotaDoAtendimento.tsx`, montada por
+  `pages/atendimento`).
 
 ## Decisões desta fatia
 
@@ -59,9 +57,6 @@ uma da outra.
 ## Fora de âmbito (fatias seguintes da spec S08)
 
 - `notas` reais vindas de um backend (fila com múltiplas notas/pacientes) --
-  continuam sempre injetadas pelo chamador. `pages/notas/NotaPage.tsx` continua a montar
-  com uma única nota fixa em memória só para a rota `/notas` existir de facto (não um
-  componente construído e nunca ligado) -- ver o README desse módulo para o que já é real
-  (assinatura) e o que continua fixture (a própria fila/nota, a sessão/Keychain).
+  continuam sempre injetadas pelo chamador.
 - Fonte real do áudio (`dir`/`dek`/`sessionId` vindos de um backend) -- `aoTocar` já liga
   ao reprodutor real (fatia 3), só falta a origem do áudio.

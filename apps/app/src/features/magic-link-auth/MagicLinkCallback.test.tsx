@@ -1,10 +1,14 @@
+import { webcrypto } from '@limmiar/crypto'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { I18nProvider } from '@lingui/react'
 import { i18n, dynamicActivate } from '../../shared/i18n'
 import * as accountApi from '../../entities/account/api'
 import { decodeBase64, encodeBase64 } from '../../shared/lib/base64'
 import { MagicLinkCallback } from './MagicLinkCallback'
+import { PasskeySemCifraError } from './webauthn'
+
+vi.mock('@tanstack/react-router', () => ({ Link: ({ to, children }: { to: string; children: React.ReactNode }) => <a href={to}>{children}</a> }))
 
 vi.mock('../../entities/account/api', async () => {
   const actual = await vi.importActual<typeof import('../../entities/account/api')>('../../entities/account/api')
@@ -17,6 +21,8 @@ vi.mock('../../entities/account/api', async () => {
 
 const verifyMagicLinkMock = vi.mocked(accountApi.verifyMagicLink)
 const completeWebAuthnCeremonyMock = vi.mocked(accountApi.completeWebAuthnCeremony)
+
+let KEK: CryptoKey
 
 const BASE_URL = 'http://api.test'
 const TOKEN = 'raw-magic-link-token'
@@ -31,17 +37,17 @@ const SIGNATURE = new Uint8Array([40, 41])
 
 const COMPLETED_ACCOUNT = {
   id: '11111111-1111-1111-1111-111111111111',
-  email: 'patient@example.com',
+  email: null,
   role: 'Patient' as const,
   accessToken: 'access-token',
   refreshToken: 'refresh-token',
   accessTokenExpiresAt: '2026-08-09T13:00:00Z',
 }
 
-function renderCallback(props: Partial<React.ComponentProps<typeof MagicLinkCallback>> = {}) {
+function renderCallback(props: Partial<React.ComponentProps<typeof MagicLinkCallback>> = {}, start = true) {
   const createCredential = props.createCredential ?? vi.fn()
   const getCredential = props.getCredential ?? vi.fn()
-  return render(
+  const view = render(
     <I18nProvider i18n={i18n}>
       <MagicLinkCallback
         baseUrl={BASE_URL}
@@ -52,11 +58,70 @@ function renderCallback(props: Partial<React.ComponentProps<typeof MagicLinkCall
       />
     </I18nProvider>,
   )
+  if (start) fireEvent.click(screen.getByRole('button', { name: 'Confirmar meu acesso' }))
+  return view
 }
 
 describe('MagicLinkCallback', () => {
+  const verified = { ok: true as const, magicLinkTicket: MAGIC_LINK_TICKET, ceremonyType: 'Register' as const,
+    challenge: encodeBase64(CHALLENGE), relyingPartyId: RELYING_PARTY_ID, credentialId: null, accountId: COMPLETED_ACCOUNT.id }
+  const created = () => ({ credentialId: CREDENTIAL_ID, clientDataJson: CLIENT_DATA_JSON, attestationObject: ATTESTATION_OBJECT, kek: KEK })
+
+  it('aguarda confirmação explícita e permite reutilizar somente o ID opaco', async () => {
+    verifyMagicLinkMock.mockResolvedValue(verified)
+    completeWebAuthnCeremonyMock.mockResolvedValue({ ok: true, account: COMPLETED_ACCOUNT })
+    renderCallback({ createCredential: vi.fn().mockImplementation(async () => created()) }, false)
+    expect(verifyMagicLinkMock).not.toHaveBeenCalled()
+    expect(screen.queryByLabelText('E-mail')).toBeNull()
+    fireEvent.change(screen.getByLabelText('Já tem um ID no Limmiar? Informe para usar a mesma conta.'), { target: { value: COMPLETED_ACCOUNT.id } })
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar meu acesso' }))
+    expect(await screen.findByRole('link', { name: 'Abrir meu acompanhamento' })).toHaveProperty('href', 'http://localhost:3000/hoje')
+    expect(verifyMagicLinkMock).toHaveBeenCalledWith(BASE_URL, { token: TOKEN, patientAccountId: COMPLETED_ACCOUNT.id })
+  })
+
+  it('recusa passkey sem cifra antes de criar uma conta no servidor', async () => {
+    verifyMagicLinkMock.mockResolvedValue(verified)
+    renderCallback({ createCredential: vi.fn().mockRejectedValue(new PasskeySemCifraError()) })
+    expect((await screen.findByRole('alert')).textContent).toContain('não permite desbloquear seus dados cifrados')
+    expect(completeWebAuthnCeremonyMock).not.toHaveBeenCalled()
+  })
+
+  it('sair da tela cancela a passkey e não conclui uma credencial que chega depois', async () => {
+    verifyMagicLinkMock.mockResolvedValue(verified)
+    let finish!: (value: ReturnType<typeof created>) => void
+    const createCredential = vi.fn().mockImplementation(() => new Promise((resolve) => { finish = resolve }))
+    const view = renderCallback({ createCredential })
+    await vi.waitFor(() => expect(createCredential).toHaveBeenCalledOnce())
+    const signal = createCredential.mock.calls[0]![0].signal as AbortSignal
+    view.unmount()
+    finish(created())
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(signal.aborted).toBe(true)
+    expect(completeWebAuthnCeremonyMock).not.toHaveBeenCalled()
+  })
+
+  it.each([{ role: 'Professional' }, { email: 'identity@example.test' }, { id: 'another-id' }])('recusa conta incompatível com a identidade anônima verificada: %j', async (change) => {
+    verifyMagicLinkMock.mockResolvedValue(verified)
+    completeWebAuthnCeremonyMock.mockResolvedValue({ ok: true, account: { ...COMPLETED_ACCOUNT, ...change } } as Awaited<ReturnType<typeof accountApi.completeWebAuthnCeremony>>)
+    const onAuthenticated = vi.fn()
+    renderCallback({ createCredential: vi.fn().mockImplementation(async () => created()), onAuthenticated })
+    await screen.findByRole('alert')
+    expect(onAuthenticated).not.toHaveBeenCalled()
+  })
+  it('informa falha de rede e ignora rejeição após desmontar', async () => {
+    verifyMagicLinkMock.mockRejectedValueOnce(new Error('rede'))
+    const view = renderCallback()
+    expect(await screen.findByRole('alert')).toBeTruthy()
+    view.unmount()
+    let rejeitar!: (erro: Error) => void
+    verifyMagicLinkMock.mockReturnValueOnce(new Promise((_resolve, reject) => { rejeitar = reject }))
+    const outra = renderCallback()
+    outra.unmount(); rejeitar(new Error('tardia')); await Promise.resolve()
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
   beforeAll(async () => {
     await dynamicActivate('pt-BR')
+    KEK = await webcrypto.importKek(new Uint8Array(32).fill(7))
   })
 
   afterEach(() => {
@@ -73,11 +138,13 @@ describe('MagicLinkCallback', () => {
       challenge: encodeBase64(CHALLENGE),
       relyingPartyId: RELYING_PARTY_ID,
       credentialId: null,
+      accountId: COMPLETED_ACCOUNT.id,
     })
     const createCredential = vi.fn().mockResolvedValue({
       credentialId: CREDENTIAL_ID,
       clientDataJson: CLIENT_DATA_JSON,
       attestationObject: ATTESTATION_OBJECT,
+      kek: KEK,
     })
     const getCredential = vi.fn()
     completeWebAuthnCeremonyMock.mockResolvedValue({ ok: true, account: COMPLETED_ACCOUNT })
@@ -96,8 +163,8 @@ describe('MagicLinkCallback', () => {
     const createInput = createCredential.mock.calls[0]![0]
     expect(createInput.challenge).toEqual(CHALLENGE)
     expect(createInput.relyingPartyId).toBe(RELYING_PARTY_ID)
-    expect(new TextDecoder().decode(createInput.userId)).toBe(MAGIC_LINK_TICKET)
-    expect(createInput.userName).toBe(MAGIC_LINK_TICKET)
+    expect(new TextDecoder().decode(createInput.userId)).toBe(COMPLETED_ACCOUNT.id)
+    expect(createInput.userName).toBe(COMPLETED_ACCOUNT.id)
     expect(getCredential).not.toHaveBeenCalled()
 
     expect(completeWebAuthnCeremonyMock).toHaveBeenCalledWith(BASE_URL, {
@@ -108,12 +175,10 @@ describe('MagicLinkCallback', () => {
     })
 
     expect(onAuthenticated).toHaveBeenCalledWith({
-      id: COMPLETED_ACCOUNT.id,
-      email: COMPLETED_ACCOUNT.email,
-      role: COMPLETED_ACCOUNT.role,
+      ...COMPLETED_ACCOUNT,
       twoFactorRequirement: 'NotApplicable',
       twoFactorTicket: null,
-    })
+    }, KEK)
     // The component no longer writes to storage itself -- that is the caller's job now
     // (SessionProvider.iniciarSessao, wired in app/routing/router.tsx). Proof is onAuthenticated
     // being called with the right account, asserted above.
@@ -128,6 +193,7 @@ describe('MagicLinkCallback', () => {
       challenge: encodeBase64(CHALLENGE),
       relyingPartyId: RELYING_PARTY_ID,
       credentialId: encodeBase64(CREDENTIAL_ID),
+      accountId: COMPLETED_ACCOUNT.id,
     })
     const createCredential = vi.fn()
     const getCredential = vi.fn().mockResolvedValue({
@@ -135,6 +201,7 @@ describe('MagicLinkCallback', () => {
       clientDataJson: CLIENT_DATA_JSON,
       authenticatorData: AUTHENTICATOR_DATA,
       signature: SIGNATURE,
+      kek: KEK,
     })
     completeWebAuthnCeremonyMock.mockResolvedValue({ ok: true, account: COMPLETED_ACCOUNT })
     const onAuthenticated = vi.fn()
@@ -182,6 +249,7 @@ describe('MagicLinkCallback', () => {
       challenge: encodeBase64(CHALLENGE),
       relyingPartyId: RELYING_PARTY_ID,
       credentialId: null,
+      accountId: COMPLETED_ACCOUNT.id,
     })
     const createCredential = vi.fn().mockRejectedValue(new Error('NotAllowedError'))
     const getCredential = vi.fn()
@@ -202,11 +270,13 @@ describe('MagicLinkCallback', () => {
       challenge: encodeBase64(CHALLENGE),
       relyingPartyId: RELYING_PARTY_ID,
       credentialId: null,
+      accountId: COMPLETED_ACCOUNT.id,
     })
     const createCredential = vi.fn().mockResolvedValue({
       credentialId: CREDENTIAL_ID,
       clientDataJson: CLIENT_DATA_JSON,
       attestationObject: ATTESTATION_OBJECT,
+      kek: KEK,
     })
     const getCredential = vi.fn()
     completeWebAuthnCeremonyMock.mockResolvedValue({
@@ -232,6 +302,7 @@ describe('MagicLinkCallback', () => {
       challenge: encodeBase64(CHALLENGE),
       relyingPartyId: RELYING_PARTY_ID,
       credentialId: null,
+      accountId: COMPLETED_ACCOUNT.id,
     })
     const createCredential = vi.fn()
     const getCredential = vi.fn()
@@ -264,6 +335,7 @@ describe('MagicLinkCallback', () => {
       challenge: encodeBase64(CHALLENGE),
       relyingPartyId: RELYING_PARTY_ID,
       credentialId: null,
+      accountId: COMPLETED_ACCOUNT.id,
     })
 
     await vi.waitFor(() => expect(verifyMagicLinkMock).toHaveBeenCalledTimes(1))
@@ -280,11 +352,13 @@ describe('MagicLinkCallback', () => {
       challenge: encodeBase64(CHALLENGE),
       relyingPartyId: RELYING_PARTY_ID,
       credentialId: null,
+      accountId: COMPLETED_ACCOUNT.id,
     })
     const createCredential = vi.fn().mockResolvedValue({
       credentialId: CREDENTIAL_ID,
       clientDataJson: CLIENT_DATA_JSON,
       attestationObject: ATTESTATION_OBJECT,
+      kek: KEK,
     })
     let resolveComplete!: (value: Awaited<ReturnType<typeof accountApi.completeWebAuthnCeremony>>) => void
     completeWebAuthnCeremonyMock.mockReturnValue(
@@ -313,11 +387,13 @@ describe('MagicLinkCallback', () => {
       challenge: encodeBase64(CHALLENGE),
       relyingPartyId: RELYING_PARTY_ID,
       credentialId: null,
+      accountId: COMPLETED_ACCOUNT.id,
     })
     const createCredential = vi.fn().mockResolvedValue({
       credentialId: CREDENTIAL_ID,
       clientDataJson: CLIENT_DATA_JSON,
       attestationObject: ATTESTATION_OBJECT,
+      kek: KEK,
     })
     const getCredential = vi.fn()
     completeWebAuthnCeremonyMock.mockResolvedValue({ ok: true, account: COMPLETED_ACCOUNT })
@@ -336,6 +412,8 @@ describe('MagicLinkCallback', () => {
       </I18nProvider>,
     )
 
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar meu acesso' }))
+
     expect((await screen.findByRole('alert')).textContent).toBe(
       'Este link de acesso não é mais válido. Solicite um novo.',
     )
@@ -350,6 +428,7 @@ describe('MagicLinkCallback', () => {
       challenge: encodeBase64(CHALLENGE),
       relyingPartyId: RELYING_PARTY_ID,
       credentialId: null,
+      accountId: COMPLETED_ACCOUNT.id,
     })
     let rejectCreate!: (reason: unknown) => void
     const createCredential = vi.fn().mockReturnValue(

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { abrirMicrofone, type AbrirMicrofoneResult } from '../../features/live-session/microfone'
+import { abrirMicrofone, type AbrirMicrofoneResult } from '../../entities/consentimento/microfone'
 import type { EstadoConsentimento } from '../../entities/consentimento/api'
 
 // Andaime de e2e, nunca produção: consentimento-microfone.spec.ts clica "Gravar" e lê no DOM o

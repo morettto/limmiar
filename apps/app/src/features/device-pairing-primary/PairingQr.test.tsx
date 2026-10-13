@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import { I18nProvider } from '@lingui/react'
 import QRCode from 'qrcode'
 import { i18n, dynamicActivate } from '../../shared/i18n'
@@ -41,19 +41,27 @@ async function flushMicrotasks() {
   }
 }
 
-function renderPairingQr(onClaimed: (key: string, sessionId: string) => void = vi.fn(), onExpired?: () => void) {
-  return render(
+function pairingQr(onClaimed: (key: string, sessionId: string) => void = vi.fn(), onExpired?: () => void, primaryPublicKeyBase64 = PRIMARY_PUBLIC_KEY) {
+  return (
     <I18nProvider i18n={i18n}>
       <PairingQr
         baseUrl="http://api.test"
         accountId={ACCOUNT_ID}
         accessToken={ACCESS_TOKEN}
-        primaryPublicKeyBase64={PRIMARY_PUBLIC_KEY}
+        primaryPublicKeyBase64={primaryPublicKeyBase64}
         onClaimed={onClaimed}
         onExpired={onExpired}
       />
-    </I18nProvider>,
+    </I18nProvider>
   )
+}
+
+function renderPairingQr(onClaimed: (key: string, sessionId: string) => void = vi.fn(), onExpired?: () => void) {
+  return render(pairingQr(onClaimed, onExpired))
+}
+
+function displayingSession(sessionId: string, now = Date.now()) {
+  return { ok: true as const, sessionId, expiresAt: new Date(now + 60_000).toISOString() }
 }
 
 describe('PairingQr', () => {
@@ -282,6 +290,121 @@ describe('PairingQr', () => {
     toDataURLSpy.mockRestore()
   })
 
+  it('ignores a claim status that is not claimed or has no device key and keeps polling', async () => {
+    vi.useFakeTimers()
+    createPairingSessionMock.mockResolvedValue(displayingSession(SESSION_ID))
+    getPairingClaimStatusMock
+      .mockResolvedValueOnce({ ok: true, claimed: true, newDevicePublicKey: null })
+      .mockResolvedValueOnce({ ok: true, claimed: false, newDevicePublicKey: NEW_DEVICE_PUBLIC_KEY })
+      .mockResolvedValue({ ok: true, claimed: false, newDevicePublicKey: null })
+    const onClaimed = vi.fn()
+    const toDataURLSpy = mockToDataURLForFakeTimers()
+    renderPairingQr(onClaimed)
+    await flushMicrotasks()
+
+    await vi.advanceTimersByTimeAsync(3000)
+    await flushMicrotasks()
+
+    expect(getPairingClaimStatusMock).toHaveBeenCalledTimes(3)
+    expect(onClaimed).not.toHaveBeenCalled()
+    expect(screen.getByRole('img')).toBeTruthy()
+    toDataURLSpy.mockRestore()
+  })
+
+  it('stops polling when the component unmounts while displaying the QR', async () => {
+    vi.useFakeTimers()
+    createPairingSessionMock.mockResolvedValue(displayingSession(SESSION_ID))
+    getPairingClaimStatusMock.mockResolvedValue({ ok: true, claimed: false, newDevicePublicKey: null })
+    const toDataURLSpy = mockToDataURLForFakeTimers()
+    const { unmount } = renderPairingQr()
+    await flushMicrotasks()
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(getPairingClaimStatusMock).toHaveBeenCalledTimes(1)
+
+    unmount()
+    await vi.advanceTimersByTimeAsync(5000)
+
+    expect(getPairingClaimStatusMock).toHaveBeenCalledTimes(1)
+    toDataURLSpy.mockRestore()
+  })
+
+  it('delivers the claim to the latest onClaimed after a rerender', async () => {
+    vi.useFakeTimers()
+    createPairingSessionMock.mockResolvedValue(displayingSession(SESSION_ID))
+    getPairingClaimStatusMock.mockResolvedValue({ ok: true, claimed: true, newDevicePublicKey: NEW_DEVICE_PUBLIC_KEY })
+    const antigo = vi.fn()
+    const novo = vi.fn()
+    const toDataURLSpy = mockToDataURLForFakeTimers()
+    const view = renderPairingQr(antigo)
+    await flushMicrotasks()
+
+    view.rerender(pairingQr(novo))
+    await vi.advanceTimersByTimeAsync(1000)
+
+    expect(novo).toHaveBeenCalledWith(NEW_DEVICE_PUBLIC_KEY, SESSION_ID)
+    expect(antigo).not.toHaveBeenCalled()
+    toDataURLSpy.mockRestore()
+  })
+
+  it('restarts the pairing session when the primary key changes and not when nothing changes', async () => {
+    createPairingSessionMock.mockResolvedValue(displayingSession(SESSION_ID))
+    getPairingClaimStatusMock.mockResolvedValue({ ok: true, claimed: false, newDevicePublicKey: null })
+    const onClaimed = vi.fn()
+    const view = renderPairingQr(onClaimed)
+    await screen.findByRole('img')
+
+    view.rerender(pairingQr(onClaimed))
+    expect(createPairingSessionMock).toHaveBeenCalledTimes(1)
+
+    view.rerender(pairingQr(onClaimed, undefined, 'b3V0cmEtY2hhdmU='))
+    await waitFor(() => expect(createPairingSessionMock).toHaveBeenCalledTimes(2))
+    expect(createPairingSessionMock).toHaveBeenLastCalledWith('http://api.test', ACCOUNT_ID, ACCESS_TOKEN, 'b3V0cmEtY2hhdmU=')
+  })
+
+  it('never lets a late session of a previous key replace the current one', async () => {
+    let resolveOld: (result: deviceApi.CreatePairingSessionResult) => void = () => {}
+    createPairingSessionMock
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveOld = resolve }))
+      .mockResolvedValueOnce(displayingSession('session-new'))
+    getPairingClaimStatusMock.mockResolvedValue({ ok: true, claimed: false, newDevicePublicKey: null })
+    const toDataURLSpy = vi.spyOn(QRCode, 'toDataURL')
+    const onClaimed = vi.fn()
+    const view = renderPairingQr(onClaimed)
+    view.rerender(pairingQr(onClaimed, undefined, 'b3V0cmEtY2hhdmU='))
+    await screen.findByRole('img')
+    toDataURLSpy.mockClear()
+
+    resolveOld(displayingSession('session-old'))
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
+
+    expect(toDataURLSpy).not.toHaveBeenCalled()
+    expect((screen.getByLabelText('Código de pareamento') as HTMLTextAreaElement).value).toContain('session-new')
+    toDataURLSpy.mockRestore()
+  })
+
+  it('never lets a late QR of a previous key replace the current one', async () => {
+    createPairingSessionMock
+      .mockResolvedValueOnce(displayingSession('session-old'))
+      .mockResolvedValueOnce(displayingSession('session-new'))
+    getPairingClaimStatusMock.mockResolvedValue({ ok: true, claimed: false, newDevicePublicKey: null })
+    let resolveOldQr: (value: string) => void = () => {}
+    const toDataURLSpy = vi
+      .spyOn(QRCode, 'toDataURL')
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveOldQr = resolve }) as unknown as ReturnType<typeof QRCode.toDataURL>)
+    const onClaimed = vi.fn()
+    const view = renderPairingQr(onClaimed)
+    await waitFor(() => expect(toDataURLSpy).toHaveBeenCalledTimes(1))
+    view.rerender(pairingQr(onClaimed, undefined, 'b3V0cmEtY2hhdmU='))
+    await screen.findByRole('img')
+
+    resolveOldQr('data:image/png;base64,old')
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
+
+    expect((screen.getByLabelText('Código de pareamento') as HTMLTextAreaElement).value).toContain('session-new')
+    expect((screen.getByRole('img') as HTMLImageElement).src).not.toBe('data:image/png;base64,old')
+    toDataURLSpy.mockRestore()
+  })
+
   it('renders a translated error when createPairingSession fails', async () => {
     createPairingSessionMock.mockResolvedValue({ ok: false, code: 'auth.access_token_invalid', params: {} })
     renderPairingQr()
@@ -360,5 +483,36 @@ describe('PairingQr', () => {
     expect(getPairingClaimStatusMock).not.toHaveBeenCalled()
 
     toDataURLSpy.mockRestore()
+  })
+})
+
+describe('PairingQr: troca de idioma', () => {
+  afterEach(async () => {
+    cleanup()
+    vi.clearAllMocks()
+    await dynamicActivate('pt-BR')
+  })
+
+  it('retraduz o texto sem criar outra sessão de pareamento', async () => {
+    createPairingSessionMock.mockResolvedValue({ ok: true, sessionId: SESSION_ID, expiresAt: new Date(Date.now() + 60_000).toISOString() })
+    getPairingClaimStatusMock.mockResolvedValue({ ok: true, claimed: false, newDevicePublicKey: null })
+    renderPairingQr()
+    await screen.findByRole('img')
+
+    await act(() => dynamicActivate('en-US'))
+
+    expect((await screen.findByRole('img')).getAttribute('alt')).toBe('QR code to pair a new device')
+    expect(createPairingSessionMock).toHaveBeenCalledOnce()
+  })
+
+  it('retraduz o erro já mostrado', async () => {
+    createPairingSessionMock.mockResolvedValue({ ok: false, code: 'auth.access_token_invalid', params: {} })
+    renderPairingQr()
+    await screen.findByRole('alert')
+
+    await act(() => dynamicActivate('en-US'))
+
+    expect(screen.getByRole('alert').textContent).toBe('Your session has expired. Sign in again.')
+    expect(createPairingSessionMock).toHaveBeenCalledOnce()
   })
 })

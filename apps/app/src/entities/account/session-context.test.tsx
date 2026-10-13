@@ -3,7 +3,7 @@ import { cleanup, render, screen } from '@testing-library/react'
 import type { Account } from './account'
 import { SessionContext, useSession, type ContextoSessao } from './session-context'
 
-const ACCOUNT: Account = {
+const ACCOUNT: Account = {accessToken: 'test-access', refreshToken: 'test-refresh', accessTokenExpiresAt: '2099-01-01T00:00:00Z',
   id: '11111111-1111-1111-1111-111111111111',
   email: 'user@example.com',
   role: 'Professional',
@@ -33,7 +33,7 @@ describe('session-context', () => {
   })
 
   it('useSession inside a SessionContext.Provider returns the provided value', () => {
-    const value: ContextoSessao = { sessao: ACCOUNT, iniciarSessao: vi.fn(), terminarSessao: vi.fn() }
+    const value: ContextoSessao = {kek: null,  sessao: ACCOUNT, iniciarSessao: vi.fn(), terminarSessao: vi.fn() }
 
     render(
       <SessionContext.Provider value={value}>

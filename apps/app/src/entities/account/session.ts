@@ -15,24 +15,24 @@ export interface SessaoDeConta {
 }
 
 const PAPEIS: readonly AccountRole[] = ['Professional', 'Patient']
-const REQUISITOS_2FA: readonly TwoFactorRequirement[] = ['NotApplicable', 'SetupRequired', 'ChallengeRequired']
+// 'SetupRequired' fica de fora de propósito: um cadastro sem segundo fator concluído nunca é guardado.
+const REQUISITOS_2FA: readonly TwoFactorRequirement[] = ['NotApplicable', 'ChallengeRequired']
 
-// Valida os quatro campos que o predicado promete (valor is Account), não só `id` -- um
-// sessionStorage editável no DevTools não deve conseguir forjar um `role`/`twoFactorRequirement`
-// que o compilador depois trata como garantido em quem ler `sessao` do contexto.
+// Stored metadata never grants access: the API still validates the bearer token.
 function ehConta(valor: unknown): valor is Account {
-  if (typeof valor !== 'object' || valor === null) {
+  if (!valor) {
     return false
   }
-  const { id, email, role, twoFactorRequirement } = valor as Partial<Account>
+  const { id, email, role, twoFactorRequirement, accessToken, refreshToken, accessTokenExpiresAt } = valor as Partial<Account>
   return (
     typeof id === 'string' &&
     id !== '' &&
-    typeof email === 'string' &&
-    role !== undefined &&
-    PAPEIS.includes(role) &&
-    twoFactorRequirement !== undefined &&
-    REQUISITOS_2FA.includes(twoFactorRequirement)
+    (role === 'Patient' ? email === null : typeof email === 'string' && email.trim() !== '') &&
+    PAPEIS.includes(role as AccountRole) &&
+    REQUISITOS_2FA.includes(twoFactorRequirement as TwoFactorRequirement) &&
+    typeof accessToken === 'string' && accessToken !== '' &&
+    typeof refreshToken === 'string' && refreshToken !== '' &&
+    typeof accessTokenExpiresAt === 'string' && Number.isFinite(Date.parse(accessTokenExpiresAt))
   )
 }
 
@@ -42,6 +42,7 @@ export function criarSessaoDeConta(storage: KeyValueStorage): SessaoDeConta {
   return {
     ler() {
       const raw = storage.getItem(SESSION_STORAGE_KEY)
+      // Stryker disable next-line ConditionalExpression,BlockStatement: equivalent, JSON.parse(null) is null, which ehConta refuses.
       if (raw === null) {
         return null
       }
@@ -49,6 +50,7 @@ export function criarSessaoDeConta(storage: KeyValueStorage): SessaoDeConta {
       let parsed: unknown
       try {
         parsed = JSON.parse(raw)
+        // Stryker disable next-line BlockStatement: equivalent, an unparsed value stays undefined, which ehConta refuses.
       } catch {
         return null
       }
@@ -56,15 +58,13 @@ export function criarSessaoDeConta(storage: KeyValueStorage): SessaoDeConta {
       if (!ehConta(parsed)) {
         return null
       }
-      // Campo a campo, não `{ ...parsed }`: o spread deixaria entrar num `Account` o que o
-      // DevTools escrevesse a mais no storage (S18-11). `twoFactorTicket` sai sempre null --
-      // uma sessão gravada antes do S18-07 ainda pode ter um ticket lá. Ver README.
-      const { id, email, role, twoFactorRequirement } = parsed
-      return { id, email, role, twoFactorRequirement, twoFactorTicket: null }
+      const { id, email, role, twoFactorRequirement, accessToken, refreshToken, accessTokenExpiresAt } = parsed
+      return { id, email, role, twoFactorRequirement, twoFactorTicket: null, accessToken, refreshToken, accessTokenExpiresAt }
     },
     registar(account) {
-      const { twoFactorTicket: _twoFactorTicket, ...semTicket } = account
-      storage.setItem(SESSION_STORAGE_KEY, JSON.stringify(semTicket))
+      if (!ehConta(account)) throw new Error('Cannot persist an incomplete authentication')
+      const { id, email, role, twoFactorRequirement, accessToken, refreshToken, accessTokenExpiresAt } = account
+      storage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ id, email, role, twoFactorRequirement, accessToken, refreshToken, accessTokenExpiresAt }))
     },
     terminar() {
       storage.removeItem(SESSION_STORAGE_KEY)

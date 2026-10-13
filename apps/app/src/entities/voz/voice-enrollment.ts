@@ -1,0 +1,81 @@
+import { t } from '@lingui/core/macro'
+import { type CryptoKey } from '@limmiar/crypto'
+import { request, type ProblemResult } from '../../shared/api'
+import { decodeBase64, encodeBase64 } from '../../shared/lib/base64'
+import { selarEmbedding } from './voice-crypto'
+
+type VoiceEnrollmentResult = { ok: true } | ProblemResult
+
+function voiceEnrollmentPath(accountId: string): string {
+  return `/accounts/${accountId}/voice-enrollment`
+}
+
+// wrappedDek/sealedEmbedding are opaque bytes end to end, same convention as
+// createPatient's wrappedDek/ciphertext -- the raw embedding is never a request property of
+// its own.
+export async function cadastrarVoz(
+  baseUrl: string,
+  accountId: string,
+  token: string,
+  kek: CryptoKey,
+  embedding: readonly number[],
+): Promise<VoiceEnrollmentResult> {
+  const { wrappedDek, sealedEmbedding } = await selarEmbedding(kek, accountId, embedding)
+
+  const result = await request(
+    baseUrl,
+    'PUT',
+    voiceEnrollmentPath(accountId),
+    { wrappedDek: encodeBase64(wrappedDek), sealedEmbedding: encodeBase64(sealedEmbedding) },
+    token,
+  )
+
+  if (!result.ok) {
+    return result
+  }
+  if (result.response.status !== 204) throw new Error(t`Resposta de voz inválida.`)
+  return { ok: true }
+}
+
+export type ObterCadastroVozResult =
+  | { ok: true; wrappedDek: Uint8Array<ArrayBuffer>; sealedEmbedding: Uint8Array<ArrayBuffer> }
+  | ProblemResult
+
+export async function obterCadastroVoz(
+  baseUrl: string,
+  accountId: string,
+  token: string,
+): Promise<ObterCadastroVozResult> {
+  const result = await request(baseUrl, 'GET', voiceEnrollmentPath(accountId), undefined, token)
+
+  if (!result.ok) {
+    return result
+  }
+
+  if (result.response.status !== 200) throw new Error(t`Resposta de voz inválida.`)
+  const body: unknown = await result.response.json()
+  if (typeof body !== 'object' || body === null || !('wrappedDek' in body) || !('sealedEmbedding' in body) ||
+      typeof body.wrappedDek !== 'string' || typeof body.sealedEmbedding !== 'string') throw new Error(t`Resposta de voz inválida.`)
+  const wrappedDek = decodeBase64(body.wrappedDek)
+  const sealedEmbedding = decodeBase64(body.sealedEmbedding)
+  if (wrappedDek.length !== 60 || sealedEmbedding.length !== 796) throw new Error(t`Resposta de voz inválida.`)
+  return {
+    ok: true,
+    wrappedDek,
+    sealedEmbedding,
+  }
+}
+
+export async function removerCadastroVoz(
+  baseUrl: string,
+  accountId: string,
+  token: string,
+): Promise<VoiceEnrollmentResult> {
+  const result = await request(baseUrl, 'DELETE', voiceEnrollmentPath(accountId), undefined, token)
+
+  if (!result.ok) {
+    return result
+  }
+  if (result.response.status !== 204) throw new Error(t`Resposta de voz inválida.`)
+  return { ok: true }
+}

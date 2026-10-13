@@ -1,6 +1,6 @@
 import '@vitest/web-worker'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { I18nProvider } from '@lingui/react'
 import { dynamicActivate, i18n } from '../../shared/i18n'
 import { encodeBase64 } from '../../shared/lib/base64'
@@ -106,6 +106,7 @@ function nota(overrides: Partial<Nota> = {}): Nota {
   return {
     id: 'nota-1',
     patientId: 'p-sem-sumario',
+    atendimentoId: 'atendimento-1',
     revisao: 0,
     frases: ORDEM_SECOES.map((secao) => ({ id: `${secao}-0`, secao, texto: '', ancoras: [] })),
     estado: ESTADO_PENDENTE,
@@ -114,6 +115,63 @@ function nota(overrides: Partial<Nota> = {}): Nota {
 }
 
 describe('PainelProfissional', () => {
+  it('abre encontros e pendências por ID, separa hoje e próximos dias, e trava ações durante captura', async () => {
+    const primeira = sessaoEm1h('p-1')
+    const segunda = { ...primeira, sessionId: 's-2', patientId: 'p-2', inicioEm: new Date(Date.now() + 48 * 3600000).toISOString() }
+    const fetch = fetchMockPadrao(['p-1', 'p-2'], [primeira, segunda])
+    fetch.mockImplementation((url: string) => Promise.resolve(url.includes('/agenda/sessions') ? agendaResponse([primeira, segunda])
+      : url.includes('/consents') ? new Response(JSON.stringify({ gravacao: 'pendente', analiseIa: 'concedido' })) : patientsResponse(['p-1', 'p-2'])))
+    vi.stubGlobal('fetch', fetch)
+    const openSummaries = vi.fn().mockResolvedValue([
+      { patientId: 'p-1', ok: true, name: 'Amelia', risk: 'elevado' },
+      { patientId: 'p-2', ok: true, name: 'Bruno', risk: 'baixo' },
+    ])
+    const onStart = vi.fn(); const onOpenItem = vi.fn()
+    const props = { openSummaries, onStart, onOpenItem, notas: [nota({ patientId: 'p-1' })] }
+    const view = renderPainel(props)
+    fireEvent.click(await screen.findByRole('button', { name: /Iniciar próxima: Amelia/ }))
+    expect(onStart).toHaveBeenLastCalledWith('p-1', 's-1')
+    const hoje = within(screen.getByRole('region', { name: 'Hoje' }))
+    if (new Date(primeira.inicioEm).toDateString() === new Date().toDateString()) expect(hoje.getByRole('button', { name: /Amelia/ })).toBeTruthy()
+    fireEvent.click(within(screen.getByRole('region', { name: 'Próximos dias' })).getByRole('button', { name: /Bruno/ }))
+    expect(onStart).toHaveBeenLastCalledWith('p-2', 's-2')
+    fireEvent.click(screen.getByRole('button', { name: 'Requer você' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Amelia · Assinar nota pendente' }))
+    expect(onOpenItem).toHaveBeenLastCalledWith('p-1', 'atendimento-1')
+    fireEvent.click(screen.getByRole('button', { name: 'Amelia · Revisar risco' }))
+    expect(onOpenItem).toHaveBeenLastCalledWith('p-1', undefined)
+    fireEvent.click(screen.getByRole('button', { name: 'Bruno · Revisar consentimento' }))
+    expect(onOpenItem).toHaveBeenLastCalledWith('p-2', undefined)
+    view.rerender(elementoPainel({ ...props, versao: 1 }))
+    await waitFor(() => expect(openSummaries).toHaveBeenCalledTimes(2))
+  })
+
+  it('não permite iniciar encontro sem sumário decifrado mesmo com ação conectada', async () => {
+    vi.stubGlobal('fetch', fetchMockPadrao(['p-1'], [sessaoEm1h('p-1')]))
+    const onStart = vi.fn()
+    renderPainel({ onStart, openSummaries: vi.fn().mockResolvedValue([{ patientId: 'p-1', ok: false }]) })
+    expect(await screen.findByRole('button', { name: /Iniciar próxima sessão às/ })).toHaveProperty('disabled', true)
+    const encontro = within(screen.getByRole('region', { name: 'Painel do consultório' })).getAllByRole('button', { name: /Paciente/ })[0]!
+    expect(encontro).toHaveProperty('disabled', true)
+    expect(onStart).not.toHaveBeenCalled()
+  })
+
+  it('a ação principal não inventa paciente quando não há sessão, mesmo diante de evento tardio', async () => {
+    vi.stubGlobal('fetch', fetchMockPadrao([]))
+    const onStart = vi.fn()
+    const view = renderPainel({ onStart, openSummaries: vi.fn().mockResolvedValue([]) })
+    const button = await screen.findByRole('button', { name: /Iniciar próxima sessão/ })
+    button.removeAttribute('disabled')
+    fireEvent.click(button)
+    expect(onStart).not.toHaveBeenCalled()
+    view.unmount()
+    vi.stubGlobal('fetch', fetchMockPadrao(['p-1'], [sessaoEm1h('p-1')]))
+    renderPainel({ openSummaries: vi.fn().mockResolvedValue([{ patientId: 'p-1', ok: true, name: 'Amelia', risk: 'baixo' }]) })
+    const desconectada = await screen.findByRole('button', { name: /Iniciar próxima: Amelia/ })
+    desconectada.removeAttribute('disabled')
+    fireEvent.click(desconectada)
+    expect(onStart).not.toHaveBeenCalled()
+  })
   beforeAll(async () => {
     await dynamicActivate('pt-BR')
     stubMatchMedia()
@@ -146,7 +204,7 @@ describe('PainelProfissional', () => {
     renderPainel({ openSummaries })
 
     const hora = horaDaSessao(sessao.inicioEm, 'pt-BR')
-    const botao = await screen.findByRole('button', { name: new RegExp(`Amelia.*${hora}`) })
+    const botao = await screen.findByRole('button', { name: new RegExp(`Iniciar próxima: Amelia.*${hora}`) })
     expect(botao).toBeTruthy()
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining('/accounts/acc-1/agenda/sessions?from='),
@@ -341,7 +399,7 @@ describe('PainelProfissional', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Requer você' }))
     const itens = screen.getAllByRole('listitem')
     expect(itens).toHaveLength(1)
-    expect(itens[0].textContent).toBe('Paciente')
+    expect(itens[0].textContent).toBe('Paciente · Assinar nota pendente')
   })
 
   it('critério 2: trocar de conta nunca mostra os dados da conta anterior', async () => {
@@ -573,5 +631,49 @@ describe('PainelProfissional', () => {
     consentsCall.resolve(consentimentosResponse())
     await consentsCall.promise
     await Promise.resolve()
+  })
+
+  it('lista só encontros que ainda não começaram, separa hoje dos outros dias e conta os da semana', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2026, 9, 11, 12, 0, 0))
+    const em = (sessionId: string, patientId: string, inicio: Date): SessaoAgendada => ({ sessionId, patientId, inicioEm: inicio.toISOString(), duracaoMinutos: 50 })
+    const sessoes = [em('passada', 'p-1', new Date(2026, 9, 11, 11, 0)), em('agora', 'p-2', new Date(2026, 9, 11, 12, 0)),
+      em('tarde', 'p-3', new Date(2026, 9, 11, 15, 0)), em('amanha', 'p-4', new Date(2026, 9, 12, 9, 0))]
+    vi.stubGlobal('fetch', fetchMockPadrao(['p-1', 'p-2', 'p-3', 'p-4'], sessoes))
+    const nomes = { 'p-1': 'Ana', 'p-2': 'Bia', 'p-3': 'Caio', 'p-4': 'Dora' }
+    const openSummaries = vi.fn().mockResolvedValue(Object.entries(nomes).map(([patientId, name]) => ({ patientId, ok: true, name, risk: 'baixo' })))
+    renderPainel({ openSummaries, onStart: vi.fn() })
+    const hoje = await screen.findByRole('region', { name: 'Hoje' })
+    const nomesDe = (regiao: HTMLElement) => within(regiao).queryAllByRole('button').map((botao) => botao.querySelector('span')!.textContent)
+    await waitFor(() => expect(nomesDe(hoje)).toEqual(['Bia', 'Caio']))
+    expect(nomesDe(screen.getByRole('region', { name: 'Próximos dias' }))).toEqual(['Dora'])
+    expect(screen.getByText('Sessões na semana').parentElement!.textContent).toBe('Sessões na semana3')
+  })
+
+  it('mostra cada falha de fonte com o texto próprio e a lista de pendências com nome', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.reject(new Error('offline'))))
+    renderPainel({ openSummaries: vi.fn() })
+    await screen.findByText('Não foi possível carregar o painel. Tente novamente.')
+    expect(screen.getByText('Não foi possível carregar a agenda.')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Requer você' }))
+    expect(screen.getByRole('list', { name: 'Requer você' })).toBeTruthy()
+  })
+
+  it('a resposta tardia de uma conta anterior não substitui o painel da atual', async () => {
+    vi.stubGlobal('fetch', fetchMockPadrao(['p-1']))
+    const antiga = deferred<SummaryResult[]>()
+    const openSummaries = vi.fn().mockReturnValueOnce(antiga.promise).mockResolvedValue([{ patientId: 'p-1', ok: true, name: 'Atual', risk: 'baixo' }])
+    const props = { openSummaries, notas: [nota({ patientId: 'p-1' })], onOpenItem: vi.fn() }
+    const view = renderPainel(props)
+    await waitFor(() => expect(openSummaries).toHaveBeenCalledTimes(1))
+    view.rerender(elementoPainel({ ...props, chaveiro: { ...CHAVEIRO_PADRAO, accountId: 'acc-2' } }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Requer você' }))
+    await screen.findByRole('button', { name: 'Atual · Assinar nota pendente' })
+
+    await act(async () => antiga.resolve([{ patientId: 'p-1', ok: true, name: 'Antiga', risk: 'baixo' }]))
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)) })
+
+    expect(screen.queryByText(/Antiga/)).toBeNull()
+    expect(screen.getByRole('button', { name: 'Atual · Assinar nota pendente' })).toBeTruthy()
   })
 })

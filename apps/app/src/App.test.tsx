@@ -9,8 +9,6 @@ describe('App — locale switch survives an active recording session (D18)', () 
   })
 
   it('does not reload the document and preserves in-memory session state across a locale switch', async () => {
-    vi.spyOn(window.navigator, 'languages', 'get').mockReturnValue(['pt-BR'])
-
     // jsdom hardens window.location.reload against redefinition, so it cannot be spied on. The
     // no-reload guarantee is proven structurally instead: the DOM root and an unrelated piece of
     // in-memory state both survive the switch, which a reload would have destroyed.

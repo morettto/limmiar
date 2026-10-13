@@ -1,6 +1,10 @@
 {
+  // Ambiente de teste (docs/ambiente-de-teste.md): o app sai em https://limmiar-app.<subdomínio>.workers.dev.
+  // O nome do Worker é por conta Cloudflare; as origens da API e do copiloto entram no build (VITE_*), não aqui.
   "name": "limmiar-app",
   "compatibility_date": "2026-08-02",
+  "workers_dev": true,
+  "preview_urls": false,
   "assets": {
     "directory": "./dist",
     "not_found_handling": "single-page-application"

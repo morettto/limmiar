@@ -2,40 +2,29 @@
 
 ## Responsabilidade
 
-Monta a tela de configuração do copiloto de IA na rota `/settings/copilot`
-(`app/routing/router.tsx`, `copilotSettingsRoute`): liga a sessão real e o navegador ao
-formulário BYOK de `features/copilot-byok/CopilotKeySetup`.
+Telas de configuração da conta profissional. `CopilotPage` monta a rota `/settings/copilot`
+(`app/routing/router.tsx`, `copilotSettingsRoute`): a única opção é o interruptor que liga ou
+desliga o envio dos votos "útil / não útil" do copiloto
+(`features/consentimento-votos/ConsentimentoVotos`).
 
 ## Fluxo principal
 
-1. `CopilotKeyPage` lê `useSession()` (`entities/account/session-context.tsx`) diretamente,
-   sem receber `accountId` por prop.
-2. Renderiza `<CopilotKeySetup accountId={sessao?.id ?? null} kek={null} onDone={onDone} />`.
-   `accountId` nunca colapsa para `''` -- `null` sem sessão é o mesmo `null` que
-   `CopilotKeySetup` já trata no ramo trancado junto com `kek === null` (ver
-   `features/copilot-byok/README.md`).
-3. `kek` continua fixo em `null`: não há ainda nenhum `KeychainProvider` montado na app, então
-   `CopilotKeySetup` mostra sempre o ramo "Chaveiro bloqueado" com o botão "Pular".
-4. `onDone` chama `useNavigate()` para voltar a `/`.
+1. `CopilotRouteComponent` (`router.tsx`) exige conta profissional: sem sessão ou com conta de
+   paciente redireciona para `/`. Com ela, monta `CopilotPage` com o `accountId` da sessão --
+   o mesmo molde de `/settings/audit` e `/settings/voice`.
+2. `CopilotPage` mostra o título, um aviso de que os votos ficam
+   cifrados neste aparelho e só saem se a opção estiver ligada, e o interruptor.
+3. A escolha é por conta, em `localStorage` (`entities/insight/consentimento-voto.ts`). A primeira
+   pergunta aparece no primeiro voto, em `features/live-session/LiveInsights`.
 
 ## Pontos de entrada
 
-- `CopilotKeyPage()` -- componente React, sem props. Lê a sessão via `useSession()`
-  (`entities/account/session-context.tsx`) em vez de receber `accountId` por parâmetro.
-- Montada em `/settings/copilot` via `copilotSettingsRoute` (`app/routing/router.tsx`), sem
-  route component intermédio -- `copilotSettingsRoute.component = CopilotKeyPage`
-  diretamente.
+- `CopilotPage({ accountId })` (`CopilotPage.tsx`).
+- `AuditPage` (`AuditPage.tsx`) e `VoicePage` (`VoicePage.tsx`), montadas por
+  `/settings/audit` e `/settings/voice`.
 
-## Decisões recentes relevantes
+## Decisões relevantes
 
-- **`CopilotKeyPage` deixou de receber `accountId` como prop e passou a ler `useSession()`
-  diretamente (S18-10).** Até então, um `CopilotKeyRouteComponent` em
-  `app/routing/router.tsx` chamava `useSession()` e repassava `accountId` como prop (S18-01),
-  por causa da regra `fsd-pages-no-app` (`pages` não podia importar `app`). Com
-  `SessionContext`/`useSession()` descidos para `entities/account/session-context.tsx`, o
-  wrapper deixou de ter função e foi apagado.
-- **`accountId` nunca colapsa para `''` (S18-04).** A versão anterior a este ticket já tinha
-  corrigido `accountId ?? ''` para manter `string | null` de ponta a ponta, porque `''` é a
-  sentinela que `assertAccountId` (`features/copilot-byok/key-store.ts`) rejeita; a leitura
-  direta via `useSession().sessao?.id ?? null` introduzida no S18-10 preserva esse mesmo tipo,
-  sem reintroduzir a sentinela.
+- **A configuração de chave de API (BYOK) foi retirada da V1.** A página de chave, o
+  formulário e o armazenamento da chave e o teste de CORS dos provedores saíram juntos; a chamada ao copiloto
+  vai só para o orquestrador do produto, na mesma origem do app.

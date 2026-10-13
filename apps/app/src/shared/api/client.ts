@@ -12,7 +12,7 @@ async function readProblem(response: Response): Promise<ProblemResult> {
 // body, since which fields to pull — and whether there is a body — differs per endpoint.
 export async function request(
   baseUrl: string,
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
   path: string,
   body?: unknown,
   accessToken?: string,
@@ -26,7 +26,7 @@ export async function request(
 
 async function sendRequest(
   baseUrl: string,
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
   path: string,
   body?: unknown,
   accessToken?: string,

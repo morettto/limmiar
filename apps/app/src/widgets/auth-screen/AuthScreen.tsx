@@ -1,33 +1,36 @@
 import { useId, useState } from 'react'
 import { Trans, useLingui } from '@lingui/react/macro'
-import { translateProblemCode } from '../../shared/api'
+import type { MessageDescriptor } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
+import { problemMessage } from '../../shared/api'
 import {
   continueWithGoogle,
   deriveEmailPasswordVerifier,
   deriveEmailSalt,
+  deriveAccountKek,
+  login,
   register,
-  requestMagicLink,
   type Account,
   type AccountRole,
 } from '../../entities/account'
 import { TotpChallenge } from '../../features/totp-challenge/TotpChallenge'
+import { MagicLinkCallback } from '../../features/magic-link-auth/MagicLinkCallback'
 import { TotpSetup } from '../../features/totp-enrollment/TotpSetup'
 
 export interface AuthScreenProps {
   baseUrl: string
-  getGoogleIdToken: () => Promise<string>
-  onAuthenticated?: (account: Account) => void
+  getGoogleIdToken?: () => Promise<string>
+  onAuthenticated?: (account: Account, kek?: CryptoKey) => void
   initialRole?: AccountRole
 }
 
 const DEFAULT_ROLE: AccountRole = 'Professional'
 
 type SubmitState =
-  | { status: 'idle' }
   | { status: 'submitting' }
-  | { status: 'error'; message: string }
+  | { status: 'error'; message: MessageDescriptor }
   | { status: 'success'; account: Account }
-  | { status: 'magic-link-sent' }
+  | { status: 'patient-invitation'; token: string }
   | { status: 'totp-setup'; account: Account }
   | { status: 'totp-challenge'; account: Account }
 
@@ -37,14 +40,23 @@ export function AuthScreen({ baseUrl, getGoogleIdToken, onAuthenticated, initial
   const [role, setRole] = useState<AccountRole>(initialRole ?? DEFAULT_ROLE)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [state, setState] = useState<SubmitState>({ status: 'idle' })
+  const [invitation, setInvitation] = useState('')
+  const [mode, setMode] = useState<{ status: 'register' | 'login' }>({ status: 'register' })
+  const [kek, setKek] = useState<CryptoKey | undefined>()
+  const [state, setState] = useState<SubmitState | null>(null)
 
-  function handleAuthenticated(account: Account) {
-    onAuthenticated?.(account)
+  function handleAuthenticated(account: Account, key?: CryptoKey) {
+    if (key === undefined) onAuthenticated?.(account)
+    else onAuthenticated?.(account, key)
     setState({ status: 'success', account })
   }
 
-  function handleAccountResult(account: Account) {
+  function handleAccountResult(account: Account, key?: CryptoKey) {
+    if (account.role !== 'Professional' || account.email === null) {
+      setState({ status: 'error', message: problemMessage('unexpected_error', {}) })
+      return
+    }
+    setKek(key)
     switch (account.twoFactorRequirement) {
       case 'SetupRequired':
         setState({ status: 'totp-setup', account })
@@ -53,44 +65,46 @@ export function AuthScreen({ baseUrl, getGoogleIdToken, onAuthenticated, initial
         setState({ status: 'totp-challenge', account })
         break
       case 'NotApplicable':
-        handleAuthenticated(account)
+        handleAuthenticated(account, key)
         break
     }
   }
 
   function handleFailure(code: string, params: Record<string, string>) {
-    setState({ status: 'error', message: translateProblemCode(code, params, i18n) })
+    setState({ status: 'error', message: problemMessage(code, params) })
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setState({ status: 'submitting' })
-
+    try {
     if (role === 'Patient') {
-      const result = await requestMagicLink(baseUrl, { email })
-      if (result.ok) {
-        setState({ status: 'magic-link-sent' })
-      } else {
-        handleFailure(result.code, result.params)
-      }
+      setState({ status: 'patient-invitation', token: invitation.trim().toUpperCase() })
       return
     }
 
     const salt = await deriveEmailSalt(email)
     const passwordVerifier = await deriveEmailPasswordVerifier(password, salt)
-    const result = await register(baseUrl, { email, passwordVerifier, role })
+    const result = mode.status === 'login'
+      ? await login(baseUrl, { email, passwordVerifier })
+      : await register(baseUrl, { email, passwordVerifier, role })
 
     if (result.ok) {
-      handleAccountResult(result.account)
+      const key = await deriveAccountKek(password, email)
+      setPassword('')
+      handleAccountResult(result.account, key)
     } else {
       handleFailure(result.code, result.params)
     }
+    } catch {
+      setState({ status: 'error', message: msg`Não foi possível conectar. Tente novamente.` })
+    }
   }
 
-  async function handleGoogleClick() {
+  async function handleGoogleClick(getToken: () => Promise<string>) {
     setState({ status: 'submitting' })
-
-    const idToken = await getGoogleIdToken()
+    try {
+    const idToken = await getToken()
     const result = await continueWithGoogle(baseUrl, { idToken, requestedRole: role })
 
     if (result.ok) {
@@ -98,9 +112,12 @@ export function AuthScreen({ baseUrl, getGoogleIdToken, onAuthenticated, initial
     } else {
       handleFailure(result.code, result.params)
     }
+    } catch {
+      setState({ status: 'error', message: msg`Não foi possível continuar com o Google. Tente novamente.` })
+    }
   }
 
-  if (state.status === 'totp-setup') {
+  if (state?.status === 'totp-setup') {
     // twoFactorTicket is non-null here: the backend always sets it when
     // twoFactorRequirement is not 'NotApplicable'.
     return (
@@ -108,43 +125,45 @@ export function AuthScreen({ baseUrl, getGoogleIdToken, onAuthenticated, initial
         baseUrl={baseUrl}
         accountId={state.account.id}
         ticket={state.account.twoFactorTicket!}
-        onDone={() => handleAuthenticated(state.account)}
+        onDone={(tokens) => handleAuthenticated({
+          ...state.account, ...tokens, twoFactorRequirement: 'ChallengeRequired', twoFactorTicket: null,
+        }, kek)}
       />
     )
   }
 
-  if (state.status === 'totp-challenge') {
+  if (state?.status === 'totp-challenge') {
     return (
       <TotpChallenge
         baseUrl={baseUrl}
         accountId={state.account.id}
         ticket={state.account.twoFactorTicket!}
-        onVerified={handleAuthenticated}
+        onVerified={(account) => handleAuthenticated(account, kek)}
       />
     )
   }
 
-  if (state.status === 'magic-link-sent') {
-    return (
-      <div className="mx-auto max-w-sm p-4">
-        <p role="status">
-          <Trans>Verifique seu e-mail para continuar. Enviamos um link de acesso, se este e-mail existir.</Trans>
-        </p>
-      </div>
-    )
-  }
+  if (state?.status === 'patient-invitation') return <MagicLinkCallback baseUrl={baseUrl} token={state.token} onAuthenticated={handleAuthenticated} />
 
-  const isSubmitting = state.status === 'submitting'
+  const isSubmitting = state?.status === 'submitting'
 
   return (
     <div className="mx-auto max-w-sm p-4">
-      {state.status === 'success' ? (
+      {role === 'Professional' ? (
+        <div className="mb-4 flex gap-4">
+          <button type="button" disabled={isSubmitting} aria-pressed={mode.status === 'login'}
+            onClick={() => { setMode({ status: 'login' }); setState(null) }}>
+            <Trans>Entrar</Trans>
+          </button>
+          <button type="button" disabled={isSubmitting} aria-pressed={mode.status === 'register'}
+            onClick={() => { setMode({ status: 'register' }); setState(null) }}>
+            <Trans>Cadastrar</Trans>
+          </button>
+        </div>
+      ) : null}
+      {state?.status === 'success' ? (
         <p role="status">
-          {state.account.role === 'Professional' ? (
-            <Trans>Conta criada. Você está cadastrado como profissional.</Trans>
-          ) : (
-            <Trans>Conta criada. Você está cadastrado como paciente.</Trans>
-          )}
+          <Trans>Conta criada. Você está cadastrado como profissional.</Trans>
         </p>
       ) : null}
 
@@ -184,7 +203,10 @@ export function AuthScreen({ baseUrl, getGoogleIdToken, onAuthenticated, initial
       </fieldset>
 
       <form onSubmit={(event) => void handleSubmit(event)}>
-        <label className="mb-2 block">
+        {role === 'Patient' ? <label className="mb-4 block">
+          <span><Trans>Código de acesso recebido do profissional</Trans></span>
+          <input required autoComplete="off" value={invitation} onChange={(event) => setInvitation(event.target.value)} />
+        </label> : <label className="mb-2 block">
           <span className="mb-1 block text-sm font-medium">
             <Trans>E-mail</Trans>
           </span>
@@ -195,7 +217,7 @@ export function AuthScreen({ baseUrl, getGoogleIdToken, onAuthenticated, initial
             onChange={(event) => setEmail(event.target.value)}
             className="w-full rounded-md border border-neutral-300 px-3 py-2"
           />
-        </label>
+        </label>}
         {role === 'Professional' ? (
           <label className="mb-4 block">
             <span className="mb-1 block text-sm font-medium">
@@ -204,6 +226,7 @@ export function AuthScreen({ baseUrl, getGoogleIdToken, onAuthenticated, initial
             <input
               type="password"
               required
+              autoComplete={mode.status === 'login' ? 'current-password' : 'new-password'}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               className="w-full rounded-md border border-neutral-300 px-3 py-2"
@@ -211,9 +234,9 @@ export function AuthScreen({ baseUrl, getGoogleIdToken, onAuthenticated, initial
           </label>
         ) : null}
 
-        {state.status === 'error' ? (
+        {state?.status === 'error' ? (
           <p role="alert" className="mb-4 text-sm text-red-700">
-            {state.message}
+            {i18n._(state.message)}
           </p>
         ) : null}
 
@@ -222,16 +245,20 @@ export function AuthScreen({ baseUrl, getGoogleIdToken, onAuthenticated, initial
           disabled={isSubmitting}
           className="mb-2 w-full rounded-md bg-neutral-900 px-4 py-2 text-white"
         >
-          {role === 'Professional' ? <Trans>Criar conta</Trans> : <Trans>Enviar link mágico</Trans>}
+          {role === 'Professional'
+            ? mode.status === 'login' ? <Trans>Acessar conta</Trans> : <Trans>Criar conta</Trans>
+            : <Trans>Continuar com meu código</Trans>}
         </button>
+        {role === 'Professional' && getGoogleIdToken !== undefined ? (
         <button
           type="button"
           disabled={isSubmitting}
-          onClick={() => void handleGoogleClick()}
+          onClick={() => void handleGoogleClick(getGoogleIdToken)}
           className="w-full rounded-md border border-neutral-300 px-4 py-2"
         >
           <Trans>Continuar com o Google</Trans>
         </button>
+        ) : null}
       </form>
     </div>
   )

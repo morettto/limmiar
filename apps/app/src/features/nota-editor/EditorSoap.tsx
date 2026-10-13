@@ -11,9 +11,10 @@ export interface EditorSoapProps {
   onChange: (nota: Nota) => void
   /** Vem do reprodutor real (fatia 3, `features/nota-audio/reprodutor.ts`), repassado sem
    *  alteração até `Citacao`. */
-  aoTocar: (ancora: Ancora) => void
+  aoTocar?: (ancora: Ancora) => void
   /** Assinar de facto (fatia 4) fica por conta do chamador; aqui só se garante o atalho. */
   aoAssinar: (nota: Nota) => void
+  aoAbrirTranscricao?(transcriptId: string, revisao: number): void
 }
 
 /**
@@ -21,7 +22,7 @@ export interface EditorSoapProps {
  * `Citacao` por âncora de cada frase. `⌘↵`/`Ctrl+↵` (ver `ehAtalhoAssinar`, `./atalho-assinar.ts`)
  * disparam `aoAssinar(nota)` a partir de qualquer ponto do editor.
  */
-export function EditorSoap({ nota, onChange, aoTocar, aoAssinar }: EditorSoapProps) {
+export function EditorSoap({ nota, onChange, aoTocar, aoAssinar, aoAbrirTranscricao }: EditorSoapProps) {
   const { t } = useLingui()
   const assinada = nota.estado === ESTADO_ASSINADA
   const rotulos: Record<SecaoSoap, string> = {
@@ -59,6 +60,18 @@ export function EditorSoap({ nota, onChange, aoTocar, aoAssinar }: EditorSoapPro
                     <Citacao key={indiceAncora} ancora={ancora} aoTocar={aoTocar} />
                   ))}
                 </div>
+                {frase.referencias?.map(referencia => {
+                  const pagina = referencia.pagina
+                  const paragrafo = referencia.paragrafo
+                  const revisao = referencia.revisaoTranscricao + 1
+                  return <details key={`${referencia.trechoId}:${referencia.transcriptId}:${referencia.revisaoTranscricao}`} className="insight-source">
+                    <summary>{t`Referência bibliográfica`} · {referencia.titulo}</summary>
+                    <p>{referencia.autor} · {t`Página ${pagina}, parágrafo ${paragrafo}`}</p>
+                    <blockquote>{referencia.citacaoLiteral}</blockquote>
+                    <p>{t`Fala do paciente na revisão ${revisao}`}: {referencia.frasePaciente}</p>
+                    <button type="button" disabled={!aoAbrirTranscricao} onClick={aoAbrirTranscricao ? () => aoAbrirTranscricao(referencia.transcriptId, referencia.revisaoTranscricao) : undefined}>{t`Ver fala da referência`}</button>
+                  </details>
+                })}
               </div>
             ))}
           </section>

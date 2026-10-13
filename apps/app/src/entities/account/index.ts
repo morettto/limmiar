@@ -1,5 +1,6 @@
-export type { Account, AccountRole, TwoFactorRequirement } from './account'
+export type { Account, AccountRole, TwoFactorRequirement, SessionTokens } from './account'
 export { deriveEmailPasswordVerifier, deriveEmailSalt } from './password-verifier'
+export { deriveAccountKek, createRecoveryEnvelope, openRecoveryEnvelope } from './account-keys'
 export { deriveRecoveryVerifier } from './recovery-verifier'
 export {
   register,
@@ -8,11 +9,12 @@ export {
   beginTotpEnrollment,
   confirmTotpEnrollment,
   verifyTotpChallenge,
-  requestMagicLink,
   verifyMagicLink,
   recoverAccess,
   registerRecoveryPhrase,
   completeWebAuthnCeremony,
+  refreshSession,
+  logoutSession,
 } from './api'
 export type {
   RegisterResult,
@@ -22,7 +24,6 @@ export type {
   ConfirmTotpEnrollmentResult,
   TotpChallengeResult,
   MagicLinkCeremonyType,
-  RequestMagicLinkResult,
   VerifyMagicLinkResult,
   RegisterRecoveryPhraseResult,
   MagicLinkAccount,
