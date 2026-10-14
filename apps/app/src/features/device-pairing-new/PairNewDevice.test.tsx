@@ -254,10 +254,7 @@ describe('PairNewDevice', () => {
       </I18nProvider>,
     )
 
-    for (let i = 0; i < 50 && fetchPairingPayloadMock.mock.calls.length === 0; i++) {
-      await vi.advanceTimersByTimeAsync(0)
-    }
-    expect(fetchPairingPayloadMock).toHaveBeenCalledTimes(1)
+    await vi.waitFor(() => expect(fetchPairingPayloadMock).toHaveBeenCalledTimes(1))
     unmount()
 
     resolvePayload({ ok: false, code: 'auth.device_pairing_session_not_found', params: {} })
@@ -272,7 +269,7 @@ describe('PairNewDevice', () => {
     claimPairingSessionMock.mockResolvedValue({ ok: true, primaryPublicKey: TEST_PRIMARY_KEY })
     fetchPairingPayloadMock.mockResolvedValue({ ok: false, code: 'auth.device_pairing_session_not_found', params: {} })
     render(<I18nProvider i18n={i18n}><PairNewDevice baseUrl={BASE_URL} decode={decode} onKekAdopted={vi.fn()} /></I18nProvider>)
-    for (let i = 0; i < 50 && fetchPairingPayloadMock.mock.calls.length === 0; i++) await vi.advanceTimersByTimeAsync(0)
+    await vi.waitFor(() => expect(fetchPairingPayloadMock).toHaveBeenCalledTimes(1))
 
     await act(async () => { await vi.advanceTimersByTimeAsync(PAYLOAD_POLL_TIMEOUT_MS - 5000) })
     expect(screen.queryByRole('alert')).toBeNull()
@@ -300,9 +297,7 @@ describe('PairNewDevice', () => {
       </I18nProvider>,
     )
 
-    for (let i = 0; i < 50 && fetchPairingPayloadMock.mock.calls.length === 0; i++) {
-      await vi.advanceTimersByTimeAsync(0)
-    }
+    await vi.waitFor(() => expect(fetchPairingPayloadMock).toHaveBeenCalledTimes(1))
     await vi.advanceTimersByTimeAsync(500)
 
     expect(screen.getByRole('status').textContent).toBe('Aguardando o outro dispositivo enviar a chave...')
