@@ -5,14 +5,15 @@
 Cliente HTTP próprio para a AbacatePay (não existe SDK .NET oficial), a verificação da
 assinatura dos seus webhooks, a memória de idempotência de webhooks recebidos
 (`abacatepay_webhook_events`) e a superfície HTTP que os liga (`POST /webhooks/abacatepay`).
-Este README cobre **fatias 1-9 do ticket S12-01**: o mapeamento puro de resposta HTTP, o
+Este README cobre **fatias 1-9 do ticket S12-01** (ver secções abaixo) mais o **ticket S12-02**
+(secção "S12-02 -- reserva pública" no fim): o mapeamento puro de resposta HTTP, o
 contrato JSON fixado contra fixtures gravadas (critério de aceite 1), o cliente sobre um
 handler HTTP falso, a verificação pura da assinatura HMAC do webhook, a tabela de dedupe e o
 seu store, a invariante de RLS que a exceção da tabela de dedupe respeita, o endpoint que os
 liga (critério de aceite 3: reentrega devolve `duplicate:true`, nunca 409), o registo em DI
-(`AddBilling`/`MapBilling`), a configuração obrigatória `AbacatePay:WebhookSecret` com falha
+(`AddBilling`/`MapBillingEndpoints`), a configuração obrigatória `AbacatePay:WebhookSecret` com falha
 rápida, e a sonda viva de drift agendada (critério de aceite 2). Só o ADR de dedupe sem RLS
-fica para o fecho -- ver `.harness/S12-01-forma.md` para o desenho completo já aprovado.
+já está documentado em `docs/adr/ADR-S12-01-dedupe-de-webhook-sem-rls.md`.
 
 ## Fluxo principal
 
@@ -37,8 +38,8 @@ fica para o fecho -- ver `.harness/S12-01-forma.md` para o desenho completo já 
     seam testado sem HTTP nenhum (`AbacatePayClientMapResponseTests`, 7 casos). Exposto ao
     projeto de testes via `<InternalsVisibleTo>` em `Api.csproj` (item nativo do SDK, sem
     `AssemblyInfo.cs` nem atributo à mão).
-  - `AbacatePayClient(HttpClient, string apiKey)` -- o seam é o construtor: fixa
-    `BaseAddress = BaseUrl` e `Authorization: Bearer <apiKey>`. Sem interface, sem fábrica.
+  - `AbacatePayClient(HttpClient, string apiKey)` -- o seam é o construtor: valida a chave e
+    cada pedido usa URL absoluta e `Authorization: Bearer <apiKey>`, sem mutar o cliente.
   - `CreateCheckoutAsync`/`GetCheckoutAsync` -- `HttpRequestException` vira `Unavailable`;
     `OperationCanceledException` (onde `TaskCanceledException` de timeout se inclui) só vira
     `Unavailable` quando o token do chamador NÃO está cancelado -- cancelamento cooperativo
@@ -78,7 +79,7 @@ fica para o fecho -- ver `.harness/S12-01-forma.md` para o desenho completo já 
     falha rápida por `InvalidOperationException` (molde `Program.cs:36-37`, não
     `ConsentComposition.AddConsent`, que não tem chave obrigatória própria). Regista
     `AbacatePayWebhookSecret` (record, não `string` nua) e `AbacatePayWebhookStore`.
-  - `MapBilling(WebApplication)` -- chama `BillingEndpoints.MapBillingEndpoints`.
+  - `MapBillingEndpoints(IEndpointRouteBuilder)` -- regista o endpoint do webhook.
   - `AbacatePayJsonContext` -- agora também `[JsonSerializable(AbacatePayWebhookEvent)]` e
     `[JsonSerializable(WebhookAckResponse)]`, além dos dois registados nas fatias 1-4.
 - `BillingEndpoints.cs` -- `POST /webhooks/abacatepay`
@@ -107,7 +108,7 @@ fica para o fecho -- ver `.harness/S12-01-forma.md` para o desenho completo já 
   sobre o corpo cru de cada pedido real.
 - `Api.Billing.AbacatePayWebhookStore.TryRecordAsync(string eventId, string eventType,
   CancellationToken)` -- Postgres real (Testcontainers nos testes), sem RLS.
-- `POST /webhooks/abacatepay` -- a fronteira HTTP do webhook. `AddBilling`/`MapBilling` são os
+- `POST /webhooks/abacatepay` -- a fronteira HTTP do webhook. `AddBilling`/`MapBillingEndpoints` são os
   pontos de registo em `Program.Composition.cs`. `BillingEndpoints.ReadBoundedBodyAsync` --
   `internal`, o leitor limitado que impõe o teto de 64 KiB.
 
@@ -192,7 +193,7 @@ fica para o fecho -- ver `.harness/S12-01-forma.md` para o desenho completo já 
   pesa mais), mas por haver um único escritor e pelo par `GRANT`/`REVOKE`.
   `RowLevelSecurityCoverageTests` é o teste que passa a impor "toda tabela com dados de tenant
   tem RLS" como invariante geral, com esta tabela como a única exceção nomeada. O ADR completo
-   (`docs/adr/ADR-S12-01-dedupe-de-webhook-sem-rls.md`) fica para o fecho.
+   (`docs/adr/ADR-S12-01-dedupe-de-webhook-sem-rls.md`) documenta a exceção de RLS.
 - **`AddBilling` recebe `IConfiguration`, ao contrário de `ConsentComposition.AddConsent`.**
   O molde do Consent não tem parâmetro porque não tem nenhuma chave obrigatória própria;
   `AbacatePay:WebhookSecret` obriga `AddBilling` a ler configuração, e o molde para essa
@@ -241,8 +242,99 @@ fica para o fecho -- ver `.harness/S12-01-forma.md` para o desenho completo já 
 
 ## Fora de âmbito desta dispatch
 
-Nona e última fatia de código do ticket S12-01. Não tocado, fica para o fecho:
-`docs/adr/ADR-S12-01-dedupe-de-webhook-sem-rls.md` (a ADR que documenta por que
-`abacatepay_webhook_events` não tem RLS -- a decisão em si já está em vigor e testada por
-`RowLevelSecurityCoverageTests`, só falta o documento). Ver `.harness/S12-01-forma.md`
-("Seams, por ordem de fatia") para a lista completa e a ordem.
+## S12-02 -- reserva pública (`PublicBooking`)
+
+Reserva por link opaco sem bearer, com checkout AbacatePay e reembolso no conflito tardio.
+Ficheiros novos: `PublicBooking.cs` (tipos, políticas, serviço), `PublicBookingStore.cs`
+(efeitos), `PublicBookingEndpoints.cs` (rotas); migração `0010_public_booking.sql`.
+
+### Tipos
+
+- `PublicReserveRequest(StartsAt, Name, Contact)` /
+  `PublicReserveResponse(SessionId, CheckoutUrl?)` (source-gen em `AbacatePayJsonContext`).
+- `enum ReserveOutcome { Reserved, SlotTaken, LinkInvalidOrExpired, PaymentPending }` e o
+  record `ReserveResult(Outcome, SessionId, CheckoutUrl, IsDuplicate)` (fronteira
+  service→endpoint, ADR-0011: nomeado, nunca tuplo).
+- `AbacateData(Id, Status, Amount)` -- o `data` que S12-01 deixou por modelar -- mais
+  `Data?` em `AbacatePayWebhookEvent` (extras como `externalId`/`url` ignorados).
+- `enum PaymentStatus { Pending, Paid, Refunded, Failed }` (int na BD, sem ramo de parse)
+  via `AbacatePayMapper.ToPaymentStatus(CheckoutStatus)` (puro; Expirado/Cancelado → Failed).
+- `enum RefundOutcome { Refunded, NoPayment, AlreadyRefunded, ProviderHasNoRefund,
+  RefundFailed }`; `IAbacatePayClient` = criar checkout + `RefundAsync`. A produção devolve
+  `ProviderHasNoRefund` (a v2 não documenta reembolso); os testes injetam um fake que conta.
+- `enum NoShowVerdict { Excused, ForfeitsFee }` (+`[JsonStringEnumMemberName]`, molde
+  `CheckoutStatus`) e `NoShowPolicy.Decide(faltasPrevias)` -- política única global, a
+  primeira falta é desculpada, sem config por tenant.
+
+### Fluxo principal
+
+- `POST /p/{token}/reserve` (público, molde `DevicePairingEndpoints` claim): valida nome,
+  contacto e data futura (400) → `ResolveTenantAsync(hash)` (nulo/expirado → 404) →
+  reclama o efeito (`externalId` determinístico link+slot, UNIQUE: repetição → 200 com o
+  guardado) → `CreateCheckoutAsync` (falha → 202 `PaymentPending`, sem sessão parcial) →
+  `ScheduleAsync` (conflito → 409; com Paid → `RefundAsync` uma vez + marca Refunded) →
+  201 + `checkout_url`. Checkout antes da sessão de propósito (ver "Decisões").
+- `POST /webhooks/abacatepay` (estendido, sempre 200 nunca 409): dedupe de evento (S12-01)
+  e depois `ConfirmPaymentAsync` por `checkout_id` (`AND status = Pending`: reentrega é
+  no-op e reembolsado nunca rebaixa). Sem `data` → 200 sem confirmar.
+- `POST /sessions/{id}/no-show` (bearer do tenant): `TryMarkNoShowAsync` (falso → 404, RLS
+  trata alheio como inexistente) → `CountPriorNoShowsAsync` (sem a atual) →
+  200 `excused|forfeitsFee`. Idempotente.
+
+### Persistência
+
+- `public_booking_links(token_hash PK, tenant_id, expires_at NULL)` +
+  `booking_payments(external_id PK, tenant_id, session_id?, checkout_id, checkout_url,
+  status int, amount, name, contact)` -- ambas ENABLE+FORCE RLS, por isso a allowlist de
+  sem-RLS (`RowLevelSecurityCoverageTests`) não mexe. `externalId→tenant` é coluna, sem
+  tabela-mapa. `ALTER TABLE scheduled_sessions ADD COLUMN no_show` + grant (0004 intocado).
+- `booking_payments_checkout_id_idx` -- índice em `checkout_id` (webhook e política RLS
+  `payment_lookup` leem por ali, a PK é `external_id`; sem índice era seq scan a cada
+  webhook). Primeiro `CREATE INDEX` explícito do projeto -- `IF NOT EXISTS`, idempotente
+  como o resto da 0010. Provado contra `pg_indexes` real (`BookingPaymentsSchemaTests`).
+- Resolução/lookup sem tenant por GUC local + política (`link_resolve`, `payment_lookup`):
+  sem `SECURITY DEFINER`, porque FORCE RLS aplica-se ao dono das tabelas e o dono real em
+  produção pode não ser superuser. Grants mínimos (o `DO UPDATE` vazio escreve `status`,
+  já concedida; links só SELECT).
+
+### Pontos de entrada
+
+- `IPublicBooking.ReserveAsync(token, cmd, ct)` -- o serviço; `IPublicLinkStore` /
+  `IBookingPaymentStore` / `IAbacatePayClient` -- o I/O mínimo.
+- `NoShowPolicy.Decide(int)` / `RefundDecision.ShouldRefund(bool, PaymentStatus)` /
+  `AbacatePayMapper.ToPaymentStatus(CheckoutStatus)` -- puros, sem Docker.
+- `AbacatePayClient.RefundAsync` -- `ProviderHasNoRefund`, sem HTTP.
+- DI: `AbacatePay:ApiKey` com falha rápida (molde `WebhookSecret`, sem Options) + cliente
+  tipado via `AddHttpClient<IAbacatePayClient>().AddTypedClient<IAbacatePayClient>(...)`.
+  `IAbacatePayClient` e `IPublicBooking` (que o injeta) são ambos `AddTransient` -- nunca
+  `AddSingleton`, ou o `HttpMessageHandler` fica captivo dentro do singleton e o DNS nunca
+  refresca (os dois endpoints resolvem-nos por pedido, então transiente é seguro). Prova em
+  `Startup/HttpClientLifetimeTests.cs`: duas resoluções do root provider dão instâncias
+  diferentes. `Program.Composition.cs` já chamava `AddBilling`/`MapBilling`, sem toque.
+
+### Testes
+
+`PublicBookingEndpointsTests` (HTTP ponta-a-ponta, Testcontainers): gémeo concorrente do
+slot (201+409, 1 linha), 404 inválido/expirado/conta-desconhecida, 3×400, 201+url+1 linha,
+dedupe (201→200, 1 linha), 202 sem sessão, 409→200 com sessão vazia, webhook Paid→Paid,
+webhook desconhecido (200, 0 linhas), conflito-com-Paid (409 + 1 refund + Refunded +
+reentrega sem 2.º refund), Paid-sem-reembolso-no-fornecedor (409, fica Paid), e 6 de
+no-show. `PublicBookingPolicyTests` + `AbacatePayMapperTests` (puros).
+`Billing/BookingPaymentsSchemaTests.cs` -- `pg_indexes` real confirma
+`booking_payments_checkout_id_idx`. `Startup/HttpClientLifetimeTests.cs` -- `IAbacatePayClient`
+e `IPublicBooking` não são captivos (duas resoluções do root provider, instâncias diferentes).
+
+### Decisões relevantes
+
+- Token opaco de 256 bits em base64url, só o hash guardado (short-code rejeitado:
+  enumerável). Emissão de links fica fora deste ticket (sem escritor nem endpoint).
+- `externalId` determinístico (link+slot): a repetição do POST reclama o mesmo efeito em
+  vez de cobrar duas vezes; links diferentes no mesmo slot separam-se no `SlotTaken`.
+- Claim atómico `ON CONFLICT DO UPDATE` + `(xmax = 0)`: devolve sempre uma linha (o
+  reconsulta no conflito lê o estado fresco, incluindo Paid tardio), sem janela
+  SELECT→INSERT.
+- No-show não mexe em dinheiro (veredito só regista); reembolsar `Excused` fica por
+  decidir fora deste ticket.
+
+O módulo está completo para o âmbito S12-01. A decisão da tabela de dedupe sem RLS está em
+`docs/adr/ADR-S12-01-dedupe-de-webhook-sem-rls.md`.
