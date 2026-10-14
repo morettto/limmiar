@@ -52,6 +52,7 @@ export default defineConfig({
         ConnectionStrings__AppDb: `Host=127.0.0.1;Port=${PG_PORTA};Database=limmiar_e2e;Username=app_role;Password=limmiar_e2e`,
         StaffAccess__ApiKey: 'e2e-unused-staff-key',
         AbacatePay__WebhookSecret: 'e2e-unused-webhook-secret',
+        AbacatePay__ApiKey: 'e2e-unused-payments-key',
         // AES-256-GCM key for accounts.totp_secret_encrypted (S11-03, endurecimento) -- base64
         // of 32 bytes, fixed test value like every other E2E-only secret on this list.
         Totp__EncryptionKey: 'VFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFRUVFQ=',

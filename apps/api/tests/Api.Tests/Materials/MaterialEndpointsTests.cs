@@ -31,6 +31,7 @@ public sealed class MaterialEndpointsTests(PostgresContainerFixture fixture) : I
         builder.UseSetting("Totp:EncryptionKey", TotpTestEncryptionKey.Base64);
         builder.UseSetting("StaffAccess:ApiKey", "owned-test-staff-key");
         builder.UseSetting("AbacatePay:WebhookSecret", "owned-test-webhook-key");
+        builder.UseSetting("AbacatePay:ApiKey", "test-abacate-key");
         builder.UseSetting("WebAuthn:RelyingPartyId", "limmiar.test");
         builder.UseSetting("WebAuthn:ExpectedOrigin", "https://limmiar.test");
     });

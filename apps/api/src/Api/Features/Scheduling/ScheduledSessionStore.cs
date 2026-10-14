@@ -21,8 +21,16 @@ public sealed class ScheduledSessionStore(NpgsqlDataSource dataSource)
     /// hits <c>scheduled_sessions_live_slot_uq</c> and becomes a
     /// <see cref="ScheduledSessionSlotConflictException"/> -- acceptance criterion 1.
     /// </summary>
-    public async Task<ScheduledSession?> InsertAsync(
+    public Task<ScheduledSession?> InsertAsync(
         Guid tenantId, Guid patientId, DateTimeOffset startsAt, int durationMinutes, CancellationToken cancellationToken)
+        => InsertAsync(tenantId, patientId, startsAt, durationMinutes, true, cancellationToken);
+
+    public Task<ScheduledSession?> InsertPublicAsync(
+        Guid tenantId, Guid patientId, DateTimeOffset startsAt, int durationMinutes, CancellationToken cancellationToken)
+        => InsertAsync(tenantId, patientId, startsAt, durationMinutes, false, cancellationToken);
+
+    private async Task<ScheduledSession?> InsertAsync(
+        Guid tenantId, Guid patientId, DateTimeOffset startsAt, int durationMinutes, bool requirePatientRecord, CancellationToken cancellationToken)
     {
         await using var scope = await dataSource.OpenTenantScopedTransactionAsync(tenantId, cancellationToken);
 
@@ -31,7 +39,7 @@ public sealed class ScheduledSessionStore(NpgsqlDataSource dataSource)
         insertCommand.CommandText = $"""
             INSERT INTO scheduled_sessions (tenant_id, patient_id, starts_at, duration_minutes)
             SELECT @tenantId, @patientId, @startsAt, @durationMinutes
-            WHERE EXISTS (
+            WHERE NOT @requirePatientRecord OR EXISTS (
                 SELECT 1 FROM patient_record_entries
                 WHERE tenant_id = @tenantId AND patient_id = @patientId AND sequence = 1
             )
@@ -41,6 +49,7 @@ public sealed class ScheduledSessionStore(NpgsqlDataSource dataSource)
         insertCommand.Parameters.AddWithValue("patientId", patientId);
         insertCommand.Parameters.AddWithValue("startsAt", startsAt);
         insertCommand.Parameters.AddWithValue("durationMinutes", durationMinutes);
+        insertCommand.Parameters.AddWithValue("requirePatientRecord", requirePatientRecord);
 
         ScheduledSession inserted;
         try

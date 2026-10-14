@@ -490,15 +490,13 @@ public sealed class PatientLinkStoreTests : IAsyncLifetime
     [Fact]
     public async Task ListReceivedSharesAsync_AfterUnlink_ReturnsPriorItemsWithUnlinkedAt()
     {
-        var clock = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
-        var store = new PatientLinkStore(_dataSource, () => clock);
+        var store = new PatientLinkStore(_dataSource);
         await SeedAccountsAsync(ProfessionalId, PatientAccountId);
         var invite = await store.CreateInviteAsync(ProfessionalId, PatientId, CancellationToken.None);
         await store.RedeemAsync(invite.Code, PatientAccountId, CancellationToken.None);
         var ciphertext = SomeCiphertext(0x0A);
         await store.ShareAsync(PatientAccountId, ProfessionalId, ciphertext, CancellationToken.None);
 
-        clock = clock.AddDays(1);
         await store.UnlinkAsync(PatientAccountId, ProfessionalId, CancellationToken.None);
 
         var shares = await store.ListReceivedSharesAsync(ProfessionalId, CancellationToken.None);

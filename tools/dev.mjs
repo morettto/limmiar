@@ -19,7 +19,7 @@ if (!existsSync(settingsPath)) {
     },
     StaffAccess: { ApiKey: secret() },
     Totp: { EncryptionKey: secret() },
-    AbacatePay: { WebhookSecret: secret() },
+    AbacatePay: { WebhookSecret: secret(), ApiKey: secret() },
     WebAuthn: { RelyingPartyId: 'localhost', ExpectedOrigin: 'http://localhost:5173' },
     Cors: { AllowedOrigins: ['http://localhost:5173'] },
   }, null, 2))

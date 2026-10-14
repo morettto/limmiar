@@ -32,6 +32,7 @@ public sealed class OnlineSessionEndpointsTests(PostgresContainerFixture fixture
         builder.UseSetting("Totp:EncryptionKey", TotpTestEncryptionKey.Base64);
         builder.UseSetting("StaffAccess:ApiKey", "owned-test-staff-key");
         builder.UseSetting("AbacatePay:WebhookSecret", "owned-test-webhook-key");
+        builder.UseSetting("AbacatePay:ApiKey", "test-abacate-key");
         builder.UseSetting("WebAuthn:RelyingPartyId", "limmiar.test");
         builder.UseSetting("WebAuthn:ExpectedOrigin", "https://limmiar.test");
         builder.UseSetting("Cors:AllowedOrigins:0", "https://limmiar.test");

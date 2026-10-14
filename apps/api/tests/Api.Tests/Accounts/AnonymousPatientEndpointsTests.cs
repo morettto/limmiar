@@ -37,6 +37,7 @@ public sealed class AnonymousPatientEndpointsTests(PostgresContainerFixture fixt
         builder.UseSetting("WebAuthn:ExpectedOrigin", Origin);
         builder.UseSetting("Totp:EncryptionKey", TotpTestEncryptionKey.Base64);
         builder.UseSetting("AbacatePay:WebhookSecret", "whsec_test123");
+        builder.UseSetting("AbacatePay:ApiKey", "test-abacate-key");
     });
 
     private static async Task<(Account Professional, Guid PatientId, string Code)> InviteAsync(WebApplicationFactory<Program> factory,
