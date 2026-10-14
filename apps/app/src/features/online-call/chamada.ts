@@ -137,7 +137,12 @@ export async function conectarChamada(input: EntradaChamada): Promise<ChamadaOnl
     if (!encerrada) socket.send(JSON.stringify({ token: input.token }))
   }
   socket.onerror = falhar
-  socket.onclose = falhar
+  // Revocation can close signaling before its queued ended frame is delivered.
+  socket.onclose = event => {
+    if (encerrada) return
+    if (event.code === 1000 && event.reason === 'Session ended') { limpar(); input.estado('encerrada') }
+    else falhar()
+  }
   socket.onmessage = ({ data }) => {
     if (typeof data !== 'string' || data.length > 65536 || ++pendentes > 256) { falhar(); return }
     fila = fila.then(() => processar(JSON.parse(data) as Sinal)).catch(falhar).finally(() => { pendentes-- })

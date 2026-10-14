@@ -18,7 +18,8 @@ test('HTML rotulado como áudio permanece um recurso de mídia sem executar cód
   await lista.getByRole('button', { name: 'Adicionar paciente', exact: true }).click()
   await lista.getByRole('link', { name: nome, exact: true }).click()
   await iniciarSessaoAgora(page)
-  await page.getByRole('checkbox', { name: 'Paciente autorizou a gravação', exact: true }).check()
+  await page.getByRole('checkbox', { name: 'Paciente autorizou a gravação', exact: true }).click()
+  await expect(page.getByRole('checkbox', { name: 'Paciente autorizou a gravação', exact: true })).toBeChecked()
   const sessao = page.getByRole('region', { name: 'Gravação e transcrição', exact: true })
   await sessao.getByLabel('Ou carregar áudio', { exact: true }).setInputFiles({ name: 'hostil.wav', mimeType: 'audio/wav',
     buffer: Buffer.from('<script>window.audioExecuted=true</script><img src="/audio-security-probe" onerror="window.audioExecuted=true">') })

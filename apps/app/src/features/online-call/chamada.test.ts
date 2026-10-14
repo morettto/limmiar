@@ -6,11 +6,11 @@ class Socket {
   static instancias: Socket[] = []
   readyState = 1
   onopen: (() => void) | null = null
-  onclose: (() => void) | null = null
+  onclose: ((event: Pick<CloseEvent, 'code' | 'reason'>) => void) | null = null
   onerror: (() => void) | null = null
   onmessage: ((event: { data: unknown }) => void) | null = null
   send = vi.fn()
-  close = vi.fn(() => { this.readyState = 3; this.onclose?.() })
+  close = vi.fn(() => { this.readyState = 3; this.onclose?.({ code: 1000, reason: '' }) })
   readonly url: URL
   constructor(url: URL) { this.url = url; Socket.instancias.push(this) }
   receber(data: unknown) { this.onmessage?.({ data: typeof data === 'object' && data !== null ? JSON.stringify(data) : data }) }
@@ -195,6 +195,23 @@ describe('sinalização e trilhas da sessão online', () => {
     expect(estado).toHaveBeenLastCalledWith('encerrada')
     chamada.sair()
   })
+  it('o fechamento explícito do servidor encerra a chamada mesmo sem o frame ended', async () => {
+    const { socket } = await conectar('patient')
+    estado.mockClear()
+    socket.onclose?.({ code: 1000, reason: 'Session ended' })
+    socket.onerror?.()
+    socket.onclose?.({ code: 1000, reason: 'Session ended' })
+    expect(estado).toHaveBeenCalledExactlyOnceWith('encerrada')
+    expect(falhar).not.toHaveBeenCalled()
+    expect(stop).toHaveBeenCalledOnce()
+  })
+  it.each([{ code: 1000, reason: 'Participant left' }, { code: 1006, reason: 'Session ended' }])('outros fechamentos permanecem interrupções: %j', async event => {
+    const { socket } = await conectar()
+    socket.onclose?.(event)
+    expect(estado).toHaveBeenLastCalledWith('interrompida')
+    expect(falhar).toHaveBeenCalledOnce()
+    expect(stop).toHaveBeenCalledOnce()
+  })
   it.each(['joined-wrong', 'joined-invalid', 'offer', 'answer-empty', 'unknown', 'invalid-json', 'binary', 'large', 'ice-empty'])('recusa sinalização inválida: %s', async variante => {
     const pronto = iniciar()
     const rejeitado = expect(pronto).rejects.toThrow()
@@ -218,7 +235,7 @@ describe('sinalização e trilhas da sessão online', () => {
     const socket = Socket.instancias[0]!
     if (evento === 'timeout') await vi.advanceTimersByTimeAsync(15000)
     else if (evento === 'error') socket.onerror?.()
-    else if (evento === 'close') socket.onclose?.()
+    else if (evento === 'close') socket.onclose?.({ code: 1006, reason: '' })
     else controller.abort()
     await rejeitado
     expect(stop).toHaveBeenCalledOnce()
