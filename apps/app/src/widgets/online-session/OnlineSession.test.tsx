@@ -33,7 +33,7 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 async function montar() {
   render(<I18nProvider i18n={i18n}><OnlineSession {...props} /></I18nProvider>)
-  fireEvent.click(screen.getByRole('button', { name: 'Gerar convite de sessão online' }))
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Gerar convite de sessão online' })) })
   return screen.findByLabelText('Link privado da sessão online')
 }
 

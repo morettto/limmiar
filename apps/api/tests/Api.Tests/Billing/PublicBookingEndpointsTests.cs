@@ -259,11 +259,7 @@ public sealed class PublicBookingEndpointsTests : IAsyncLifetime
         factory.Services.GetRequiredService<FakeAbacatePayClient>();
         using var client = factory.CreateClient();
         var accountId = await RegisterActiveProfessionalAsync(client, "pubbook-retry@example.com");
-        var occupy = await client.PostAsJsonAsync(
-            $"/accounts/{accountId}/agenda/sessions",
-            new ScheduleSessionRequest(Guid.NewGuid(), SomeStart, 50),
-            SchedulingJsonContext.Default.ScheduleSessionRequest);
-        Assert.Equal(HttpStatusCode.Created, occupy.StatusCode);
+        await ScheduleViaBearerAsync(client, accountId, SomeStart);
         var token = await SeedLinkAsync(accountId, null);
 
         var conflicted = await PostReserveAsync(client, token, SomeStart, "Maria", "maria@example.com");
