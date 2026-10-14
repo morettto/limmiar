@@ -7,7 +7,7 @@ const fetcher = vi.fn()
 beforeEach(() => { vi.stubGlobal('fetch', fetcher) })
 afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks() })
 it('prepara somente pelo proxy local em RAM com SHA256 e bearer em header', async () => {
-  fetcher.mockResolvedValueOnce(Response.json(ready))
+  fetcher.mockResolvedValueOnce(Response.json({ materialId: 'id', ready: false, sha256: 'sha', stage: 'aguardando' }, { status: 202 }))
   await prepareLocalMaterial(access, 'id', metadata, new Uint8Array([1, 2, 3]))
   expect(fetcher.mock.lastCall![0]).toBe('/copiloto/api/acervo/owner/id/preparar')
   const init = fetcher.mock.lastCall![1]

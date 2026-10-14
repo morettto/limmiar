@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { RotuloLocutor } from '@limmiar/diarization'
-import { formatarInstante, montarBlocos } from './blocos-transcricao'
+import { formatarInstante, montarBlocos as agrupar } from './blocos-transcricao'
 import type { LinhaTranscricao } from './linhas-transcricao'
+
+const montarBlocos = (linhas: LinhaTranscricao[]) => agrupar(linhas, linhas.map(({ texto, inicioMs, fimMs, locutor }) => ({ texto, inicioMs, fimMs, locutor })))
 
 let proxima = 0
 const linha = (texto: string, locutor: string | null, papel: RotuloLocutor | null, inicioMs = proxima * 1000): LinhaTranscricao =>
@@ -9,6 +11,28 @@ const linha = (texto: string, locutor: string | null, papel: RotuloLocutor | nul
 const resumo = (linhas: LinhaTranscricao[]) => montarBlocos(linhas).map((bloco) => [bloco.papel, bloco.pessoa, bloco.linhas.map((l) => l.texto).join(' ')])
 
 describe('blocos da transcrição', () => {
+  it('não conta silêncio nem mistura intervalos de pessoas que falam ao mesmo tempo', () => {
+    const falas = [linha('Profissional', 'p', 'voce', 0), linha('Paciente', 's', 'paciente', 500)]
+    falas[0]!.fimMs = 1000; falas[1]!.fimMs = 1500
+    expect(agrupar(falas, [
+      { texto: 'Profissional', locutor: 'p', inicioMs: 0, fimMs: 1000 },
+      { texto: 'Paciente', locutor: 's', inicioMs: 500, fimMs: 1500 },
+    ]).map(bloco => bloco.falaMs)).toEqual([1000, 1000])
+    const continua = linha('Continuação', 'p', 'voce', 85000)
+    continua.fimMs = 94000
+    expect(agrupar([falas[0]!, continua], [
+      { texto: 'Primeira', locutor: 'p', inicioMs: 0, fimMs: 1000 },
+      { texto: 'Continuação', locutor: 'p', inicioMs: 85000, fimMs: 94000 },
+    ])[0]).toMatchObject({ inicioMs: 0, falaMs: 10000 })
+  })
+
+  it('conta sobreposição uma vez mesmo se as palavras chegam fora de ordem', () => {
+    const fala = { ...linha('Frase', 'p', 'voce', 0), fimMs: 1500 }
+    expect(agrupar([fala], [
+      { texto: 'Fim', locutor: 'p', inicioMs: 500, fimMs: 1500 },
+      { texto: 'Início', locutor: 'p', inicioMs: 0, fimMs: 1000 },
+    ])[0]!.falaMs).toBe(1500)
+  })
   it('junta as falas seguidas do mesmo falante e só quebra quando outra pessoa fala', () => {
     proxima = 0
     const blocos = montarBlocos([linha('Bom dia.', 'p', 'voce'), linha('Como vai?', 'p', 'voce'), linha('Tenho medo.', 's', 'paciente'),
@@ -24,41 +48,38 @@ describe('blocos da transcrição', () => {
     expect(resumo([linha('Uma.', 'a', 'voce'), linha('Duas.', 'b', 'voce'), linha('Três.', 'a', 'voce')])).toEqual([['voce', null, 'Uma. Duas. Três.']])
   })
 
-  it('depois que um falante é confirmado como profissional, qualquer outra voz sem papel já é paciente', () => {
+  it('preserva vozes desconhecidas sem adivinhar profissional ou paciente', () => {
     proxima = 0
-    expect(resumo([linha('Oi.', 'p', 'voce'), linha('Ainda sem voz.', 'x', null), linha('Sem falante', null, null), linha('Sou eu.', 'p', 'voce'),
-      linha('Outra voz.', 'y', null)])).toEqual([
-      ['voce', null, 'Oi.'], ['paciente', 2, 'Ainda sem voz. Sem falante'], ['voce', null, 'Sou eu.'], ['paciente', 3, 'Outra voz.'],
+    expect(resumo([linha('Oi.', 'p', 'voce'), linha('Incerta.', 'x', null), linha('Sem falante.', null, null),
+      linha('Outra.', 'y', null), linha('Voltei.', 'x', null)])).toEqual([
+      ['voce', null, 'Oi.'], [null, null, 'Incerta.'], [null, null, 'Sem falante.'],
+      [null, null, 'Outra.'], [null, null, 'Voltei.'],
     ])
   })
 
-  it('antes de qualquer confirmação a primeira voz é o profissional e a segunda já é paciente', () => {
+  it('mantém paciente confirmado mesmo com pessoas adicionais', () => {
     proxima = 0
-    expect(resumo([linha('Bom dia.', 'x', null), linha('Sem falante', null, null), linha('Tenho medo.', 'y', null), linha('E mais.', null, null),
-      linha('Doutora.', 'x', null)])).toEqual([
-      ['voce', null, 'Bom dia. Sem falante'], ['paciente', null, 'Tenho medo. E mais.'], ['voce', null, 'Doutora.'],
+    expect(resumo([linha('Paciente.', 'paciente', 'paciente'), linha('Outra pessoa.', 'pessoa_4', null),
+      linha('Profissional.', 'profissional', 'voce'), linha('Paciente novamente.', 'paciente', 'paciente')])).toEqual([
+      ['paciente', null, 'Paciente.'], [null, 4, 'Outra pessoa.'], ['voce', null, 'Profissional.'],
+      ['paciente', null, 'Paciente novamente.'],
     ])
   })
 
-  it('a primeira voz sem papel é o profissional mesmo que outra já tenha sido decidida como paciente', () => {
+  it('numera somente identidades canônicas sem papel confirmado', () => {
     proxima = 0
-    expect(resumo([linha('Bom dia.', 'x', 'paciente'), linha('Oi.', 'y', null), linha('Tchau.', 'z', null)])).toEqual([
-      ['paciente', 2, 'Bom dia.'], ['voce', null, 'Oi.'], ['paciente', 3, 'Tchau.'],
+    expect(resumo([linha('A.', 'pessoa_2', null), linha('B.', 'pessoa_2', null), linha('C.', 'pessoa_3', null),
+      linha('D.', 'pessoa_4_extra', null), linha('E.', 'pessoa_5', 'paciente')])).toEqual([
+      [null, 2, 'A. B.'], [null, 3, 'C.'], [null, null, 'D.'], ['paciente', null, 'E.'],
     ])
   })
 
-  it('o texto sem falante no começo é provisoriamente do profissional', () => {
+  it('fala sem identidade fica desconhecida no início e após pessoa confirmada', () => {
     proxima = 0
-    expect(resumo([linha('Sem falante', null, null)])).toEqual([['voce', null, 'Sem falante']])
-    proxima = 0
-    expect(resumo([linha('Bom dia.', 'x', 'paciente')])).toEqual([['paciente', null, 'Bom dia.']])
-  })
-
-  it('com mais de uma voz que não é o profissional numera Pessoa 2, Pessoa 3 pela ordem em que falam', () => {
-    proxima = 0
-    const blocos = montarBlocos([linha('Oi.', 'p', 'voce'), linha('Eu.', 'b', 'paciente'), linha('Eu também.', 'c', 'paciente'),
-      linha('E eu.', 'b', 'paciente'), linha('Sim.', 'p', 'voce')])
-    expect(blocos.map((bloco) => [bloco.papel, bloco.pessoa])).toEqual([['voce', null], ['paciente', 2], ['paciente', 3], ['paciente', 2], ['voce', null]])
+    expect(resumo([linha('Sem falante.', null, null), linha('Paciente.', 'paciente', 'paciente'),
+      linha('Sem identificação.', null, null)])).toEqual([
+      [null, null, 'Sem falante.'], ['paciente', null, 'Paciente.'], [null, null, 'Sem identificação.'],
+    ])
   })
 
   it('sem linhas não há blocos', () => {

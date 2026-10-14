@@ -42,6 +42,44 @@ class AcervoProfissional(unittest.TestCase):
     def prepare(self):
         return self.store.preparar(self.owner, self.material_id, self.data, self.fields)
 
+    def test_preparo_libera_modelo_entre_lotes_para_consultas(self):
+        eventos = []
+        progresso = []
+
+        class Trava:
+            def __enter__(self): eventos.append("entra")
+            def __exit__(self, *args): eventos.append("sai")
+
+        def codificar(textos, *args, **kwargs):
+            self.assertLessEqual(len(textos), 8)
+            self.assertEqual(eventos[-1], "entra")
+            eventos.append("modelo")
+            return np.ones((len(textos), 2), dtype=np.float32)
+
+        data = ((TEXT + " ") * 100).encode()
+        with patch.object(personal.embedder, "codificar_documentos", side_effect=codificar):
+            material = self.store.preparar(self.owner, self.material_id, data,
+                {**self.fields, "sha256": hashlib.sha256(data).hexdigest()}, Trava(),
+                lambda *estado: progresso.append(estado))
+        self.assertGreater(len(material.blocks), 8)
+        self.assertEqual(len(material.embeddings), len(material.blocks))
+        total = len({block.texto for block in material.blocks})
+        self.assertEqual(eventos, ["entra", "modelo", "sai"] * ((total + 7) // 8))
+        self.assertEqual(progresso[0], ("referencias", 0, total))
+        self.assertEqual(progresso[-1], ("referencias", total, total))
+        self.assertEqual([item[1] for item in progresso[1:-1]], list(range(8, total, 8)))
+
+    def test_agrupa_por_tamanho_sem_perder_paragrafo_ou_desalinhar_vetor(self):
+        textos = [TEXT, "B" * 900, TEXT, "C" * 200, "D" * 1100]
+        data = "\n\n".join(textos).encode()
+        with patch.object(personal.embedder, "codificar_documentos",
+            side_effect=lambda entradas, *args, **kw: np.array([[len(texto), ord(texto[0])] for texto in entradas])) as codificar:
+            material = self.store.preparar(self.owner, self.material_id, data,
+                {**self.fields, "sha256": hashlib.sha256(data).hexdigest()})
+        self.assertEqual(codificar.call_args.args[0], [textos[4], textos[1], textos[3], TEXT])
+        self.assertEqual([block.texto for block in material.blocks], textos)
+        self.assertEqual(material.embeddings.tolist(), [[len(texto), ord(texto[0])] for texto in textos])
+
     def test_ram_snapshot_isolates_owner_verifies_literal_page_and_keeps_every_paragraph(self):
         with patch.object(Path, "write_bytes", side_effect=AssertionError("disk")), patch.object(Path, "open", side_effect=AssertionError("disk")):
             material = self.prepare()
@@ -92,7 +130,12 @@ class AcervoProfissional(unittest.TestCase):
             page[NameObject("/Contents")] = stream
         writer.write(buffer)
         data = buffer.getvalue()
-        material = self.store.preparar(self.owner, self.material_id, data, {**self.fields, "tipo": "pdf", "sha256": hashlib.sha256(data).hexdigest()})
+        progresso = []
+        material = self.store.preparar(self.owner, self.material_id, data,
+            {**self.fields, "tipo": "pdf", "sha256": hashlib.sha256(data).hexdigest()},
+            progresso=lambda *estado: progresso.append(estado))
+        self.assertEqual(progresso, [("leitura", 0, 2), ("leitura", 1, 2), ("leitura", 2, 2),
+            ("referencias", 0, 2), ("referencias", 2, 2)])
         snapshot = self.store.snapshot(self.owner, [self.material_id])
         self.assertEqual(len(material.pages), 2)
         self.assertTrue(snapshot.proveniencia(self.material_id, 2, "Segunda pagina"))
@@ -129,22 +172,22 @@ class AcervoProfissional(unittest.TestCase):
             personal.materiais_autorizados(self.owner, "Bearer token")
 
     def test_http_upload_parses_only_memory_fields_and_ready_requires_real_preparation(self):
-        with patch.object(personal, "materiais_autorizados", return_value=self.authorized()), patch.object(Path, "write_bytes", side_effect=AssertionError("disk")):
+        with patch.object(personal, "materiais_da_conta", return_value=self.authorized()), patch.object(Path, "write_bytes", side_effect=AssertionError("disk")):
             response = self.client.post(f"/api/acervo/{self.owner}/{self.material_id}/preparar", headers={"Authorization": "Bearer opaque"},
                                         data=self.fields, files={"file": ("obra.txt", self.data, "text/plain")})
-            self.assertEqual(response.status_code, 200)
-            self.assertTrue(response.json()["ready"])
+            self.assertEqual(response.status_code, 202)
+            self.assertFalse(response.json()["ready"])
             self.assertEqual(response.json()["sha256"], self.fields["sha256"])
-            self.assertEqual(self.client.get(f"/api/acervo/{self.owner}", headers={"Authorization": "Bearer opaque"}).json()["materials"], [response.json()])
+            self.assertTrue(self.client.get(f"/api/acervo/{self.owner}", headers={"Authorization": "Bearer opaque"}).json()["materials"][0]["ready"])
             self.assertEqual(self.client.delete(f"/api/acervo/{self.owner}/{self.material_id}", headers={"Authorization": "Bearer opaque"}).status_code, 204)
             self.assertEqual(self.store.listar(self.owner), [])
-        with patch.object(personal, "materiais_autorizados", return_value={}):
+        with patch.object(personal, "materiais_da_conta", return_value={}):
             response = self.client.post(f"/api/acervo/{self.other}/{self.material_id}/preparar", data=self.fields, files={"file": ("obra.txt", self.data)})
             self.assertEqual(response.status_code, 404)
 
     def test_multipart_recuses_unknown_duplicate_missing_and_oversize_fields(self):
         path = f"/api/acervo/{self.owner}/{self.material_id}/preparar"
-        with patch.object(personal, "materiais_autorizados", return_value=self.authorized()):
+        with patch.object(personal, "materiais_da_conta", return_value=self.authorized()):
             for fields in ({**self.fields, "other": "x"}, {"titulo": "missing"}, {**self.fields, "titulo": "x" * 4097}):
                 response = self.client.post(path, data=fields, files={"file": ("obra.txt", self.data)})
                 self.assertIn(response.status_code, (400, 413))
@@ -155,9 +198,9 @@ class AcervoProfissional(unittest.TestCase):
 
     def test_revocation_during_preparation_or_inference_never_serves_material(self):
         path = f"/api/acervo/{self.owner}/{self.material_id}/preparar"
-        with patch.object(personal, "materiais_autorizados", side_effect=[self.authorized(), {}]):
+        with patch.object(personal, "materiais_da_conta", side_effect=[self.authorized(), {}]):
             response = self.client.post(path, data=self.fields, files={"file": ("obra.txt", self.data)})
-            self.assertEqual(response.status_code, 404)
+            self.assertEqual(response.status_code, 202)
             self.assertEqual(self.store.listar(self.owner), [])
         self.prepare()
         body = {"frase": "Fala sintética", "accountId": self.owner, "materialIds": [self.material_id]}

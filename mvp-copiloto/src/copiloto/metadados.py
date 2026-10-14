@@ -55,6 +55,7 @@ def versao() -> dict:
         "source_hashes": hashes(FONTES.glob("*.py")),
         "juiz": juiz_llm.VERSAO,
         "dispositivo_embedder": os.environ.get("COPILOTO_EMBEDDER_DISPOSITIVO", "cpu"),
+        "dtype_embedder": "float16" if os.environ.get("COPILOTO_EMBEDDER_DISPOSITIVO", "cpu").startswith("cuda") else "float32",
     }
 
 

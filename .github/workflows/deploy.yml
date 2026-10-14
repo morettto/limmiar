@@ -44,6 +44,18 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - uses: actions/cache@v4
+        with:
+          path: apps/app/public/models/voice-identity
+          key: voice-wasm-${{ runner.os }}-${{ hashFiles('tools/voice-identity/Dockerfile', 'tools/voice-identity/CMakeLists.txt', 'tools/voice-identity/embedding.cpp', 'tools/voice-identity/worker.js', 'tools/voice-identity/setup.mjs') }}
+
+      - name: Prepare verified browser voice model and runtime for E2E
+        run: node tools/voice-identity/setup.mjs
+
       - name: E2E (crossOriginIsolated + iframe de terceiro)
         run: pnpm --filter app exec playwright install --with-deps chromium
       - run: pnpm --filter app test:e2e

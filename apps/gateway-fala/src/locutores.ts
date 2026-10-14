@@ -8,35 +8,63 @@ const unitario = (vetor: ArrayLike<number>): number[] => {
   return valores.map((valor) => valor / norma)
 }
 
-// Quem fala, frase a frase: casou com a impressão de voz do profissional (mesmo limiar do cadastro no aparelho) é ele; quem
-// não casou é agrupado por similaridade entre si, na ordem em que aparece. A impressão só vive nesta instância.
+interface Voz { nome: string; ancora: number[]; recentes: number[][] }
+
 export class Locutores {
-  private readonly perfil: number[]
-  private readonly vozes: { nome: string; soma: number[] }[] = []
+  private readonly vozes: Voz[]
+  private profissionalReconhecido = false
 
-  constructor(perfil: readonly number[]) { this.perfil = unitario(perfil) }
+  constructor(perfil: readonly number[]) {
+    this.vozes = [{ nome: PROFISSIONAL, ancora: unitario(perfil), recentes: [] }]
+  }
 
-  identificar(embedding: ArrayLike<number>): string {
+  private avaliar(voz: number[]): { conhecida: Voz | undefined; similaridade: number } {
+    const candidatas = this.vozes.map(candidata => ({ candidata, similaridade: Math.max(
+      similaridadeCosseno(candidata.ancora, voz), ...candidata.recentes.map(prototipo => similaridadeCosseno(prototipo, voz)),
+    ) })).sort((a, b) => b.similaridade - a.similaridade)
+    const melhor = candidatas[0]
+    if (!melhor) return { conhecida: undefined, similaridade: -Infinity }
+    const segunda = candidatas[1]?.similaridade ?? -Infinity
+    const conhecida = melhor.similaridade >= LIMIAR_MESMA_VOZ && melhor.similaridade - segunda >= 0.08 ? melhor.candidata : undefined
+    return { conhecida, similaridade: melhor.similaridade }
+  }
+
+  reconhecer(embedding: ArrayLike<number>): string | null {
+    const conhecida = this.avaliar(unitario(embedding)).conhecida
+    return conhecida?.nome ?? null
+  }
+
+  identificar(embedding: ArrayLike<number>, confirmacao?: ArrayLike<number>): string | null {
     const voz = unitario(embedding)
-    if (similaridadeCosseno(this.perfil, voz) >= LIMIAR_MESMA_VOZ) return PROFISSIONAL
-    let melhor = this.vozes[0]
-    let melhorSimilaridade = -Infinity
-    for (const candidata of this.vozes) {
-      const similaridade = similaridadeCosseno(candidata.soma, voz)
-      if (similaridade > melhorSimilaridade) { melhor = candidata; melhorSimilaridade = similaridade }
+    const primeira = this.avaliar(voz)
+    if (!confirmacao) {
+      if (primeira.conhecida?.nome === PROFISSIONAL) this.profissionalReconhecido = true
+      return primeira.conhecida?.nome ?? null
     }
-    if (melhor && melhorSimilaridade >= LIMIAR_MESMA_VOZ) {
-      voz.forEach((valor, i) => { melhor.soma[i]! += valor })
-      return melhor.nome
+    const outra = unitario(confirmacao)
+    const segunda = this.avaliar(outra)
+    if (primeira.conhecida) {
+      if (segunda.conhecida === primeira.conhecida && similaridadeCosseno(voz, outra) >= LIMIAR_MESMA_VOZ) {
+        if (primeira.conhecida.nome === PROFISSIONAL) this.profissionalReconhecido = true
+        const recentes = primeira.conhecida.recentes
+        recentes.push(voz, outra)
+        for (const antiga of recentes.splice(0, Math.max(0, recentes.length - 2))) antiga.fill(0)
+      }
+      return primeira.conhecida.nome
     }
-    const nome = this.vozes.length === 0 ? 'paciente' : `pessoa_${this.vozes.length + 1}`
-    this.vozes.push({ nome, soma: voz })
+    if (!this.profissionalReconhecido || segunda.conhecida || primeira.similaridade >= 0.4 || segunda.similaridade >= 0.4 ||
+      !(similaridadeCosseno(voz, outra) >= LIMIAR_MESMA_VOZ)) return null
+    const nome = this.vozes.length === 1 ? 'paciente' : `pessoa_${this.vozes.length}`
+    this.vozes.push({ nome, ancora: voz, recentes: [outra] })
     return nome
   }
 
   limpar(): void {
-    this.perfil.fill(0)
-    this.vozes.forEach(({ soma }) => soma.fill(0))
+    for (const voz of this.vozes) {
+      voz.ancora.fill(0)
+      voz.recentes.forEach(prototipo => prototipo.fill(0))
+    }
     this.vozes.length = 0
+    this.profissionalReconhecido = false
   }
 }

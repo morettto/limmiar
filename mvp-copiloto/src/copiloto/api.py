@@ -5,10 +5,11 @@ import json
 import logging
 import os
 import threading
+import time
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import FastAPI, Header, HTTPException, Request, Response
+from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
@@ -23,6 +24,8 @@ VERSAO = metadados.versao()
 ESTADO_INICIAL = metadados.estado_arquivos()
 trava_inferencia = threading.Lock()
 trava_votos = threading.Lock()
+trava_preparos = threading.Lock()
+preparos: dict[tuple[str, str], dict] = {}
 MAX_CORPO_VOTO = 16 * 1024
 
 
@@ -31,6 +34,7 @@ def arrancar() -> None:
     log = logging.getLogger("uvicorn.error")
     log.info("Carregando o modelo de busca %s", embedder.PADRAO)
     embedder.carregar()
+    embedder.codificar_consultas(["Consulta sintética de aquecimento."], lote=1)
     log.info("Carregando os modelos de tradução")
     traducao.aquecer()
 
@@ -78,38 +82,71 @@ def saude() -> dict:
 
 @app.get("/api/acervo/{account_id}")
 def acervo_pessoal(account_id: UUID, authorization: str | None = Header(default=None)) -> dict:
-    acervo_profissional.materiais_autorizados(str(account_id), authorization)
-    return {"materials": acervo_profissional.ACERVO.listar(str(account_id))}
+    owner = str(account_id)
+    owned = acervo_profissional.materiais_da_conta(owner, authorization)
+    with trava_preparos:
+        estados = [status.copy() for (conta, id_), status in preparos.items() if conta == owner and id_ in owned]
+    preparados = acervo_profissional.ACERVO.listar(owner)
+    ids = {item["materialId"] for item in preparados}
+    return {"materials": preparados + [item for item in estados if item["materialId"] not in ids]}
 
 
-@app.post("/api/acervo/{account_id}/{material_id}/preparar")
+@app.post("/api/acervo/{account_id}/{material_id}/preparar", status_code=202)
 async def preparar_material(account_id: UUID, material_id: UUID, request: Request,
+                            background_tasks: BackgroundTasks,
                             authorization: str | None = Header(default=None)) -> dict:
-    authorized = await asyncio.to_thread(acervo_profissional.materiais_autorizados, str(account_id), authorization)
-    if str(material_id) not in authorized:
-        acervo_profissional.falhar("material.not_authorized", 404)
+    owned = await asyncio.to_thread(acervo_profissional.materiais_da_conta, str(account_id), authorization)
+    if str(material_id) not in owned:
+        acervo_profissional.falhar("material.not_found", 404)
     data, fields = await acervo_profissional.multipart_em_memoria(request)
+    owner, id_ = str(account_id), str(material_id)
+    key = (owner, id_)
+    with trava_preparos:
+        anterior = preparos.get(key)
+        if anterior and anterior["stage"] != "falhou":
+            return anterior.copy()
+        if sum(item["stage"] != "falhou" for item in preparos.values()) >= 4:
+            acervo_profissional.falhar("material.busy", 429)
+        status = {"materialId": id_, "sha256": fields["sha256"], "ready": False, "stage": "aguardando"}
+        preparos[key] = status
+    background_tasks.add_task(_preparar_material, owner, id_, data, fields, authorization)
+    return status.copy()
+
+
+def _preparar_material(owner: str, id_: str, data: bytes, fields: dict, authorization: str | None):
+    key = (owner, id_)
     try:
-        material = await asyncio.to_thread(_preparar_em_ram, str(account_id), str(material_id), data, fields)
-    except HTTPException:
-        raise
-    except Exception:
-        acervo_profissional.falhar("material.processing_failed", 503)
-    current = await asyncio.to_thread(acervo_profissional.materiais_autorizados, str(account_id), authorization)
-    if str(material_id) not in current:
-        acervo_profissional.ACERVO.remover(str(account_id), str(material_id))
-        acervo_profissional.falhar("material.not_authorized", 404)
-    return material.status()
+        with trava_preparos:
+            preparos[key]["stage"] = "organizando"
+        _preparar_em_ram(owner, id_, data, fields)
+        current = acervo_profissional.materiais_da_conta(owner, authorization)
+        if id_ not in current:
+            acervo_profissional.ACERVO.remover(owner, id_)
+        with trava_preparos:
+            preparos.pop(key, None)
+    except Exception as erro:
+        logging.getLogger("uvicorn.error").warning(json.dumps({"event": "material_prepare_failed",
+            "materialId": id_, "errorType": type(erro).__name__}))
+        acervo_profissional.ACERVO.remover(owner, id_)
+        with trava_preparos:
+            preparos[key]["stage"] = "falhou"
 
 
 def _preparar_em_ram(owner: str, material_id: str, data: bytes, fields: dict):
-    with trava_inferencia:
-        return acervo_profissional.ACERVO.preparar(owner, material_id, data, fields)
+    inicio = time.perf_counter()
+    def atualizar(fase: str, completo: int, total: int):
+        with trava_preparos:
+            preparos[(owner, material_id)]["progress"] = {"phase": fase, "completed": completo, "total": total}
+        if completo == 0 or completo == total or completo % 64 == 0:
+            logging.getLogger("uvicorn.error").info(json.dumps({"event": "material_preparation_progress",
+                "materialId": material_id, "phase": fase, "completed": completo, "total": total,
+                "elapsed_ms": round((time.perf_counter() - inicio) * 1000)}))
+    return acervo_profissional.ACERVO.preparar(owner, material_id, data, fields, trava_inferencia, atualizar)
 
 
 @app.delete("/api/acervo/{account_id}/{material_id}")
 def remover_material(account_id: UUID, material_id: UUID, authorization: str | None = Header(default=None)) -> Response:
-    acervo_profissional.materiais_autorizados(str(account_id), authorization)
+    acervo_profissional.materiais_da_conta(str(account_id), authorization)
     acervo_profissional.ACERVO.remover(str(account_id), str(material_id))
     return Response(status_code=204)
 

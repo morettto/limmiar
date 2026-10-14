@@ -11,7 +11,7 @@ export interface Palavra {
 }
 
 // O que o gateway manda ao navegador: só o que é novo. `parcial` substitui o anterior (texto da frase em curso, ainda sem tempos); `final` chega uma vez por frase,
-// com o falante já resolvido; `falante` corrige uma frase curta que herdou o rótulo da vizinha.
+// com falante confirmado ou incerto; `falante` corrige palavra incerta pelo próprio contexto acústico.
 export type Saida =
   | { type: 'pronta' }
   | { type: 'parcial'; texto: string; processado_ms: number }

@@ -9,10 +9,13 @@ import type { Transcricao } from '../../entities/transcricao/transcricao'
 import type { Prontuario } from '../../features/prontuario/abrir-prontuario'
 import { ProntuarioContext } from '../../features/prontuario/prontuario-context'
 import { AtendimentoPage, type AtendimentoPageProps } from './AtendimentoPage'
+import { encerrarAtendimento } from '../../features/prontuario/encerrar-atendimento'
 
 type Bloqueio = { shouldBlockFn(args: { current: { pathname: string }; next: { pathname: string } }): boolean; disabled: boolean; enableBeforeUnload: boolean }
 const roteador = vi.hoisted(() => ({ bloqueio: null as unknown, navegar: vi.fn(), travarNavegacao: vi.fn() }))
 const bloqueio = () => roteador.bloqueio as Bloqueio
+const finalizacao = vi.hoisted(() => ({ parar: vi.fn(async () => {}), salvar: vi.fn(async () => {}) }))
+vi.mock('../../features/prontuario/encerrar-atendimento', () => ({ encerrarAtendimento: vi.fn(async () => {}) }))
 
 vi.mock('@tanstack/react-router', () => ({
   Link: ({ to, params, search, children, ...resto }: { to: string; params?: { patientId: string; atendimentoId?: string }; search?: { aba: string }; children: React.ReactNode; 'aria-current'?: string }) =>
@@ -23,24 +26,29 @@ vi.mock('@tanstack/react-router', () => ({
 vi.mock('../../widgets/app-shell/bloqueio', () => ({ useBloquearNavegacao: roteador.travarNavegacao }))
 vi.mock('../../widgets/patient-care/ConsentimentoPaciente', () => ({ ConsentimentoPaciente: ({ patientId }: { patientId: string }) => <div>Consentimento de {patientId}</div> }))
 vi.mock('../../features/prontuario/EstadoDoAtendimento', () => ({ EstadoDoAtendimento: ({ atendimentoId }: { atendimentoId: string }) => <p>Estado de {atendimentoId}</p> }))
-vi.mock('../../features/live-session/SessionReview', () => ({ SessionReview: ({ paciente, atendimentoId, transcricao, onPendingChange, onSaved, onPropostaReferencia }: {
+vi.mock('../../features/live-session/SessionReview', () => ({ SessionReview: ({ paciente, atendimentoId, transcricao, onPendingChange, onSaved, onPropostaReferencia, prepararEncerramento }: {
   paciente: { id: string; nome: string; transcricoes: Transcricao[] }; atendimentoId: string; transcricao?: Transcricao; onPendingChange(pendente: boolean): void
-  onSaved(transcricao: Transcricao): void; onPropostaReferencia(proposta: PropostaReferencia): void }) => <div>
+  onSaved(transcricao: Transcricao): void; onPropostaReferencia(proposta: PropostaReferencia): void; prepararEncerramento?(parar: () => Promise<void>): void }) => {
+  prepararEncerramento?.(finalizacao.parar)
+  return <div>
   <p>Gravação de {paciente.nome} sessão {atendimentoId} revisão {transcricao?.revisao ?? 'nenhuma'} de {paciente.transcricoes.length} no prontuário</p>
   <button onClick={() => onPendingChange(true)}>Capturar</button><button onClick={() => onPendingChange(false)}>Confirmar salvamento</button>
   <button onClick={() => onSaved({} as Transcricao)}>Salvar transcrição</button>
   <button onClick={() => onPropostaReferencia(proposta)}>Propor referência</button>
-</div> }))
-vi.mock('../../widgets/online-session/OnlineSession', () => ({ OnlineSession: ({ patientId, atendimentoId, onPendingChange }: { patientId: string; atendimentoId: string; onPendingChange(pendente: boolean): void }) => <div>
+</div> } }))
+vi.mock('../../widgets/online-session/OnlineSession', () => ({ OnlineSession: ({ patientId, atendimentoId, onPendingChange, atendimentoEncerrado }: { patientId: string; atendimentoId: string; atendimentoEncerrado?: boolean; onPendingChange(pendente: boolean): void }) => <div>
+  <output data-testid="online-encerrado">{String(atendimentoEncerrado)}</output>
   Chamada de {patientId} sessão {atendimentoId}<button onClick={() => onPendingChange(true)}>Conectar chamada</button><button onClick={() => onPendingChange(false)}>Salvar chamada</button>
 </div> }))
-vi.mock('../../features/nota-editor/NotaDoAtendimento', () => ({ NotaDoAtendimento: ({ nota, transcricoes, analiseAutorizada, ativa, propostaReferencia, dek, onDescartarProposta, onAbrirTranscricao, onSaved }: {
+vi.mock('../../features/nota-editor/NotaDoAtendimento', () => ({ NotaDoAtendimento: ({ nota, transcricoes, analiseAutorizada, ativa, propostaReferencia, dek, onDescartarProposta, onAbrirTranscricao, onSaved, prepararSalvamento }: {
   nota?: Nota; transcricoes: Transcricao[]; analiseAutorizada: boolean; ativa: boolean; propostaReferencia: PropostaReferencia | null; dek: unknown
-  onDescartarProposta(): void; onAbrirTranscricao(): void; onSaved(): void }) => <div>
+  onDescartarProposta(): void; onAbrirTranscricao(): void; onSaved(): void; prepararSalvamento?(salvar: () => Promise<void>): void }) => {
+  prepararSalvamento?.(finalizacao.salvar)
+  return <div>
   <p>Nota {nota?.id ?? 'nenhuma'} com {transcricoes.length} revisões, análise {String(analiseAutorizada)}, ativa {String(ativa)}, dek {String(dek === chave)}</p>
   {propostaReferencia && <><p>Referência de {propostaReferencia.patientId}</p><button onClick={onDescartarProposta}>Cancelar proposta</button></>}
   <button onClick={onAbrirTranscricao}>Ver fala</button><button onClick={onSaved}>Nota salva</button>
-</div> }))
+</div> } }))
 
 const chave = {} as CryptoKey
 const proposta: PropostaReferencia = { patientId: 'paciente-1', inicioMs: 0, fimMs: 500, referencia: { trechoId: 'fonte', titulo: 'Livro', autor: 'Autor', pagina: 1, paragrafo: 1,
@@ -61,6 +69,44 @@ const painel = (texto: string) => screen.getByText(texto, { exact: false }).clos
 describe('AtendimentoPage', () => {
   beforeAll(async () => { await dynamicActivate('pt-BR') })
   afterEach(() => { cleanup(); vi.clearAllMocks() })
+
+  it('encerra a captura pendente e pede revisão, sem salvar nem encerrar o atendimento ainda', async () => {
+    montar()
+    fireEvent.click(screen.getByRole('button', { name: 'Capturar' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Encerrar sessão' }))
+    await screen.findByText('Captura encerrada. Confira e salve a transcrição antes de encerrar a sessão.')
+    expect(finalizacao.parar).toHaveBeenCalledOnce()
+    expect(finalizacao.salvar).not.toHaveBeenCalled()
+    expect(encerrarAtendimento).not.toHaveBeenCalled()
+  })
+
+  it('salva o rascunho antes de persistir o encerramento e não permite encerrar duas vezes', async () => {
+    montar()
+    fireEvent.click(screen.getByRole('button', { name: 'Encerrar sessão' }))
+    await screen.findByText('Sessão encerrada')
+    expect(finalizacao.salvar).toHaveBeenCalledOnce()
+    expect(encerrarAtendimento).toHaveBeenCalledWith('', 'conta-1', 'access', 'paciente-1', 'atendimento-1', chave)
+    expect(finalizacao.salvar.mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(encerrarAtendimento).mock.invocationCallOrder[0]!)
+    expect(screen.queryByRole('button', { name: 'Encerrar sessão' })).toBeNull()
+    expect(recarregar).toHaveBeenCalledOnce()
+  })
+
+  it.each(['nota', 'encerramento', 'sem-detalhe'])('não anuncia sucesso e permite tentar novamente se falhar em %s', async etapa => {
+    if (etapa === 'nota') finalizacao.salvar.mockRejectedValueOnce(new Error('Nota não salva'))
+    else vi.mocked(encerrarAtendimento).mockRejectedValueOnce(etapa === 'sem-detalhe' ? 'rede' : new Error('Encerramento não salvo'))
+    montar()
+    fireEvent.click(screen.getByRole('button', { name: 'Encerrar sessão' }))
+    await screen.findByText(etapa === 'nota' ? 'Nota não salva' : etapa === 'sem-detalhe' ? 'Não foi possível encerrar a sessão. Tente novamente.' : 'Encerramento não salvo')
+    expect(screen.queryByText('Sessão encerrada')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Encerrar sessão' })).toHaveProperty('disabled', false)
+  })
+
+  it('reabre atendimento encerrado sem oferecer modalidade nem encerramento novo', () => {
+    montar(prontuario({ atendimentos: [{ ...atendimento, encerradoEm: '2026-10-05T15:00:00Z' }] }))
+    expect(screen.getByText('Sessão encerrada')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Encerrar sessão' })).toBeNull()
+    expect(screen.queryByLabelText('Tipo de sessão')).toBeNull()
+  })
 
   it('sem a sessão na pasta do paciente avisa e leva de volta à pasta', () => {
     montar(prontuario(), { atendimentoId: 'inexistente' })
@@ -117,6 +163,14 @@ describe('AtendimentoPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Salvar chamada' }))
     fireEvent.change(screen.getByLabelText('Tipo de sessão'), { target: { value: 'presencial' } })
     expect(screen.getByText(/Gravação de/)).toBeTruthy()
+  })
+
+  it('bloqueia novos convites quando encerra um atendimento na modalidade online', async () => {
+    montar()
+    fireEvent.change(screen.getByLabelText('Tipo de sessão'), { target: { value: 'online' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Encerrar sessão' }))
+    await screen.findByText('Sessão encerrada')
+    expect(screen.getByTestId('online-encerrado').textContent).toBe('true')
   })
 
   it('leva a referência proposta à aba da nota e a descarta ao cancelar ou ao voltar a capturar', () => {

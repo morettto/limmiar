@@ -1,7 +1,8 @@
 # Identidade vocal local
 
-Nemotron fornece diarização por sessão. O reconhecimento de uma voz cadastrada
-usa NVIDIA TitaNet Large, exportado pelo sherpa-onnx, em WebAssembly no dispositivo.
+O cadastro de uma voz usa NVIDIA TitaNet Large, exportado pelo sherpa-onnx,
+em WebAssembly no dispositivo. A sessão presencial identifica vozes no gateway,
+com o mesmo modelo TitaNet e segmentação Pyannote nativa em threads próprias.
 O wrapper chama somente a API pública da biblioteca; não implementa rede neural,
 FFT, filtro mel nem extração de características.
 
@@ -38,3 +39,22 @@ Modelo: NVIDIA TitaNet Large, exportação sherpa-onnx `nemo_en_titanet_large.on
 101.405.493 bytes, SHA-256 `d51abcf31717ef28162f26acb9d44dd4127c3d44c9b8624f699f3425daca8e77`.
 A licença original é [CC BY 4.0](https://huggingface.co/nvidia/speakerverification_en_titanet_large/blob/main/README.md).
 NVIDIA é a autora dos pesos; o sherpa-onnx fornece a exportação e o runtime Apache 2.0.
+
+## Separação no gateway
+
+`node tools/voice-identity/setup-segmentacao.mjs` prepara somente o modelo público
+Pyannote compatível com o sherpa-onnx instalado. O setup e a imagem Docker verificam
+SHA-256 do arquivo e do modelo; ele fica no servidor, sem aumentar o bundle do app.
+`pnpm dev` executa ambos os setups e configura `GATEWAY_FALA_SEGMENTACAO`.
+
+Janelas de até 10 s mantêm o custo limitado. Cada intervalo tem suas próprias
+amostras de voz; rótulos locais do segmentador não confirmam identidade. Intervalos
+curtos ou sobrepostos ficam incertos, sem herdar a voz anterior. Nova identidade
+exige profissional já reconhecido e duas amostras independentes consistentes.
+O primeiro novo falante é paciente; acompanhantes conservam IDs separados e exigem
+revisão do papel clínico. Em chamada com terceiros, confirmar quem é paciente.
+
+127 testes do gateway passaram, cobertura 100%, incluindo dois falantes sintéticos
+com modelos reais. Medição local de 12 janelas e 30 intervalos: 21 identificados
+corretamente, 9 incertos, nenhum atribuído à pessoa errada; média 252 ms, máximo
+315 ms por janela em CPU. Isso não qualifica microfone humano nem carga concorrente.

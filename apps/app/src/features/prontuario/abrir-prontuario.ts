@@ -1,7 +1,7 @@
 import { t } from '@lingui/core/macro'
 import { i18n } from '@lingui/core'
 import type { CryptoKey } from '@limmiar/crypto'
-import { lerAtendimento, type Atendimento } from '../../entities/atendimento/atendimento'
+import { lerAtendimento, lerEncerramento, type Atendimento } from '../../entities/atendimento/atendimento'
 import { obterConsentimentos, type ConsentimentosDoPaciente } from '../../entities/consentimento/api'
 import type { Nota } from '../../entities/nota/nota'
 import { abrirNotas } from '../../entities/nota/abrir-notas'
@@ -41,6 +41,12 @@ export async function abrirProntuario(baseUrl: string, accountId: string, access
     const atendimento = lerAtendimento(bytes, patientId)
     return atendimento === null ? [] : [atendimento]
   })
+  const encerramentos = new Map(entradas.flatMap(bytes => {
+    const encerramento = lerEncerramento(bytes)
+    return encerramento ? [[encerramento.atendimentoId, encerramento.encerradoEm] as const] : []
+  }))
   const notas = await abrirNotas(entradas, patientId, aberto.dek, baseUrl, accountId, accessToken)
-  return { nome: resumo.name, risco: resumo.risk, dek: aberto.dek, consentimentos: consentimentos.consentimentos, transcricoes, notas, atendimentos }
+  return { nome: resumo.name, risco: resumo.risk, dek: aberto.dek, consentimentos: consentimentos.consentimentos, transcricoes, notas,
+    atendimentos: atendimentos.map(atendimento => encerramentos.has(atendimento.id)
+      ? { ...atendimento, encerradoEm: encerramentos.get(atendimento.id)! } : atendimento) }
 }

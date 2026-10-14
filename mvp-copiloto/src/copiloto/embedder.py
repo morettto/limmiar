@@ -31,7 +31,9 @@ def carregar(nome: str = PADRAO):
         if nome not in _MODELOS:
             from sentence_transformers import SentenceTransformer
 
-            _MODELOS[nome] = SentenceTransformer(nome, device=os.environ.get("COPILOTO_EMBEDDER_DISPOSITIVO", "cpu"))
+            device = os.environ.get("COPILOTO_EMBEDDER_DISPOSITIVO", "cpu")
+            _MODELOS[nome] = SentenceTransformer(nome, device=device,
+                model_kwargs={"torch_dtype": "float16"} if device.startswith("cuda") else {})
         return _MODELOS[nome]
 
 

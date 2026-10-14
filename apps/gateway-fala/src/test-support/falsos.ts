@@ -7,8 +7,8 @@ export const esperar = () => new Promise<void>((resolver) => setImmediate(resolv
 
 // Parâmetros pequenos para os testes andarem em segundos de áudio, não em minutos.
 export const PARAMETROS: ParametrosSessao = {
-  bufferMs: 10_000, rotacaoMs: 1000, rotacaoForcadaMs: 3000, fraseMinimaMs: 500, vozMaximaMs: 1500,
-  margemAntesMs: 100, margemDepoisMs: 200, repeticaoMs: 500,
+  bufferMs: 10_000, rotacaoMs: 1000, rotacaoForcadaMs: 3000, fraseMinimaMs: 500, vozMaximaMs: 10_000,
+  margemDepoisMs: 200, repeticaoMs: 500,
 }
 
 // Duas "vozes" distinguíveis: o PCM de teste é uma constante, e a constante escolhe o vetor.
@@ -33,6 +33,18 @@ export class ExtratorFalso implements Extrator {
     this.chamadas.push(pcm.length)
     if (this.retorno) return this.retorno(pcm)
     return Promise.resolve(Float32Array.from(VETOR[Math.round(pcm[pcm.length >> 1]! * 32768)]!))
+  }
+
+  segmentar(pcm: Float32Array) {
+    const segmentos: { start: number; end: number; speaker: number }[] = []
+    for (let i = 0; i < pcm.length;) {
+      const amplitude = Math.round(pcm[i]! * 32768)
+      let fim = i + 1
+      while (fim < pcm.length && Math.round(pcm[fim]! * 32768) === amplitude) fim++
+      if (amplitude !== 0) segmentos.push({ start: i / 16000, end: fim / 16000, speaker: amplitude })
+      i = fim
+    }
+    return Promise.resolve(segmentos)
   }
 
   encerrar(): Promise<void> { return Promise.resolve() }

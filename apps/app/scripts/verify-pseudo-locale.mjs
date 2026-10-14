@@ -19,6 +19,16 @@ const [sourceCatalog, pseudoCatalog] = await Promise.all([
   readFile(`${appRoot}src/locales/pseudo-LOCALE/messages.js`, 'utf-8'),
 ])
 
+// A compiled message is a list of parts: a string is literal text, [name] a placeholder, and
+// [name, 'plural', { branch: parts }] a choice whose branches nest more parts. Only literal text expands.
+function literalText(parts) {
+  return parts.map(part => {
+    if (typeof part === 'string') return part
+    const branches = part[2]
+    return typeof branches === 'object' ? Object.values(branches).filter(Array.isArray).map(literalText).join('') : ''
+  }).join('')
+}
+
 const sourceMessages = extractMessages(sourceCatalog)
 const pseudoMessages = extractMessages(pseudoCatalog)
 
@@ -28,12 +38,11 @@ if (sourceKeys.length === 0) {
 }
 
 for (const key of sourceKeys) {
-  const [sourceText] = sourceMessages[key]
-  const [pseudoText] = pseudoMessages[key] ?? []
-
-  if (pseudoText === undefined) {
+  if (pseudoMessages[key] === undefined) {
     throw new Error(`pseudo-LOCALE catalog is missing key "${key}" present in the source catalog`)
   }
+  const sourceText = literalText(sourceMessages[key])
+  const pseudoText = literalText(pseudoMessages[key])
   if (pseudoText === sourceText) {
     throw new Error(`pseudo-LOCALE text for "${key}" is identical to the source — pseudolocalization did not run`)
   }

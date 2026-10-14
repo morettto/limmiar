@@ -33,7 +33,7 @@ jobs:
       # Só o que estes testes importam. torch, sentence-transformers e ctranslate2 ficam de fora de propósito:
       # test_confiabilidade, test_frase, test_triagem_frase, test_triagem_rbf e test_benchmark_final100_cpu os carregam.
       - name: Install dependencies
-        run: pip install fastapi httpx numpy pypdf python-multipart rank-bm25
+        run: pip install fastapi httpx numpy pypdf python-multipart rank-bm25 uvicorn
 
       - name: Unit tests
         run: |
@@ -47,11 +47,14 @@ jobs:
             scripts/test_ciclo_juiz.py \
             scripts/test_citacoes.py \
             scripts/test_continuacao.py \
+            scripts/test_embedder.py \
             scripts/test_finalizar_qualificacao.py \
             scripts/test_fontes_dev.py \
             scripts/test_juiz_llm.py \
             scripts/test_metadados.py \
             scripts/test_niveis_cartao.py \
+            scripts/test_preparo_material.py \
+            scripts/test_preparo_integracao.py \
             scripts/test_qualificacao.py \
             scripts/test_qualificacao5k.py \
             scripts/test_qualificar_revisado.py \

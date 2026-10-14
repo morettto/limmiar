@@ -15,7 +15,7 @@ import { papelDoFalante, transcreverAoVivo, type SessaoTranscricao, type Transcr
 import { LiveInsights } from './LiveInsights'
 import { abrirPerfilDeVoz } from './perfil-de-voz'
 import { PAPEIS_ONLINE, transcreverOnline } from './transcrever-online'
-import { prepareAuthorizedMaterials } from '../../entities/material/authorized-materials'
+import { prepareAuthorizedMaterials, type SessionMaterial } from '../../entities/material/authorized-materials'
 import type { BibliografiaInsight } from '../../entities/insight/insight'
 import type { PropostaReferencia } from '../../entities/nota/referencia'
 
@@ -44,11 +44,14 @@ export interface SessionReviewProps {
   transcricao?: Transcricao
   online?: { local: MediaStream | null; remoto: MediaStream | null; ativa: boolean }
   prepararEncerramento?(encerrar: () => Promise<void>): void
+  encerrada?: boolean
+  bloqueada?: boolean
+  onPreparingChange?(preparando: boolean): void
   onSaved?(transcricao: Transcricao): void
   onPropostaReferencia?(proposta: PropostaReferencia): void
 }
 
-export function SessionReview({ baseUrl, accessToken, accountId, kek, paciente, atendimentoId, transcricao, onPendingChange, online, prepararEncerramento, onSaved, onPropostaReferencia }: SessionReviewProps) {
+export function SessionReview({ baseUrl, accessToken, accountId, kek, paciente, atendimentoId, transcricao, onPendingChange, online, prepararEncerramento, onSaved, onPropostaReferencia, encerrada = false, bloqueada = false, onPreparingChange }: SessionReviewProps) {
   const { i18n, t } = useLingui()
   const [palavras, setPalavras] = useState<PalavraAtribuida[]>(() => transcricao?.palavras ?? [])
   const [papeis, setPapeis] = useState<Record<string, RotuloLocutor | null>>(() => transcricao?.papeis ?? {})
@@ -71,6 +74,8 @@ export function SessionReview({ baseUrl, accessToken, accountId, kek, paciente, 
   const votosLocais = useMemo(() => ({ accountId, kek }), [accountId, kek])
   const [bibliografia, setBibliografia] = useState<BibliografiaInsight | null>(null)
   const [materiaisPendentes, setMateriaisPendentes] = useState(0)
+  const [materiais, setMateriais] = useState<SessionMaterial[]>([])
+  const [selecionados, setSelecionados] = useState<string[]>(transcricao?.materialIds ?? [])
   const tentativa = useRef<Transcricao | null>(null)
   const recorder = useRef<MediaRecorder | null>(null)
   const sessaoAoVivo = useRef<SessaoTranscricao | null>(null)
@@ -81,6 +86,7 @@ export function SessionReview({ baseUrl, accessToken, accountId, kek, paciente, 
   const controller = useRef<AbortController | null>(null)
   const corrigidos = useRef<Record<string, RotuloLocutor | null>>({})
   const player = useRef<HTMLAudioElement | null>(null)
+  const perfilPronto = useRef<Promise<{ perfil: number[] | null; falhou: boolean }> | null>(null)
   // Stryker disable next-line BooleanLiteral: equivalent, the effect below sets the flag before any async work.
   const montado = useRef(true)
   const consentimentos = useRef(paciente.consentimentos)
@@ -92,19 +98,39 @@ export function SessionReview({ baseUrl, accessToken, accountId, kek, paciente, 
   const identificada = palavras.every((palavra) => palavra.texto.trim() !== '' && papelDe.get(palavra.locutor) != null)
   const haPendencias = gravando || ocupado || alterada
   const jaGravada = revisao >= 0
+  const bibliografiaSelecionada = useMemo(() => bibliografia === null ? undefined : {
+    ...bibliografia, materialIds: selecionados.filter(id => bibliografia.materialIds.includes(id)),
+  }, [bibliografia, selecionados])
+
+  useEffect(() => {
+    if (online || !autorizada || !analiseAutorizada || jaGravada || encerrada) return
+    const abort = new AbortController()
+    let perfil: number[] | null = null
+    perfilPronto.current = abrirPerfilDeVoz(baseUrl, accountId, accessToken, kek, abort.signal)
+      .then(aberto => { perfil = aberto; return { perfil: aberto, falhou: false } }, () => ({ perfil: null, falhou: true }))
+    return () => { abort.abort(); perfil?.fill(0); perfilPronto.current = null }
+  }, [baseUrl, accountId, accessToken, kek, online, autorizada, analiseAutorizada, jaGravada, encerrada])
 
   useEffect(() => {
     let ativa = true
+    let espera: ReturnType<typeof setTimeout> | undefined
     setBibliografia(null); setMateriaisPendentes(0)
-    if (analiseAutorizada) {
+    function carregar(primeira: boolean) {
       void prepareAuthorizedMaterials({ baseUrl, accountId, accessToken }, kek).then(result => {
-        if (ativa) { setBibliografia({ accountId, accessToken, materialIds: result.materialIds }); setMateriaisPendentes(result.pending) }
+        if (ativa) {
+          setBibliografia({ accountId, accessToken, materialIds: result.materialIds }); setMateriaisPendentes(result.pending)
+          setMateriais(result.materials)
+          if (primeira && !transcricao) setSelecionados(result.materialIds)
+          if (result.pending > 0) espera = setTimeout(() => carregar(false), 1500)
+        }
       }).catch(() => { if (ativa) setMateriaisPendentes(1) })
     }
-    return () => { ativa = false }
-  }, [baseUrl, accountId, accessToken, kek, analiseAutorizada])
+    if (analiseAutorizada) carregar(true)
+    return () => { ativa = false; clearTimeout(espera) }
+  }, [baseUrl, accountId, accessToken, kek, analiseAutorizada, transcricao])
 
   useEffect(() => { onPendingChange(haPendencias) }, [haPendencias, onPendingChange])
+  useEffect(() => { onPreparingChange?.(ocupado) }, [ocupado, onPreparingChange])
   useEffect(() => {
     if (!haPendencias) return
     const avisar = (evento: BeforeUnloadEvent) => { evento.preventDefault(); evento.returnValue = '' }
@@ -125,7 +151,7 @@ export function SessionReview({ baseUrl, accessToken, accountId, kek, paciente, 
   // Stryker restore ArrayDeclaration
   useEffect(() => {
     if (!autorizada || !analiseAutorizada) controller.current?.abort()
-    if (!autorizada && recorder.current?.state !== 'inactive') recorder.current?.stop()
+    if ((!autorizada || !analiseAutorizada) && recorder.current?.state !== 'inactive') recorder.current?.stop()
     if (!analiseAutorizada) {
       palavrasOnline.current = []; inicioOnline.current = null
       setPalavras([]); setPapeis({}); setAlterada(false)
@@ -135,6 +161,15 @@ export function SessionReview({ baseUrl, accessToken, accountId, kek, paciente, 
 
   useEffect(() => {
     prepararEncerramento?.(async () => {
+      const gravador = recorder.current
+      const presencial = sessaoAoVivo.current
+      if (gravador && gravador.state !== 'inactive') {
+        await new Promise<void>(resolve => {
+          gravador.addEventListener('stop', () => resolve(), { once: true })
+          gravador.stop()
+        })
+        await presencial?.encerrar()
+      }
       await filaOnline.current
       await sessaoOnline.current?.encerrar()
       setGravando(false); setEstavelAteMs(Number.MAX_SAFE_INTEGER)
@@ -188,7 +223,7 @@ export function SessionReview({ baseUrl, accessToken, accountId, kek, paciente, 
   }, [localOnline, remotoOnline, onlineAtiva, autorizada, analiseAutorizada, jaGravada])
 
   async function analisar(audio: Blob) {
-    if (!montado.current || consentimentos.current.gravacao !== 'concedido') return
+    if (consentimentos.current.gravacao !== 'concedido') return
     setAudioUrl(URL.createObjectURL(audio))
     if (consentimentos.current.analiseIa !== 'concedido') {
       setMensagem(msg`O áudio é temporário nesta sessão. Autorize a análise por IA para transcrever.`)
@@ -245,36 +280,6 @@ export function SessionReview({ baseUrl, accessToken, accountId, kek, paciente, 
       setEstavelAteMs(0)
       setPausada(false)
       sessaoAoVivo.current = null
-      if (consentimentos.current.analiseIa === 'concedido') {
-        let perfil: number[] | null = null
-        let falhaNoPerfil = false
-        try { perfil = await abrirPerfilDeVoz(baseUrl, accountId, accessToken, kek, abort.signal) }
-        catch { falhaNoPerfil = true }
-        if (abort.signal.aborted || perfil === null) {
-          if (!abort.signal.aborted) {
-            setErroCaptura(falhaNoPerfil ? msg`Seu perfil de voz não pôde ser aberto. Sem ele não dá para saber quem está falando.` : msg`Cadastre sua voz antes de gravar: é preciso saber quem está falando.`)
-          }
-          resultado.microfone.stream.getTracks().forEach((track) => track.stop())
-          return
-        }
-        sessaoAoVivo.current = await transcreverAoVivo(resultado.microfone.stream, abort.signal, (transcricao) => {
-          if (abort.signal.aborted) return
-          setPalavras(transcricao.palavras)
-          setPapeis(Object.fromEntries(transcricao.palavras.flatMap((palavra) => palavra.locutor === null ? [] : [[palavra.locutor,
-            palavra.locutor in corrigidos.current ? corrigidos.current[palavra.locutor] : papelDoFalante(palavra.locutor)]])))
-          setEstavelAteMs(transcricao.estavelAteMs)
-          setFinais(transcricao.finais)
-          setAviso(transcricao.aviso)
-          setRevisada(false)
-          setAlterada(transcricao.palavras.length > 0)
-        }, (erro) => {
-          if (abort.signal.aborted) return
-          setErroCaptura(erro.message)
-          if (gravador.state !== 'inactive') gravador.stop()
-        // eslint-disable-next-line lingui/no-unlocalized-strings -- Transport option value, not visible copy.
-        }, { trilhas: 'proprias', perfil })
-      }
-      if (abort.signal.aborted) { resultado.microfone.stream.getTracks().forEach((track) => track.stop()); return }
       const partes: Blob[] = []
       let tamanho = 0
       gravador.addEventListener('dataavailable', (evento) => {
@@ -291,6 +296,10 @@ export function SessionReview({ baseUrl, accessToken, accountId, kek, paciente, 
         const audio = new Blob(partes, { type: gravador.mimeType })
         partes.length = 0
         recorder.current = null
+        if (abort.signal.aborted) {
+          resultado.microfone.stream.getTracks().forEach(track => track.stop())
+          return
+        }
         const sessao = sessaoAoVivo.current
         sessaoAoVivo.current = null
         if (sessao) {
@@ -309,11 +318,44 @@ export function SessionReview({ baseUrl, accessToken, accountId, kek, paciente, 
           void analisar(audio)
         }
       }, { once: true })
+      if (consentimentos.current.analiseIa === 'concedido') {
+        const preparado = await perfilPronto.current!
+        const perfil = preparado.perfil?.slice() ?? null
+        const falhaNoPerfil = preparado.falhou
+        if (abort.signal.aborted || perfil === null) {
+          if (!abort.signal.aborted) {
+            setErroCaptura(falhaNoPerfil ? msg`Seu perfil de voz não pôde ser aberto. Sem ele não dá para saber quem está falando.` : msg`Cadastre sua voz antes de gravar: é preciso saber quem está falando.`)
+          }
+          resultado.microfone.stream.getTracks().forEach((track) => track.stop())
+          return
+        }
+        recorder.current = gravador
+        gravador.start(5000)
+        sessaoAoVivo.current = await transcreverAoVivo(resultado.microfone.stream, abort.signal, (transcricao) => {
+          if (abort.signal.aborted) return
+          setPalavras(transcricao.palavras)
+          setPapeis(Object.fromEntries(transcricao.palavras.flatMap((palavra) => palavra.locutor === null ? [] : [[palavra.locutor,
+            palavra.locutor in corrigidos.current ? corrigidos.current[palavra.locutor] : papelDoFalante(palavra.locutor)]])))
+          setEstavelAteMs(transcricao.estavelAteMs)
+          setFinais(transcricao.finais)
+          setAviso(transcricao.aviso)
+          setRevisada(false)
+          setAlterada(transcricao.palavras.length > 0)
+        }, (erro) => {
+          if (abort.signal.aborted) return
+          setErroCaptura(erro.message)
+          if (gravador.state !== 'inactive') gravador.stop()
+        // eslint-disable-next-line lingui/no-unlocalized-strings -- Transport option value, not visible copy.
+        }, { trilhas: 'proprias', perfil })
+      }
+      if (abort.signal.aborted) return
       recorder.current = gravador
-      gravador.start(5000)
+      if (gravador.state === 'inactive') gravador.start(5000)
       setGravando(true)
       setMensagem(msg`Transcrição ao vivo. Seu perfil de voz identifica quem está falando.`)
     } catch {
+      controller.current?.abort()
+      if (recorder.current && recorder.current.state !== 'inactive') recorder.current.stop()
       resultado.microfone.stream.getTracks().forEach((track) => track.stop())
       setMensagem(msg`Não foi possível iniciar a gravação.`)
     } finally { setOcupado(false) }
@@ -337,6 +379,7 @@ export function SessionReview({ baseUrl, accessToken, accountId, kek, paciente, 
     setPalavras(transcricao.palavras)
     setEstavelAteMs(Number.MAX_SAFE_INTEGER)
     setPapeis(transcricao.papeis)
+    setSelecionados(transcricao.materialIds ?? [])
     setRevisada(true)
     setAlterada(false)
     tentativa.current = null
@@ -360,6 +403,7 @@ export function SessionReview({ baseUrl, accessToken, accountId, kek, paciente, 
       const nova = tentativa.current ?? {
         id: atendimentoId, patientId: paciente.id, revisao: revisao + 1, autorId: accountId, registradaEm: new Date().toISOString(),
         palavras, papeis: Object.fromEntries(Object.entries(papeis).filter((entrada): entrada is [string, RotuloLocutor] => entrada[1] !== null)),
+        materialIds: selecionados,
       }
       tentativa.current = nova
       const jaSalva = ultima !== undefined && new TextDecoder().decode(transcricaoParaEntrada(ultima)) === new TextDecoder().decode(transcricaoParaEntrada(nova))
@@ -395,14 +439,14 @@ export function SessionReview({ baseUrl, accessToken, accountId, kek, paciente, 
       : <Trans>Seu perfil de voz identifica o profissional. Confira as falas incertas antes de usar a transcrição.</Trans>}</p>
     {!autorizada && <p role="status"><Trans>O consentimento de gravação é necessário.</Trans></p>}
     {!online && <div className="my-3 flex flex-wrap gap-3">
-      <button type="button" className="button-primary" disabled={!gravando && (!autorizada || ocupado || alterada || jaGravada)} onClick={() => gravando ? recorder.current!.stop() : void iniciarGravacao()}>
+      <button type="button" className="button-primary" disabled={bloqueada || ocupado || (!gravando && (!autorizada || alterada || jaGravada || encerrada))} onClick={() => gravando ? recorder.current!.stop() : void iniciarGravacao()}>
         {gravando ? <Trans>Encerrar gravação</Trans> : <Trans>Iniciar gravação</Trans>}
       </button>
       {gravando && sessaoAoVivo.current && <button type="button" onClick={() => {
         sessaoAoVivo.current!.pausar(!pausada)
         setPausada(!pausada)
       }}>{pausada ? <Trans>Retomar sessão</Trans> : <Trans>Pausar sessão</Trans>}</button>}
-      <label><Trans>Ou carregar áudio</Trans><input type="file" accept="audio/*" disabled={!autorizada || ocupado || gravando || alterada || jaGravada}
+      <label><Trans>Ou carregar áudio</Trans><input type="file" accept="audio/*" disabled={!autorizada || ocupado || gravando || alterada || jaGravada || encerrada || bloqueada}
         onChange={(e) => {
           const arquivo = e.target.files![0]
           if (!arquivo) return
@@ -420,6 +464,16 @@ export function SessionReview({ baseUrl, accessToken, accountId, kek, paciente, 
     {gravando && aviso === 'atrasada' && <p role="status"><Trans>A transcrição está atrasada em relação à fala. O áudio continua sendo enviado.</Trans></p>}
     {analiseAutorizada && bibliografia === null && materiaisPendentes === 0 && <p role="status"><Trans>Preparando seu acervo autorizado para o copiloto local...</Trans></p>}
     {materiaisPendentes > 0 && <p role="status"><Trans>Há materiais autorizados que não estão prontos nesta máquina. Verifique seu acervo pessoal.</Trans></p>}
+    {analiseAutorizada && materiais.length > 0 && <fieldset disabled={ocupado || gravando || bloqueada || encerrada}>
+      <legend><Trans>Obras desta sessão</Trans></legend>
+      <p><Trans>Escolha as referências que o copiloto poderá consultar neste atendimento.</Trans></p>
+      {materiais.map(material => <label key={material.materialId}><input type="checkbox" disabled={!material.ready}
+        checked={selecionados.includes(material.materialId)} onChange={evento => {
+          setSelecionados(atual => evento.target.checked ? [...atual, material.materialId] : atual.filter(id => id !== material.materialId))
+          setAlterada(palavras.length > 0)
+          tentativa.current = null
+        }} />{material.title}{!material.ready && <span><Trans> · Em preparação</Trans></span>}</label>)}
+    </fieldset>}
     {gravando && <p role="status">{pausada ? <Trans>Microfone pausado.</Trans> : <Trans>O áudio permanece somente em memória durante a sessão.</Trans>}</p>}
     {audioUrl && <audio ref={player} controls src={audioUrl} className="my-3 w-full" />}
     {locutores.length > 0 && !online && <fieldset><legend><Trans>Identificar vozes</Trans></legend>
@@ -447,7 +501,7 @@ export function SessionReview({ baseUrl, accessToken, accountId, kek, paciente, 
         {audioUrl && <button type="button" disabled={!palavras.some((palavra) => palavra.locutor === locutor)} onClick={() => tocar(palavras.find((palavra) => palavra.locutor === locutor)!.inicioMs)}><Trans>Ouvir esta voz</Trans></button>}
       </div>})}
     </fieldset>}
-    <LiveInsights palavras={palavras} papeis={papeis} estavelAteMs={estavelAteMs} finais={gravando ? finais : undefined} autorizada={analiseAutorizada && bibliografia !== null} bibliografia={bibliografia ?? undefined} votos={votosLocais} trilhasSeparadas={online !== undefined} onOuvir={audioUrl ? tocar : undefined}
+    <LiveInsights palavras={palavras} papeis={papeis} estavelAteMs={estavelAteMs} finais={gravando ? finais : undefined} autorizada={analiseAutorizada && bibliografia !== null} bibliografia={bibliografiaSelecionada} temObrasAutorizadas={materiais.length > 0} votos={votosLocais} trilhasSeparadas={online !== undefined} onOuvir={audioUrl ? tocar : undefined}
       onSelectFonte={onPropostaReferencia && jaGravada && !haPendencias && !online?.ativa ? (consulta, fonte, inicioMs, fimMs) => onPropostaReferencia({
         patientId: paciente.id, inicioMs, fimMs, referencia: { trechoId: fonte.trecho_id, titulo: fonte.titulo, autor: fonte.autor,
           pagina: fonte.pagina, paragrafo: fonte.paragrafo, citacaoLiteral: fonte.citacao_literal,
@@ -463,10 +517,10 @@ export function SessionReview({ baseUrl, accessToken, accountId, kek, paciente, 
           return <li key={indice} className="my-2 flex flex-wrap gap-2">
           {audioUrl ? <button type="button" aria-label={t`Ouvir palavra aos ${segundos}s`} onClick={() => tocar(palavra.inicioMs)}><Trans>{segundos}s</Trans></button> : <span><Trans>{segundos}s</Trans></span>}
           <label><Trans>Texto aos {segundos}s</Trans>
-            <input disabled={ocupado || gravando} value={palavra.texto} onChange={(e) => corrigir(indice, { texto: e.target.value })} />
+            <input disabled={ocupado || gravando || bloqueada} value={palavra.texto} onChange={(e) => corrigir(indice, { texto: e.target.value })} />
           </label>
           <label><Trans>Voz aos {segundos}s</Trans>
-            <select disabled={ocupado || gravando} value={vozAtual} onChange={(e) => corrigir(indice, { locutor: e.target.value || null })}>
+            <select disabled={ocupado || gravando || bloqueada} value={vozAtual} onChange={(e) => corrigir(indice, { locutor: e.target.value || null })}>
               <option value=""><Trans>Não identificado</Trans></option>
               {locutores.map((locutor, i) => {
                 const numero = i + 1
@@ -476,13 +530,13 @@ export function SessionReview({ baseUrl, accessToken, accountId, kek, paciente, 
           </label>
         </li>})}</ol>
       </details>
-      <label><input type="checkbox" checked={revisada} disabled={!identificada || ocupado || gravando} onChange={(e) => setRevisada(e.target.checked)} />
+      <label><input type="checkbox" checked={revisada} disabled={!identificada || ocupado || gravando || bloqueada} onChange={(e) => setRevisada(e.target.checked)} />
         {audioUrl ? <Trans>Conferi o texto e quem falou cada trecho ouvindo o áudio.</Trans> : <Trans>Conferi o texto e quem falou cada trecho.</Trans>}
       </label>
       {revisada && <p role="status"><Trans>Transcrição revisada.</Trans></p>}
       <div className="my-3 flex gap-3">
-        <button type="button" className="button-primary" disabled={!revisada || !identificada || !alterada || ocupado || gravando} onClick={() => void salvar()}><Trans>Salvar transcrição</Trans></button>
-        {alterada && <button type="button" disabled={ocupado || gravando} onClick={descartar}><Trans>Descartar alterações</Trans></button>}
+        <button type="button" className="button-primary" disabled={!revisada || !identificada || !alterada || ocupado || gravando || bloqueada} onClick={() => void salvar()}><Trans>Salvar transcrição</Trans></button>
+        {alterada && <button type="button" disabled={ocupado || gravando || bloqueada} onClick={descartar}><Trans>Descartar alterações</Trans></button>}
       </div>
     </>}
     {historico.length > 0 && <details className="mt-4"><summary><Trans>Revisões e correções</Trans> ({historico.length})</summary>

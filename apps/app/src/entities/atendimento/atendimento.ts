@@ -3,6 +3,27 @@ export interface Atendimento {
   readonly patientId: string
   readonly agendamentoId: string
   readonly iniciadoEm: string
+  readonly encerradoEm?: string
+}
+
+export interface EncerramentoAtendimento {
+  atendimentoId: string
+  encerradoEm: string
+  autorId: string
+}
+
+export function encerramentoParaEntrada(encerramento: EncerramentoAtendimento): Uint8Array<ArrayBuffer> {
+  return new TextEncoder().encode(JSON.stringify({ tipo: 'encerramento-atendimento', ...encerramento }))
+}
+
+export function lerEncerramento(bytes: Uint8Array<ArrayBuffer>): EncerramentoAtendimento | null {
+  let valor: unknown
+  try { valor = JSON.parse(new TextDecoder().decode(bytes)) } catch { return null }
+  if (typeof valor !== 'object' || valor === null) return null
+  const { tipo, atendimentoId, encerradoEm, autorId } = valor as Record<string, unknown>
+  if (tipo !== 'encerramento-atendimento' || !naoVazio(atendimentoId) || !naoVazio(autorId) ||
+    typeof encerradoEm !== 'string' || !Number.isFinite(Date.parse(encerradoEm))) return null
+  return { atendimentoId, encerradoEm, autorId }
 }
 
 export function atendimentoParaEntrada(atendimento: Atendimento): Uint8Array<ArrayBuffer> {

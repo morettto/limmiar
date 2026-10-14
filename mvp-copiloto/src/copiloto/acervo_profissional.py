@@ -3,9 +3,14 @@ from __future__ import annotations
 
 import hashlib
 import io
+import logging
+import json
 import os
 import sqlite3
 import threading
+import time
+from collections.abc import Callable
+from contextlib import nullcontext
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from uuid import UUID
@@ -27,7 +32,7 @@ def falhar(code: str, status: int = 400):
     raise HTTPException(status_code=status, detail={"code": code})
 
 
-def materiais_autorizados(account_id: str, authorization: str | None) -> dict[str, dict]:
+def materiais_da_conta(account_id: str, authorization: str | None) -> dict[str, dict]:
     if not isinstance(authorization, str) or not authorization.startswith("Bearer ") or not authorization[7:].strip():
         falhar("material.unauthorized", 401)
     try:
@@ -42,11 +47,18 @@ def materiais_autorizados(account_id: str, authorization: str | None) -> dict[st
     if response.status_code != 200:
         falhar("material.unavailable", 503)
     try:
-        items = {str(UUID(item["materialId"])): item for item in response.json()["materials"] if item["authorized"] is True}
+        materials = response.json()["materials"]
+        if any(not isinstance(item, dict) or not isinstance(item.get("authorized"), bool) for item in materials):
+            raise ValueError("invalid materials")
+        items = {str(UUID(item["materialId"])): item for item in materials}
     except (KeyError, ValueError, TypeError):
         falhar("material.unavailable", 503)
     ACERVO.reconciliar(account_id, items)
     return items
+
+
+def materiais_autorizados(account_id: str, authorization: str | None) -> dict[str, dict]:
+    return {id_: item for id_, item in materiais_da_conta(account_id, authorization).items() if item["authorized"] is True}
 
 
 async def multipart_em_memoria(request: Request) -> tuple[bytes, dict[str, str]]:
@@ -161,7 +173,9 @@ class Acervo:
         with self._lock:
             return [item.status() for item in self._owners.get(owner, {}).values()]
 
-    def preparar(self, owner: str, id_: str, data: bytes, fields: dict[str, str]) -> Material:
+    def preparar(self, owner: str, id_: str, data: bytes, fields: dict[str, str], trava_modelo=None,
+                 progresso: Callable[[str, int, int], None] | None = None) -> Material:
+        inicio_preparo = time.perf_counter()
         if not data or len(data) > MAX_BYTES:
             falhar("material.too_large", 413)
         digest = hashlib.sha256(data).hexdigest()
@@ -172,7 +186,13 @@ class Acervo:
         try:
             if fields["tipo"] == "pdf" and data.startswith(b"%PDF-"):
                 reader = PdfReader(io.BytesIO(data))
-                pages = tuple(parse._limpar(page.extract_text() or "") for page in reader.pages)
+                total_paginas = len(reader.pages)
+                extraidas = []
+                if progresso and total_paginas: progresso("leitura", 0, total_paginas)
+                for numero, page in enumerate(reader.pages, 1):
+                    extraidas.append(parse._limpar(page.extract_text() or ""))
+                    if progresso: progresso("leitura", numero, total_paginas)
+                pages = tuple(extraidas)
             elif fields["tipo"] == "txt":
                 pages = (parse._limpar(data.decode("utf-8")),)
                 if "\0" in pages[0]:
@@ -200,11 +220,28 @@ class Acervo:
         if not blocks:
             falhar("material.no_text")
         model = embedder.PADRAO
-        vectors = embedder.codificar_documentos([block.texto for block in blocks], model, lote=8)
+        inicio_embedding = time.perf_counter()
+        textos = list(dict.fromkeys(block.texto for block in blocks))
+        ordem = sorted(range(len(textos)), key=lambda indice: len(textos[indice]), reverse=True)
+        if progresso: progresso("referencias", 0, len(textos))
+        lotes = []
+        for inicio in range(0, len(textos), 8):
+            with trava_modelo if trava_modelo is not None else nullcontext():
+                lotes.append(embedder.codificar_documentos(
+                    [textos[indice] for indice in ordem[inicio:inicio + 8]], model, lote=8))
+            if progresso: progresso("referencias", min(inicio + 8, len(textos)), len(textos))
+        unicos = np.concatenate(lotes)[np.argsort(ordem)]
+        indices = {texto: indice for indice, texto in enumerate(textos)}
+        vectors = unicos[[indices[block.texto] for block in blocks]]
         material = Material(id_, fields["titulo"].strip(), fields["autores"].strip(), digest, pages,
                             tuple(blocks), vectors, model, datetime.now(timezone.utc).isoformat())
         with self._lock:
             self._owners.setdefault(owner, {})[id_] = material
+        logging.getLogger("uvicorn.error").info(json.dumps({"event": "material_prepared", "materialId": id_,
+            "pages": len(pages), "paragraphs": len(blocks), "unique_paragraphs": len(textos), "bytes": len(data),
+            "extraction_ms": round((inicio_embedding - inicio_preparo) * 1000),
+            "embedding_ms": round((time.perf_counter() - inicio_embedding) * 1000),
+            "device": os.environ.get("COPILOTO_EMBEDDER_DISPOSITIVO", "cpu")}))
         return material
 
     def snapshot(self, owner: str, ids: list[str]) -> Snapshot:

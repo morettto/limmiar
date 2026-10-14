@@ -36,6 +36,16 @@ jobs:
       # vitest exits non-zero when any coverage threshold (perFile 100%) is
       # unmet, so this step's own exit code is the gate — nothing extra to
       # check.
+      - name: Prepare verified native voice models
+        run: |
+          mkdir -p apps/app/public/models/voice-identity
+          curl --fail --location --retry 3 https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/nemo_en_titanet_large.onnx -o apps/app/public/models/voice-identity/titanet.onnx
+          echo "d51abcf31717ef28162f26acb9d44dd4127c3d44c9b8624f699f3425daca8e77  apps/app/public/models/voice-identity/titanet.onnx" | sha256sum -c -
+          node tools/voice-identity/setup-segmentacao.mjs
+
+      - name: Gateway unit and native integration tests + coverage
+        run: pnpm --filter gateway-fala test:unit
+
       - name: Unit tests + coverage (app)
         run: pnpm --filter app test:unit
 

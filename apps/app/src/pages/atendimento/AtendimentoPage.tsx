@@ -11,6 +11,9 @@ import { useProntuario } from '../../features/prontuario/prontuario-context'
 import { useBloquearNavegacao } from '../../widgets/app-shell/bloqueio'
 import { ConsentimentoPaciente } from '../../widgets/patient-care/ConsentimentoPaciente'
 import { OnlineSession } from '../../widgets/online-session/OnlineSession'
+import { encerrarAtendimento } from '../../features/prontuario/encerrar-atendimento'
+import { msg } from '@lingui/core/macro'
+import { traduzir, type Texto } from '../../shared/i18n'
 
 // eslint-disable-next-line lingui/no-unlocalized-strings -- ARIA token, not copy.
 const paginaAtual = (ativa: boolean) => (ativa ? 'page' : undefined)
@@ -47,6 +50,12 @@ function Sessao({ baseUrl, accountId, accessToken, kek, patientId, atendimentoId
   const [pendente, setPendente] = useState(false)
   const [propostaReferencia, setPropostaReferencia] = useState<PropostaReferencia | null>(null)
   const [falhaRecarga, setFalhaRecarga] = useState(false)
+  const [finalizando, setFinalizando] = useState(false)
+  const [preparando, setPreparando] = useState(false)
+  const [encerrada, setEncerrada] = useState(atendimento.encerradoEm !== undefined)
+  const [avisoEncerramento, setAvisoEncerramento] = useState<Texto | null>(null)
+  const pararCaptura = useRef<() => Promise<void>>(null)
+  const salvarNota = useRef<() => Promise<void>>(null)
   const tituloRef = useRef<HTMLHeadingElement>(null)
   const tipoSessaoId = useId()
 
@@ -68,6 +77,27 @@ function Sessao({ baseUrl, accountId, accessToken, kek, patientId, atendimentoId
   }), [navigate, patientId, atendimentoId])
   const proporReferencia = useCallback((proposta: PropostaReferencia) => { setPropostaReferencia(proposta); void irParaAba(ABA_NOTA) }, [irParaAba])
   const abrirTranscricao = useCallback(() => void irParaAba(ABA_INSIGHTS), [irParaAba])
+  const registrarCaptura = useCallback((parar: () => Promise<void>) => { pararCaptura.current = parar }, [])
+  const registrarNota = useCallback((salvar: () => Promise<void>) => { salvarNota.current = salvar }, [])
+
+  async function encerrar() {
+    setFinalizando(true); setAvisoEncerramento(null)
+    try {
+      if (pendente) {
+        await pararCaptura.current?.()
+        await irParaAba(ABA_INSIGHTS)
+        setAvisoEncerramento(msg`Captura encerrada. Confira e salve a transcrição antes de encerrar a sessão.`)
+        return
+      }
+      await salvarNota.current!()
+      await encerrarAtendimento(baseUrl, accountId, accessToken, patientId, atendimentoId, prontuario.dek)
+      await recarregar()
+      setEncerrada(true)
+      setAvisoEncerramento(msg`Sessão encerrada. Os registros estão salvos. A nota permanece disponível para revisão e assinatura.`)
+    } catch (erro) {
+      setAvisoEncerramento(erro instanceof Error ? erro.message : msg`Não foi possível encerrar a sessão. Tente novamente.`)
+    } finally { setFinalizando(false) }
+  }
 
   useBloquearNavegacao(pendente)
   useBlocker({
@@ -90,6 +120,11 @@ function Sessao({ baseUrl, accountId, accessToken, kek, patientId, atendimentoId
       </nav>
       <h1 ref={tituloRef} tabIndex={-1}><Trans>Sessão de {data}</Trans></h1>
       <EstadoDoAtendimento atendimentoId={atendimentoId} />
+      <div className="my-4 flex flex-wrap gap-3">
+        {!encerrada && <button type="button" className="button-primary" disabled={finalizando || preparando || (tipoSessao === 'online' && pendente)} onClick={() => void encerrar()}><Trans>Encerrar sessão</Trans></button>}
+        {encerrada && <p role="status"><Trans>Sessão encerrada</Trans></p>}
+      </div>
+      {avisoEncerramento !== null && <p role="status">{traduzir(i18n, avisoEncerramento)}</p>}
     </header>
     <nav aria-label={t`Seções da sessão`} className="flex gap-4">
       <Link to="/pacientes/$patientId/sessoes/$atendimentoId" params={{ patientId, atendimentoId }} search={{ aba: ABA_INSIGHTS }} aria-current={paginaAtual(aba === ABA_INSIGHTS)}><Trans>Insights</Trans></Link>
@@ -99,7 +134,7 @@ function Sessao({ baseUrl, accountId, accessToken, kek, patientId, atendimentoId
     <div hidden={aba !== ABA_INSIGHTS}>
       <section className="workspace-card" aria-label={t`Consentimento e tipo de sessão`}>
         <ConsentimentoPaciente baseUrl={baseUrl} accountId={accountId} accessToken={accessToken} patientId={patientId} />
-        {!abriuComTranscricao && <>
+        {!abriuComTranscricao && !encerrada && <>
           <label htmlFor={tipoSessaoId}><Trans>Tipo de sessão</Trans></label><select id={tipoSessaoId} disabled={pendente} value={tipoSessao} onChange={event => setTipoSessao(event.target.value as 'presencial' | 'online')}>
             <option value="presencial"><Trans>Presencial, com microfone compartilhado</Trans></option>
             <option value="online"><Trans>Online, com conexão do paciente</Trans></option>
@@ -108,14 +143,16 @@ function Sessao({ baseUrl, accountId, accessToken, kek, patientId, atendimentoId
       </section>
       {tipoSessao === 'online' && !abriuComTranscricao
         ? <OnlineSession baseUrl={baseUrl} accountId={accountId} accessToken={accessToken} patientId={patientId} kek={kek} paciente={paciente} atendimentoId={atendimentoId} transcricao={transcricao}
-          onPendingChange={receberPendencias} onSaved={atualizarProntuario} onPropostaReferencia={proporReferencia} />
+          onPendingChange={receberPendencias} onSaved={atualizarProntuario} onPropostaReferencia={proporReferencia} atendimentoEncerrado={encerrada} bloqueada={finalizando} />
         : <SessionReview baseUrl={baseUrl} accessToken={accessToken} accountId={accountId} kek={kek} paciente={paciente} atendimentoId={atendimentoId} transcricao={transcricao}
-          onPendingChange={receberPendencias} onSaved={atualizarProntuario} onPropostaReferencia={proporReferencia} />}
+          onPendingChange={receberPendencias} onSaved={atualizarProntuario} onPropostaReferencia={proporReferencia}
+          prepararEncerramento={registrarCaptura} encerrada={encerrada} bloqueada={finalizando} onPreparingChange={setPreparando} />}
     </div>
     <div hidden={aba !== ABA_NOTA}>
       <NotaDoAtendimento baseUrl={baseUrl} accountId={accountId} accessToken={accessToken} patientId={patientId} atendimentoId={atendimentoId} dek={prontuario.dek}
         nota={prontuario.notas.find(nota => nota.atendimentoId === atendimentoId)} transcricoes={transcricoes} analiseAutorizada={prontuario.consentimentos.analiseIa === 'concedido'}
-        ativa={aba === ABA_NOTA} propostaReferencia={propostaReferencia} onDescartarProposta={descartarProposta} onAbrirTranscricao={abrirTranscricao} onSaved={atualizarProntuario} />
+        ativa={aba === ABA_NOTA} propostaReferencia={propostaReferencia} onDescartarProposta={descartarProposta} onAbrirTranscricao={abrirTranscricao} onSaved={atualizarProntuario}
+        prepararSalvamento={registrarNota} bloqueada={finalizando} />
     </div>
   </main>
 }

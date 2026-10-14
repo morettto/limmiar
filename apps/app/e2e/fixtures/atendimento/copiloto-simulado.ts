@@ -57,6 +57,7 @@ const semAcento = (texto: string) => texto.normalize('NFD').replace(/\p{M}/gu, '
 
 export async function simularCopiloto(page: Page): Promise<CopilotoSimulado> {
   const preparados = new Map<string, string>()
+  const acompanhamentos = new Map<string, number>()
   const estado: CopilotoSimulado = { consultas: [], votosEnviados: [], preparados: () => [...preparados.keys()] }
   await page.route('**/copiloto/api/**', async (route) => {
     const pedido = route.request()
@@ -68,10 +69,17 @@ export async function simularCopiloto(page: Page): Promise<CopilotoSimulado> {
         const sha256 = /name="sha256"\r\n\r\n([0-9a-f]{64})/.exec(pedido.postDataBuffer()?.toString('latin1') ?? '')?.[1]
         if (!sha256) return route.fulfill({ status: 400 })
         preparados.set(materialId, sha256)
-        return route.fulfill({ json: { materialId, ready: true, sha256, paragraphs: 12, preparedAt: new Date().toISOString() } })
+        acompanhamentos.set(materialId, 0)
+        return route.fulfill({ status: 202, json: { materialId, ready: false, sha256, stage: 'aguardando' } })
       }
       if (pedido.method() === 'DELETE' && materialId) { preparados.delete(materialId); return route.fulfill({ status: 204 }) }
-      return route.fulfill({ json: { materials: [...preparados].map(([materialId, sha256]) => ({ materialId, ready: true, sha256, paragraphs: 12, preparedAt: new Date().toISOString() })) } })
+      return route.fulfill({ json: { materials: [...preparados].map(([materialId, sha256]) => {
+        const consulta = (acompanhamentos.get(materialId) ?? 0) + 1
+        acompanhamentos.set(materialId, consulta)
+        if (consulta <= 2) return { materialId, ready: false, sha256, stage: 'organizando',
+          progress: { phase: consulta === 1 ? 'leitura' : 'referencias', completed: consulta === 1 ? 1 : 8, total: consulta === 1 ? 2 : 24 } }
+        return { materialId, ready: true, sha256, paragraphs: 12, preparedAt: new Date().toISOString() }
+      }) } })
     }
     if (pathname.endsWith('/votos')) {
       estado.votosEnviados.push(pedido.postData() ?? '')

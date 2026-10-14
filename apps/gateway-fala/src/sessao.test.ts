@@ -69,20 +69,21 @@ describe('quem fala, no modo presencial', () => {
       { type: 'final', frase: 1, falante: 'paciente', processado_ms: 3900,
         palavras: [{ texto: 'Dor', inicio_ms: 2200, fim_ms: 3000 }, { texto: 'forte', inicio_ms: 3100, fim_ms: 3800 }] },
     ])
-    expect(extrator.chamadas).toEqual([24_000, 24_000])
+    expect(extrator.chamadas.every(tamanho => tamanho === 8000)).toBe(true)
   })
 
   it('agrupa as vozes que não são o profissional e numera as novas', async () => {
     const { sessao, canal, up } = await iniciar()
+    sessao.pcm(pcmConstante(1000, AMPLITUDE.A))
     sessao.pcm(pcmConstante(1000, AMPLITUDE.B))
     sessao.pcm(pcmConstante(1000, AMPLITUDE.C))
     sessao.pcm(pcmConstante(1000, AMPLITUDE.B))
-    const todas: [string, number, number][] = [['um', 0.1, 0.9], ['dois', 1.1, 1.9], ['tres', 2.1, 2.9]]
-    for (let finais = 1; finais <= 3; finais++) {
+    const todas: [string, number, number][] = [['profissional', 0.1, 0.8], ['um', 1.1, 1.8], ['dois', 2.1, 2.8], ['tres', 3.1, 3.8]]
+    for (let finais = 1; finais <= 4; finais++) {
       up.palavras(todas.slice(0, finais), finais)
       await esperar()
     }
-    expect(canal.de('final').map((final) => final.falante)).toEqual(['paciente', 'pessoa_2', 'paciente'])
+    expect(canal.de('final').map((final) => final.falante)).toEqual(['profissional', 'paciente', 'pessoa_2', 'paciente'])
   })
 
   it('frase curta herda o falante da anterior e é corrigida quando a vizinha seguinte está mais perto', async () => {
@@ -92,8 +93,8 @@ describe('quem fala, no modo presencial', () => {
     await esperar()
     up.palavras([['Olá', 0.1, 1.5], ['Sim', 2.1, 2.3]], 2)
     await esperar()
-    expect(canal.de('final')[1]).toMatchObject({ frase: 1, falante: 'profissional' })
-    expect(extrator.chamadas).toHaveLength(1)
+    expect(canal.de('final')[1]).toMatchObject({ frase: 1, falante: null })
+    expect(extrator.chamadas).toHaveLength(5)
     up.palavras([['Olá', 0.1, 1.5], ['Sim', 2.1, 2.3], ['Estou', 2.4, 2.8], ['mal', 2.9, 3.9]], 4)
     await esperar()
     expect(canal.de('final')[2]).toMatchObject({ frase: 2, falante: 'paciente' })
@@ -103,9 +104,9 @@ describe('quem fala, no modo presencial', () => {
   it('frase curta sem nenhuma vizinha fica sem falante até a próxima ser verificada', async () => {
     const { sessao, canal, up } = await iniciar()
     falaAB(sessao)
-    up.palavras([['Oi', 0.1, 0.3]], 1)
+    up.palavras([['Oi', 0.1, 0.2]], 1)
     await esperar()
-    up.palavras([['Oi', 0.1, 0.3], ['Bom', 0.5, 0.9], ['dia', 1, 1.6]], 3)
+    up.palavras([['Oi', 0.1, 0.2], ['Bom', 0.5, 0.9], ['dia', 1, 1.6]], 3)
     await esperar()
     expect(canal.de('final').map((final) => final.falante)).toEqual([null, 'profissional'])
     expect(canal.de('falante')).toEqual([{ type: 'falante', frase: 0, falante: 'profissional' }])
@@ -117,7 +118,7 @@ describe('quem fala, no modo presencial', () => {
     extrator.retorno = () => Promise.resolve(null)
     up.palavras([['Bom', 0.1, 1.5]], 1)
     await esperar()
-    expect(extrator.chamadas).toHaveLength(1)
+    expect(extrator.chamadas).toHaveLength(2)
     expect(canal.de('final')[0]!.falante).toBeNull()
   })
 
@@ -149,7 +150,36 @@ describe('quem fala, no modo presencial', () => {
     sessao.pcm(pcmConstante(6000, AMPLITUDE.A))
     up.palavras([['longa', 0.1, 5.5]], 1)
     await esperar()
-    expect(extrator.chamadas).toEqual([1500 * 16])
+    expect(extrator.chamadas).toEqual([500 * 16, 500 * 16])
+  })
+})
+
+describe('trocas de voz dentro da frase', () => {
+  it('divide uma frase longa em janelas limitadas e emite cada palavra com a voz correta', async () => {
+    const { sessao, canal, extrator, up } = await iniciar(INICIO_PRESENCIAL, { parametros: { ...SEM_ROTACAO, bufferMs: 30_000 } })
+    sessao.pcm(pcmConstante(6000, AMPLITUDE.A))
+    sessao.pcm(pcmConstante(6000, AMPLITUDE.B))
+    sessao.pcm(pcmConstante(2000, AMPLITUDE.A))
+    const segmentar = vi.spyOn(extrator, 'segmentar')
+    up.palavras([['Olá', 0.1, 1], ['Bem', 2, 3], ['Paciente', 6.2, 7], ['Sim', 8, 9], ['Continuo', 10.1, 11], ['Perfeito', 12.1, 13]], 6)
+    await esperar()
+    expect(canal.de('final').map(final => [final.falante, final.palavras.map(palavra => palavra.texto)])).toEqual([
+      ['profissional', ['Olá', 'Bem']], ['paciente', ['Paciente', 'Sim']],
+      ['paciente', ['Continuo']], ['profissional', ['Perfeito']],
+    ])
+    expect(segmentar.mock.calls.every(([pcm]) => pcm.length <= 160000)).toBe(true)
+  })
+
+  it('expira palavras incertas quando o próprio áudio saiu da janela, sem chute posterior', async () => {
+    const { sessao, canal, up } = await iniciar()
+    sessao.pcm(pcmConstante(400, AMPLITUDE.B))
+    up.palavras([['Oi', 0.1, 0.2]], 1)
+    await esperar()
+    sessao.pcm(pcmConstante(15000, AMPLITUDE.A))
+    up.palavras([['Oi', 0.1, 0.2], ['Tudo bem', 14, 15]], 2)
+    await esperar()
+    expect(canal.de('final')[0]!.falante).toBeNull()
+    expect(canal.de('falante')).toEqual([])
   })
 })
 
@@ -259,7 +289,7 @@ describe('rotação da sessão upstream', () => {
     expect(novo.amostras).toBe(1160 * 16)
     novo.palavras([['Dor', 0.3, 0.9]], 1, 0.5)
     await esperar()
-    expect(canal.de('final')[1]).toEqual({ type: 'final', frase: 1, falante: 'paciente', processado_ms: 1700,
+    expect(canal.de('final')[1]).toEqual({ type: 'final', frase: 1, falante: null, processado_ms: 1700,
       palavras: [{ texto: 'Dor', inicio_ms: 1500, fim_ms: 2100 }] })
   })
 

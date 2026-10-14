@@ -8,13 +8,13 @@ export function PatientSessions({ patientId }: { patientId: string }) {
   const { i18n, t } = useLingui()
   const { prontuario } = useProntuario()
   const sessoes = [...prontuario.atendimentos].reverse()
-  return <section aria-label={t`Sessões do paciente`} className="patient-sessions">
+  return <section aria-label={t`Sessões do paciente`} className="workspace-card patient-sessions">
     <div className="professional-header"><h2><Trans>Sessões do paciente</Trans></h2><span className="editorial-meta"><Plural value={sessoes.length} _0="# sessões" one="# sessão" other="# sessões" /></span></div>
     {sessoes.length === 0 ? <p><Trans>Nenhuma sessão ainda. Inicie a primeira a partir de um agendamento de hoje.</Trans></p> :
-      <ul>{sessoes.map(sessao => {
+      <ul className="patient-session-list">{sessoes.map(sessao => {
         const data = i18n.date(sessao.iniciadoEm, FORMATO_DATA_ATENDIMENTO)
-        return <li key={sessao.id}>
-          <Link to="/pacientes/$patientId/sessoes/$atendimentoId" params={{ patientId, atendimentoId: sessao.id }} search={{ aba: ABA_INSIGHTS }}><Trans>Sessão de {data}</Trans></Link>{' '}
+        return <li key={sessao.id} className="patient-session-row">
+          <Link className="patient-session-link" to="/pacientes/$patientId/sessoes/$atendimentoId" params={{ patientId, atendimentoId: sessao.id }} search={{ aba: ABA_INSIGHTS }}><Trans>Sessão de {data}</Trans></Link>{' '}
           <EstadoDoAtendimento atendimentoId={sessao.id} />
         </li>
       })}</ul>}

@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Trans, useLingui } from '@lingui/react/macro'
+import { Link } from '@tanstack/react-router'
 import type { PalavraAtribuida, RotuloLocutor } from '@limmiar/diarization'
 import { consultarInsight, type BibliografiaInsight, type ConsultaInsight, type FonteInsight, type ResultadoInsight } from '../../entities/insight/insight'
 import { criarFilaInsights } from '../../entities/insight/fila-insights'
@@ -26,20 +27,22 @@ interface Props {
   onOuvir?: (inicioMs: number) => void
   trilhasSeparadas?: boolean
   bibliografia?: BibliografiaInsight
+  temObrasAutorizadas?: boolean
   votos?: { accountId: string; kek: CryptoKey }
   onSelectFonte?(consulta: ConsultaInsight, fonte: FonteInsight, inicioMs: number, fimMs: number): void
 }
 
-export function LiveInsights({ palavras, papeis, estavelAteMs, finais, autorizada, onOuvir, trilhasSeparadas, bibliografia, votos, onSelectFonte }: Props) {
+export function LiveInsights({ palavras, papeis, estavelAteMs, finais, autorizada, onOuvir, trilhasSeparadas, bibliografia, votos, onSelectFonte, temObrasAutorizadas }: Props) {
   const { t } = useLingui()
   const prefixo = useId()
+  const semMateriais = bibliografia?.materialIds.length === 0
   const consultas = useMemo(() => {
-    if (!autorizada) return []
+    if (!autorizada || semMateriais) return []
     // Stryker disable next-line ConditionalExpression: equivalent, `papeis[null]` is undefined, which is not 'paciente' either.
     const doPaciente = trilhasSeparadas ? palavras.filter(palavra => palavra.locutor !== null && papeis[palavra.locutor] === 'paciente') : palavras
     const falas = selecionarFalasPaciente(doPaciente, papeis, estavelAteMs)
     return [...falas, ...selecionarTurnosPaciente(doPaciente, papeis, estavelAteMs, falas)]
-  }, [palavras, papeis, estavelAteMs, autorizada, trilhasSeparadas])
+  }, [palavras, papeis, estavelAteMs, autorizada, trilhasSeparadas, semMateriais])
   const linhas = useMemo(() => {
     if (!trilhasSeparadas) return montarLinhasTranscricao(palavras, papeis, consultas, finais)
     const fontes = new Map<string | null, typeof palavras>()
@@ -49,7 +52,7 @@ export function LiveInsights({ palavras, papeis, estavelAteMs, finais, autorizad
     })
     return [...fontes.values()].flatMap(fonte => montarLinhasTranscricao(fonte, papeis, consultas)).sort((a, b) => a.inicioMs - b.inicioMs)
   }, [palavras, papeis, consultas, finais, trilhasSeparadas])
-  const blocos = useMemo(() => montarBlocos(linhas), [linhas])
+  const blocos = useMemo(() => montarBlocos(linhas, palavras), [linhas, palavras])
   const [resultados, setResultados] = useState<Record<string, { resultado: ResultadoInsight; chave: string } | null>>({})
   const [aberta, setAberta] = useState<string | null>(null)
   const baloes = useRef(new Map<string, HTMLDetailsElement>())
@@ -132,13 +135,13 @@ ${trecho}`
       {linhas.length === 0 && <p><Trans>A fala aparecerá aqui durante a sessão.</Trans></p>}
       <ol className="transcript-blocks">{blocos.map((bloco) => {
         const segundos = (bloco.inicioMs / 1000).toFixed(1)
-        const instante = formatarInstante(bloco.inicioMs)
+        const duracao = formatarInstante(bloco.falaMs)
         const numero = bloco.pessoa
-        const nome = bloco.papel === 'voce' ? t`Profissional` : numero === null ? t`Paciente` : t`Pessoa ${numero}`
+        const nome = bloco.papel === 'voce' ? t`Profissional` : bloco.papel === 'paciente' ? t`Paciente` : numero === null ? t`Voz não identificada` : t`Pessoa ${numero}`
         return <li key={bloco.id} className={`transcript-block transcript-block-${bloco.papel}`}>
           <div className="transcript-meta">
             <strong>{nome}</strong>
-            {onOuvir ? <button type="button" onClick={() => onOuvir(bloco.inicioMs)} aria-label={t`Ouvir trecho aos ${segundos}s`}>{instante}</button> : <span>{instante}</span>}
+            {onOuvir ? <button type="button" onClick={() => onOuvir(bloco.inicioMs)} aria-label={t`Ouvir trecho aos ${segundos}s`}><Trans>Tempo de fala: {duracao}</Trans></button> : <span><Trans>Tempo de fala: {duracao}</Trans></span>}
           </div>
           <div className="transcript-text">{bloco.linhas.map((linha, indice) => {
             const insight = insightDaLinha(linha.consultaId)
@@ -165,7 +168,10 @@ ${trecho}`
       <button type="button" className="button-secondary" onClick={() => void responder('sim')}><Trans>Enviar</Trans></button>
       <button type="button" className="button-secondary" onClick={() => void responder('nao')}><Trans>Só neste aparelho</Trans></button>
     </div>}
-    {qualificados.size === 0 && <p><Trans>Quando houver um insight, a fala será marcada com tracejado.</Trans></p>}
+    {autorizada && semMateriais ? <p role="status">{temObrasAutorizadas
+      ? <Trans>Selecione uma obra para receber referências nesta sessão.</Trans>
+      : <Link to="/acervo"><Trans>Autorize materiais no acervo para receber referências durante a sessão.</Trans></Link>}</p>
+      : qualificados.size === 0 && <p><Trans>Quando houver um insight, a fala será marcada com tracejado.</Trans></p>}
     {[...qualificados.values()].map(({ consulta, resultado }) => {
       const quantidade = resultado.cartoes.length
       const fortes = resultado.cartoes.filter((fonte) => fonte.nivel === 'forte')

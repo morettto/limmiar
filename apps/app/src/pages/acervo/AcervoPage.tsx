@@ -4,7 +4,7 @@ import type { CryptoKey } from '@limmiar/crypto'
 import { authorizeMaterial, deleteMaterial, getMaterialContent, listMaterials, uploadMaterial, type MaterialAccess, type MaterialSummary } from '../../entities/material/api'
 import { materialHash, materialType, openMaterialContent, openMaterialMetadata, sealMaterial, type MaterialMetadata, type MaterialType } from '../../entities/material/material-crypto'
 import { readMaterialDetails } from '../../entities/material/material-details'
-import { listPreparedMaterials, prepareLocalMaterial, removeLocalMaterial } from '../../entities/material/local-material'
+import { listPreparedMaterials, prepareLocalMaterial, removeLocalMaterial, type MaterialProgress } from '../../entities/material/local-material'
 import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import { translateProblemCode } from '../../shared/api'
@@ -30,6 +30,9 @@ export function AcervoPage({ kek, ...access }: AcervoPageProps) {
   const [query, setQuery] = useState('')
   const [ready, setReady] = useState<Set<string>>(new Set())
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const [preparing, setPreparing] = useState<Set<string>>(new Set())
+  const [failed, setFailed] = useState<Set<string>>(new Set())
+  const [progress, setProgress] = useState<Map<string, MaterialProgress>>(new Map())
   const uploadInput = useRef<HTMLInputElement>(null)
   const hintId = useId()
   const { baseUrl, accountId, accessToken } = access
@@ -45,12 +48,41 @@ export function AcervoPage({ kek, ...access }: AcervoPageProps) {
       const prepared = await listPreparedMaterials({ baseUrl, accountId, accessToken }).catch(() => null)
       if (active) {
         setMaterials(opened)
-        setReady(new Set(opened.filter(material => material.authorized && prepared?.some(item => item.materialId === material.materialId && item.ready && item.sha256 === material.metadata.sha256)).map(material => material.materialId)))
+        setProgress(new Map(prepared?.flatMap(item => !item.ready && item.progress ? [[item.materialId, item.progress] as const] : [])))
+        setReady(new Set(opened.filter(material => prepared?.some(item => item.materialId === material.materialId && item.ready && item.sha256 === material.metadata.sha256)).map(material => material.materialId)))
+        setPreparing(previous => new Set([...previous, ...(prepared?.filter(item => !item.ready && item.stage !== 'falhou').map(item => item.materialId) ?? [])]
+          .filter(id => !prepared?.some(item => item.materialId === id && (item.ready || item.stage === 'falhou')))))
+        setFailed(new Set(prepared?.filter(item => !item.ready && item.stage === 'falhou').map(item => item.materialId)))
       }
     }
     void load().catch(() => { if (active) setError(msg`Não foi possível abrir seu acervo. Tente novamente.`) }).finally(() => { if (active) setLoading(false) })
     return () => { active = false }
   }, [baseUrl, accountId, accessToken, kek, version])
+
+  useEffect(() => {
+    if (preparing.size === 0) return
+    let active = true
+    const timer = setInterval(() => {
+      void listPreparedMaterials({ baseUrl, accountId, accessToken }).then(prepared => {
+        if (!active) return
+        setProgress(new Map(prepared.flatMap(item => !item.ready && item.progress ? [[item.materialId, item.progress] as const] : [])))
+        setReady(new Set(prepared.filter(item => item.ready).map(item => item.materialId)))
+        setPreparing(new Set(prepared.filter(item => !item.ready && item.stage !== 'falhou').map(item => item.materialId)))
+        setFailed(new Set(prepared.filter(item => !item.ready && item.stage === 'falhou').map(item => item.materialId)))
+      }).catch(() => { if (active) setError(msg`Não foi possível acompanhar o preparo. Tente novamente.`) })
+    }, 1000)
+    return () => { active = false; clearInterval(timer) }
+  }, [baseUrl, accountId, accessToken, preparing.size])
+
+  async function preparar(id: string, metadata: MaterialMetadata, bytes: Uint8Array<ArrayBuffer>) {
+    setPreparing(previous => new Set([...previous, id]))
+    setFailed(previous => new Set([...previous].filter(item => item !== id)))
+    try { await prepareLocalMaterial({ baseUrl, accountId, accessToken }, id, metadata, bytes) }
+    catch {
+      setPreparing(previous => new Set([...previous].filter(item => item !== id)))
+      setFailed(previous => new Set([...previous, id]))
+    }
+  }
 
   // Stryker disable next-line ArithmeticOperator: equivalent, a version counter only has to differ from the previous value.
   const recarregar = () => setVersion(value => value + 1)
@@ -58,11 +90,8 @@ export function AcervoPage({ kek, ...access }: AcervoPageProps) {
   async function perform(action: () => Promise<void>) {
     setBusy(true); setError(null); setStatus(null)
     try { await action() }
-    catch (cause) {
-      setError(cause instanceof Error && cause.message === 'material.prepare'
-        ? msg`Material guardado. O serviço local não conseguiu prepará-lo; tente novamente quando estiver disponível.`
-        : msg`Não foi possível concluir. Tente novamente.`)
-    } finally { setBusy(false) }
+    catch { setError(msg`Não foi possível concluir. Tente novamente.`) }
+    finally { setBusy(false) }
   }
 
   async function content(material: OpenMaterial) {
@@ -101,7 +130,8 @@ export function AcervoPage({ kek, ...access }: AcervoPageProps) {
       if (!result.ok) throw new Error(translateProblemCode(result.code, result.params, i18n))
       setTitle(''); setAuthors(''); setReference(''); setChosen(null); uploadInput.current!.value = ''
       recarregar()
-      setStatus(msg`Material guardado no seu acervo. Autorize seu uso para prepará-lo nesta máquina.`)
+      setStatus(msg`Material guardado. Estamos preparando suas referências em segundo plano.`)
+      void preparar(sealed.materialId, metadata, bytes)
     })
   }
 
@@ -110,14 +140,9 @@ export function AcervoPage({ kek, ...access }: AcervoPageProps) {
       const result = await authorizeMaterial(access, material.materialId, authorized)
       if (!result.ok) throw new Error(translateProblemCode(result.code, result.params, i18n))
       setMaterials(previous => previous.map(item => item.materialId === material.materialId ? { ...item, authorized } : item))
-      setReady(previous => new Set([...previous].filter(id => id !== material.materialId)))
       if (authorized) {
-        setStatus(msg`Preparando o material na sua máquina...`)
-        await prepareLocalMaterial(access, material.materialId, material.metadata, await content(material))
-        setReady(previous => new Set([...previous, material.materialId]))
-        setStatus(msg`Material preparado nesta máquina para suas consultas.`)
+        setStatus(msg`Material disponível para selecionar nas suas sessões.`)
       } else {
-        await removeLocalMaterial(access, material.materialId)
         setStatus(msg`Autorização retirada. Este material não participa das suas consultas.`)
       }
     })
@@ -149,7 +174,7 @@ export function AcervoPage({ kek, ...access }: AcervoPageProps) {
     <header className="professional-header"><div><p className="editorial-meta"><Trans>Bibliografia pessoal</Trans></p><h1><Trans>Seu acervo</Trans></h1>
       <p><Trans>Obras e materiais de referência para o seu trabalho clínico.</Trans></p></div></header>
     <section className="workspace-card" aria-label={t`Adicionar material`}>
-      <h2><Trans>Adicionar material</Trans></h2><p><Trans>PDF ou texto UTF-8, até 20 MB. Arquivo e dados bibliográficos são cifrados antes do envio.</Trans></p>
+      <h2><Trans>Adicionar material</Trans></h2><p><Trans>PDF ou texto UTF-8, até 20 MB. O arquivo é armazenado cifrado. Para preparar as referências, seu conteúdo é processado em memória pelo serviço do acervo.</Trans></p>
       {!chosen && <p id={hintId}><Trans>Escolha o arquivo primeiro. Título, autores e edição são lidos do documento e liberados para edição em seguida.</Trans></p>}
       <form className="material-form" aria-busy={busy} onSubmit={event => void upload(event)}>
         <label className="material-upload"><Trans>Arquivo do material</Trans><input ref={uploadInput} type="file" accept=".pdf,.txt,application/pdf,text/plain" disabled={busy} aria-describedby={chosen ? undefined : hintId} onChange={event => void choose(event.target.files?.[0])} /></label>
@@ -160,19 +185,24 @@ export function AcervoPage({ kek, ...access }: AcervoPageProps) {
       </form>
     </section>
     {error !== null && <div><p role="alert">{i18n._(error)}</p><button type="button" disabled={busy} onClick={recarregar}><Trans>Tentar novamente</Trans></button></div>}
-    {status !== null && <p role="status">{i18n._(status)}</p>}
+    {status !== null && <p role="status">{busy && <span className="preparation-spinner" aria-hidden="true" />}{i18n._(status)}</p>}
     <section className="workspace-card" aria-label={t`Materiais do acervo`} aria-busy={loading || busy}>
       <div className="professional-header"><h2><Trans>Materiais do acervo</Trans></h2><span className="editorial-meta"><Plural value={materials.length} _0="# materiais" one="# material" other="# materiais" /></span></div>
-      <p><Trans>A autorização é pessoal. Preparar um material libera sua consulta no serviço local; a qualidade do juiz clínico é verificada separadamente.</Trans></p>
+      <p><Trans>Os arquivos são preparados após o envio. Autorize as obras que poderão ser selecionadas em cada sessão.</Trans></p>
       <label><Trans>Buscar no acervo</Trans><input type="search" value={query} onChange={event => setQuery(event.target.value)} /></label>
       {loading ? <p role="status"><Trans>Abrindo seu acervo...</Trans></p> : materials.length === 0 ? <div className="editorial-empty"><h3><Trans>Uma estante para suas referências</Trans></h3><p><Trans>Adicione sua primeira obra. Depois, escolha os materiais que autoriza usar nas consultas.</Trans></p></div> : filtered.length === 0 ? <p><Trans>Nenhum material corresponde à busca.</Trans></p> :
         <ul className="material-list">{filtered.map(material => <li key={material.materialId} className="material-row">
           <div><p className="editorial-meta">{material.metadata.type.toUpperCase()} · {new Intl.NumberFormat(i18n.locale, { maximumFractionDigits: 1 }).format(material.metadata.size / 1024 / 1024)} <Trans>MB</Trans></p><h3>{material.metadata.title}</h3>
             {material.metadata.authors && <p>{material.metadata.authors}</p>}{material.metadata.reference && <p>{material.metadata.reference}</p>}
-            <p className="editorial-meta">{ready.has(material.materialId) ? t`Preparado nesta máquina` : material.authorized ? t`Autorizado · requer preparação nesta máquina` : t`Guardado · uso não autorizado`}</p>
+            {preparing.has(material.materialId) ? <div role="status">{progress.has(material.materialId)
+              ? <MaterialPreparationProgress progress={progress.get(material.materialId)!} />
+              : <p><span className="preparation-spinner" aria-hidden="true" /><Trans>Organizando o conteúdo e preparando suas referências...</Trans></p>}</div>
+              : failed.has(material.materialId) ? <p role="alert"><Trans>Não foi possível preparar este arquivo. Tente novamente.</Trans></p>
+              : <p className="editorial-meta">{ready.has(material.materialId) ? t`Pronto para selecionar na sessão` : t`Arquivo guardado · aguardando preparação`}</p>}
+            {!material.authorized && <p className="editorial-meta"><Trans>Guardado · uso não autorizado</Trans></p>}
           </div><div className="material-actions">
             <label><input type="checkbox" disabled={busy} checked={material.authorized} onChange={event => void authorize(material, event.target.checked)} /><Trans>Autorizar nas minhas consultas</Trans></label>
-            {material.authorized && !ready.has(material.materialId) && <button type="button" disabled={busy} onClick={() => void authorize(material, true)}><Trans>Preparar nesta máquina</Trans></button>}
+            {!ready.has(material.materialId) && !preparing.has(material.materialId) && <button type="button" disabled={busy} onClick={() => void content(material).then(bytes => preparar(material.materialId, material.metadata, bytes)).catch(() => setError(msg`Não foi possível preparar este arquivo. Tente novamente.`))}><Trans>Preparar arquivo</Trans></button>}
             <button type="button" disabled={busy} onClick={() => void download(material)}><Trans>Recuperar arquivo</Trans></button>
             {confirmDelete === material.materialId ? <div><p><Trans>Excluir permanentemente este material?</Trans></p><button type="button" disabled={busy} onClick={() => void remove(material)}><Trans>Confirmar exclusão</Trans></button><button type="button" disabled={busy} onClick={() => setConfirmDelete(null)}><Trans>Cancelar</Trans></button></div> :
               <button type="button" disabled={busy} onClick={() => setConfirmDelete(material.materialId)}><Trans>Excluir material</Trans></button>}
@@ -180,4 +210,14 @@ export function AcervoPage({ kek, ...access }: AcervoPageProps) {
         </li>)}</ul>}
     </section>
   </main>
+}
+
+function MaterialPreparationProgress({ progress }: { progress: MaterialProgress }) {
+  const { t } = useLingui()
+  const { completed, total, phase } = progress
+  return <div className="material-preparation">
+    <p><span className="preparation-spinner" aria-hidden="true" />{phase === 'leitura' ? t`Lendo páginas: ${completed} de ${total}` : t`Preparando referências: ${completed} de ${total}`}</p>
+    <progress value={completed} max={total} aria-label={t`Avanço da preparação`} />
+    <span>{Math.floor(completed / total * 100)}%</span>
+  </div>
 }

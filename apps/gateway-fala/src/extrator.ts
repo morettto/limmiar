@@ -1,25 +1,29 @@
+export interface SegmentoVoz { start: number; end: number; speaker: number }
+
 export interface Extrator {
   readonly dimensao: number
-  // null: o áudio não rendeu uma impressão de voz válida. Rejeita só se o próprio extrator quebrou.
   embutir(pcm: Float32Array): Promise<Float32Array | null>
+  segmentar(pcm: Float32Array): Promise<SegmentoVoz[]>
   encerrar(): Promise<void>
 }
 
-type Resposta = { tipo: 'pronto'; dimensao: number } | { tipo: 'embedding'; embedding: Float32Array | null }
+export type PedidoVoz = { tipo: 'embedding' | 'segmentos'; pcm: Float32Array }
+type Resposta = { tipo: 'pronto'; dimensao: number } | { tipo: 'embedding'; embedding: Float32Array | null } |
+  { tipo: 'segmentos'; segmentos: SegmentoVoz[] }
 
 export interface TrabalhadorDeVoz {
-  postMessage(pcm: Float32Array, transferiveis: ArrayBuffer[]): void
+  postMessage(pedido: PedidoVoz, transferiveis: ArrayBuffer[]): void
   on(evento: 'message', ouvinte: (resposta: Resposta) => void): unknown
   on(evento: 'error', ouvinte: (erro: Error) => void): unknown
   terminate(): Promise<number>
 }
 
-interface Tarefa { pcm: Float32Array; resolver(embedding: Float32Array | null): void; rejeitar(erro: Error): void }
+interface BaseTarefa { pcm: Float32Array; rejeitar(erro: Error): void }
+type Tarefa = BaseTarefa & ({ tipo: 'embedding'; resolver(embedding: Float32Array | null): void } |
+  { tipo: 'segmentos'; resolver(segmentos: SegmentoVoz[]): void })
 
-// O TitaNet roda em threads próprias para não travar a retransmissão do áudio; cada uma carrega o modelo uma vez.
-// Se uma thread cai, o extrator inteiro quebra e `aoQuebrar` decide (em produção, o processo sai e o orquestrador o reinicia).
-export async function criarExtratorTitanet(opcoes: { modelo: string; threads: number; aoQuebrar(erro: Error): void },
-  fabrica: (modelo: string) => TrabalhadorDeVoz): Promise<Extrator> {
+export async function criarExtratorTitanet(opcoes: { modelo: string; modeloSegmentacao: string; threads: number; aoQuebrar(erro: Error): void },
+  fabrica: (modelo: string, modeloSegmentacao: string) => TrabalhadorDeVoz): Promise<Extrator> {
   const livres: TrabalhadorDeVoz[] = []
   const emAndamento = new Map<TrabalhadorDeVoz, Tarefa>()
   const fila: Tarefa[] = []
@@ -40,12 +44,12 @@ export async function criarExtratorTitanet(opcoes: { modelo: string; threads: nu
       const tarefa = fila.shift()!
       const trabalhador = livres.shift()!
       emAndamento.set(trabalhador, tarefa)
-      trabalhador.postMessage(tarefa.pcm, [tarefa.pcm.buffer as ArrayBuffer])
+      trabalhador.postMessage({ tipo: tarefa.tipo, pcm: tarefa.pcm }, [tarefa.pcm.buffer as ArrayBuffer])
     }
   }
 
   const trabalhadores = await Promise.all(Array.from({ length: opcoes.threads }, () => new Promise<TrabalhadorDeVoz>((pronto, falhou) => {
-    const trabalhador = fabrica(opcoes.modelo)
+    const trabalhador = fabrica(opcoes.modelo, opcoes.modeloSegmentacao)
     trabalhador.on('error', (erro) => { falhou(erro); quebrar(erro) })
     trabalhador.on('message', (resposta) => {
       if (resposta.tipo === 'pronto') {
@@ -55,9 +59,11 @@ export async function criarExtratorTitanet(opcoes: { modelo: string; threads: nu
         return
       }
       const tarefa = emAndamento.get(trabalhador)!
+      if (tarefa.tipo === 'embedding' && resposta.tipo === 'embedding') tarefa.resolver(resposta.embedding)
+      else if (tarefa.tipo === 'segmentos' && resposta.tipo === 'segmentos') tarefa.resolver(resposta.segmentos)
+      else { quebrar(new Error('Resposta incompatível do extrator de voz.')); return }
       emAndamento.delete(trabalhador)
       livres.push(trabalhador)
-      tarefa.resolver(resposta.embedding)
       despachar()
     })
   })))
@@ -65,7 +71,11 @@ export async function criarExtratorTitanet(opcoes: { modelo: string; threads: nu
   return {
     dimensao,
     embutir: (pcm) => quebrado ? Promise.reject(quebrado) : new Promise((resolver, rejeitar) => {
-      fila.push({ pcm, resolver, rejeitar })
+      fila.push({ tipo: 'embedding', pcm, resolver, rejeitar })
+      despachar()
+    }),
+    segmentar: (pcm) => quebrado ? Promise.reject(quebrado) : new Promise((resolver, rejeitar) => {
+      fila.push({ tipo: 'segmentos', pcm, resolver, rejeitar })
       despachar()
     }),
     encerrar: async () => { await Promise.all(trabalhadores.map((trabalhador) => trabalhador.terminate())) },

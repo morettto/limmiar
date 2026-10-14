@@ -9,7 +9,7 @@ const config = lerConfig(process.env)
 // Só categorias e contagens vão ao log: nunca fala, impressão de voz ou texto.
 const registrar = (evento: string) => console.info(JSON.stringify({ em: new Date().toISOString(), evento }))
 
-const extrator = await criarExtratorTitanet({ modelo: config.modelo, threads: config.threads, aoQuebrar: (erro) => {
+const extrator = await criarExtratorTitanet({ modelo: config.modelo, modeloSegmentacao: config.modeloSegmentacao, threads: config.threads, aoQuebrar: (erro) => {
   console.error(`O extrator de voz quebrou: ${erro.message}`)
   process.exit(1)
 } }, criarTrabalhadorTitanet)

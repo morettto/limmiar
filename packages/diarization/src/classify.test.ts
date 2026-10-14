@@ -9,8 +9,8 @@ describe('similaridadeCosseno', () => {
     expect(similaridadeCosseno([1, 2], [10, 20])).toBeCloseTo(1, 12)
   })
 
-  it.each([[[], []], [[1], [1, 2]], [[NaN, 0], [1, 0]], [[1, 0], [Infinity, 0]], [[0, 0], [1, 0]]])('vetor incompatível ou inválido %j x %j não decide (NaN)', (a, b) => {
-    expect(similaridadeCosseno(a, b)).toBeNaN()
+  it.each([[[], []], [[1], [1, 2]], [[NaN, 0], [1, 0]], [[1, 0], [Infinity, 0]], [[0, 0], [1, 0]], [['1', 0], [1, 0]], [[1, 0], ['1', 0]]])('vetor incompatível ou inválido %j x %j não decide (NaN)', (a, b) => {
+    expect(similaridadeCosseno(a as number[], b as number[])).toBeNaN()
   })
 })
 

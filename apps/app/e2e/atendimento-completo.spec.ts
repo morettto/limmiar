@@ -154,10 +154,12 @@ test('atendimento completo: do cadastro à nota assinada, com microfone falso e 
         await page.getByLabel('Título da obra', { exact: true }).fill(titulo)
         await page.getByLabel('Autores', { exact: true }).fill(`Autor Sintético ${indice === 0 ? 'A' : 'B'}`)
         await page.getByRole('button', { name: 'Guardar no acervo', exact: true }).click()
-        await expect(page.getByRole('status').filter({ hasText: 'Material guardado no seu acervo.' })).toBeVisible()
+        await expect(page.getByRole('status').filter({ hasText: 'Material guardado.' })).toBeVisible()
         const linha = page.locator('li.material-row').filter({ hasText: titulo })
+        await expect(linha.getByRole('progressbar', { name: 'Avanço da preparação' })).toBeVisible()
+        if (indice === 0) await page.screenshot({ path: test.info().outputPath('acervo-progress.png'), fullPage: true })
         await linha.getByRole('checkbox', { name: 'Autorizar nas minhas consultas', exact: true }).click()
-        await expect(linha.getByText('Preparado nesta máquina', { exact: true })).toBeVisible()
+        await expect(linha.getByText('Pronto para selecionar na sessão', { exact: true })).toBeVisible()
       }
       expect(copiloto.preparados()).toHaveLength(2)
       await voltarAoInicio(page)
@@ -297,6 +299,8 @@ test('atendimento completo: do cadastro à nota assinada, com microfone falso e 
     })
 
     await relatorio.passo('13. Auditoria: entradas e cadeia íntegra', 'real', async () => {
+      await page.getByRole('button', { name: 'Encerrar sessão', exact: true }).click()
+      await expect(page.getByText('Sessão encerrada', { exact: true })).toBeVisible()
       await voltarAoInicio(page)
       const acoes = await lerTrilha(page)
       for (const esperada of ['Entrada na conta', 'Prontuário aberto', 'Registro acrescentado ao prontuário', 'Nota assinada']) expect(acoes).toContain(esperada)
@@ -314,6 +318,7 @@ test('atendimento completo: do cadastro à nota assinada, com microfone falso e 
       await abrirCarteira(page)
       await carteira.getByRole('link', { name: nomePaciente, exact: true }).click()
       await page.getByRole('link', { name: /^Sessão de / }).click()
+      await expect(page.getByText('Sessão encerrada', { exact: true })).toBeVisible()
       await abrirAbaDaSessao(page, 'Nota')
       const referencia = nota.locator('details').filter({ has: page.locator('summary', { hasText: OBRA_A.titulo }) })
       await referencia.locator('summary').click()

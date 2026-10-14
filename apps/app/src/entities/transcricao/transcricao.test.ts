@@ -7,6 +7,13 @@ const entrada = JSON.parse(new TextDecoder().decode(transcricaoParaEntrada(trans
 const bytes = (valor: unknown) => new TextEncoder().encode(JSON.stringify(valor))
 
 describe('transcrição persistida', () => {
+  it('preserva seleção de obras e recusa seleção malformada', () => {
+    const selecionada = { ...transcricao, materialIds: ['obra-1', 'obra-2'] }
+    expect(lerTranscricao(transcricaoParaEntrada(selecionada), 'paciente')).toEqual(selecionada)
+    for (const materialIds of [null, 'obra', [3], [''], [' ']]) {
+      expect(lerTranscricao(bytes({ ...entrada, materialIds }), 'paciente')).toBeNull()
+    }
+  })
   it('preserva palavras, tempos, autoria e revisão e descarta campos de áudio nas duas fronteiras', () => {
     const contaminada = { ...transcricao, audio: 'nunca salvar', palavras: transcricao.palavras.map((palavra) => ({ ...palavra, audio: 'nunca salvar' })) }
     expect(lerTranscricao(transcricaoParaEntrada(contaminada), 'paciente')).toEqual(transcricao)

@@ -17,59 +17,30 @@ beforeEach(async () => {
   vi.spyOn(local, 'prepareLocalMaterial').mockResolvedValue()
 })
 afterEach(() => vi.restoreAllMocks())
-it('restaura arquivo cifrado após reinício, verifica hash e envia plaintext somente ao motor local', async () => {
-  expect(await prepareAuthorizedMaterials(access, kek)).toEqual({ materialIds: ['id'], pending: 0 })
-  expect(local.prepareLocalMaterial).toHaveBeenCalledWith(access, 'id', expect.objectContaining({ title: 'Obra' }), expect.anything())
-  expect(Array.from(vi.mocked(local.prepareLocalMaterial).mock.lastCall![3])).toEqual(Array.from(bytes))
-})
-it('reusa somente materiais próprios autorizados com o mesmo hash; a consulta de estado não publica nada', async () => {
-  vi.mocked(local.listPreparedMaterials).mockResolvedValue([{ materialId: 'other', ready: true, sha256: 'sha', paragraphs: 1, preparedAt: '' },
-    { materialId: 'id', ready: true, sha256: await materialHash(bytes), paragraphs: 1, preparedAt: '' }])
-  expect(await prepareAuthorizedMaterials(access, kek)).toEqual({ materialIds: ['id'], pending: 0 })
+it('lista somente obras autorizadas e prontas sem baixar nem preparar arquivos na sessão', async () => {
+  vi.mocked(local.listPreparedMaterials).mockResolvedValue([{ materialId: 'id', ready: true, sha256: await materialHash(bytes), paragraphs: 1, preparedAt: '' }])
+  expect(await prepareAuthorizedMaterials(access, kek)).toEqual({ materialIds: ['id'], pending: 0, materials: [{ materialId: 'id', title: 'Obra', ready: true }] })
   expect(api.getMaterialContent).not.toHaveBeenCalled()
   expect(local.prepareLocalMaterial).not.toHaveBeenCalled()
+})
+it('não libera obra não autorizada mesmo se preparada', async () => {
   vi.mocked(api.listMaterials).mockResolvedValue({ ok: true, materials: [{ ...sealed, authorized: false, createdAt: '' }] })
-  expect(await prepareAuthorizedMaterials(access, kek)).toEqual({ materialIds: [], pending: 0 })
+  expect(await prepareAuthorizedMaterials(access, kek)).toEqual({ materialIds: [], pending: 0, materials: [] })
 })
-it('prepara hash obsoleto e conta falhas sem autorizar ou considerar pronto', async () => {
-  vi.mocked(local.listPreparedMaterials).mockRejectedValue(new Error('motor parado'))
-  vi.mocked(local.prepareLocalMaterial).mockRejectedValue(new Error('falha'))
-  expect(await prepareAuthorizedMaterials(access, kek)).toEqual({ materialIds: [], pending: 1 })
-  vi.mocked(api.getMaterialContent).mockResolvedValue({ ok: false, code: 'materials.not_found', params: {} })
-  expect(await prepareAuthorizedMaterials(access, kek)).toEqual({ materialIds: [], pending: 1 })
-  const corrupted = await sealMaterial(kek, access.accountId, 'id', { title: '', authors: '', reference: '', filename: '', type: 'txt', size: bytes.length, sha256: 'wrong' }, bytes)
-  vi.mocked(api.listMaterials).mockResolvedValue({ ok: true, materials: [{ ...corrupted, authorized: true, createdAt: '' }] })
-  vi.mocked(api.getMaterialContent).mockResolvedValue({ ok: true, ciphertext: corrupted.contentCiphertext })
-  expect(await prepareAuthorizedMaterials(access, kek)).toEqual({ materialIds: [], pending: 1 })
+it('obra ausente, em preparação, de outro id ou hash não pode ser selecionada', async () => {
+  const hash = await materialHash(bytes)
+  for (const prepared of [[], [{ materialId: 'id', ready: false as const, sha256: hash, stage: 'organizando' as const }],
+    [{ materialId: 'other', ready: true as const, sha256: hash, paragraphs: 1, preparedAt: '' }],
+    [{ materialId: 'id', ready: true as const, sha256: 'wrong', paragraphs: 1, preparedAt: '' }]]) {
+    vi.mocked(local.listPreparedMaterials).mockResolvedValue(prepared)
+    expect(await prepareAuthorizedMaterials(access, kek)).toEqual({ materialIds: [], pending: 1, materials: [{ materialId: 'id', title: 'Obra', ready: false }] })
+  }
 })
-it('recusa carteira indisponível antes de acessar qualquer arquivo', async () => {
-  vi.mocked(api.listMaterials).mockResolvedValue({ ok: false, code: 'auth.invalid_credentials', params: {} })
+it('falhas de carteira, estado ou decifração não viram acervo vazio', async () => {
+  vi.mocked(api.listMaterials).mockResolvedValueOnce({ ok: false, code: 'materials.not_found', params: {} })
   await expect(prepareAuthorizedMaterials(access, kek)).rejects.toThrow('unavailable')
-  expect(api.getMaterialContent).not.toHaveBeenCalled()
-})
-it('com o motor local parado ainda prepara o que está autorizado', async () => {
-  vi.mocked(local.listPreparedMaterials).mockRejectedValue(new Error('motor parado'))
-  expect(await prepareAuthorizedMaterials(access, kek)).toEqual({ materialIds: ['id'], pending: 0 })
-  expect(local.prepareLocalMaterial).toHaveBeenCalledOnce()
-})
-it.each([
-  ['outro material com o mesmo hash', { materialId: 'other', ready: true, sha256: 'HASH' }],
-  ['o mesmo material com hash diferente', { materialId: 'id', ready: true, sha256: 'diferente' }],
-  ['o mesmo material ainda não pronto', { materialId: 'id', ready: false, sha256: 'HASH' }],
-])('prepara de novo quando o estado local só tem %s', async (_nome, estado) => {
-  const sha256 = await materialHash(bytes)
-  vi.mocked(local.listPreparedMaterials).mockResolvedValue([{ ...estado, sha256: estado.sha256 === 'HASH' ? sha256 : estado.sha256, paragraphs: 1, preparedAt: '' } as local.PreparedMaterial])
-  expect(await prepareAuthorizedMaterials(access, kek)).toEqual({ materialIds: ['id'], pending: 0 })
-  expect(api.getMaterialContent).toHaveBeenCalledOnce()
-  expect(local.prepareLocalMaterial).toHaveBeenCalledOnce()
-})
-it('nunca entrega ao motor local um arquivo cujo hash não confere nem um conteúdo indisponível', async () => {
-  vi.mocked(api.getMaterialContent).mockResolvedValue({ ok: false, code: 'materials.not_found', params: {} })
-  expect(await prepareAuthorizedMaterials(access, kek)).toEqual({ materialIds: [], pending: 1 })
-  expect(local.prepareLocalMaterial).not.toHaveBeenCalled()
-  const corrompido = await sealMaterial(kek, access.accountId, 'id', { title: '', authors: '', reference: '', filename: '', type: 'txt', size: bytes.length, sha256: 'errado' }, bytes)
-  vi.mocked(api.listMaterials).mockResolvedValue({ ok: true, materials: [{ ...corrompido, authorized: true, createdAt: '' }] })
-  vi.mocked(api.getMaterialContent).mockResolvedValue({ ok: true, ciphertext: corrompido.contentCiphertext })
-  expect(await prepareAuthorizedMaterials(access, kek)).toEqual({ materialIds: [], pending: 1 })
-  expect(local.prepareLocalMaterial).not.toHaveBeenCalled()
+  vi.mocked(local.listPreparedMaterials).mockRejectedValueOnce(new Error('offline'))
+  await expect(prepareAuthorizedMaterials(access, kek)).rejects.toThrow('offline')
+  vi.mocked(api.listMaterials).mockResolvedValueOnce({ ok: true, materials: [{ ...sealed, wrappedDek: new Uint8Array(3), authorized: true, createdAt: '' }] })
+  await expect(prepareAuthorizedMaterials(access, kek)).rejects.toThrow()
 })

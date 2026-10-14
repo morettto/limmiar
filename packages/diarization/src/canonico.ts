@@ -14,8 +14,7 @@ export function montarTranscricaoCanonica(
   let atual: { locutor: RotuloLocutor; palavras: PalavraAtribuida[] } | null = null
 
   for (const palavra of palavras) {
-    // `=== null` é para o tipo (Map.get exige `string`); em runtime `.get(null)`
-    // devolveria `undefined` na mesma, por isso é um mutante equivalente.
+    // Stryker disable next-line ConditionalExpression: Map.get(null) returns undefined like this null branch; the check narrows the key type.
     const rotulo = palavra.locutor === null ? null : (rotulos.get(palavra.locutor) ?? null)
 
     if (rotulo === null) {

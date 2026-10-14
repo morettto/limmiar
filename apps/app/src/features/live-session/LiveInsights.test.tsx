@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { I18nProvider } from '@lingui/react'
-import type { ComponentProps } from 'react'
+import type { ComponentProps, ReactNode } from 'react'
 import { FalhaServicoInsight } from '../../entities/insight/falha-insight'
 import { consultarInsight, enviarVoto, type ResultadoInsight } from '../../entities/insight/insight'
 import { dynamicActivate, i18n } from '../../shared/i18n'
@@ -11,9 +11,10 @@ import { gravarConsentimento, lerConsentimento } from '../../entities/insight/co
 import { webcrypto as limmiarWebcrypto } from '@limmiar/crypto'
 
 vi.mock('../../entities/insight/insight', () => ({ consultarInsight: vi.fn(), enviarVoto: vi.fn() }))
+vi.mock('@tanstack/react-router', () => ({ Link: ({ to, children }: { to: string; children: ReactNode }) => <a href={to}>{children}</a> }))
 const consultar = vi.mocked(consultarInsight)
 const enviar = vi.mocked(enviarVoto)
-const bibliografia = { accountId: 'conta-4', accessToken: 'tok', materialIds: [] }
+const bibliografia = { accountId: 'conta-4', accessToken: 'tok', materialIds: ['m1'] }
 const props = { palavras: [{ texto: 'Tenho medo.', inicioMs: 0, fimMs: 1000, locutor: 's' }], papeis: { s: 'paciente' as const }, estavelAteMs: 1100, autorizada: true }
 const fonte = { trecho_id: 't1', titulo: 'Livro', autor: 'Autor', pagina: 1, paragrafo: 2, citacao_literal: 'Citação literal.', fenomeno_na_fala: 'Medo', fenomeno_no_trecho: 'Medo', probabilidade: 0.995, nivel: 'forte' as const }
 const possivel = { ...fonte, trecho_id: 't2', titulo: 'Artigo', probabilidade: 0.93, nivel: 'possivel' as const }
@@ -22,6 +23,25 @@ function view(value: ComponentProps<typeof LiveInsights> = props) { return <I18n
 beforeAll(async () => dynamicActivate('pt-BR'))
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.clearAllMocks() })
 describe('insights durante a sessão', () => {
+  it('distingue seleção vazia de acervo não autorizado e não envia a fala', async () => {
+    render(view({ ...props, bibliografia: { ...bibliografia, materialIds: [] }, temObrasAutorizadas: true }))
+    expect(screen.getByText('Selecione uma obra para receber referências nesta sessão.')).toBeTruthy()
+    expect(screen.queryByRole('link', { name: /Autorize materiais/ })).toBeNull()
+    expect(consultar).not.toHaveBeenCalled()
+  })
+  it('orienta a autorizar materiais e não envia falas quando o acervo autorizado está vazio', async () => {
+    vi.useFakeTimers()
+    consultar.mockResolvedValue(resultado)
+    const mounted = render(view({ ...props, bibliografia: { ...bibliografia, materialIds: [] } }))
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    expect(consultar).not.toHaveBeenCalled()
+    expect(screen.getByRole('link', { name: 'Autorize materiais no acervo para receber referências durante a sessão.' }).getAttribute('href')).toBe('/acervo')
+    expect(screen.queryByText('Quando houver um insight, a fala será marcada com tracejado.')).toBeNull()
+    mounted.rerender(view({ ...props, bibliografia }))
+    await act(async () => vi.advanceTimersByTimeAsync(500))
+    expect(consultar).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('link')).toBeNull()
+  })
   it('seleciona a fonte escolhida com frase e tempos reais; abrir balão não aprova a nota', async () => {
     vi.useFakeTimers()
     consultar.mockResolvedValue(resultado)
@@ -406,6 +426,15 @@ describe('transcrição em blocos contínuos', () => {
   const blocos = () => [...document.querySelectorAll('li.transcript-block')] as HTMLElement[]
   const semAnalise = { ...props, autorizada: false }
 
+  it('mostra dez segundos de fala mesmo com setenta e cinco segundos de silêncio', () => {
+    render(view({ ...semAnalise, palavras: [
+      { texto: 'Primeira frase.', inicioMs: 0, fimMs: 5000, locutor: 's' },
+      { texto: 'Segunda frase.', inicioMs: 80_000, fimMs: 85_000, locutor: 's' },
+    ] }))
+    expect(screen.getByText('Tempo de fala: 0:10')).toBeTruthy()
+    expect(blocos()).toHaveLength(1)
+  })
+
   it('junta as frases seguidas do mesmo falante e só abre outro balão quando a outra pessoa fala', () => {
     render(view({ ...semAnalise, papeis: { p: 'voce', s: 'paciente' }, palavras: [palavra('Bom dia.', 0, 'p'), palavra('Como vai?', 1000, 'p'),
       palavra('Tenho medo.', 65_000, 's'), palavra('Não durmo.', 66_000, 's'), palavra('Entendo.', 67_000, 'p')] }))
@@ -414,7 +443,7 @@ describe('transcrição em blocos contínuos', () => {
       ['transcript-block transcript-block-paciente', 'Paciente', 'Tenho medo. Não durmo.'],
       ['transcript-block transcript-block-voce', 'Profissional', 'Entendo.'],
     ])
-    expect(blocos().map((bloco) => bloco.querySelector('.transcript-meta span')!.textContent)).toEqual(['0:00', '1:05', '1:07'])
+    expect(blocos().map((bloco) => bloco.querySelector('.transcript-meta span')!.textContent)).toEqual(['Tempo de fala: 0:00', 'Tempo de fala: 0:00', 'Tempo de fala: 0:00'])
   })
 
   it('mostra a hipótese do servidor em tom mais claro no fim do balão atual', () => {
@@ -425,17 +454,16 @@ describe('transcrição em blocos contínuos', () => {
     expect(screen.getByText('Bom dia.').className).toBe('')
   })
 
-  it('enquanto a voz não tem papel o texto não aparece como não identificado', () => {
+  it('mostra voz não identificada sem adivinhar papel profissional', () => {
     render(view({ ...semAnalise, papeis: {}, palavras: [palavra('Bom dia.', 0, 'speaker_1'), palavra('Oi', 1000, null)] }))
-    expect(blocos().map((bloco) => [bloco.className, bloco.querySelector('.transcript-text')!.textContent])).toEqual([
-      ['transcript-block transcript-block-voce', 'Bom dia. Oi'],
-    ])
-    expect(screen.queryByText('Não identificado')).toBeNull()
+    expect(blocos().map(bloco => bloco.querySelector('strong')!.textContent)).toEqual(['Voz não identificada', 'Voz não identificada'])
+    expect(screen.queryByText('Profissional')).toBeNull()
   })
 
-  it('numera Pessoa 2 e Pessoa 3 quando há mais de uma voz que não é o profissional', () => {
-    render(view({ ...semAnalise, papeis: { p: 'voce', a: 'paciente', b: 'paciente' }, palavras: [palavra('Oi.', 0, 'p'), palavra('Eu.', 1000, 'a'), palavra('Eu também.', 2000, 'b')] }))
-    expect(blocos().map((bloco) => bloco.querySelector('strong')!.textContent)).toEqual(['Profissional', 'Pessoa 2', 'Pessoa 3'])
+  it('mantém paciente identificado mesmo com participante adicional', () => {
+    render(view({ ...semAnalise, papeis: { profissional: 'voce', paciente: 'paciente', pessoa_4: null },
+      palavras: [palavra('Oi.', 0, 'profissional'), palavra('Eu.', 1000, 'paciente'), palavra('Eu também.', 2000, 'pessoa_4')] }))
+    expect(blocos().map(bloco => bloco.querySelector('strong')!.textContent)).toEqual(['Profissional', 'Paciente', 'Pessoa 4'])
   })
 
   it('a escuta do áudio vale por balão, a partir do início dele', () => {

@@ -50,6 +50,14 @@ it('repassa a proposta bibliográfica, a sessão e a transcrição salva à revi
 function callbacks() { return vi.mocked(OnlineCall).mock.lastCall![0] }
 
 describe('sessão online vinculada ao prontuário', () => {
+  it.each([{ atendimentoEncerrado: true }, { bloqueada: true }])('impede gerar convite durante encerramento ou depois dele: %j', estado => {
+    render(<I18nProvider i18n={i18n}><OnlineSession {...props} {...estado} /></I18nProvider>)
+    const gerar = screen.getByRole('button', { name: 'Gerar convite de sessão online' })
+    expect((gerar as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(gerar)
+    expect(criarSessaoOnline).not.toHaveBeenCalled()
+  })
+
   it('gera convite por ID e expõe apenas a credencial do paciente no fragmento do link', async () => {
     const link = await montar() as HTMLInputElement
     expect(criarSessaoOnline).toHaveBeenCalledExactlyOnceWith('/api', 'conta', 'token', 'registro')

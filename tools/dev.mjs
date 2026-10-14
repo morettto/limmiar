@@ -67,7 +67,7 @@ try { execFileSync(process.execPath, ['tools/nemotron/garantir.mjs'], { stdio: '
 catch { process.exit(1) }
 const children = []
 console.log('Preparando o perfil de voz local (TitaNet).')
-try { execFileSync(process.execPath, ['tools/voice-identity/setup.mjs'], { stdio: 'inherit' }) }
+try { execFileSync(process.execPath, ['tools/voice-identity/setup.mjs'], { stdio: 'inherit' }); execFileSync(process.execPath, ['tools/voice-identity/setup-segmentacao.mjs'], { stdio: 'inherit' }) }
 catch {
   console.error('Não foi possível preparar a identificação de voz. Confira tools/voice-identity/README.md.')
   process.exit(1)
@@ -94,12 +94,13 @@ process.on('SIGINT', () => stop())
 process.on('SIGTERM', () => stop())
 start(copilotPython, ['-m', 'uvicorn', 'copiloto.api:app', '--app-dir', 'src', '--host', '127.0.0.1', '--port', '8000'], {
   cwd: resolve(root, 'mvp-copiloto'),
-  env: { ...env, COPILOTO_EMBEDDER_DISPOSITIVO: process.env.COPILOTO_EMBEDDER_DISPOSITIVO ?? 'cpu',
+  env: { ...env, COPILOTO_EMBEDDER_DISPOSITIVO: env.COPILOTO_EMBEDDER_DISPOSITIVO ?? 'cpu',
     COPILOTO_JUIZ_DISPOSITIVO: process.env.COPILOTO_JUIZ_DISPOSITIVO ?? 'cpu' },
 })
 // Gateway de fala (apps/gateway-fala): o /speech do Vite chega aqui; ele fala com o container do NeMo-Speech.
 start(process.execPath, ['apps/gateway-fala/src/main.ts'], {
-  env: { ...env, GATEWAY_FALA_MODELO: resolve(root, 'apps/app/public/models/voice-identity/titanet.onnx'), NEMOTRON_URLS: URLS_REALTIME.join(','),
+  env: { ...env, GATEWAY_FALA_MODELO: resolve(root, 'apps/app/public/models/voice-identity/titanet.onnx'),
+    GATEWAY_FALA_SEGMENTACAO: resolve(root, '.local/diarization/sherpa-onnx-pyannote-segmentation-3-0/model.onnx'), NEMOTRON_URLS: URLS_REALTIME.join(','),
     NEMOTRON_SESSOES_POR_INSTANCIA: String(SESSOES_POR_INSTANCIA) },
 })
 console.log('Carregando o acervo e o juiz bibliográfico local.')

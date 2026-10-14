@@ -48,14 +48,48 @@ beforeEach(async () => {
 afterEach(() => { vi.clearAllMocks() })
 
 describe('papelDoFalante', () => {
-  it('só "profissional" é o profissional; qualquer outra pessoa é paciente', () => {
+  it('só os papéis confirmados recebem profissional ou paciente', () => {
     expect(papelDoFalante('profissional')).toBe('voce')
     expect(papelDoFalante('paciente')).toBe('paciente')
-    expect(papelDoFalante('pessoa_2')).toBe('paciente')
+    expect(papelDoFalante('pessoa_2')).toBeNull()
   })
 })
 
 describe('transcrição e identificação de quem fala no gateway', () => {
+  it('ouve durante a abertura do gateway e envia a primeira fala inteira em ordem quando ele fica pronto', async () => {
+    let conectar!: (aberta: typeof servidor) => void
+    abrir.mockImplementationOnce(() => new Promise((resolve) => { conectar = resolve }))
+    const iniciando = iniciar()
+    expect(capturar).toHaveBeenCalledOnce()
+    const primeiro = new Float32Array([0.1, 0.2])
+    const segundo = new Float32Array([0.3])
+    pcmCapturado(primeiro); pcmCapturado(segundo)
+    expect(servidor.enviar).not.toHaveBeenCalled()
+    conectar(servidor)
+    const sessao = await iniciando
+    const terceiro = new Float32Array([0.4])
+    pcmCapturado(terceiro)
+    expect(servidor.enviar.mock.calls).toEqual([[primeiro], [segundo], [terceiro]])
+    await sessao.encerrar()
+  })
+
+  it('não acumula áudio sem limite se a abertura exceder dez segundos de captura', async () => {
+    let conectar!: (aberta: typeof servidor) => void
+    abrir.mockImplementationOnce(() => new Promise((resolve) => { conectar = resolve }))
+    const iniciando = iniciar()
+    const rejeitada = expect(iniciando).rejects.toMatchObject({ name: 'AbortError' })
+    pcmCapturado(new Float32Array(160000))
+    pcmCapturado(new Float32Array(1))
+    pcmCapturado(new Float32Array(1))
+    conectar(servidor)
+    await rejeitada
+    expect(falhar).toHaveBeenCalledOnce()
+    expect(cancelar).toHaveBeenCalledOnce()
+    expect(servidor.descartar).toHaveBeenCalledOnce()
+    expect(servidor.enviar).not.toHaveBeenCalled()
+    expect(perfil).toEqual([0, 0, 0])
+  })
+
   it('apresenta o perfil de voz ao gateway e liga a captura ao envio', async () => {
     await iniciar()
     expect(opcoes()).toMatchObject({ identidade: { modo: 'presencial', perfil } })
@@ -135,6 +169,25 @@ describe('transcrição e identificação de quem fala no gateway', () => {
 })
 
 describe('falhas', () => {
+  it('descarta o gateway que termina de abrir depois de a captura falhar', async () => {
+    let conectar!: (aberta: typeof servidor) => void
+    abrir.mockImplementationOnce(() => new Promise((resolve) => { conectar = resolve }))
+    capturar.mockRejectedValueOnce(new Error('captura'))
+    await expect(iniciar()).rejects.toThrow('captura')
+    conectar(servidor)
+    await vi.waitFor(() => expect(servidor.descartar).toHaveBeenCalledOnce())
+    expect(servidor.enviar).not.toHaveBeenCalled()
+  })
+
+  it('libera a captura que termina de abrir depois de o gateway falhar', async () => {
+    let capturada!: (aberta: { encerrar: typeof encerrarCaptura; pausar: typeof pausar; cancelar: typeof cancelar }) => void
+    capturar.mockImplementationOnce(() => new Promise((resolve) => { capturada = resolve }))
+    abrir.mockRejectedValueOnce(new Error('servidor'))
+    await expect(iniciar()).rejects.toThrow('servidor')
+    capturada({ encerrar: encerrarCaptura, pausar, cancelar })
+    await vi.waitFor(() => expect(cancelar).toHaveBeenCalledOnce())
+  })
+
   it('o gateway falha: para o microfone, apaga o perfil, libera tudo, avisa uma vez e rejeita o encerramento', async () => {
     const sessao = await iniciar()
     const causa = new Error('falhou')
@@ -214,18 +267,19 @@ describe('cancelamento', () => {
     expect(perfil).toEqual([0, 0, 0])
   })
 
-  it('cancelar com o gateway conectando descarta a sessão e não chega a abrir a captura', async () => {
+  it('cancelar com o gateway conectando descarta a sessão e libera a captura iniciada em paralelo', async () => {
     const abort = new AbortController()
     abrir.mockImplementationOnce(async () => { abort.abort(); return servidor })
     await expect(iniciar(abort)).rejects.toMatchObject({ name: 'AbortError', message: 'Cancelado' })
-    expect(capturar).not.toHaveBeenCalled()
+    expect(capturar).toHaveBeenCalledOnce()
+    expect(cancelar).toHaveBeenCalledOnce()
     expect(servidor.descartar).toHaveBeenCalled()
   })
 
   it('libera uma captura que terminou de abrir depois do cancelamento', async () => {
     const abort = new AbortController()
     capturar.mockImplementationOnce(async () => { abort.abort(); return { encerrar: encerrarCaptura, pausar, cancelar } })
-    await expect(iniciar(abort)).rejects.toThrow('cancelada')
+    await expect(iniciar(abort)).rejects.toMatchObject({ name: 'AbortError' })
     expect(cancelar).toHaveBeenCalledOnce()
     expect(parar).toHaveBeenCalledOnce()
     expect(servidor.descartar).toHaveBeenCalledOnce()

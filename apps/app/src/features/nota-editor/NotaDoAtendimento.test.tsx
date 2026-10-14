@@ -58,6 +58,45 @@ describe('NotaDoAtendimento', () => {
   })
   afterEach(() => { cleanup(); vi.restoreAllMocks(); aoSalvar.mockClear(); aoDescartar.mockClear(); aoAbrir.mockClear() })
 
+  it('o encerramento salva o rascunho atual sem assinar, mesmo depois de editar o texto', async () => {
+    let salvar!: () => Promise<void>
+    montar({ prepararSalvamento: callback => { salvar = callback } })
+    fireEvent.change(subjetivo(), { target: { value: 'Rascunho para encerramento' } })
+    await act(async () => salvar())
+    expect((await notasGravadas())[0]!.frases[0]!.texto).toBe('Rascunho para encerramento')
+    expect(assinaturas.assinarNota).not.toHaveBeenCalled()
+  })
+
+  it('propaga falha de salvamento para impedir encerramento falso', async () => {
+    let salvar!: () => Promise<void>
+    montar({ prepararSalvamento: callback => { salvar = callback } })
+    vi.mocked(patients.getPatientRecord).mockRejectedValueOnce(new Error('Sem conexão'))
+    await act(async () => { await expect(salvar()).rejects.toThrow('Sem conexão') })
+    expect(screen.getByText('Sem conexão')).toBeTruthy()
+    expect(aoSalvar).not.toHaveBeenCalled()
+  })
+
+  it('encerrar uma nota assinada preserva a assinatura e não regrava', async () => {
+    let salvar!: () => Promise<void>
+    montar({ nota: gravada('assinada'), prepararSalvamento: callback => { salvar = callback } })
+    await act(async () => salvar())
+    expect(patients.appendPatientEntry).not.toHaveBeenCalled()
+    expect(assinaturas.assinarNota).not.toHaveBeenCalled()
+  })
+
+  it('durante finalização bloqueia edição e assinatura, mas salva pelo controle da página', async () => {
+    let salvar!: () => Promise<void>
+    montar({ bloqueada: true, propostaReferencia: proposta, prepararSalvamento: callback => { salvar = callback } })
+    expect(screen.getByRole('group', { name: 'Nota da sessão' })).toHaveProperty('disabled', true)
+    expect(screen.getByRole('button', { name: 'Salvar nota' })).toHaveProperty('disabled', true)
+    expect(screen.getByRole('button', { name: 'Assinar nota' })).toHaveProperty('disabled', true)
+    expect(confirmar()).toHaveProperty('disabled', true)
+    fireEvent.keyDown(subjetivo(), { key: 'Enter', ctrlKey: true })
+    expect(assinaturas.assinarNota).not.toHaveBeenCalled()
+    await act(async () => salvar())
+    expect(aoSalvar).toHaveBeenCalledOnce()
+  })
+
   it('salva a nota da sessão cifrada no prontuário, avisa a página e não regrava a mesma revisão', async () => {
     montar()
     fireEvent.change(subjetivo(), { target: { value: 'Queixa fictícia' } })

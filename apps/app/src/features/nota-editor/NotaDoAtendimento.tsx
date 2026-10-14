@@ -31,6 +31,8 @@ export interface NotaDoAtendimentoProps {
   onDescartarProposta(): void
   onAbrirTranscricao(): void
   onSaved(): void
+  prepararSalvamento?(salvar: () => Promise<void>): void
+  bloqueada?: boolean
 }
 
 function papelDe(transcricao: Transcricao, locutor: string | null) {
@@ -43,7 +45,7 @@ function novaNota(patientId: string, atendimentoId: string): Nota {
     frases: ORDEM_SECOES.map((secao) => ({ id: `${secao}-0`, secao, texto: '', ancoras: [] })) }
 }
 
-export function NotaDoAtendimento({ baseUrl, accountId, accessToken, patientId, atendimentoId, dek, nota: gravada, transcricoes, analiseAutorizada, ativa, propostaReferencia, onDescartarProposta, onAbrirTranscricao, onSaved }: NotaDoAtendimentoProps) {
+export function NotaDoAtendimento({ baseUrl, accountId, accessToken, patientId, atendimentoId, dek, nota: gravada, transcricoes, analiseAutorizada, ativa, propostaReferencia, onDescartarProposta, onAbrirTranscricao, onSaved, prepararSalvamento, bloqueada = false }: NotaDoAtendimentoProps) {
   const { i18n, t } = useLingui()
   const [nota, setNota] = useState<Nota>(() => gravada ?? novaNota(patientId, atendimentoId))
   const [ocupado, setOcupado] = useState(false)
@@ -52,6 +54,9 @@ export function NotaDoAtendimento({ baseUrl, accountId, accessToken, patientId, 
   const propostaRef = useRef<HTMLFormElement>(null)
   const accessTokenRef = useRef(accessToken)
   accessTokenRef.current = accessToken
+  const salvarRascunho = useRef<() => Promise<void>>(null)
+  salvarRascunho.current = () => gravar(false, true)
+  useEffect(() => { prepararSalvamento?.(() => salvarRascunho.current!()) }, [prepararSalvamento])
 
   useEffect(() => {
     if (propostaReferencia && ativa) {
@@ -61,7 +66,7 @@ export function NotaDoAtendimento({ baseUrl, accountId, accessToken, patientId, 
     }
   }, [propostaReferencia, ativa])
 
-  async function gravar(assinar: boolean) {
+  async function gravar(assinar: boolean, propagarErro = false) {
     // Stryker disable next-line ConditionalExpression: equivalent, the buttons and the editor shortcut already refuse a signed note.
     if (nota.estado === ESTADO_ASSINADA) return
     const atual = nota
@@ -86,6 +91,7 @@ export function NotaDoAtendimento({ baseUrl, accountId, accessToken, patientId, 
       onSaved()
     } catch (erro) {
       setMensagem(erro instanceof Error ? erro.message : msg`Não foi possível concluir. Tente novamente.`)
+      if (propagarErro) throw erro
     } finally { setOcupado(false) }
   }
 
@@ -97,7 +103,7 @@ export function NotaDoAtendimento({ baseUrl, accountId, accessToken, patientId, 
     transcricaoDaProposta?.revisao === propostaReferencia.referencia.revisaoTranscricao &&
     palavrasDaProposta[0]?.inicioMs === propostaReferencia.inicioMs && palavrasDaProposta.at(-1)?.fimMs === propostaReferencia.fimMs &&
     palavrasDaProposta.map(palavra => palavra.texto).join(' ') === propostaReferencia.referencia.frasePaciente
-  const podeAdicionarReferencia = propostaValida && nota.estado !== ESTADO_ASSINADA && !ocupado
+  const podeAdicionarReferencia = propostaValida && nota.estado !== ESTADO_ASSINADA && !ocupado && !bloqueada
 
   function confirmarReferencia() {
     if (!podeAdicionarReferencia) return
@@ -125,8 +131,10 @@ export function NotaDoAtendimento({ baseUrl, accountId, accessToken, patientId, 
       <button type="submit" disabled={!podeAdicionarReferencia}><Trans>Confirmar referência na avaliação</Trans></button>
       <button type="button" onClick={onDescartarProposta}><Trans>Descartar referência</Trans></button>
     </form>}
-    <EditorSoap nota={nota} onChange={setNota} aoAssinar={() => { if (!ocupado) void gravar(true) }} aoAbrirTranscricao={abrirTranscricao} />
-    <div className="flex gap-2"><button type="button" className="button-primary" disabled={ocupado || nota.estado === ESTADO_ASSINADA} onClick={() => void gravar(false)}><Trans>Salvar nota</Trans></button>
-      <button type="button" disabled={ocupado || nota.estado === ESTADO_ASSINADA} onClick={() => void gravar(true)}><Trans>Assinar nota</Trans></button></div>
+    <fieldset className="note-editor-controls" aria-label={t`Nota da sessão`} disabled={ocupado || bloqueada}>
+      <EditorSoap nota={nota} onChange={setNota} aoAssinar={() => { if (!ocupado && !bloqueada) void gravar(true) }} aoAbrirTranscricao={abrirTranscricao} />
+    </fieldset>
+    <div className="flex gap-2"><button type="button" className="button-primary" disabled={ocupado || bloqueada || nota.estado === ESTADO_ASSINADA} onClick={() => void gravar(false)}><Trans>Salvar nota</Trans></button>
+      <button type="button" disabled={ocupado || bloqueada || nota.estado === ESTADO_ASSINADA} onClick={() => void gravar(true)}><Trans>Assinar nota</Trans></button></div>
   </section>
 }

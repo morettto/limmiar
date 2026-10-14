@@ -16,8 +16,10 @@ export type CapturaTranscricao =
   | { trilhas: 'proprias'; perfil: number[] }
   | { trilhas: 'emprestadas'; falante: FalanteDaTrilha; receberPcm?(pcm: Float32Array): void }
 
-// O gateway só devolve "profissional" ou o nome de outra pessoa ("paciente", "pessoa_2"...).
-export const papelDoFalante = (falante: string): RotuloLocutor => falante === 'profissional' ? 'voce' : 'paciente'
+export const papelDoFalante = (falante: string): RotuloLocutor | null => falante === 'profissional' ? 'voce' : falante === 'paciente' ? 'paciente' : null
+
+// A abertura do socket tem limite de 10 s; conservar esse áudio evita perder a primeira fala durante a conexão.
+const AMOSTRAS_NA_ABERTURA = 16000 * 10
 
 // A transcrição e a identificação de quem fala rodam no gateway de fala, que recebe o PCM só em memória.
 export async function transcreverAoVivo(stream: MediaStream, signal: AbortSignal,
@@ -26,6 +28,8 @@ export async function transcreverAoVivo(stream: MediaStream, signal: AbortSignal
   const capturaAbort = new AbortController()
   let captura: CapturaPcm | undefined
   let sessaoServidor: SessaoServidor | undefined
+  let fila: Float32Array[] = []
+  let amostrasNaFila = 0
   let ultimo!: ResultadoTranscricao
   let encerrada = false
   let encerramento: Promise<void> | undefined
@@ -39,6 +43,7 @@ export async function transcreverAoVivo(stream: MediaStream, signal: AbortSignal
     signal.removeEventListener('abort', cancelar)
     capturaAbort.abort()
     captura?.cancelar()
+    fila = []
     if (controle.trilhas === 'proprias') {
       stream.getTracks().forEach((track) => track.stop())
       controle.perfil.fill(0)
@@ -56,23 +61,34 @@ export async function transcreverAoVivo(stream: MediaStream, signal: AbortSignal
   try {
     if (signal.aborted) cancelar()
     if (encerrada) throw new DOMException('Cancelado', 'AbortError')
-    const aberta = await abrirTranscricao({
-      identidade: controle.trilhas === 'proprias' ? { modo: 'presencial', perfil: controle.perfil } : { modo: 'online', falante: controle.falante },
-      aoResultado: (resultado) => { if (!encerrada) { ultimo = resultado; atualizar(resultado) } },
-      falhar: erro,
-    })
-    if (encerrada) { aberta.descartar(); throw new DOMException('Cancelado', 'AbortError') }
-    sessaoServidor = aberta
-    captura = await capturarPcm(stream, capturaAbort.signal, (pcm) => {
+    const capturando = capturarPcm(stream, capturaAbort.signal, (pcm) => {
       if (encerrada) return
       // Stryker disable next-line ConditionalExpression: equivalent, a presencial control has no `receberPcm`, so calling it is a no-op.
       if (controle.trilhas === 'emprestadas') controle.receberPcm?.(pcm)
-      sessaoServidor!.enviar(pcm)
+      if (sessaoServidor) sessaoServidor.enviar(pcm)
+      else {
+        amostrasNaFila += pcm.length
+        if (amostrasNaFila > AMOSTRAS_NA_ABERTURA) { erro(new Error(t`Não foi possível iniciar a gravação.`)); return }
+        fila.push(pcm)
+      }
     }, () => erro(new Error(t`O microfone foi interrompido.`)), {
       trilhas: controle.trilhas,
       aoEncerrarTrilha: controle.trilhas === 'emprestadas' ? () => { void encerrar().catch(() => {}) } : undefined,
+    }).then((aberta) => {
+      if (encerrada) { aberta.cancelar(); throw new DOMException('Cancelado', 'AbortError') }
+      captura = aberta
     })
-    if (encerrada) { captura.cancelar(); throw new Error(t`A captura foi cancelada.`) }
+    const conectando = abrirTranscricao({
+      identidade: controle.trilhas === 'proprias' ? { modo: 'presencial', perfil: controle.perfil } : { modo: 'online', falante: controle.falante },
+      aoResultado: (resultado) => { if (!encerrada) { ultimo = resultado; atualizar(resultado) } },
+      falhar: erro,
+    }).then((aberta) => {
+      if (encerrada) { aberta.descartar(); throw new DOMException('Cancelado', 'AbortError') }
+      sessaoServidor = aberta
+      fila.forEach((pcm) => aberta.enviar(pcm))
+      fila = []
+    })
+    await Promise.all([capturando, conectando])
     return {
       pausar: (pausada) => captura!.pausar(pausada),
       encerrar,

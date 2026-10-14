@@ -244,6 +244,7 @@ describe('PatientList', () => {
     view.rerender(lista('token-antigo'))
     view.rerender(lista('token-novo'))
     await screen.findByRole('link', { name: 'Paciente fictício' })
+    await waitFor(() => expect(screen.queryByRole('status')).toBeNull())
     await act(async () => rejeitada.reject(new Error('rede caiu')))
     expect(screen.queryByRole('status')).toBeNull()
   })

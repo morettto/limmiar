@@ -16,12 +16,14 @@ export interface OnlineSessionProps {
   paciente: SessionReviewProps['paciente']
   atendimentoId: SessionReviewProps['atendimentoId']
   transcricao?: SessionReviewProps['transcricao']
+  atendimentoEncerrado?: boolean
+  bloqueada?: boolean
   onPendingChange(pending: boolean): void
   onSaved?: SessionReviewProps['onSaved']
   onPropostaReferencia?: SessionReviewProps['onPropostaReferencia']
 }
 
-export function OnlineSession({ baseUrl, accountId, accessToken, patientId, kek, paciente, atendimentoId, transcricao, onPendingChange, onSaved, onPropostaReferencia }: OnlineSessionProps) {
+export function OnlineSession({ baseUrl, accountId, accessToken, patientId, kek, paciente, atendimentoId, transcricao, onPendingChange, onSaved, onPropostaReferencia, atendimentoEncerrado = false, bloqueada = false }: OnlineSessionProps) {
   const { i18n, t } = useLingui()
   const [convite, setConvite] = useState<ConviteOnline | null>(null)
   const [ocupado, setOcupado] = useState(false)
@@ -64,7 +66,7 @@ export function OnlineSession({ baseUrl, accountId, accessToken, patientId, kek,
   const link = new URL('/session/online', location.origin)
   if (convite) link.hash = new URLSearchParams({ room: convite.roomId, token: convite.patientToken }).toString()
   return <section aria-label={t`Convite da sessão online`}>
-    {!convite && <button type="button" className="button-primary" disabled={ocupado} onClick={() => void criar()}><Trans>Gerar convite de sessão online</Trans></button>}
+    {!convite && <button type="button" className="button-primary" disabled={ocupado || atendimentoEncerrado || bloqueada} onClick={() => void criar()}><Trans>Gerar convite de sessão online</Trans></button>}
     {erro !== null && <p role="alert">{i18n._(erro)}</p>}
     {convite && !encerrada && <>
       <label><Trans>Link privado da sessão online</Trans><input readOnly value={link.href} onFocus={event => event.target.select()} /></label>
@@ -83,6 +85,6 @@ export function OnlineSession({ baseUrl, accountId, accessToken, patientId, kek,
     </>}
     {encerrada && <p role="status"><Trans>Convite online encerrado.</Trans></p>}
     {convite && <SessionReview baseUrl={baseUrl} accountId={accountId} accessToken={accessToken} kek={kek} paciente={paciente} atendimentoId={atendimentoId} transcricao={transcricao}
-      online={{ ...fluxos, ativa: conectada && !encerrada }} onPendingChange={setTranscricaoPendente} prepararEncerramento={prepararEncerramento} onSaved={onSaved} onPropostaReferencia={onPropostaReferencia} />}
+      online={{ ...fluxos, ativa: conectada && !encerrada }} encerrada={atendimentoEncerrado} bloqueada={bloqueada} onPendingChange={setTranscricaoPendente} prepararEncerramento={prepararEncerramento} onSaved={onSaved} onPropostaReferencia={onPropostaReferencia} />}
   </section>
 }

@@ -6,7 +6,7 @@ import * as consent from '../../entities/consentimento/api'
 import * as signatures from '../../entities/nota/api'
 import { openRecord, sealEntry, sealNewPatient } from '../../entities/patient/patient-crypto'
 import { transcricaoParaEntrada, type Transcricao } from '../../entities/transcricao/transcricao'
-import { atendimentoParaEntrada, type Atendimento } from '../../entities/atendimento/atendimento'
+import { atendimentoParaEntrada, encerramentoParaEntrada, type Atendimento } from '../../entities/atendimento/atendimento'
 import { abrirProntuario } from './abrir-prontuario'
 
 const data = '2026-10-01T12:00:00Z'
@@ -36,6 +36,18 @@ beforeEach(async () => {
 afterEach(() => vi.restoreAllMocks())
 
 describe('abrirProntuario', () => {
+  it('reabre a sessão encerrada preservando transcrição e sem encerrar outra sessão', async () => {
+    const encerradoEm = '2026-10-13T16:00:00.000Z'
+    const outra = { ...atendimento, id: 'outra', agendamentoId: 'agendamento-2' }
+    await acrescentar(atendimentoParaEntrada(atendimento))
+    await acrescentar(atendimentoParaEntrada(outra))
+    await acrescentar(transcricaoParaEntrada(transcricao))
+    await acrescentar(encerramentoParaEntrada({ atendimentoId: atendimento.id, encerradoEm, autorId: 'conta' }))
+    const aberto = await abrir()
+    expect(aberto.atendimentos).toEqual([{ ...atendimento, encerradoEm }, outra])
+    expect(aberto.transcricoes).toEqual([transcricao])
+    expect(aberto.notas).toEqual([])
+  })
   it('decifra nome e risco da primeira entrada e traz consentimentos', async () => {
     const aberto = await abrir()
     expect(aberto).toMatchObject({ nome: 'Paciente fictício', risco: 'moderado', consentimentos: { gravacao: 'concedido', analiseIa: 'pendente' },

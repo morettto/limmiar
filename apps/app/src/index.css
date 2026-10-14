@@ -44,6 +44,7 @@
 #root label, #root legend { font: 400 14px/20px var(--font-interface); }
 #root :is(button, input, select, textarea, label, legend) { letter-spacing: var(--tracking-body-sm); }
 #root fieldset { border: 1px solid var(--color-ash); border-radius: var(--radius-lg); padding: 16px; background: var(--color-paper); }
+#root .note-editor-controls { border: 0; padding: 0; background: transparent; }
 #root label:has(input[type="checkbox"]), #root label:has(input[type="radio"]) { display: inline-flex; min-height: 44px; align-items: center; gap: 8px; }
 #root fieldset > label:has(input[type="checkbox"]), #root fieldset > label:has(input[type="radio"]) { display: flex; }
 #root input[type="checkbox"], #root input[type="radio"] { accent-color: var(--color-carbon); }
@@ -70,6 +71,10 @@
 #root a.patient-folder:hover, #root a.patient-folder:hover::before { background: var(--color-bone); border-color: var(--color-carbon); }
 .patient-record-heading { border-top: 1px solid var(--color-ash); padding-top: 24px; }
 .patient-sessions ul, .material-list { list-style: none; padding: 0; }
+.patient-session-list { display: grid; gap: 12px; margin: 24px 0 0; }
+.patient-session-row { display: flex; flex-direction: column; gap: 8px; padding: 20px; border: 1px solid var(--color-ash); border-radius: var(--radius-lg); background: var(--color-paper); }
+#root .patient-session-link { display: flex; align-items: center; min-height: 44px; font: 500 18px/1.4 var(--font-interface); color: var(--color-ink); text-decoration: none; }
+.patient-session-row:focus-within, .patient-session-row:hover { border-color: var(--color-olive-char); background: var(--color-bone); }
 .session-folder > summary { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 12px; min-height: 44px; }
 .session-folder > summary > span:first-child { font: 400 20px/1.2 var(--font-editorial); }
 .session-text { white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -80,6 +85,13 @@
 .material-upload input { display: block; margin-top: 12px; max-width: 100%; }
 .material-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(230px, .5fr); gap: 24px; padding: 24px 0; border-top: 1px solid var(--color-ash); overflow-wrap: anywhere; }
 .material-actions { display: flex; flex-wrap: wrap; align-content: start; gap: 8px; }
+.preparation-spinner { display: inline-block; width: 16px; height: 16px; margin-inline-end: 8px; vertical-align: middle; border: 2px solid var(--color-ash); border-top-color: var(--color-olive-char); border-radius: 50%; animation: preparation-spin .8s linear infinite; }
+.material-preparation progress { width: min(90%, 24rem); height: 8px; margin-inline-end: 8px; appearance: none; border: 0; border-radius: 4px; background: var(--color-bone); }
+.material-preparation progress::-webkit-progress-bar { background: var(--color-bone); border-radius: 4px; }
+.material-preparation progress::-webkit-progress-value { background: var(--color-olive-char); border-radius: 4px; }
+.material-preparation progress::-moz-progress-bar { background: var(--color-olive-char); border-radius: 4px; }
+@keyframes preparation-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .preparation-spinner { animation: none; } }
 .material-actions label { flex-basis: 100%; }
 .editorial-empty { padding: 32px 0; border-top: 1px solid var(--color-ash); margin-top: 24px; }
 @media (max-width: 640px) { .material-form, .material-row { grid-template-columns: minmax(0, 1fr); } .workspace-card { padding: 16px; } .material-actions { gap: 12px; } }

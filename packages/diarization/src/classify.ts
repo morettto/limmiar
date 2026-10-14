@@ -5,7 +5,7 @@ export type RotuloLocutor = 'voce' | 'paciente'
 export const LIMIAR_MESMA_VOZ = 0.5
 
 export function similaridadeCosseno(a: readonly number[], b: readonly number[]): number {
-  if (a.length === 0 || a.length !== b.length || !a.every(Number.isFinite) || !b.every(Number.isFinite)) return NaN
+  if (a.length !== b.length || !a.every(Number.isFinite) || !b.every(Number.isFinite)) return NaN
   let produto = 0
   let normaA = 0
   let normaB = 0

@@ -1,8 +1,8 @@
-import { Atribuicao, type Revisao } from './atribuicao.ts'
+import { atribuirVozes, falanteNoInstante } from './atribuicao.ts'
 import { BufferPcm } from './buffer-pcm.ts'
 import type { Extrator } from './extrator.ts'
 import { Locutores } from './locutores.ts'
-import { AMOSTRAS_POR_MS, type Falante, type Inicio, type Palavra, type Saida } from './protocolo.ts'
+import { AMOSTRAS_POR_MS, type Inicio, type Palavra, type Saida } from './protocolo.ts'
 import type { AbrirUpstream, MensagemUpstream, PalavraUpstream, Upstream } from './upstream.ts'
 
 export interface ParametrosSessao {
@@ -11,19 +11,18 @@ export interface ParametrosSessao {
   // Pausa em que a sessão upstream é reiniciada para limitar o que o servidor acumula, e o teto em que reinicia mesmo sem pausa.
   rotacaoMs: number
   rotacaoForcadaMs: number
-  // Abaixo disto o TitaNet não distingue vozes; a frase herda o falante da vizinha.
+  // A impressão de voz usa amostras independentes; respostas curtas aguardam contexto acústico.
   fraseMinimaMs: number
   vozMaximaMs: number
   // O fim de uma palavra do reconhecedor costuma sair antes do fim da fala.
-  margemAntesMs: number
   margemDepoisMs: number
   // Sem mudança de texto, um parcial só repete o `processado_ms` a cada tanto, para o app medir o atraso.
   repeticaoMs: number
 }
 
 export const PARAMETROS_PADRAO: ParametrosSessao = {
-  bufferMs: 30_000, rotacaoMs: 180_000, rotacaoForcadaMs: 300_000, fraseMinimaMs: 1000, vozMaximaMs: 15_000,
-  margemAntesMs: 100, margemDepoisMs: 200, repeticaoMs: 500,
+  bufferMs: 30_000, rotacaoMs: 180_000, rotacaoForcadaMs: 300_000, fraseMinimaMs: 1500, vozMaximaMs: 10_000,
+  margemDepoisMs: 200, repeticaoMs: 500,
 }
 
 export interface Canal {
@@ -52,7 +51,7 @@ export class Sessao {
   private readonly parametros: ParametrosSessao
   private readonly buffer: BufferPcm
   private readonly locutores: Locutores | undefined
-  private readonly atribuicao = new Atribuicao()
+  private pendentes: { frase: number; instanteMs: number }[] = []
   private upstream: Upstream | undefined
   private deslocamentoMs = 0
   private amostrasNoUpstream = 0
@@ -109,6 +108,7 @@ export class Sessao {
     this.upstream = undefined
     this.buffer.limpar()
     this.locutores?.limpar()
+    this.pendentes = []
     this.fila = []
     this.mensagens = []
   }
@@ -166,30 +166,43 @@ export class Sessao {
 
   private async finalizar(novas: PalavraUpstream[], processadoMs: number): Promise<void> {
     const palavras = novas.map((palavra) => this.palavra(palavra))
-    const frase = { id: this.proximaFrase++, inicioMs: palavras[0]!.inicio_ms, fimMs: palavras.at(-1)!.fim_ms }
-    let falante: Falante | null = this.inicio.modo === 'online' ? this.inicio.falante : null
-    let revisoes: Revisao[] = []
-    if (this.locutores) {
-      const verificado = await this.verificar(frase)
-      if (this.encerrada) return
-      const resolvido = this.atribuicao.resolver(frase, verificado)
-      falante = resolvido.falante
-      revisoes = resolvido.revisoes
+    if (this.inicio.modo === 'online') {
+      this.canal.enviar({ type: 'final', frase: this.proximaFrase++, falante: this.inicio.falante,
+        palavras, processado_ms: processadoMs })
+    } else {
+      for (let posicao = 0; posicao < palavras.length;) {
+        const primeira = palavras[posicao]!
+        const tetoMs = primeira.inicio_ms + this.parametros.vozMaximaMs - this.parametros.margemDepoisMs
+        let fim = posicao + 1
+        while (fim < palavras.length && palavras[fim]!.fim_ms <= tetoMs) fim++
+        const lote = palavras.slice(posicao, fim)
+        const fimMs = Math.min(lote.at(-1)!.fim_ms + this.parametros.margemDepoisMs, tetoMs + this.parametros.margemDepoisMs)
+        const inicioMs = Math.max(0, fimMs - this.parametros.vozMaximaMs,
+          (this.buffer.recebidas / AMOSTRAS_POR_MS) - this.parametros.bufferMs)
+        const pcm = this.buffer.recortar(inicioMs * AMOSTRAS_POR_MS, fimMs * AMOSTRAS_POR_MS)
+        const trechos = await atribuirVozes(pcm, inicioMs, this.parametros.fraseMinimaMs, this.deps.extrator, this.locutores!)
+        if (this.encerrada) return
+        this.pendentes = this.pendentes.filter(pendente => {
+          const falante = falanteNoInstante(trechos, pendente.instanteMs)
+          if (falante !== null) this.canal.enviar({ type: 'falante', frase: pendente.frase, falante })
+          return falante === null && pendente.instanteMs >= inicioMs
+        })
+        for (let i = 0; i < lote.length;) {
+          const palavra = lote[i]!
+          const instanteMs = (palavra.inicio_ms + palavra.fim_ms) / 2
+          const falante = falanteNoInstante(trechos, instanteMs)
+          let ate = i + 1
+          while (falante !== null && ate < lote.length &&
+            falanteNoInstante(trechos, (lote[ate]!.inicio_ms + lote[ate]!.fim_ms) / 2) === falante) ate++
+          const frase = this.proximaFrase++
+          this.canal.enviar({ type: 'final', frase, falante, palavras: lote.slice(i, ate), processado_ms: processadoMs })
+          if (falante === null) this.pendentes.push({ frase, instanteMs })
+          i = ate
+        }
+        posicao = fim
+      }
     }
     this.processadoEnviadoMs = processadoMs
-    this.canal.enviar({ type: 'final', frase: frase.id, falante, palavras, processado_ms: processadoMs })
-    for (const revisao of revisoes) this.canal.enviar({ type: 'falante', ...revisao })
-  }
-
-  // null: a frase é curta demais, ou o áudio dela já saiu da memória, ou não rendeu uma impressão de voz válida.
-  private async verificar(frase: { inicioMs: number; fimMs: number }): Promise<Falante | null> {
-    const { fraseMinimaMs, vozMaximaMs, margemAntesMs, margemDepoisMs } = this.parametros
-    if (frase.fimMs - frase.inicioMs < fraseMinimaMs) return null
-    const de = frase.inicioMs - margemAntesMs
-    const pcm = this.buffer.recortar(de * AMOSTRAS_POR_MS, Math.min(frase.fimMs + margemDepoisMs, de + vozMaximaMs) * AMOSTRAS_POR_MS)
-    if (pcm.length < fraseMinimaMs * AMOSTRAS_POR_MS) return null
-    const embedding = await this.deps.extrator.embutir(pcm)
-    return embedding && !this.encerrada ? this.locutores!.identificar(embedding) : null
   }
 
   private enviarParcial(texto: string, processadoMs: number): void {
