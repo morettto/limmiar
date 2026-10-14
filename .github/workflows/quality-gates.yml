@@ -7,6 +7,52 @@ on:
     branches: [main]
 
 jobs:
+  app-e2e:
+    name: "App E2E (real API, encryption and browser voice runtime)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: limmiar_e2e
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - uses: actions/cache@v4
+        with:
+          path: apps/app/public/models/voice-identity
+          key: voice-wasm-${{ runner.os }}-${{ hashFiles('tools/voice-identity/Dockerfile', 'tools/voice-identity/CMakeLists.txt', 'tools/voice-identity/embedding.cpp', 'tools/voice-identity/worker.js', 'tools/voice-identity/setup.mjs') }}
+      - name: Prepare verified browser voice model and runtime
+        run: node tools/voice-identity/setup.mjs
+      - run: pnpm --filter app exec playwright install --with-deps chromium
+      - run: pnpm --filter app test:e2e
+      - name: Upload browser diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: app-e2e-report
+          path: apps/app/test-results
   # Runs on every push to main AND every PR (not gated to pull_request) —
   # coverage must hold on main too, not just be checked before merge.
   coverage:
@@ -563,7 +609,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Restore Stryker incremental baseline (from nightly, main)
+      - name: Restore Stryker incremental baseline (same PR, then nightly main)
         uses: actions/cache/restore@v6
         with:
           path: |
@@ -578,6 +624,7 @@ jobs:
           # resolves to whatever the nightly job most recently published.
           key: stryker-incremental-pr-${{ github.run_id }}
           restore-keys: |
+            stryker-incremental-pr-
             stryker-incremental-main-
 
       # stryker exits non-zero if the mutation score is below the `break`

@@ -181,7 +181,7 @@ describe('violações do protocolo', () => {
     ws.send(iniciar())
     await vi.waitFor(() => expect(tipos(recebidas)).toEqual(['pronta']))
     ws.send(Buffer.alloc(70_000))
-    expect(await fechou).toBe(1006)
+    expect(await fechou).toBe(1009)
   })
 })
 

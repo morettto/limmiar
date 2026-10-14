@@ -107,5 +107,5 @@ function conectar(ws: WebSocket, config: ConfigServidor): void {
     sessao!.pcm(new Int16Array(dados.buffer.slice(dados.byteOffset, dados.byteOffset + dados.byteLength)))
   })
   ws.on('close', () => sessao?.encerrar())
-  ws.on('error', () => ws.terminate())
+  ws.on('error', () => sessao?.encerrar())
 }

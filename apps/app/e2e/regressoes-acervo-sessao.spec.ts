@@ -5,6 +5,52 @@ import { simularCopiloto } from './fixtures/atendimento/copiloto-simulado'
 
 test.use({ locale: 'pt-BR' })
 
+test('metadados XMP hostis ficam como texto literal durante leitura, armazenamento e reabertura', async ({ page, request }) => {
+  await simularCopiloto(page)
+  const titulo = '<img src="/xmp-security-probe" onerror="window.xmpExecuted=true"><script>window.xmpExecuted=true</script>'
+  const escaparXml = (texto: string) => texto.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;')
+  const xmp = `<x:xmpmeta xmlns:x="adobe:ns:meta/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:dc="http://purl.org/dc/elements/1.1/">
+<rdf:RDF><rdf:Description><dc:title><rdf:Alt><rdf:li xml:lang="x-default">${escaparXml(titulo)}</rdf:li></rdf:Alt></dc:title>
+<dc:creator><rdf:Seq><rdf:li>Autora sintética</rdf:li></rdf:Seq></dc:creator></rdf:Description></rdf:RDF>
+<script xmlns="http://www.w3.org/1999/xhtml">window.xmpExecuted=true</script>
+<img xmlns="http://www.w3.org/1999/xhtml" src="/xmp-security-probe" onerror="window.xmpExecuted=true" />
+</x:xmpmeta>`
+  const objetos = [
+    '<< /Type /Catalog /Pages 2 0 R /Metadata 3 0 R >>',
+    '<< /Type /Pages /Kids [] /Count 0 >>',
+    `<< /Type /Metadata /Subtype /XML /Length ${Buffer.byteLength(xmp)} >>\nstream\n${xmp}\nendstream`,
+  ]
+  let pdf = '%PDF-1.7\n'
+  const offsets = objetos.map((objeto, i) => {
+    const offset = Buffer.byteLength(pdf)
+    pdf += `${i + 1} 0 obj\n${objeto}\nendobj\n`
+    return offset
+  })
+  const xref = Buffer.byteLength(pdf)
+  pdf += `xref\n0 4\n0000000000 65535 f \n${offsets.map(offset => `${String(offset).padStart(10, '0')} 00000 n \n`).join('')}trailer\n<< /Size 4 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`
+  const sondagens: string[] = []
+  page.on('request', pedido => { if (pedido.url().includes('/xmp-security-probe')) sondagens.push(pedido.url()) })
+  await page.addInitScript(() => { (window as Window & { xmpExecuted?: boolean }).xmpExecuted = false })
+  const conta = await registrarProfissionalNaInterface(page, request)
+  await page.getByRole('link', { name: 'Acervo pessoal', exact: true }).click()
+  await page.getByLabel('Arquivo do material', { exact: true }).setInputFiles({ name: 'xmp-hostil.pdf', mimeType: 'application/pdf', buffer: Buffer.from(pdf) })
+  await expect(page.getByLabel('Título da obra', { exact: true })).toHaveValue(titulo)
+  await expect(page.getByLabel('Autores', { exact: true })).toHaveValue('Autora sintética')
+  await page.getByRole('button', { name: 'Guardar no acervo', exact: true }).click()
+  const linha = page.locator('li.material-row').filter({ hasText: titulo })
+  await expect(linha).toBeVisible()
+  await expect(linha.locator('img, script')).toHaveCount(0)
+  expect(await page.evaluate(() => (window as Window & { xmpExecuted?: boolean }).xmpExecuted)).toBe(false)
+  expect(sondagens).toEqual([])
+  await page.reload()
+  await entrarProfissionalNaInterface(page, conta)
+  await page.getByRole('link', { name: 'Acervo pessoal', exact: true }).click()
+  await expect(linha).toBeVisible()
+  await expect(linha.locator('img, script')).toHaveCount(0)
+  expect(await page.evaluate(() => (window as Window & { xmpExecuted?: boolean }).xmpExecuted)).toBe(false)
+  expect(sondagens).toEqual([])
+})
+
 test('preparo após upload mostra avanço e falha reais sem bloquear autorização, revogação ou repetição', async ({ page, request }) => {
   await simularCopiloto(page)
   const titulo = 'Acervo de regressão ' + randomUUID()
