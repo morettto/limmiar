@@ -202,6 +202,16 @@ public sealed class PatientLinkStore(NpgsqlDataSource dataSource, Func<DateTimeO
     {
         await using var scope = await dataSource.OpenTenantScopedTransactionAsync(accountId, cancellationToken);
 
+        // Timestamp the unlink only after earlier shares release the row, using the database clock in production.
+        await using var lockCommand = scope.CreateCommand("""
+            SELECT 1 FROM patient_links WHERE unlinked_at IS NULL
+              AND ((professional_account_id = @accountId AND patient_account_id = @peerAccountId)
+                OR (professional_account_id = @peerAccountId AND patient_account_id = @accountId)) FOR UPDATE
+            """);
+        lockCommand.Parameters.AddWithValue("accountId", accountId);
+        lockCommand.Parameters.AddWithValue("peerAccountId", peerAccountId);
+        await lockCommand.ExecuteScalarAsync(cancellationToken);
+
         await using var updateCommand = scope.CreateCommand();
         updateCommand.Transaction = scope.Transaction;
         updateCommand.CommandText = """
@@ -211,7 +221,8 @@ public sealed class PatientLinkStore(NpgsqlDataSource dataSource, Func<DateTimeO
               AND ((professional_account_id = @accountId AND patient_account_id = @peerAccountId)
                 OR (professional_account_id = @peerAccountId AND patient_account_id = @accountId))
             """;
-        updateCommand.Parameters.AddWithValue("unlinkedAt", _clock());
+        if (clock is null) updateCommand.CommandText = updateCommand.CommandText.Replace("@unlinkedAt", "clock_timestamp()");
+        else updateCommand.Parameters.AddWithValue("unlinkedAt", _clock());
         updateCommand.Parameters.AddWithValue("accountId", accountId);
         updateCommand.Parameters.AddWithValue("peerAccountId", peerAccountId);
 

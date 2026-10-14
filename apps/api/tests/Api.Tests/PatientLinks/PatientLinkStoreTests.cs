@@ -425,6 +425,43 @@ public sealed class PatientLinkStoreTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task UnlinkAsync_ReadsClockOnlyAfterConcurrentShareReleasesTheLink()
+    {
+        await LinkedStoreAsync();
+        var clockReads = 0;
+        var unlinkTime = new DateTimeOffset(DateTime.UtcNow.Date.AddDays(1), TimeSpan.Zero);
+        var store = new PatientLinkStore(_dataSource, () => { Interlocked.Increment(ref clockReads); return unlinkTime; });
+        await using var sharing = await _dataSource.OpenTenantScopedTransactionAsync(PatientAccountId, CancellationToken.None);
+        await using var hold = sharing.CreateCommand("""
+            SELECT 1 FROM patient_links
+            WHERE patient_account_id = @patient AND professional_account_id = @professional AND unlinked_at IS NULL FOR SHARE
+            """);
+        hold.Parameters.AddWithValue("patient", PatientAccountId);
+        hold.Parameters.AddWithValue("professional", ProfessionalId);
+        await hold.ExecuteScalarAsync();
+        var unlink = store.UnlinkAsync(PatientAccountId, ProfessionalId, CancellationToken.None);
+        try
+        {
+            var deadline = DateTime.UtcNow.AddSeconds(10);
+            await using var waiting = _dataSource.CreateCommand("""
+                SELECT EXISTS (SELECT 1 FROM pg_stat_activity
+                    WHERE wait_event_type = 'Lock' AND query LIKE '%patient_links%')
+                """);
+            while (!(bool)(await waiting.ExecuteScalarAsync())!)
+            {
+                Assert.True(DateTime.UtcNow < deadline, "Unlink did not reach the held row lock.");
+                await Task.Yield();
+            }
+            Assert.Equal(0, Volatile.Read(ref clockReads));
+            Assert.False(unlink.IsCompleted);
+        }
+        finally { await sharing.Transaction.CommitAsync(); }
+        Assert.True(await unlink);
+        Assert.Equal(1, clockReads);
+        Assert.Equal(unlinkTime, Assert.Single(await store.ListReceivedSharesAsync(ProfessionalId, CancellationToken.None)).UnlinkedAt);
+    }
+
+    [Fact]
     public async Task ListReceivedSharesAsync_WhenNeverLinkedToAnyone_ReturnsEmpty()
     {
         var store = new PatientLinkStore(_dataSource);
