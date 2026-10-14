@@ -1,9 +1,34 @@
 import { test, expect } from '@playwright/test'
 import { randomUUID } from 'node:crypto'
-import { registrarProfissionalNaInterface, entrarProfissionalNaInterface } from './fixtures/profissional-interface'
+import { registrarProfissionalNaInterface, entrarProfissionalNaInterface, abrirCarteira, iniciarSessaoAgora } from './fixtures/profissional-interface'
 import { simularCopiloto } from './fixtures/atendimento/copiloto-simulado'
 
 test.use({ locale: 'pt-BR' })
+
+test('HTML rotulado como áudio permanece um recurso de mídia sem executar código', async ({ page, request }) => {
+  const sondagens: string[] = []
+  page.on('request', pedido => { if (pedido.url().includes('/audio-security-probe')) sondagens.push(pedido.url()) })
+  await page.addInitScript(() => { (window as Window & { audioExecuted?: boolean }).audioExecuted = false })
+  await registrarProfissionalNaInterface(page, request)
+  await abrirCarteira(page)
+  const lista = page.getByRole('region', { name: 'Pacientes', exact: true })
+  const nome = 'Áudio hostil ' + randomUUID()
+  await lista.locator('details.patient-add > summary').click()
+  await lista.getByLabel('Nome do paciente', { exact: true }).fill(nome)
+  await lista.getByRole('button', { name: 'Adicionar paciente', exact: true }).click()
+  await lista.getByRole('link', { name: nome, exact: true }).click()
+  await iniciarSessaoAgora(page)
+  await page.getByRole('checkbox', { name: 'Paciente autorizou a gravação', exact: true }).check()
+  const sessao = page.getByRole('region', { name: 'Gravação e transcrição', exact: true })
+  await sessao.getByLabel('Ou carregar áudio', { exact: true }).setInputFiles({ name: 'hostil.wav', mimeType: 'audio/wav',
+    buffer: Buffer.from('<script>window.audioExecuted=true</script><img src="/audio-security-probe" onerror="window.audioExecuted=true">') })
+  const player = sessao.locator('audio')
+  await expect(player).toHaveAttribute('src', /^blob:/)
+  await expect.poll(() => player.evaluate(elemento => (elemento as HTMLMediaElement).error?.code)).toBe(4)
+  await expect(sessao.locator('img, script')).toHaveCount(0)
+  expect(await page.evaluate(() => (window as Window & { audioExecuted?: boolean }).audioExecuted)).toBe(false)
+  expect(sondagens).toEqual([])
+})
 
 test('metadados XMP hostis ficam como texto literal durante leitura, armazenamento e reabertura', async ({ page, request }) => {
   await simularCopiloto(page)
