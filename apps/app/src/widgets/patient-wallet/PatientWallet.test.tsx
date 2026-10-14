@@ -1,6 +1,6 @@
 import '@vitest/web-worker'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import { I18nProvider } from '@lingui/react'
 import { webcrypto as limmiarWebcrypto } from '@limmiar/crypto'
 import { dynamicActivate, i18n } from '../../shared/i18n'
@@ -238,5 +238,21 @@ describe('PatientWallet', () => {
     summariesCall.resolve([{ patientId: 'p1', ok: true, name: 'Ana', risk: 'elevado' }])
     await summariesCall.promise
     await Promise.resolve()
+  })
+
+  it('locking the keyring while decryption is pending never reveals the stale patient names', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(patientsResponse(['p1'])), {
+      status: 200, headers: { 'Content-Type': 'application/json' },
+    })))
+    const summaries = deferred<SummaryResult[]>()
+    const openSummaries = vi.fn().mockReturnValue(summaries.promise)
+    const { rerender } = renderWallet({ openSummaries })
+    await waitFor(() => expect(openSummaries).toHaveBeenCalledOnce())
+    const signal = openSummaries.mock.calls[0]![2] as AbortSignal
+    rerender(<I18nProvider i18n={i18n}><PatientWallet baseUrl="http://api.test" accountId="acc-1" accessToken="token-1" kek={null} openSummaries={openSummaries} /></I18nProvider>)
+    expect(signal.aborted).toBe(true)
+    await act(async () => { summaries.resolve([{ patientId: 'p1', ok: true, name: 'Stale patient', risk: 'baixo' }]); await summaries.promise })
+    expect(screen.getByText('Chaveiro bloqueado. Desbloqueie para ver a carteira de pacientes.')).toBeTruthy()
+    expect(screen.queryByText('Stale patient')).toBeNull()
   })
 })

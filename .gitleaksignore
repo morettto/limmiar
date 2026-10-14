@@ -1,0 +1,5 @@
+# Immutable test fixtures: a public-key sample and a dummy invite code, not credentials.
+7ca43a9fc417fe800026bcfae60d940b37b950cb:apps/app/src/features/device-pairing-primary/PairingQr.test.tsx:generic-api-key:361
+7ca43a9fc417fe800026bcfae60d940b37b950cb:apps/app/src/widgets/patient-care/PatientAccess.test.tsx:generic-api-key:34
+# Historical generated index contains file digests only (size/time/hash schema).
+8e5f75ff6d9a2a81b0d6da72156256dba9d0ac8c:graphify-out/cache/stat-index.json:generic-api-key:1
