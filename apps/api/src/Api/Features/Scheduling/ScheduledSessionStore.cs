@@ -54,6 +54,39 @@ public sealed class ScheduledSessionStore(NpgsqlDataSource dataSource)
         return inserted;
     }
 
+    /// <summary>Marca a falta; idempotente (repetir devolve o mesmo). RLS trata tenant
+    /// trocado como inexistente: 0 linhas, sem ramo extra.</summary>
+    public async Task<bool> TryMarkNoShowAsync(Guid tenantId, Guid sessionId, CancellationToken cancellationToken)
+    {
+        await using var scope = await dataSource.OpenTenantScopedTransactionAsync(tenantId, cancellationToken);
+
+        await using var command = scope.Connection.CreateCommand();
+        command.Transaction = scope.Transaction;
+        command.CommandText = "UPDATE scheduled_sessions SET no_show = true WHERE id = @id";
+        command.Parameters.AddWithValue("id", sessionId);
+        var rows = await command.ExecuteNonQueryAsync(cancellationToken);
+
+        await scope.Transaction.CommitAsync(cancellationToken);
+        return rows == 1;
+    }
+
+    /// <summary>Faltas anteriores do tenant sem contar a atual (a política Decide recebe só o
+    /// passado). ExecuteScalar: COUNT devolve sempre uma linha, sem ramo de leitor.</summary>
+    public async Task<int> CountPriorNoShowsAsync(Guid tenantId, Guid sessionId, CancellationToken cancellationToken)
+    {
+        await using var scope = await dataSource.OpenTenantScopedTransactionAsync(tenantId, cancellationToken);
+
+        await using var command = scope.Connection.CreateCommand();
+        command.Transaction = scope.Transaction;
+        command.CommandText = "SELECT COUNT(*) FROM scheduled_sessions WHERE tenant_id = @tenant AND no_show AND id <> @id";
+        command.Parameters.AddWithValue("tenant", tenantId);
+        command.Parameters.AddWithValue("id", sessionId);
+        var count = (long)(await command.ExecuteScalarAsync(cancellationToken))!;
+
+        await scope.Transaction.CommitAsync(cancellationToken);
+        return (int)count;
+    }
+
     /// <summary>
     /// Moves a session to a new slot under a row lock (<c>SELECT ... FOR UPDATE</c>) so the
     /// guards in <see cref="LockAndGuardAsync"/> observe a state that cannot change out from

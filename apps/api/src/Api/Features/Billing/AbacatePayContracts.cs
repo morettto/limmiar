@@ -32,10 +32,41 @@ public sealed record Checkout(string Id, string? ExternalId, string Url, int Amo
 /// <summary>Envelope de todas as rotas HTTP. Não genérico: há um só payload (Checkout) neste ticket.</summary>
 public sealed record CheckoutEnvelope(Checkout? Data, string? Error, bool Success);
 
-/// <summary>
-/// Envelope do webhook. Sem <c>data</c>: a página por evento da documentação nunca foi
-/// alcançada (404 -- ver handoff S12-01), e fixar um <c>data</c> assumido violaria o critério
-/// de aceite 1. <c>BillingEndpoints</c> (fatia 7) é o único leitor -- é ele quem desserializa
-/// isto do corpo cru do pedido, depois de <see cref="AbacatePayWebhookSignature.IsAuthentic"/>.
-/// </summary>
-public sealed record AbacatePayWebhookEvent(string Id, string Event, int ApiVersion, bool DevMode);
+public enum PaymentStatus
+{
+    Pending,
+    Paid,
+    Refunded,
+    Failed,
+}
+
+public enum RefundOutcome
+{
+    Refunded,
+    NoPayment,
+    AlreadyRefunded,
+    ProviderHasNoRefund,
+    RefundFailed,
+}
+
+/// <summary>O seam puro do dinheiro: deriva o estado interno a partir do status de fio já
+/// desserializado, sem I/O. Expirado/cancelado viram Failed: sem sessão a cumprir nem
+/// reembolso a pedir, só registo.</summary>
+public static class AbacatePayMapper
+{
+    public static PaymentStatus ToPaymentStatus(CheckoutStatus status) => status switch
+    {
+        CheckoutStatus.Paid => PaymentStatus.Paid,
+        CheckoutStatus.Refunded => PaymentStatus.Refunded,
+        CheckoutStatus.Pending => PaymentStatus.Pending,
+        _ => PaymentStatus.Failed,
+    };
+}
+
+/// <summary>Envelope do webhook; <c>Data</c> nulo = evento sem payload confirmável.
+/// Único leitor: <c>BillingEndpoints</c>, depois de <see cref="AbacatePayWebhookSignature.IsAuthentic"/>.</summary>
+public sealed record AbacatePayWebhookEvent(string Id, string Event, int ApiVersion, bool DevMode, AbacateData? Data);
+
+/// <summary>O <c>data</c> que S12-01 deixou por modelar: só o trio que a confirmação lê.
+/// Desconhecidos (<c>externalId</c>, <c>url</c>, ...) são ignorados à desserialização.</summary>
+public sealed record AbacateData(string Id, CheckoutStatus Status, int Amount);

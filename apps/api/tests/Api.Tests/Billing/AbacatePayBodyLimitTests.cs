@@ -27,10 +27,8 @@ public sealed class AbacatePayBodyLimitTests
         Assert.Equal(body, await BillingEndpoints.ReadBoundedBodyAsync(request, CancellationToken.None));
     }
 
-    private static HttpRequest RequestWithBody(byte[] body)
+    private static HttpRequest RequestWithBody(byte[] body) => new DefaultHttpContext
     {
-        var context = new DefaultHttpContext();
-        context.Request.Body = new MemoryStream(body);
-        return context.Request;
-    }
+        Request = { Body = new MemoryStream(body) },
+    }.Request;
 }
