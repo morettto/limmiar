@@ -1,7 +1,8 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { I18nProvider } from '@lingui/react'
 import { i18n, dynamicActivate } from '../../shared/i18n'
+import { deferred } from '../../test-support/deferred'
 import type { CryptoKey } from '@limmiar/crypto'
 import { listarVinculos, type Vinculo } from '../../entities/vinculo/api'
 import { lerEstadoPartilha, definirPartilha } from '../../entities/partilha/preferencias'
@@ -38,12 +39,16 @@ const VINCULO_ONDE_SOU_PROFISSIONAL: Vinculo = {
   chavePublicaDoPar: new Uint8Array(32).fill(2),
 }
 
-function renderComponente() {
-  return render(
+function componente(accessToken = ACCESS_TOKEN) {
+  return (
     <I18nProvider i18n={i18n}>
-      <PartilhaCheckIns baseUrl={BASE_URL} accountId={ACCOUNT_ID} accessToken={ACCESS_TOKEN} kek={KEK} />
-    </I18nProvider>,
+      <PartilhaCheckIns baseUrl={BASE_URL} accountId={ACCOUNT_ID} accessToken={accessToken} kek={KEK} />
+    </I18nProvider>
   )
+}
+
+function renderComponente() {
+  return render(componente())
 }
 
 describe('PartilhaCheckIns', () => {
@@ -121,6 +126,15 @@ describe('PartilhaCheckIns', () => {
     expect(screen.queryByRole('checkbox')).toBeNull()
   })
 
+  it('treats a network failure listing links as the same fail-closed read error', async () => {
+    vi.mocked(listarVinculos).mockRejectedValue(new TypeError('Failed to fetch'))
+
+    renderComponente()
+
+    expect((await screen.findByRole('alert')).textContent).toContain('Não foi possível carregar')
+    expect(screen.queryByRole('checkbox')).toBeNull()
+  })
+
   it('turning the checkbox on calls definirPartilha with the link key and shows the "ativo" text', async () => {
     vi.mocked(listarVinculos).mockResolvedValue({ ok: true, vinculos: [VINCULO_MARTA] })
     vi.mocked(lerEstadoPartilha).mockResolvedValue({ versao: 0, estado: {} })
@@ -171,5 +185,64 @@ describe('PartilhaCheckIns', () => {
     resolveLer({ versao: 0, estado: {} })
 
     await new Promise((resolve) => setTimeout(resolve, 0))
+  })
+
+  it('não desenha nada enquanto carrega e, pronta, não mostra alerta nem checkbox travada', async () => {
+    const leitura = deferred<{ versao: number; estado: Record<string, never> }>()
+    vi.mocked(listarVinculos).mockResolvedValue({ ok: true, vinculos: [VINCULO_MARTA] })
+    vi.mocked(lerEstadoPartilha).mockReturnValue(leitura.promise)
+    const { container } = renderComponente()
+    expect(container.innerHTML).toBe('')
+    await act(async () => leitura.resolve({ versao: 0, estado: {} }))
+    const checkbox = await screen.findByRole('checkbox')
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect((checkbox as HTMLInputElement).disabled).toBe(false)
+  })
+
+  it('com a leitura das preferências falha, não afirma nenhum estado de compartilhamento', async () => {
+    vi.mocked(listarVinculos).mockResolvedValue({ ok: true, vinculos: [VINCULO_MARTA] })
+    vi.mocked(lerEstadoPartilha).mockRejectedValue(new Error('falha'))
+    renderComponente()
+    await screen.findByRole('alert')
+    expect(screen.queryByRole('status')).toBeNull()
+    expect(screen.queryByText(/Os check-ins que você registrar a partir de agora são compartilhados/)).toBeNull()
+  })
+
+  it('trava a checkbox enquanto grava e a libera depois, com sucesso ou com falha', async () => {
+    const gravacao = deferred<Record<string, { checkin: true }>>()
+    vi.mocked(listarVinculos).mockResolvedValue({ ok: true, vinculos: [VINCULO_MARTA] })
+    vi.mocked(lerEstadoPartilha).mockResolvedValue({ versao: 0, estado: {} })
+    vi.mocked(definirPartilha).mockReturnValueOnce(gravacao.promise)
+    renderComponente()
+    const checkbox = (await screen.findByRole('checkbox')) as HTMLInputElement
+    fireEvent.click(checkbox)
+    await waitFor(() => expect(checkbox.disabled).toBe(true))
+    await act(async () => gravacao.reject(new Error('conflito')))
+    expect(checkbox.disabled).toBe(false)
+    expect(screen.getByRole('alert').textContent).toBe('Não foi possível salvar sua preferência de compartilhamento. Tente novamente.')
+
+    const segunda = deferred<Record<string, { checkin: true }>>()
+    vi.mocked(definirPartilha).mockReturnValueOnce(segunda.promise)
+    fireEvent.click(checkbox)
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull())
+    expect(checkbox.disabled).toBe(true)
+    await act(async () => segunda.resolve({ [CHAVE_MARTA]: { checkin: true } }))
+    expect(checkbox.disabled).toBe(false)
+    expect(checkbox.checked).toBe(true)
+  })
+
+  it('refazer a leitura quando a sessão muda e ignorar a resposta tardia da anterior', async () => {
+    const antiga = deferred<{ ok: true; vinculos: Vinculo[] }>()
+    vi.mocked(listarVinculos).mockReturnValueOnce(antiga.promise).mockResolvedValue({ ok: true, vinculos: [VINCULO_MARTA] })
+    vi.mocked(lerEstadoPartilha).mockResolvedValue({ versao: 1, estado: { [CHAVE_MARTA]: { checkin: true } } })
+    const view = render(componente('token-antigo'))
+    view.rerender(componente('token-novo'))
+    await screen.findByRole('checkbox')
+    expect(listarVinculos).toHaveBeenLastCalledWith(BASE_URL, ACCOUNT_ID, 'token-novo')
+
+    await act(async () => antiga.resolve({ ok: true, vinculos: [] }))
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)) })
+
+    expect(screen.getByRole('checkbox')).toBeTruthy()
   })
 })

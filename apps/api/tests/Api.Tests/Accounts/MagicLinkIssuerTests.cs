@@ -4,106 +4,14 @@ namespace Api.Tests.Accounts;
 
 public sealed class MagicLinkIssuerTests
 {
-    private const string Email = "patient@example.com";
-
-    [Fact]
-    public void IssueToken_ReturnsNonEmptyOpaqueToken()
-    {
-        var issuer = new MagicLinkIssuer();
-
-        var token = issuer.IssueToken(Email);
-
-        Assert.NotEmpty(token);
-    }
-
-    [Fact]
-    public void IssueToken_ReturnsDifferentTokensForDifferentCalls()
-    {
-        var issuer = new MagicLinkIssuer();
-
-        var first = issuer.IssueToken(Email);
-        var second = issuer.IssueToken(Email);
-
-        Assert.NotEqual(first, second);
-    }
-
-    [Fact]
-    public void ConsumeToken_WithFreshlyIssuedToken_ReturnsBoundEmail()
-    {
-        var issuer = new MagicLinkIssuer();
-        var token = issuer.IssueToken(Email);
-
-        var result = issuer.ConsumeToken(token);
-
-        Assert.Equal(Email, result);
-    }
-
-    [Fact]
-    public void ConsumeToken_WithUnknownToken_ReturnsNull()
-    {
-        var issuer = new MagicLinkIssuer();
-
-        var result = issuer.ConsumeToken("never-issued");
-
-        Assert.Null(result);
-    }
-
-    [Fact]
-    public void ConsumeToken_CalledTwice_SecondCallReturnsNull()
-    {
-        var issuer = new MagicLinkIssuer();
-        var token = issuer.IssueToken(Email);
-
-        issuer.ConsumeToken(token);
-        var second = issuer.ConsumeToken(token);
-
-        Assert.Null(second);
-    }
-
-    [Fact]
-    public void ConsumeToken_AfterTokenLifetimeElapses_ReturnsNull()
-    {
-        var now = DateTimeOffset.UtcNow;
-        var issuer = new MagicLinkIssuer(clock: () => now);
-        var token = issuer.IssueToken(Email);
-
-        now += MagicLinkIssuer.DefaultTokenLifetime + TimeSpan.FromSeconds(1);
-
-        var result = issuer.ConsumeToken(token);
-
-        Assert.Null(result);
-    }
-
-    [Fact]
-    public void ConsumeToken_JustBeforeTokenLifetimeElapses_Succeeds()
-    {
-        var now = DateTimeOffset.UtcNow;
-        var issuer = new MagicLinkIssuer(clock: () => now);
-        var token = issuer.IssueToken(Email);
-
-        now += MagicLinkIssuer.DefaultTokenLifetime - TimeSpan.FromSeconds(1);
-
-        Assert.Equal(Email, issuer.ConsumeToken(token));
-    }
-
-    [Fact]
-    public void ConsumeToken_WithCustomTokenLifetime_HonorsIt()
-    {
-        var now = DateTimeOffset.UtcNow;
-        var issuer = new MagicLinkIssuer(clock: () => now, tokenLifetime: TimeSpan.FromSeconds(30));
-        var token = issuer.IssueToken(Email);
-
-        now += TimeSpan.FromSeconds(31);
-
-        Assert.Null(issuer.ConsumeToken(token));
-    }
+    private static readonly PatientAccessInvitation Invitation = new("0123456789AB", Guid.NewGuid(), Guid.NewGuid(), null);
 
     [Fact]
     public void IssueTicket_ReturnsNonEmptyOpaqueTicket()
     {
         var issuer = new MagicLinkIssuer();
 
-        var ticket = issuer.IssueTicket(new MagicLinkTicketData(Email, MagicLinkCeremonyType.Register, [1, 2, 3]));
+        var ticket = issuer.IssueTicket(new MagicLinkTicketData(Invitation, MagicLinkCeremonyType.Register, [1, 2, 3], Guid.NewGuid()));
 
         Assert.NotEmpty(ticket);
     }
@@ -114,7 +22,7 @@ public sealed class MagicLinkIssuerTests
         var issuer = new MagicLinkIssuer();
         var accountId = Guid.NewGuid();
         var data = new MagicLinkTicketData(
-            Email, MagicLinkCeremonyType.Assert, [4, 5, 6], accountId, [7, 8], [9, 10], 3u);
+            Invitation, MagicLinkCeremonyType.Assert, [4, 5, 6], accountId, [7, 8], [9, 10], 3u);
         var ticket = issuer.IssueTicket(data);
 
         var result = issuer.ConsumeTicket(ticket);
@@ -136,7 +44,7 @@ public sealed class MagicLinkIssuerTests
     public void ConsumeTicket_CalledTwice_SecondCallReturnsNull()
     {
         var issuer = new MagicLinkIssuer();
-        var ticket = issuer.IssueTicket(new MagicLinkTicketData(Email, MagicLinkCeremonyType.Register, [1]));
+        var ticket = issuer.IssueTicket(new MagicLinkTicketData(Invitation, MagicLinkCeremonyType.Register, [1], Guid.NewGuid()));
 
         issuer.ConsumeTicket(ticket);
         var second = issuer.ConsumeTicket(ticket);
@@ -149,7 +57,7 @@ public sealed class MagicLinkIssuerTests
     {
         var now = DateTimeOffset.UtcNow;
         var issuer = new MagicLinkIssuer(clock: () => now);
-        var ticket = issuer.IssueTicket(new MagicLinkTicketData(Email, MagicLinkCeremonyType.Register, [1]));
+        var ticket = issuer.IssueTicket(new MagicLinkTicketData(Invitation, MagicLinkCeremonyType.Register, [1], Guid.NewGuid()));
 
         now += MagicLinkIssuer.TicketLifetime + TimeSpan.FromSeconds(1);
 
@@ -161,22 +69,11 @@ public sealed class MagicLinkIssuerTests
     {
         var now = DateTimeOffset.UtcNow;
         var issuer = new MagicLinkIssuer(clock: () => now);
-        var ticket = issuer.IssueTicket(new MagicLinkTicketData(Email, MagicLinkCeremonyType.Register, [1]));
+        var ticket = issuer.IssueTicket(new MagicLinkTicketData(Invitation, MagicLinkCeremonyType.Register, [1], Guid.NewGuid()));
 
         now += MagicLinkIssuer.TicketLifetime - TimeSpan.FromSeconds(1);
 
         Assert.NotNull(issuer.ConsumeTicket(ticket));
     }
 
-    [Fact]
-    public void ConsumeToken_AndConsumeTicket_AreIndependentSingleUseStores()
-    {
-        var issuer = new MagicLinkIssuer();
-        var token = issuer.IssueToken(Email);
-        var ticket = issuer.IssueTicket(new MagicLinkTicketData(Email, MagicLinkCeremonyType.Register, [1]));
-
-        issuer.ConsumeToken(token);
-
-        Assert.NotNull(issuer.ConsumeTicket(ticket));
-    }
 }

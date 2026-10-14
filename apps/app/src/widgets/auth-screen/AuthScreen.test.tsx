@@ -11,11 +11,11 @@ vi.mock('../../entities/account/api', async () => {
   return {
     ...actual,
     register: vi.fn(),
+    login: vi.fn(),
     continueWithGoogle: vi.fn(),
     beginTotpEnrollment: vi.fn(),
     confirmTotpEnrollment: vi.fn(),
     verifyTotpChallenge: vi.fn(),
-    requestMagicLink: vi.fn(),
   }
 })
 
@@ -24,7 +24,6 @@ const continueWithGoogleMock = vi.mocked(accountApi.continueWithGoogle)
 const beginTotpEnrollmentMock = vi.mocked(accountApi.beginTotpEnrollment)
 const confirmTotpEnrollmentMock = vi.mocked(accountApi.confirmTotpEnrollment)
 const verifyTotpChallengeMock = vi.mocked(accountApi.verifyTotpChallenge)
-const requestMagicLinkMock = vi.mocked(accountApi.requestMagicLink)
 
 function renderAuthScreen(props: Partial<React.ComponentProps<typeof AuthScreen>> = {}) {
   const getGoogleIdToken = props.getGoogleIdToken ?? vi.fn().mockResolvedValue('google-id-token')
@@ -36,6 +35,24 @@ function renderAuthScreen(props: Partial<React.ComponentProps<typeof AuthScreen>
 }
 
 describe('AuthScreen', () => {
+  it('informa falha de conexão no cadastro profissional', async () => {
+    registerMock.mockRejectedValueOnce(new Error('offline'))
+    renderAuthScreen()
+    fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'professional@example.test' } })
+    fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'secure-password' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Criar conta' }))
+    expect((await screen.findByRole('alert')).textContent).toBe('Não foi possível conectar. Tente novamente.')
+  })
+
+  it('recusa resposta profissional sem e-mail', async () => {
+    const onAuthenticated = vi.fn()
+    continueWithGoogleMock.mockResolvedValueOnce({ ok: true, isNewAccount: false, account: { id: 'professional', role: 'Professional', email: null,
+      twoFactorRequirement: 'NotApplicable', twoFactorTicket: null, accessToken: 'token', refreshToken: 'refresh', accessTokenExpiresAt: '2099-01-01T00:00:00Z' } })
+    renderAuthScreen({ onAuthenticated })
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar com o Google' }))
+    await screen.findByRole('alert')
+    expect(onAuthenticated).not.toHaveBeenCalled()
+  })
   beforeAll(async () => {
     await dynamicActivate('pt-BR')
   })
@@ -46,11 +63,46 @@ describe('AuthScreen', () => {
     window.sessionStorage.clear()
   })
 
+  it('entra com senha, entrega a KEK em memória e permite voltar ao cadastro', async () => {
+    const account = { id: 'login-account', email: 'user@example.com', role: 'Professional' as const,
+      twoFactorRequirement: 'NotApplicable' as const, twoFactorTicket: null,
+      accessToken: 'access', refreshToken: 'refresh', accessTokenExpiresAt: '2099-01-01T00:00:00Z' }
+    vi.mocked(accountApi.login).mockResolvedValue({ ok: true, account })
+    const onAuthenticated = vi.fn()
+    renderAuthScreen({ onAuthenticated })
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }))
+    expect(screen.getByLabelText('Senha').getAttribute('autocomplete')).toBe('current-password')
+    fireEvent.click(screen.getByRole('button', { name: 'Cadastrar' }))
+    expect(screen.getByRole('button', { name: 'Criar conta' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Entrar' }))
+    fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: account.email } })
+    fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'senha-local-de-teste' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Acessar conta' }))
+    await waitFor(() => expect(onAuthenticated).toHaveBeenCalledOnce(), { timeout: 12000 })
+    expect(vi.mocked(accountApi.login).mock.calls[0]?.[1]).toMatchObject({ email: account.email })
+    expect(vi.mocked(accountApi.login).mock.calls[0]?.[1]).not.toHaveProperty('password')
+    expect(onAuthenticated.mock.calls[0]?.[1]).toMatchObject({ extractable: false })
+    expect((screen.getByLabelText('Senha') as HTMLInputElement).value).toBe('')
+  }, 15000)
+
+  it('mostra falha do provedor Google e permite tentar novamente', async () => {
+    continueWithGoogleMock.mockRejectedValueOnce(new Error('provedor'))
+    renderAuthScreen()
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar com o Google' }))
+    expect((await screen.findByRole('alert')).textContent).toBe('Não foi possível continuar com o Google. Tente novamente.')
+    expect((screen.getByRole('button', { name: 'Continuar com o Google' }) as HTMLButtonElement).disabled).toBe(false)
+  })
+
   it('defaults to "profissional" and shows the professional support text', () => {
     renderAuthScreen()
 
     expect((screen.getByRole('radio', { name: 'Profissional' }) as HTMLInputElement).checked).toBe(true)
     expect(screen.getByText('Gerencie pacientes, prontuários e agenda em um só lugar.')).toBeTruthy()
+  })
+
+  it('omite Google quando o provedor não está configurado', () => {
+    renderAuthScreen({ getGoogleIdToken: undefined })
+    expect(screen.queryByRole('button', { name: 'Continuar com o Google' })).toBeNull()
   })
 
   it('switches the segmented control to "paciente" and updates the support text (visually and in copy)', () => {
@@ -71,7 +123,7 @@ describe('AuthScreen', () => {
   it('submitting the e-mail form calls register() with the Argon2id-derived verifier, never the plaintext password', async () => {
     registerMock.mockResolvedValue({
       ok: true,
-      account: {
+      account: {accessToken: 'test-access', refreshToken: 'test-refresh', accessTokenExpiresAt: '2099-01-01T00:00:00Z',
         id: '11111111-1111-1111-1111-111111111111',
         email: 'user@example.com',
         role: 'Professional',
@@ -124,7 +176,7 @@ describe('AuthScreen', () => {
     const getGoogleIdToken = vi.fn().mockResolvedValue('google-id-token')
     continueWithGoogleMock.mockResolvedValue({
       ok: true,
-      account: {
+      account: {accessToken: 'test-access', refreshToken: 'test-refresh', accessTokenExpiresAt: '2099-01-01T00:00:00Z',
         id: '22222222-2222-2222-2222-222222222222',
         email: 'user@example.com',
         role: 'Patient',
@@ -135,13 +187,12 @@ describe('AuthScreen', () => {
     })
     renderAuthScreen({ getGoogleIdToken })
 
-    fireEvent.click(screen.getByRole('radio', { name: 'Paciente' }))
     fireEvent.click(screen.getByRole('button', { name: 'Continuar com o Google' }))
 
     await waitFor(() => expect(continueWithGoogleMock).toHaveBeenCalledTimes(1))
     expect(continueWithGoogleMock).toHaveBeenCalledWith('http://api.test', {
       idToken: 'google-id-token',
-      requestedRole: 'Patient',
+      requestedRole: 'Professional',
     })
   })
 
@@ -157,33 +208,16 @@ describe('AuthScreen', () => {
     )
   })
 
-  it('does not re-prompt for a role when Google resolves an existing account to a different role than selected', async () => {
-    const getGoogleIdToken = vi.fn().mockResolvedValue('google-id-token')
-    // User has "Profissional" selected locally, but the Google identity's
-    // e-mail already has an account as a Patient (ADR-S02-01: backend wins).
-    continueWithGoogleMock.mockResolvedValue({
-      ok: true,
-      account: {
-        id: '33333333-3333-3333-3333-333333333333',
-        email: 'existing@example.com',
-        role: 'Patient',
-        twoFactorRequirement: 'NotApplicable',
-        twoFactorTicket: null,
-      },
-      isNewAccount: false,
-    })
-    renderAuthScreen({ getGoogleIdToken })
-
-    expect((screen.getByRole('radio', { name: 'Profissional' }) as HTMLInputElement).checked).toBe(true)
-
+  it('recusa uma resposta de autenticação profissional que troque o papel para Patient', async () => {
+    continueWithGoogleMock.mockResolvedValue({ ok: true, isNewAccount: false, account: {
+      id: 'patient', email: null, role: 'Patient', twoFactorRequirement: 'NotApplicable', twoFactorTicket: null,
+      accessToken: 'access', refreshToken: 'refresh', accessTokenExpiresAt: '2099-01-01T00:00:00Z',
+    } })
+    const onAuthenticated = vi.fn()
+    renderAuthScreen({ onAuthenticated })
     fireEvent.click(screen.getByRole('button', { name: 'Continuar com o Google' }))
-
-    expect((await screen.findByRole('status')).textContent).toBe(
-      'Conta criada. Você está cadastrado como paciente.',
-    )
-    // No second role prompt: the segmented control still shows the
-    // (now-irrelevant) local selection, and no additional radiogroup appears.
-    expect(screen.getAllByRole('radiogroup')).toHaveLength(1)
+    expect(await screen.findByRole('alert')).toBeTruthy()
+    expect(onAuthenticated).not.toHaveBeenCalled()
   })
 
   // S02-03/S02-04 wiring: register()/continueWithGoogle() success is no
@@ -192,7 +226,7 @@ describe('AuthScreen', () => {
   it('routes a freshly-registered professional (twoFactorRequirement: SetupRequired) into TotpSetup instead of success', async () => {
     registerMock.mockResolvedValue({
       ok: true,
-      account: {
+      account: {accessToken: 'test-access', refreshToken: 'test-refresh', accessTokenExpiresAt: '2099-01-01T00:00:00Z',
         id: '44444444-4444-4444-4444-444444444444',
         email: 'pro@example.com',
         role: 'Professional',
@@ -233,42 +267,32 @@ describe('AuthScreen', () => {
     expect(screen.queryByText('Conta criada. Você está cadastrado como profissional.')).toBeNull()
   }, 15000)
 
-  it('a Google sign-in for a patient (twoFactorRequirement: NotApplicable) still goes straight to success, unchanged', async () => {
-    const getGoogleIdToken = vi.fn().mockResolvedValue('google-id-token')
-    continueWithGoogleMock.mockResolvedValue({
-      ok: true,
-      account: {
-        id: '55555555-5555-5555-5555-555555555555',
-        email: 'patient@example.com',
-        role: 'Patient',
-        twoFactorRequirement: 'NotApplicable',
-        twoFactorTicket: null,
-      },
-      isNewAccount: true,
-    })
-    const onAuthenticated = vi.fn()
-    renderAuthScreen({ getGoogleIdToken, onAuthenticated })
-
+  it('o paciente recebe apenas o formulário de código, sem contato, senha ou Google', () => {
+    renderAuthScreen()
     fireEvent.click(screen.getByRole('radio', { name: 'Paciente' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Continuar com o Google' }))
+    expect(screen.queryByLabelText('E-mail')).toBeNull()
+    expect(screen.queryByLabelText('Senha')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Continuar com o Google' })).toBeNull()
+    expect(screen.getByLabelText('Código de acesso recebido do profissional')).toBeTruthy()
+    expect(continueWithGoogleMock).not.toHaveBeenCalled()
+  })
 
-    expect((await screen.findByRole('status')).textContent).toBe(
-      'Conta criada. Você está cadastrado como paciente.',
-    )
-    expect(onAuthenticated).toHaveBeenCalledWith({
-      id: '55555555-5555-5555-5555-555555555555',
-      email: 'patient@example.com',
-      role: 'Patient',
-      twoFactorRequirement: 'NotApplicable',
-      twoFactorTicket: null,
-    })
-  }, 15000)
+  it('o código do profissional abre a confirmação privada e não dispara cadastro por e-mail', () => {
+    renderAuthScreen()
+    fireEvent.click(screen.getByRole('radio', { name: 'Paciente' }))
+    fireEvent.change(screen.getByLabelText('Código de acesso recebido do profissional'), { target: { value: '0123456789AB' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar com meu código' }))
+    expect(screen.getByRole('button', { name: 'Confirmar meu acesso' })).toBeTruthy()
+    expect(screen.queryByLabelText('E-mail')).toBeNull()
+    expect(registerMock).not.toHaveBeenCalled()
+    expect(continueWithGoogleMock).not.toHaveBeenCalled()
+  })
 
   it('routes a Google sign-in with twoFactorRequirement: ChallengeRequired into TotpChallenge', async () => {
     const getGoogleIdToken = vi.fn().mockResolvedValue('google-id-token')
     continueWithGoogleMock.mockResolvedValue({
       ok: true,
-      account: {
+      account: {accessToken: 'test-access', refreshToken: 'test-refresh', accessTokenExpiresAt: '2099-01-01T00:00:00Z',
         id: '66666666-6666-6666-6666-666666666666',
         email: 'pro@example.com',
         role: 'Professional',
@@ -287,7 +311,7 @@ describe('AuthScreen', () => {
 
     verifyTotpChallengeMock.mockResolvedValue({
       ok: true,
-      account: {
+      account: {accessToken: 'test-access', refreshToken: 'test-refresh', accessTokenExpiresAt: '2099-01-01T00:00:00Z',
         id: '66666666-6666-6666-6666-666666666666',
         email: 'pro@example.com',
         role: 'Professional',
@@ -310,7 +334,7 @@ describe('AuthScreen', () => {
   it('calling TotpSetup.onDone (after confirming enrollment) completes authentication', async () => {
     registerMock.mockResolvedValue({
       ok: true,
-      account: {
+      account: {accessToken: 'test-access', refreshToken: 'test-refresh', accessTokenExpiresAt: '2099-01-01T00:00:00Z',
         id: '77777777-7777-7777-7777-777777777777',
         email: 'pro2@example.com',
         role: 'Professional',
@@ -324,7 +348,7 @@ describe('AuthScreen', () => {
       provisioningUri: 'otpauth://totp/Limmiar:pro2@example.com?secret=JBSWY3DPEHPK3PXP&issuer=Limmiar',
     })
     const backupCodes = Array.from({ length: 10 }, (_, index) => `abcde-${index}0000`)
-    confirmTotpEnrollmentMock.mockResolvedValue({ ok: true, backupCodes })
+    confirmTotpEnrollmentMock.mockResolvedValue({accessToken: 'test-access', refreshToken: 'test-refresh', accessTokenExpiresAt: '2099-01-01T00:00:00Z',  ok: true, backupCodes })
     const onAuthenticated = vi.fn()
     renderAuthScreen({ onAuthenticated })
 
@@ -347,13 +371,13 @@ describe('AuthScreen', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Guardei meus códigos' }))
 
-    expect(onAuthenticated).toHaveBeenCalledWith({
+    expect(onAuthenticated).toHaveBeenCalledWith({accessToken: 'test-access', refreshToken: 'test-refresh', accessTokenExpiresAt: '2099-01-01T00:00:00Z',
       id: '77777777-7777-7777-7777-777777777777',
       email: 'pro2@example.com',
       role: 'Professional',
-      twoFactorRequirement: 'SetupRequired',
-      twoFactorTicket: 'ticket-pro2-setup',
-    })
+      twoFactorRequirement: 'ChallengeRequired',
+      twoFactorTicket: null,
+    }, expect.objectContaining({ extractable: false }))
     expect((await screen.findByRole('status')).textContent).toBe(
       'Conta criada. Você está cadastrado como profissional.',
     )
@@ -373,52 +397,21 @@ describe('AuthScreen', () => {
     expect(screen.getByLabelText('Senha')).toBeTruthy()
   })
 
-  it('shows "Enviar link mágico" (not "Criar conta") as the submit label for the "paciente" segment', () => {
+  it('shows "Continuar com meu código" (not "Criar conta") as the submit label for the "paciente" segment', () => {
     renderAuthScreen()
 
     fireEvent.click(screen.getByRole('radio', { name: 'Paciente' }))
 
-    expect(screen.getByRole('button', { name: 'Enviar link mágico' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Continuar com meu código' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Criar conta' })).toBeNull()
   })
 
-  it('still shows "Criar conta" (not "Enviar link mágico") as the submit label for the "profissional" segment (unchanged)', () => {
+  it('still shows "Criar conta" (not "Continuar com meu código") as the submit label for the "profissional" segment (unchanged)', () => {
     renderAuthScreen()
 
     expect(screen.getByRole('button', { name: 'Criar conta' })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Enviar link mágico' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Continuar com meu código' })).toBeNull()
   })
 
-  it('submitting the "paciente" form calls requestMagicLink(), not register(), and replaces the form with the "check your email" state', async () => {
-    requestMagicLinkMock.mockResolvedValue({ ok: true })
-    renderAuthScreen()
 
-    fireEvent.click(screen.getByRole('radio', { name: 'Paciente' }))
-    fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'patient@example.com' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Enviar link mágico' }))
-
-    await waitFor(() => expect(requestMagicLinkMock).toHaveBeenCalledTimes(1))
-    expect(requestMagicLinkMock).toHaveBeenCalledWith('http://api.test', { email: 'patient@example.com' })
-    expect(registerMock).not.toHaveBeenCalled()
-
-    expect((await screen.findByRole('status')).textContent).toBe(
-      'Verifique seu e-mail para continuar. Enviamos um link de acesso, se este e-mail existir.',
-    )
-
-    expect(screen.queryByRole('radiogroup')).toBeNull()
-    expect(screen.queryByLabelText('E-mail')).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Enviar link mágico' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Continuar com o Google' })).toBeNull()
-  })
-
-  it('shows a translated error message when requestMagicLink() reports a problem', async () => {
-    requestMagicLinkMock.mockResolvedValue({ ok: false, code: 'validation.invalid_field', params: { field: 'email' } })
-    renderAuthScreen()
-
-    fireEvent.click(screen.getByRole('radio', { name: 'Paciente' }))
-    fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'patient@example.com' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Enviar link mágico' }))
-
-    expect((await screen.findByRole('alert')).textContent).toBe('Campo inválido: email.')
-  })
 })

@@ -8,6 +8,7 @@ public sealed class RegisterHandler(IAccountStore store, ITwoFactorTicketIssuer 
 {
     public async ValueTask<AccountRegistrationResult> Handle(RegisterCommand request, CancellationToken cancellationToken)
     {
+        if (request.Role != AccountRole.Professional) return AccountRegistrationResult.Failure(AccountRegistrationFailureReason.ProfessionalAccountRequired);
         var normalizedEmail = AccountEmail.Normalize(request.Email);
         var existing = await store.FindByEmailAsync(normalizedEmail, cancellationToken);
         if (existing is not null)
@@ -21,11 +22,9 @@ public sealed class RegisterHandler(IAccountStore store, ITwoFactorTicketIssuer 
         // client submits before comparing against this.
         var account = new Account(
             Guid.NewGuid(), normalizedEmail, request.Role, SHA256.HashData(request.PasswordVerifier), GoogleSubjectId: null,
-            VerificationStatus: InitialVerificationStatus(request.Role));
+            VerificationStatus: AccountVerificationStatus.Pending);
         await store.InsertAsync(account, cancellationToken);
         return AccountRegistrationResult.Success(account, twoFactorTicketIssuer, sessionTokenIssuer);
     }
 
-    private static AccountVerificationStatus InitialVerificationStatus(AccountRole role) =>
-        role == AccountRole.Professional ? AccountVerificationStatus.Pending : AccountVerificationStatus.Active;
 }

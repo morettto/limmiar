@@ -24,9 +24,8 @@ opcional) e a série de 7 dias, dentro do layout `paciente` (que já fornece `Co
   check-in local já ter sido salvo; se isso falhar, o estado vira `'salvo-sem-partilha'` ("Check-in
   salvo neste dispositivo, mas não foi compartilhado.") e o check-in local não se desfaz -- sem
   retentativa, a decisão de partilhar é a do momento da gravação.
-- `kek === null` (chaveiro bloqueado, sem `KeychainProvider` ainda) é o estado real de produção
-  hoje -- mesmo precedente de `CopilotKeyPage`/`NotaPage`. O caminho de 3 toques só é exercido em
-  E2E (`/e2e/paciente-hoje`, `app/routing/E2ePacienteHojeScaffold.tsx`).
+- `kek === null` (chaveiro bloqueado) mostra o estado bloqueado. Em `/hoje` a KEK vem da sessão;
+  a rota também monta `PartilhaCheckIns` ("o que a minha terapeuta vê") quando a KEK existe.
 
 ## Armadilhas
 

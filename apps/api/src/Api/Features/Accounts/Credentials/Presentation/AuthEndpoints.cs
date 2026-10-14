@@ -42,6 +42,13 @@ public static class AuthEndpoints
             .Produces<RefreshTokenResponse>(StatusCodes.Status200OK)
             .Produces<LimmiarProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json");
+
+        app.MapPost("/auth/logout", HandleLogout)
+            .WithName("PostAuthLogout")
+            .WithSummary("Revoke all access and refresh tokens of this session family")
+            .WithDescription("Possession of a refresh token authorizes revocation, including an exchanged or expired token. Repeated and unknown tokens return the same 204 response.")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces<LimmiarProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json");
     }
 
     private static async Task<Results<Created<RegisterResponse>, JsonHttpResult<LimmiarProblemDetails>>> HandleRegisterAsync(
@@ -53,6 +60,7 @@ public static class AuthEndpoints
         }
 
         var result = await sender.Send(new RegisterCommand(request.Email, request.PasswordVerifier, request.Role), cancellationToken);
+        if (result.FailureReason == AccountRegistrationFailureReason.ProfessionalAccountRequired) return ValidationProblem("role");
         if (!result.Succeeded)
         {
             return ProblemJson(StatusCodes.Status409Conflict, "Email already registered", AccountsProblemCodes.AuthEmailAlreadyRegistered);
@@ -63,7 +71,7 @@ public static class AuthEndpoints
             $"/accounts/{account.Id}",
             new RegisterResponse(
                 account.Id, account.Email, account.Role, result.TwoFactorRequirement, result.TwoFactorTicket,
-                result.Session?.AccessToken, result.Session?.RefreshToken, result.Session?.AccessTokenExpiresAt));
+                AccessToken: null, RefreshToken: null, AccessTokenExpiresAt: null));
     }
 
     private static async Task<Results<Ok<LoginResponse>, JsonHttpResult<LimmiarProblemDetails>>> HandleLoginAsync(
@@ -81,7 +89,7 @@ public static class AuthEndpoints
                 var account = success.Account;
                 return TypedResults.Ok(new LoginResponse(
                     account.Id, account.Email, account.Role, success.TwoFactorRequirement, success.TwoFactorTicket,
-                    success.Session?.AccessToken, success.Session?.RefreshToken, success.Session?.AccessTokenExpiresAt));
+                    AccessToken: null, RefreshToken: null, AccessTokenExpiresAt: null));
             },
             _ => ProblemJson(StatusCodes.Status401Unauthorized, "Invalid credentials", AccountsProblemCodes.AuthInvalidCredentials));
     }
@@ -101,7 +109,7 @@ public static class AuthEndpoints
                 var account = success.Account;
                 return TypedResults.Ok(new GoogleAuthResponse(
                     account.Id, account.Email, account.Role, success.IsNewAccount, success.TwoFactorRequirement, success.TwoFactorTicket,
-                    success.Session?.AccessToken, success.Session?.RefreshToken, success.Session?.AccessTokenExpiresAt));
+                    AccessToken: null, RefreshToken: null, AccessTokenExpiresAt: null));
             },
             _ => ProblemJson(StatusCodes.Status401Unauthorized, "Invalid Google token", AccountsProblemCodes.AuthGoogleTokenInvalid));
     }
@@ -122,6 +130,20 @@ public static class AuthEndpoints
 
         var session = result.TokenPair!;
         return TypedResults.Ok(new RefreshTokenResponse(session.AccessToken, session.RefreshToken, session.AccessTokenExpiresAt));
+    }
+
+    private static async Task<Results<NoContent, JsonHttpResult<LimmiarProblemDetails>>> HandleLogout(
+        RefreshTokenRequest request, ISessionTokenIssuer sessionTokenIssuer, Api.Audit.AuditRecorder auditRecorder, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.RefreshToken))
+        {
+            return ValidationProblem("refreshToken");
+        }
+        if (sessionTokenIssuer.Revoke(request.RefreshToken) is { } session)
+        {
+            await auditRecorder.RecordAsync(session, Api.Audit.AuditAction.SignOut, cancellationToken);
+        }
+        return TypedResults.NoContent();
     }
 
     private static bool TryValidateCredentialsShape(

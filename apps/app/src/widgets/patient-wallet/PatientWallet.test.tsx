@@ -1,32 +1,24 @@
 import '@vitest/web-worker'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { renderToString } from 'react-dom/server'
 import { I18nProvider } from '@lingui/react'
 import { webcrypto as limmiarWebcrypto } from '@limmiar/crypto'
 import { dynamicActivate, i18n } from '../../shared/i18n'
 import { encodeBase64 } from '../../shared/lib/base64'
+import { deferred } from '../../test-support/deferred'
 import { PatientWallet } from './PatientWallet'
 import { sealNewPatient } from '../../entities/patient/patient-crypto'
 import type { SealedSummary, SummaryResult } from '../../entities/patient/patient-summary'
 
 const FAKE_KEK = {} as unknown as CryptoKey
 
-function deferred<T>() {
-  let resolve!: (value: T) => void
-  let reject!: (error: unknown) => void
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res
-    reject = rej
-  })
-  return { promise, resolve, reject }
-}
-
 // jsdom has no matchMedia; AdaptiveTable's useBreakpoint hook needs one to mount at all.
 // A fixed "matches: false" (-> sm/card layout) is enough here -- breakpoint-specific
 // rendering is proven by AdaptiveTable's own suite and the Playwright CT spec, not here.
-function stubMatchMedia() {
+function stubMatchMedia(wide = false) {
   window.matchMedia = vi.fn().mockImplementation((query: string) => ({
-    matches: false,
+    matches: wide,
     media: query,
     addEventListener: () => {},
     removeEventListener: () => {},
@@ -254,5 +246,112 @@ describe('PatientWallet', () => {
     await act(async () => { summaries.resolve([{ patientId: 'p1', ok: true, name: 'Stale patient', risk: 'baixo' }]); await summaries.promise })
     expect(screen.getByText('Chaveiro bloqueado. Desbloqueie para ver a carteira de pacientes.')).toBeTruthy()
     expect(screen.queryByText('Stale patient')).toBeNull()
+  })
+})
+
+function jsonResponse(body: unknown, status = 200, type = 'application/json') {
+  return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': type } })
+}
+
+describe('PatientWallet: apresentação e ciclo de vida', () => {
+  beforeAll(async () => { await dynamicActivate('pt-BR') })
+  afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); stubMatchMedia() })
+
+  it('antes de qualquer efeito, a chave nula já aparece bloqueada e a chave presente já aparece carregando', () => {
+    const com = (kek: CryptoKey | null) => renderToString(<I18nProvider i18n={i18n}><PatientWallet baseUrl="http://api.test" accountId="acc-1" accessToken="token-1" kek={kek} /></I18nProvider>)
+    expect(com(null)).toContain('Chaveiro bloqueado.')
+    expect(com(FAKE_KEK)).toContain('Carregando pacientes...')
+  })
+
+  it('na tabela mostra legenda, colunas, nome e risco por extenso e a célula vazia do item ilegível', async () => {
+    stubMatchMedia(true)
+    const erro = vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(patientsResponse(['a', 'b', 'c', 'd']))))
+    const resultados: SummaryResult[] = [
+      { patientId: 'a', ok: true, name: 'Ana', risk: 'elevado' },
+      { patientId: 'b', ok: true, name: 'Bruno', risk: 'moderado' },
+      { patientId: 'c', ok: true, name: 'Caio', risk: 'baixo' },
+      { patientId: 'd', ok: false },
+    ]
+    renderWallet({ openSummaries: vi.fn().mockResolvedValue(resultados) })
+
+    const tabela = await screen.findByRole('table', { name: 'Pacientes' })
+    expect(within(tabela).getAllByRole('columnheader').map((cabecalho) => cabecalho.textContent)).toEqual(['Paciente', 'Risco'])
+    const linhas = within(tabela).getAllByRole('row').slice(1).map((linha) => within(linha).getAllByRole('cell').map((celula) => celula.textContent))
+    expect(linhas).toEqual([['Ana', 'Elevado'], ['Bruno', 'Moderado'], ['Caio', 'Baixo'], ['Não foi possível ler', '']])
+    expect(erro).not.toHaveBeenCalled()
+  })
+
+  it('uma falha problem+json mostra o motivo do servidor, não a mensagem genérica', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ code: 'auth.forbidden', params: {} }, 403, 'application/problem+json')))
+    const openSummaries = vi.fn()
+    renderWallet({ openSummaries })
+    expect((await screen.findByRole('alert')).textContent).toBe('Você não tem acesso a esta conta.')
+    expect(openSummaries).not.toHaveBeenCalled()
+  })
+
+  it('desmontar interrompe a decifragem em andamento e não antes', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(patientsResponse(['p1']))))
+    const decifragem = deferred<SummaryResult[]>()
+    const openSummaries = vi.fn().mockReturnValue(decifragem.promise)
+    const { unmount } = renderWallet({ openSummaries })
+    await waitFor(() => expect(openSummaries).toHaveBeenCalled())
+    const sinal = openSummaries.mock.calls[0]![2] as AbortSignal
+    expect(sinal.aborted).toBe(false)
+    unmount()
+    expect(sinal.aborted).toBe(true)
+  })
+
+  it('desmontar antes da listagem terminar nunca chega a decifrar', async () => {
+    const listagem = deferred<Response>()
+    vi.stubGlobal('fetch', vi.fn().mockReturnValue(listagem.promise))
+    const openSummaries = vi.fn()
+    const { unmount } = renderWallet({ openSummaries })
+    unmount()
+    listagem.resolve(jsonResponse(patientsResponse(['p1'])))
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)) })
+    expect(openSummaries).not.toHaveBeenCalled()
+  })
+
+  it('recomeça a carteira quando a sessão muda e ignora o que a anterior devolver depois', async () => {
+    const antiga = deferred<SummaryResult[]>()
+    const atual = deferred<SummaryResult[]>()
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => jsonResponse(patientsResponse(['p1']))))
+    const openSummaries = vi.fn().mockReturnValueOnce(antiga.promise).mockReturnValueOnce(atual.promise)
+    const view = renderWallet({ openSummaries })
+    await waitFor(() => expect(openSummaries).toHaveBeenCalledTimes(1))
+    view.rerender(<I18nProvider i18n={i18n}><PatientWallet baseUrl="http://api.test" accountId="acc-1" accessToken="token-2" kek={FAKE_KEK} openSummaries={openSummaries} /></I18nProvider>)
+    expect(screen.getByRole('status').textContent).toBe('Carregando pacientes...')
+    await waitFor(() => expect(openSummaries).toHaveBeenCalledTimes(2))
+
+    await act(async () => antiga.resolve([{ patientId: 'p1', ok: true, name: 'Antiga', risk: 'baixo' }]))
+    expect(screen.queryByText('Antiga')).toBeNull()
+    expect(screen.getByRole('status').textContent).toBe('Carregando pacientes...')
+    await act(async () => atual.resolve([{ patientId: 'p1', ok: true, name: 'Atual', risk: 'baixo' }]))
+    expect(await screen.findByText('Atual')).toBeTruthy()
+  })
+
+  it('uma falha tardia da sessão anterior não derruba a carteira atual', async () => {
+    const listagemAntiga = deferred<Response>()
+    const fetchMock = vi.fn().mockReturnValueOnce(listagemAntiga.promise).mockImplementation(async () => jsonResponse(patientsResponse(['p1'])))
+    vi.stubGlobal('fetch', fetchMock)
+    const openSummaries = vi.fn().mockResolvedValue([{ patientId: 'p1', ok: true, name: 'Atual', risk: 'baixo' }])
+    const view = renderWallet({ openSummaries })
+    view.rerender(<I18nProvider i18n={i18n}><PatientWallet baseUrl="http://api.test" accountId="acc-1" accessToken="token-2" kek={FAKE_KEK} openSummaries={openSummaries} /></I18nProvider>)
+    expect(await screen.findByText('Atual')).toBeTruthy()
+
+    await act(async () => listagemAntiga.reject(new Error('rede caiu')))
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.getByText('Atual')).toBeTruthy()
+  })
+
+  it('uma chave que volta a ser nula bloqueia a carteira', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => jsonResponse(patientsResponse(['p1']))))
+    const openSummaries = vi.fn().mockResolvedValue([{ patientId: 'p1', ok: true, name: 'Ana', risk: 'baixo' }])
+    const view = renderWallet({ openSummaries })
+    expect(await screen.findByText('Ana')).toBeTruthy()
+    view.rerender(<I18nProvider i18n={i18n}><PatientWallet baseUrl="http://api.test" accountId="acc-1" accessToken="token-1" kek={null} openSummaries={openSummaries} /></I18nProvider>)
+    expect(screen.getByText('Chaveiro bloqueado. Desbloqueie para ver a carteira de pacientes.')).toBeTruthy()
+    expect(screen.queryByText('Ana')).toBeNull()
   })
 })

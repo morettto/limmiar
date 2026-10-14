@@ -31,10 +31,14 @@ desta conta.
   exatamente as três chaves que `IAccountStore` já usa (`FindByIdAsync`, `FindByEmailAsync`,
   `ListPendingDocumentReviewAsync`). Quem tem um id ou email lê a linha; a autorização de "podes
   chamar isto com este id" continua no middleware e nos handlers, como sempre foi.
-- `account_key_pairs` é tabela própria, não colunas de `accounts`: `IAccountStore.UpdateAsync`
-  substitui o registo inteiro (TOTP, WebAuthn, voz), e o par de chaves precisa sobreviver a isso
-  mesmo sob concorrência com outro `PUT` na mesma conta -- ver `KeyPair/README` (se/quando
-  existir) ou o XML doc de `AccountKeyPairService`.
+- `IAccountStore.MutateAsync` aplica alterações à versão atual da conta sob
+  `SELECT FOR UPDATE` no PostgreSQL. Voz, recuperação, TOTP e verificação profissional
+  não sobrescrevem mudanças concorrentes. A função deve ser pura: o store de teste
+  pode repeti-la ao perder uma disputa. Identidade da conta não pode ser alterada.
+  Código de reserva TOTP é conferido e consumido dentro da mesma mutação; duas
+  chamadas simultâneas com o mesmo código produzem apenas uma autenticação.
+- `account_key_pairs` tem store e tabela próprios; sua chave pública e seu
+  envoltório cifrado são independentes das configurações da conta.
 - **`totp_secret` nunca em claro em repouso.** `accounts.totp_secret_encrypted` (migração
   `0011_encrypt_totp_secret.sql`) guarda `nonce(12) || ciphertext || tag(16)` via AES-256-GCM
   (`TotpSecretCipher`, `TwoFactor/Infrastructure/`). A chave vem de `Totp:EncryptionKey`

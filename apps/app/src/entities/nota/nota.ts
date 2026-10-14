@@ -1,13 +1,26 @@
-import type { Afirmacao, Ancora } from '@limmiar/copilot'
+import type { Ancora } from '@limmiar/copilot'
 import { webcrypto } from '@limmiar/crypto'
 
 export type SecaoSoap = 'S' | 'O' | 'A' | 'P'
+
+export interface ReferenciaBibliografica {
+  readonly trechoId: string
+  readonly titulo: string
+  readonly autor: string
+  readonly pagina: number
+  readonly paragrafo: number
+  readonly citacaoLiteral: string
+  readonly transcriptId: string
+  readonly revisaoTranscricao: number
+  readonly frasePaciente: string
+}
 
 export interface FraseNota {
   readonly id: string
   readonly secao: SecaoSoap
   readonly texto: string
   readonly ancoras: readonly Ancora[]
+  readonly referencias?: readonly ReferenciaBibliografica[]
 }
 
 // as const + tipo derivado, idioma de entities/consentimento/api.ts: nota.ts é `.ts` puro,
@@ -20,31 +33,15 @@ export type EstadoNota = (typeof ESTADOS_NOTA)[number]
 export interface Nota {
   readonly id: string
   readonly patientId: string
+  readonly atendimentoId: string
   readonly revisao: number
   readonly frases: readonly FraseNota[]
   readonly estado: EstadoNota
 }
 
-// Exportada (fatia 2, S08-01): EditorSoap.tsx/NotaPage.tsx reusam esta ordem em vez de a
-// redeclararem — repetir o literal num `.tsx` dispararia lingui/no-unlocalized-strings, e a ordem
-// das secções duplicada por três ficheiros é deriva à espera de acontecer.
+// Exportada para EditorSoap.tsx/NotaDoAtendimento.tsx reusarem a ordem em vez de a redeclararem:
+// repetir o literal num `.tsx` dispararia lingui/no-unlocalized-strings.
 export const ORDEM_SECOES: readonly SecaoSoap[] = ['S', 'O', 'A', 'P']
-
-export function rascunhoParaNota(
-  id: string,
-  patientId: string,
-  porSecao: Record<SecaoSoap, readonly Afirmacao[]>,
-): Nota {
-  const frases = ORDEM_SECOES.flatMap((secao) =>
-    porSecao[secao].map((afirmacao, indice) => ({
-      id: `${secao}-${indice}`,
-      secao,
-      texto: afirmacao.texto,
-      ancoras: afirmacao.ancoras,
-    })),
-  )
-  return { id, patientId, revisao: 0, frases, estado: ESTADO_PENDENTE }
-}
 
 // fraseId inexistente lança em vez de devolver a nota inalterada: um id que já não bate
 // certo (secção reordenada, nota errada, bug de chamador) é um estado que quer falhar no
@@ -61,19 +58,25 @@ export function editarFrase(nota: Nota, fraseId: string, texto: string): Nota {
 // Forma comum a `textoCanonico` (abaixo) e `notaParaEntrada` (nota-crypto.ts): secção, texto e
 // âncoras de cada frase, sem id. Extraído porque os dois copiavam o map byte a byte e divergiriam
 // em silêncio; a saída não pode mudar um byte, há assinaturas que dependem disso.
-export function serializarFrases(frases: readonly FraseNota[]): { secao: SecaoSoap; texto: string; ancoras: { inicioMs: number; fimMs: number }[] }[] {
+export function serializarFrases(frases: readonly FraseNota[]) {
   return frases.map((frase) => ({
     secao: frase.secao,
     texto: frase.texto,
     ancoras: frase.ancoras.map((ancora) => ({ inicioMs: ancora.inicioMs, fimMs: ancora.fimMs })),
+    ...(frase.referencias === undefined ? {} : { referencias: frase.referencias.map(referencia => ({
+      trechoId: referencia.trechoId, titulo: referencia.titulo, autor: referencia.autor,
+      pagina: referencia.pagina, paragrafo: referencia.paragrafo, citacaoLiteral: referencia.citacaoLiteral,
+      transcriptId: referencia.transcriptId, revisaoTranscricao: referencia.revisaoTranscricao, frasePaciente: referencia.frasePaciente,
+    })) }),
   }))
 }
 
-// Cobre secção, texto e âncoras de cada frase, e revisão — exatamente o que a assinatura atesta.
-// Os ids ficam de fora de propósito. JSON.stringify de um literal com chaves sempre na mesma
+// Cobre atendimento, secção, texto e âncoras de cada frase, e revisão — exatamente o que a assinatura
+// atesta (a nota é daquele atendimento). Os ids das frases ficam de fora de propósito. JSON.stringify de um literal com chaves sempre na mesma
 // ordem é determinístico para o mesmo shape, logo não precisa de serializador próprio.
 export function textoCanonico(nota: Nota): string {
   return JSON.stringify({
+    atendimentoId: nota.atendimentoId,
     revisao: nota.revisao,
     frases: serializarFrases(nota.frases),
   })

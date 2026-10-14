@@ -19,11 +19,10 @@ React nem UI; `checkin.ts` é puro, `checkin-store.ts` só fala com `localStorag
 - Nenhum check-in é gravado em claro (ticket S11-01): um único envelope AES-GCM por conta guarda o
   array inteiro, DEK nova a cada `guardarCheckIn`. As datas também são dado do paciente, por isso
   não há um envelope por dia.
-- AAD fixo `limmiar/checkin/v1|<accountId>`, reusado para embrulhar a DEK e cifrar o array -- ao
-  contrário de `copilot-byok`, que separa AAD de DEK e de dado; aqui um único envelope não precisa
-  de dois.
+- AAD fixo `limmiar/checkin/v1|<accountId>`, reusado para embrulhar a DEK e cifrar o array -- um
+  único envelope não precisa de dois (mesmo padrão de `entities/insight/voto-store.ts`).
 - `guardarCheckIn`/`lerCheckIns` rejeitam `accountId === ''` (mesma guarda de
-  `features/copilot-byok/key-store.ts`).
+  `entities/insight/voto-store.ts`).
 - Um check-in no mesmo `dia` substitui o anterior; dias diferentes acumulam no mesmo array.
 - Nenhum pedido de rede transporta o check-in (ticket S11-01) -- tudo fica em `localStorage`.
 

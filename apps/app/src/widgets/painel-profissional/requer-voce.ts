@@ -11,6 +11,8 @@ export interface ItemRequerVoce {
   /** notaId | patientId | `${patientId}:${finalidade}` */
   readonly referencia: string
   readonly patientId: string
+  /** Só na assinatura: a sessão da nota, para abrir a aba da nota. */
+  readonly atendimentoId?: string
 }
 
 export function itensDeRisco(sumarios: readonly SummaryResult[]): ItemRequerVoce[] {
@@ -22,7 +24,7 @@ export function itensDeRisco(sumarios: readonly SummaryResult[]): ItemRequerVoce
 export function itensDeAssinatura(notas: readonly Nota[]): ItemRequerVoce[] {
   return notas
     .filter((nota) => nota.estado === ESTADO_PENDENTE)
-    .map((nota) => ({ id: `assinatura:${nota.id}`, fonte: 'assinatura', referencia: nota.id, patientId: nota.patientId }))
+    .map((nota) => ({ id: `assinatura:${nota.id}`, fonte: 'assinatura', referencia: nota.id, patientId: nota.patientId, atendimentoId: nota.atendimentoId }))
 }
 
 export type ConsentimentosPorPaciente = { patientId: string; consentimentos: ConsentimentosDoPaciente }

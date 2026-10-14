@@ -1,3 +1,4 @@
+using Api.Audit;
 using Api.Accounts;
 using Api.Problems;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -32,6 +33,8 @@ public static class NoteEndpoints
         Guid noteId,
         SignNoteRequest request,
         NoteService noteService,
+        HttpContext context,
+        AuditRecorder auditRecorder,
         CancellationToken cancellationToken)
     {
         if (!TryValidateSealedBlobShape(request.Signature, "signature", out var signatureProblem))
@@ -45,6 +48,11 @@ public static class NoteEndpoints
         }
 
         var result = await noteService.SignAsync(accountId, noteId, request.Revision, request.Signature, cancellationToken);
+        if (result.TryGetValue(out _))
+        {
+            await auditRecorder.RecordAsync(context, AuditAction.NoteSigned, cancellationToken);
+        }
+
         return result.Match<Results<Created<SignNoteResponse>, JsonHttpResult<LimmiarProblemDetails>>>(
             signature => TypedResults.Created(
                 $"/accounts/{accountId}/notes/{noteId}/signature",

@@ -3,7 +3,9 @@ import { Trans, useLingui } from '@lingui/react/macro'
 import { AdaptiveTable } from '@limmiar/ui'
 import type { CryptoKey } from '@limmiar/crypto'
 import { listPatients } from '../../entities/patient/api'
-import { translateProblemCode } from '../../shared/api'
+import type { MessageDescriptor } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
+import { problemMessage } from '../../shared/api'
 import { sortByRisk, type PatientRisk, type SealedSummary, type SummaryResult } from '../../entities/patient/patient-summary'
 import { openSummariesInWorker } from '../../entities/patient/worker-client'
 
@@ -21,7 +23,7 @@ type WalletState =
   | { status: 'locked' }
   | { status: 'loading' }
   | { status: 'ready'; results: SummaryResult[] }
-  | { status: 'error'; message: string }
+  | { status: 'error'; message: MessageDescriptor }
 
 function riskLabel(risk: PatientRisk): string {
   return risk.charAt(0).toUpperCase() + risk.slice(1)
@@ -52,12 +54,13 @@ export function PatientWallet({
       if (cancelled) return
 
       if (!listed.ok) {
-        setState({ status: 'error', message: translateProblemCode(listed.code, listed.params, i18n) })
+        setState({ status: 'error', message: problemMessage(listed.code, listed.params) })
         return
       }
 
       const decrypted = await openSummaries(unlockedKek, listed.patients, abortController.signal)
       if (cancelled) return
+      // Stryker disable next-line StringLiteral: equivalent, the final return renders any state left after the early returns.
       setState({ status: 'ready', results: sortByRisk(decrypted) })
     }
 
@@ -65,7 +68,7 @@ export function PatientWallet({
       if (!cancelled) {
         setState({
           status: 'error',
-          message: t`Não foi possível carregar a carteira de pacientes. Tente novamente.`,
+          message: msg`Não foi possível carregar a carteira de pacientes. Tente novamente.`,
         })
       }
     })
@@ -76,7 +79,7 @@ export function PatientWallet({
       // wallet unmounts instead of letting it decrypt to completion into a result nobody reads.
       abortController.abort()
     }
-  }, [kek, baseUrl, accountId, accessToken, openSummaries, i18n, t])
+  }, [kek, baseUrl, accountId, accessToken, openSummaries])
 
   if (state.status === 'locked') {
     return (
@@ -102,7 +105,7 @@ export function PatientWallet({
     return (
       <div className="mx-auto max-w-sm p-4">
         <p role="alert" className="text-sm text-red-700">
-          {state.message}
+          {i18n._(state.message)}
         </p>
       </div>
     )

@@ -1,4 +1,6 @@
-app = "TODO-preencher-apos-fly-launch"
+# Ambiente de teste (docs/ambiente-de-teste.md). O nome do app é global na Fly: se estiver tomado, troque aqui
+# e em docs/ambiente-de-teste.md. Segredos e origens ficam em `fly secrets`, nunca neste arquivo.
+app = "limmiar-api-teste"
 primary_region = "gru"
 
 [build]
@@ -8,11 +10,13 @@ primary_region = "gru"
   release_command = "--migrate-only"
   release_command_timeout = "5m"
 
+# Tokens de sessão, salas online e pareamento vivem na memória do processo: parar a máquina por ociosidade desloga todos.
 [http_service]
   internal_port = 8080
-  auto_stop_machines = "stop"
+  force_https = true
+  auto_stop_machines = "off"
   auto_start_machines = true
-  min_machines_running = 0
+  min_machines_running = 1
 
 [[http_service.checks]]
   grace_period = "10s"

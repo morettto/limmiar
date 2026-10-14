@@ -1,5 +1,6 @@
 import { webcrypto as limmiarWebcrypto } from '@limmiar/crypto'
 import { afterEach, describe, expect, it } from 'vitest'
+import { decodeBase64 } from '../../shared/lib/base64'
 import { guardarCheckIn, lerCheckIns } from './checkin-store'
 import type { CheckIn } from './checkin'
 
@@ -92,5 +93,18 @@ describe('empty accountId', () => {
     const kek = await makeKek()
 
     await expect(lerCheckIns(kek, '')).rejects.toThrow(/accountId/)
+  })
+
+  it('o envelope só abre com o contexto da própria conta, também quando copiado para outra', async () => {
+    const kek = await makeKek()
+    await guardarCheckIn(kek, ACCOUNT_ID, CHECKIN)
+    const guardado = localStorage.getItem(`limmiar:checkin:${ACCOUNT_ID}`)!
+    const { wrappedDek, ciphertext } = JSON.parse(guardado) as { wrappedDek: string; ciphertext: string }
+    const aad = new TextEncoder().encode(`limmiar/checkin/v1|${ACCOUNT_ID}`)
+    const dek = await limmiarWebcrypto.unwrapDek(kek, decodeBase64(wrappedDek), aad)
+    await expect(limmiarWebcrypto.decrypt(dek, decodeBase64(ciphertext), aad)).resolves.toBeDefined()
+
+    localStorage.setItem('limmiar:checkin:outra-conta', guardado)
+    await expect(lerCheckIns(kek, 'outra-conta')).rejects.toThrow()
   })
 })

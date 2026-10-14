@@ -8,7 +8,9 @@ import type { Account } from '../../entities/account'
 import { SessionContext, type ContextoSessao } from '../../entities/account/session-context'
 import { construirIndice, impressaoDigital, notaParaDoc, serializarIndice } from '../../features/nota-biblioteca/indice'
 import { chaveIndiceDaConta, selarIndice, type ChaveIndiceBusca } from '../../features/nota-biblioteca/indice-crypto'
+import { deferred } from '../../test-support/deferred'
 import { BibliotecaPage, type BibliotecaPageProps } from './BibliotecaPage'
+
 
 vi.mock('../../widgets/biblioteca/BibliotecaNotas', () => ({
   BibliotecaNotas: vi.fn(() => <div data-testid="biblioteca-notas" />),
@@ -19,7 +21,7 @@ const ACCOUNT_ID = '77777777-7777-7777-7777-777777777777'
 type Store = BibliotecaPageProps['store']
 
 function sessaoParaConta(accountId: string): Account {
-  return {
+  return {accessToken: 'test-access', refreshToken: 'test-refresh', accessTokenExpiresAt: '2099-01-01T00:00:00Z',
     id: accountId,
     email: 'user@example.com',
     role: 'Professional',
@@ -29,7 +31,7 @@ function sessaoParaConta(accountId: string): Account {
 }
 
 function sessaoValue(accountId: string | null): ContextoSessao {
-  return {
+  return {kek: null,
     sessao: accountId === null ? null : sessaoParaConta(accountId),
     iniciarSessao: vi.fn(),
     terminarSessao: vi.fn(),
@@ -54,20 +56,11 @@ async function makeChave(): Promise<ChaveIndiceBusca> {
   return chaveIndiceDaConta(kek)
 }
 
-function deferred<T>() {
-  let resolve!: (value: T) => void
-  let reject!: (error: unknown) => void
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res
-    reject = rej
-  })
-  return { promise, resolve, reject }
-}
-
 function nota(): Nota {
   return {
     id: 'nota-1',
     patientId: 'paciente-1',
+    atendimentoId: 'atendimento-1',
     revisao: 0,
     frases: [{ id: 'S-0', secao: 'S', texto: 'termo-supersecreto-xyz', ancoras: [] }],
     estado: ESTADO_PENDENTE,
@@ -84,7 +77,7 @@ async function renderEObterProps(overrides: Partial<BibliotecaPageProps> & { acc
     gravar: vi.fn().mockResolvedValue(undefined),
     apagar: vi.fn().mockResolvedValue(undefined),
   }
-  const utils = render(montar({ notas: overrides.notas ?? [nota()], chaveIndice, store }, accountId))
+  const utils = render(montar({ notas: overrides.notas ?? [nota()], nomesPacientes: new Map(), chaveIndice, store }, accountId))
   const props = () => vi.mocked(BibliotecaNotas).mock.calls.at(-1)![0]
   return { ...utils, props, store }
 }
@@ -182,7 +175,7 @@ describe('BibliotecaPage', () => {
     // `notas` e `store` novos por identidade (literais recriados, como um chamador que não
     // memoiza faria) mas com o mesmo conteúdo -- o pai rerenderizando sozinho não pode
     // disparar uma segunda leitura/gravação em OPFS.
-    rerender(montar({ notas: [{ ...notaAtual }], chaveIndice, store: { ler, gravar, apagar } }, ACCOUNT_ID))
+    rerender(montar({ notas: [{ ...notaAtual }], nomesPacientes: new Map(), chaveIndice, store: { ler, gravar, apagar } }, ACCOUNT_ID))
     // `ler` já reflete o rerender espúrio -- `store.ler()` roda até ao primeiro `await`
     // dentro do próprio `act()` do `rerender`. `gravar` não: a cadeia WebCrypto por trás
     // (packages/crypto/src/webcrypto.ts) só termina em ciclos reais do event loop.
@@ -192,7 +185,7 @@ describe('BibliotecaPage', () => {
     // "desmontar antes de persistirIndice resolver") ancora a espera num sinal real: se o
     // rerender espúrio também tivesse disparado o efeito, `gravar` chegaria a 3, não 2.
     const OUTRA_CONTA_ID = '88888888-8888-8888-8888-888888888888'
-    rerender(montar({ notas: [{ ...notaAtual }], chaveIndice, store: { ler, gravar, apagar } }, OUTRA_CONTA_ID))
+    rerender(montar({ notas: [{ ...notaAtual }], nomesPacientes: new Map(), chaveIndice, store: { ler, gravar, apagar } }, OUTRA_CONTA_ID))
     await waitFor(() => expect(gravar).toHaveBeenCalledTimes(2))
 
     expect(ler).toHaveBeenCalledTimes(2)
@@ -242,7 +235,7 @@ describe('BibliotecaPage', () => {
     expect(gravar).toHaveBeenCalledTimes(1)
 
     const notaEditada = { ...notaAtual, revisao: notaAtual.revisao + 1 }
-    rerender(montar({ notas: [notaEditada], chaveIndice, store: { ler, gravar, apagar } }, ACCOUNT_ID))
+    rerender(montar({ notas: [notaEditada], nomesPacientes: new Map(), chaveIndice, store: { ler, gravar, apagar } }, ACCOUNT_ID))
 
     await waitFor(() => expect(gravar).toHaveBeenCalledTimes(2))
     expect(ler).toHaveBeenCalledTimes(2)
@@ -261,7 +254,7 @@ describe('BibliotecaPage', () => {
 
   // S18-04: accountId derivado de `useSession().sessao?.id ?? null` (S18-10: deixou de ser
   // prop) -- mesmo ramo que chaveIndice===null já cobria, sem precisar da sentinela `''` que
-  // assertAccountId (features/copilot-byok/key-store.ts) rejeitaria noutra página.
+  // assertAccountId (entities/insight/voto-store.ts) rejeitaria noutra página.
   it('sem sessão (sessao === null): o resultado fica em a-preparar, sem tocar em ler/gravar', async () => {
     const ler = vi.fn()
     const gravar = vi.fn()
@@ -281,8 +274,7 @@ describe('BibliotecaPage', () => {
 
     unmount()
     lerCall.resolve(null)
-    await lerCall.promise
-    await Promise.resolve()
+    await new Promise((resolve) => setTimeout(resolve, 100))
 
     expect(gravar).not.toHaveBeenCalled()
   })
@@ -347,9 +339,57 @@ describe('BibliotecaPage', () => {
       <I18nProvider i18n={i18n}>
         <SessionContext.Provider value={sessaoValue(ACCOUNT_ID)}>
           {/* @ts-expect-error chaveIndiceDaConta é a única porta para ChaveIndiceBusca */}
-          <BibliotecaPage notas={[]} chaveIndice={chaveDePaciente} store={store} />
+          <BibliotecaPage notas={[]} nomesPacientes={new Map()} chaveIndice={chaveDePaciente} store={store} />
         </SessionContext.Provider>
       </I18nProvider>,
     )
+  })
+
+  it('o campo de busca começa vazio', async () => {
+    const { props } = await renderEObterProps()
+    expect(props().termo).toBe('')
+  })
+
+  it('um índice tardio de notas anteriores nunca substitui o das notas atuais', async () => {
+    const chaveIndice = await makeChave()
+    const antiga = nota()
+    const nova: Nota = { ...antiga, id: 'nota-2', frases: [{ id: 'S-0', secao: 'S', texto: 'outro-assunto-abc', ancoras: [] }] }
+    const gravacaoAntiga = deferred<void>()
+    const gravar = vi.fn().mockReturnValueOnce(gravacaoAntiga.promise).mockResolvedValue(undefined)
+    const store = { ler: vi.fn().mockResolvedValue(null), gravar, apagar: vi.fn() }
+    const { rerender, props } = await renderEObterProps({ chaveIndice, notas: [antiga], store })
+    await waitFor(() => expect(gravar).toHaveBeenCalledTimes(1))
+
+    rerender(montar({ notas: [nova], nomesPacientes: new Map(), chaveIndice, store }, ACCOUNT_ID))
+    await waitFor(() => expect(props().resultado.estado).not.toBe('a-preparar'))
+    act(() => props().onTermoChange('assunto'))
+    expect(props().resultado).toEqual({ estado: 'pronto', ids: ['nota-2'] })
+
+    await act(async () => { gravacaoAntiga.resolve(); await new Promise((resolve) => setTimeout(resolve, 100)) })
+
+    expect(props().resultado).toEqual({ estado: 'pronto', ids: ['nota-2'] })
+  })
+
+  it('uma falha tardia de notas anteriores não acende o alerta sobre a busca atual', async () => {
+    const chaveIndice = await makeChave()
+    const antiga = nota()
+    const nova: Nota = { ...antiga, id: 'nota-2' }
+    const leituraAntiga = deferred<Uint8Array<ArrayBuffer> | null>()
+    const ler = vi.fn().mockReturnValueOnce(leituraAntiga.promise).mockResolvedValue(null)
+    const store = { ler, gravar: vi.fn().mockResolvedValue(undefined), apagar: vi.fn() }
+    const { rerender, props } = await renderEObterProps({ chaveIndice, notas: [antiga], store })
+    rerender(montar({ notas: [nova], nomesPacientes: new Map(), chaveIndice, store }, ACCOUNT_ID))
+    await waitFor(() => expect(props().resultado.estado).not.toBe('a-preparar'))
+
+    await act(async () => { leituraAntiga.reject(new Error('OPFS negado')); await new Promise((resolve) => setTimeout(resolve, 50)) })
+
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.getByTestId('biblioteca-notas')).toBeTruthy()
+  })
+
+  it('o alerta de falha tem o texto próprio', async () => {
+    const store = { ler: vi.fn().mockRejectedValue(new Error('OPFS negado')), gravar: vi.fn(), apagar: vi.fn() }
+    await renderEObterProps({ store })
+    expect((await screen.findByRole('alert')).textContent).toBe('Não foi possível preparar a busca. Tente novamente.')
   })
 })

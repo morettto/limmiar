@@ -2,11 +2,11 @@ import { type CryptoKey, webcrypto } from '@limmiar/crypto'
 import { decodeBase64, encodeBase64 } from '../../shared/lib/base64'
 import type { CheckIn } from './checkin'
 
-// Same key-naming convention as key-store.ts's COPILOT_KEY_STORAGE_KEY.
+// Same key-naming convention as voto-store.ts's VOTO_STORAGE_KEY_PREFIX.
 export const CHECKIN_STORAGE_KEY_PREFIX = 'limmiar:checkin'
 const AAD_PREFIX = 'limmiar/checkin/v1|'
 
-// Shared entry guard, same rationale as key-store.ts's assertAccountId: namespaces the storage
+// Shared entry guard, same rationale as voto-store.ts's assertAccountId: namespaces the storage
 // slot and the AAD by accountId, rejected once here instead of trusting every call site.
 function assertAccountId(accountId: string): void {
   if (accountId === '') {

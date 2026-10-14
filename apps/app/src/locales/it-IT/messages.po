@@ -13,135 +13,483 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
+#: src/features/live-session/SessionReview.tsx:475
+msgid " · Em preparação"
+msgstr " · In preparazione"
+
+#. placeholder {0}: materials.length
+#: src/pages/acervo/AcervoPage.tsx:190
+msgid "{0, plural, =0 {# materiais} one {# material} other {# materiais}}"
+msgstr "{0, plural, =0 {# materiali} one {# materiale} other {# materiali}}"
+
+#. placeholder {0}: pacientes.length
+#: src/widgets/patient-care/PatientList.tsx:70
+msgid "{0, plural, =0 {# pastas} one {# pasta} other {# pastas}}"
+msgstr "{0, plural, =0 {# cartelle} one {# cartella} other {# cartelle}}"
+
+#. placeholder {0}: sessoes.length
+#: src/widgets/patient-care/PatientSessions.tsx:12
+msgid "{0, plural, =0 {# sessões} one {# sessão} other {# sessões}}"
+msgstr "{0, plural, =0 {# sessioni} one {# sessione} other {# sessioni}}"
+
+#: src/features/patient-schedule/PatientSchedule.tsx:101
+#: src/features/prontuario/HojeDoPaciente.tsx:80
+msgid "{minutos} minutos"
+msgstr "{minutos} minuti"
+
+#: src/features/live-session/SessionReview.tsx:518
+#: src/features/live-session/SessionReview.tsx:518
+msgid "{segundos}s"
+msgstr "{segundos}s"
+
+#: src/features/voice-enrollment/capturar-perfil.ts:46
+msgid "A amostra não contém fala suficiente."
+msgstr "Il campione non contiene abbastanza parlato."
+
+#: src/entities/nota/abrir-notas.ts:24
+msgid "A assinatura não corresponde ao conteúdo da nota."
+msgstr "La firma non corrisponde al contenuto della nota."
+
+#: src/features/live-session/SessionReview.tsx:288
+msgid "A captura atingiu 64 MB e foi encerrada."
+msgstr "La registrazione ha raggiunto 64 MB ed è stata interrotta."
+
+#: src/features/qr-scan/PairingScan.tsx:88
+msgid "A chave recebida não corresponde ao código QR. Gere um novo código no dispositivo de origem."
+msgstr "La chiave ricevuta non corrisponde al codice QR. Genera un nuovo codice sul dispositivo di origine."
+
+#: src/features/live-session/SessionReview.tsx:463
+msgid "A conexão com a transcrição caiu. Reconectando: o que for dito agora será transcrito assim que ela voltar."
+msgstr "La connessione con la trascrizione è caduta. Riconnessione in corso: ciò che viene detto ora sarà trascritto non appena tornerà."
+
+#: src/shared/audio/transcricao-servidor.ts:247
+msgid "A conexão com a transcrição foi perdida."
+msgstr "La connessione con la trascrizione è stata persa."
+
+#: src/features/nota-editor/NotaDoAtendimento.tsx:130
+msgid "A confirmação adiciona a referência à avaliação desta nota. Nenhum diagnóstico é preenchido automaticamente."
+msgstr "La conferma aggiunge il riferimento alla valutazione di questa nota. Nessuna diagnosi viene compilata automaticamente."
+
+#: src/features/live-session/LiveInsights.tsx:135
+msgid "A fala aparecerá aqui durante a sessão."
+msgstr "Il parlato apparirà qui durante la sessione."
+
+#: src/features/nota-editor/NotaDoAtendimento.tsx:129
+msgid "A referência não corresponde à revisão atual de uma fala autorizada deste paciente."
+msgstr "Il riferimento non corrisponde alla revisione attuale di una frase autorizzata di questo paziente."
+
+#: src/entities/nota/abrir-notas.ts:23
+msgid "A revisão do prontuário não corresponde à nota assinada."
+msgstr "La revisione della cartella non corrisponde alla nota firmata."
+
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:156
+#: src/shared/api/problem-messages.ts:160
 msgid "agenda.recording_active"
 msgstr "La sessione è in registrazione e non può essere modificata ora."
 
+#: src/features/live-session/SessionReview.tsx:464
+msgid "A transcrição está atrasada em relação à fala. O áudio continua sendo enviado."
+msgstr "La trascrizione è in ritardo rispetto al parlato. L’audio continua a essere inviato."
+
+#: src/features/live-session/SessionReview.tsx:216
+msgid "A transcrição foi interrompida. Revise o texto recuperado."
+msgstr "La trascrizione è stata interrotta. Controlla il testo recuperato."
+
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:51
+#: src/shared/api/problem-messages.ts:55
 msgid "auth.totp_not_enabled"
 msgstr "La verifica in due passaggi non è ancora stata attivata per questo account."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:37
+#: src/shared/api/problem-messages.ts:41
 msgid "auth.totp_already_enabled"
 msgstr "La verifica in due passaggi è già attiva per questo account."
 
+#: src/features/voice-enrollment/capturar-perfil.ts:52
+msgid "A voz variou durante a amostra (similaridade {similaridade})."
+msgstr "La voce è cambiata durante il campione (somiglianza {similaridade})."
+
+#: src/pages/device-pairing/PairPrimaryPage.tsx:24
+msgid "Abra sua conta no outro dispositivo. Sua chave será liberada somente depois de conferir os códigos nos dois dispositivos."
+msgstr "Apri il tuo account sull’altro dispositivo. La chiave verrà inviata solo dopo aver confrontato i codici sui due dispositivi."
+
+#: src/features/prontuario/ProntuarioProvider.tsx:52
+msgid "Abrindo prontuário..."
+msgstr "Apertura della cartella..."
+
+#: src/pages/acervo/AcervoPage.tsx:193
+msgid "Abrindo seu acervo..."
+msgstr "Apertura della tua raccolta..."
+
+#: src/widgets/patient-care/PatientList.tsx:81
+msgid "Abrindo sua carteira..."
+msgstr "Apertura delle cartelle dei tuoi pazienti..."
+
+#: src/features/magic-link-auth/MagicLinkCallback.tsx:181
+msgid "Abrir meu acompanhamento"
+msgstr "Apri il mio percorso"
+
+#: src/widgets/biblioteca/BibliotecaNotas.tsx:73
+msgid "Abrir nota {numero}"
+msgstr "Apri nota {numero}"
+
+#: src/features/prontuario/HojeDoPaciente.tsx:83
+msgid "Abrir sessão"
+msgstr "Apri sessione"
+
+#: src/features/audit-trail/AuditTrail.tsx:71
+msgid "Ação"
+msgstr "Azione"
+
+#: src/widgets/app-shell/AppShell.tsx:60
+msgid "Acervo pessoal"
+msgstr "Raccolta personale"
+
+#: src/widgets/auth-screen/AuthScreen.tsx:249
+msgid "Acessar conta"
+msgstr "Accedi all'account"
+
+#: src/widgets/patient-care/PatientAccess.tsx:46
+msgid "Acesso e consentimentos"
+msgstr "Accesso e consensi"
+
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:89
+#: src/shared/api/problem-messages.ts:93
 msgid "staff.unauthorized"
 msgstr "Accesso non autorizzato."
 
-#: src/features/recovery/RecoveryScreen.tsx:100
+#: src/features/magic-link-auth/MagicLinkCallback.tsx:153
+msgid "Acesso privado do paciente"
+msgstr "Accesso privato del paziente"
+
+#: src/features/recovery/RecoveryScreen.tsx:121
 msgid "Acesso recuperado com sucesso."
 msgstr "Accesso recuperato con successo."
 
-#: src/widgets/auth-screen/AuthScreen.tsx:181
+#: src/widgets/auth-screen/AuthScreen.tsx:200
 msgid "Acompanhe suas consultas e informações de saúde com segurança."
 msgstr "Tieni traccia delle tue visite e informazioni sanitarie in sicurezza."
 
-#: src/features/totp-enrollment/TotpSetup.tsx:128
+#: src/pages/acervo/AcervoPage.tsx:176
+#: src/pages/acervo/AcervoPage.tsx:177
+msgid "Adicionar material"
+msgstr "Aggiungi materiale"
+
+#: src/widgets/patient-care/PatientList.tsx:71
+#: src/widgets/patient-care/PatientList.tsx:77
+msgid "Adicionar paciente"
+msgstr "Aggiungi paziente"
+
+#: src/features/totp-enrollment/TotpSetup.tsx:146
 msgid "Adicione esta conta no seu aplicativo autenticador, usando as informações abaixo."
 msgstr "Aggiungi questo account nella tua app di autenticazione, usando le informazioni qui sotto."
 
-#: src/features/device-pairing-new/PairNewDevice.tsx:89
+#: src/widgets/patient-care/PatientList.tsx:88
+msgid "Adicione seu primeiro paciente para abrir o prontuário."
+msgstr "Aggiungi il primo paziente per aprire la sua cartella."
+
+#: src/pages/acervo/AcervoPage.tsx:193
+msgid "Adicione sua primeira obra. Depois, escolha os materiais que autoriza usar nas consultas."
+msgstr "Aggiungi la tua prima opera. Poi scegli i materiali che autorizzi per le consultazioni."
+
+#: src/features/patient-schedule/PatientSchedule.tsx:90
+#: src/features/patient-schedule/PatientSchedule.tsx:91
+msgid "Agenda deste paciente"
+msgstr "Agenda di questo paziente"
+
+#: src/features/patient-schedule/PatientSchedule.tsx:108
+msgid "Agendar próximo encontro"
+msgstr "Programma il prossimo incontro"
+
+#: src/features/patient-schedule/PatientSchedule.tsx:111
+msgid "Agendar sessão"
+msgstr "Programma seduta"
+
+#: src/features/device-pairing-new/PairNewDevice.tsx:118
 msgid "Aguardando o outro dispositivo enviar a chave..."
 msgstr "In attesa che l'altro dispositivo invii la chiave..."
 
+#: src/features/online-call/OnlineCall.tsx:97
+msgid "Aguardando o outro participante."
+msgstr "In attesa dell’altro partecipante."
+
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:118
+#: src/shared/api/problem-messages.ts:122
 msgid "auth.device_pairing_payload_not_ready"
 msgstr "Attendi che l'altro dispositivo legga il codice prima di consentire l'accesso."
 
-#: src/pages/paciente-hoje/PacienteHojePage.tsx:125
+#: src/widgets/app-shell/AppShell.tsx:79
+msgid "Aguarde o processamento da sessão antes de sair."
+msgstr "Attendi che l'elaborazione della sessione termini prima di uscire."
+
+#: src/entities/voz/extrator.ts:41
+msgid "Amostra de voz inválida."
+msgstr "Campione vocale non valido."
+
+#: src/features/voice-enrollment/VoiceSettings.tsx:99
+msgid "Amostra: {segundos} de 15 segundos."
+msgstr "Campione: {segundos} di 15 secondi."
+
+#: src/pages/paciente-hoje/PacienteHojePage.tsx:128
 msgid "Ansiedade"
 msgstr "Ansia"
 
-#: src/features/qr-scan/PairingScan.tsx:115
+#: src/features/qr-scan/PairingScan.tsx:132
 msgid "Aponte a câmera para o código QR exibido no outro dispositivo."
 msgstr "Inquadra con la fotocamera il codice QR mostrato sull'altro dispositivo."
+
+#: src/pages/acervo/AcervoPage.tsx:180
+msgid "Arquivo do material"
+msgstr "File del materiale"
+
+#: src/pages/acervo/AcervoPage.tsx:201
+msgid "Arquivo guardado · aguardando preparação"
+msgstr "File salvato · in attesa di preparazione"
+
+#: src/pages/acervo/AcervoPage.tsx:158
+msgid "Arquivo recuperado e decifrado neste dispositivo."
+msgstr "File recuperato e decifrato su questo dispositivo."
+
+#: src/widgets/biblioteca/BibliotecaNotas.tsx:69
+msgid "Assinada"
+msgstr "Firmata"
 
 #: src/features/nota-fila/FilaAssinatura.tsx:42
 msgid "Assinadas"
 msgstr "Firmate"
 
-#: src/features/nota-editor/EditorSoap.tsx:30
+#: src/features/nota-editor/NotaDoAtendimento.tsx:138
+msgid "Assinar nota"
+msgstr "Firma nota"
+
+#: src/widgets/painel-profissional/PainelProfissional.tsx:176
+msgid "Assinar nota pendente"
+msgstr "Firma nota in sospeso"
+
+#: src/features/audit-trail/AuditTrail.tsx:66
+msgid "Até (exclusive)"
+msgstr "Fino a (escluso)"
+
+#: src/features/patient-schedule/PatientSchedule.tsx:93
+#: src/features/prontuario/HojeDoPaciente.tsx:73
+msgid "Atualizar agenda"
+msgstr "Aggiorna agenda"
+
+#: src/pages/home/HomePage.tsx:101
+msgid "Atualizar verificação"
+msgstr "Aggiorna verifica"
+
+#: src/features/online-call/OnlineCall.tsx:114
+msgid "Áudio do outro participante"
+msgstr "Audio dell’altro partecipante"
+
+#: src/pages/acervo/AcervoPage.tsx:182
+msgid "Autores"
+msgstr "Autori"
+
+#: src/pages/acervo/AcervoPage.tsx:146
+msgid "Autorização retirada. Este material não participa das suas consultas."
+msgstr "Autorizzazione revocata. Questo materiale è escluso dalle tue consultazioni."
+
+#: src/pages/acervo/AcervoPage.tsx:204
+msgid "Autorizar nas minhas consultas"
+msgstr "Autorizza per le mie consultazioni"
+
+#: src/features/live-session/SessionReview.tsx:266
+msgid "Autorize a gravação e permita o microfone."
+msgstr "Autorizza la registrazione e consenti l'accesso al microfono."
+
+#: src/features/live-session/LiveInsights.tsx:173
+msgid "Autorize materiais no acervo para receber referências durante a sessão."
+msgstr "Autorizza i materiali nella tua biblioteca per ricevere riferimenti durante la seduta."
+
+#: src/features/online-call/OnlineCall.tsx:104
+msgid "Autorizo o uso do microfone e a transcrição nesta sessão online. O áudio segue ao servidor de transcrição, só em memória, e não é gravado."
+msgstr "Autorizzo l’uso del microfono e la trascrizione in questa sessione online. L’audio va al server di trascrizione, solo in memoria, e non viene registrato."
+
+#: src/features/voice-enrollment/VoiceSettings.tsx:93
+msgid "Autorizo o uso do microfone para cadastrar minha voz."
+msgstr "Autorizzo l’uso del microfono per registrare la mia voce."
+
+#: src/features/nota-editor/EditorSoap.tsx:31
 msgid "Avaliação"
 msgstr "Valutazione"
 
+#: src/features/live-session/LiveInsights.tsx:211
+msgid "Avalie esta fala no contexto do atendimento."
+msgstr "Valuta questa frase nel contesto della cura."
+
+#: src/pages/acervo/AcervoPage.tsx:220
+msgid "Avanço da preparação"
+msgstr "Avanzamento della preparazione"
+
+#: src/widgets/patient-care/PatientList.tsx:75
+msgid "Baixo"
+msgstr "Basso"
+
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:11
+#: src/shared/api/problem-messages.ts:15
 msgid "health.database_unreachable"
 msgstr "Database non disponibile al momento."
 
-#: src/App.tsx:10
+#: src/pages/auth/AuthPage.tsx:19
 msgid "Bem-vindo ao Limmiar"
 msgstr "Benvenuto/a su Limmiar"
 
-#: src/widgets/biblioteca/BibliotecaNotas.tsx:37
+#: src/pages/acervo/AcervoPage.tsx:174
+msgid "Bibliografia pessoal"
+msgstr "Bibliografia personale"
+
+#: src/pages/biblioteca/BibliotecaAccountPage.tsx:35
+#: src/pages/biblioteca/BibliotecaPage.tsx:77
+#: src/widgets/app-shell/AppShell.tsx:59
+msgid "Biblioteca de notas"
+msgstr "Biblioteca delle note"
+
+#: src/pages/acervo/AcervoPage.tsx:192
+msgid "Buscar no acervo"
+msgstr "Cerca nella raccolta"
+
+#: src/widgets/biblioteca/BibliotecaNotas.tsx:41
 msgid "Buscar notas"
 msgstr "Cerca note"
 
-#: src/features/copilot-byok/CopilotKeySetup.tsx:59
-msgid "Cadastrar chave de API de IA"
-msgstr "Registra chiave API di IA"
+#: src/widgets/patient-care/PatientList.tsx:80
+msgid "Buscar paciente nesta carteira"
+msgstr "Cerca un paziente in queste cartelle"
+
+#: src/widgets/auth-screen/AuthScreen.tsx:160
+msgid "Cadastrar"
+msgstr "Registrati"
+
+#: src/features/voice-enrollment/VoiceSettings.tsx:95
+msgid "Cadastrar minha voz"
+msgstr "Registra la mia voce"
+
+#: src/features/live-session/SessionReview.tsx:327
+msgid "Cadastre sua voz antes de gravar: é preciso saber quem está falando."
+msgstr "Registra la tua voce prima di registrare: è necessario sapere chi sta parlando."
+
+#: src/features/live-session/SessionReview.tsx:245
+msgid "Cadastre sua voz antes de transcrever: é preciso saber quem está falando."
+msgstr "Registra la tua voce prima di trascrivere: è necessario sapere chi sta parlando."
+
+#: src/features/voice-enrollment/VoiceSettings.tsx:97
+msgid "Cadastro cancelado."
+msgstr "Registrazione annullata."
+
+#: src/features/audit-trail/AuditTrail.tsx:69
+msgid "Cadeia íntegra: nenhuma entrada foi alterada."
+msgstr "Catena integra: nessuna voce è stata alterata."
+
+#: src/features/audit-trail/AuditTrail.tsx:69
+msgid "Cadeia quebrada a partir da entrada {quebra}."
+msgstr "Catena interrotta a partire dalla voce {quebra}."
+
+#: src/features/qr-scan/PairingScan.tsx:127
+msgid "Câmera para escanear o código QR"
+msgstr "Fotocamera per scansionare il codice QR"
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:33
+#: src/shared/api/problem-messages.ts:37
 msgid "validation.invalid_field"
 msgstr "Campo non valido: {field}."
 
-#: src/widgets/patient-wallet/PatientWallet.tsx:95
+#: src/features/voice-enrollment/VoiceSettings.tsx:97
+#: src/pages/acervo/AcervoPage.tsx:207
+msgid "Cancelar"
+msgstr "Annulla"
+
+#: src/features/device-pairing-primary/PairPrimaryDevice.tsx:99
+msgid "Cancelar pareamento"
+msgstr "Annulla associazione"
+
+#: src/features/patient-schedule/PatientSchedule.tsx:104
+msgid "Cancelar sessão"
+msgstr "Annulla seduta"
+
+#: src/pages/atendimento/AtendimentoPage.tsx:89
+msgid "Captura encerrada. Confira e salve a transcrição antes de encerrar a sessão."
+msgstr "Acquisizione terminata. Rivedi e salva la trascrizione prima di terminare la seduta."
+
+#: src/features/prontuario/HojeDoPaciente.tsx:72
+msgid "Carregando agenda de hoje..."
+msgstr "Caricamento dell’agenda di oggi..."
+
+#: src/pages/biblioteca/BibliotecaAccountPage.tsx:38
+msgid "Carregando notas do prontuário..."
+msgstr "Caricamento delle note della cartella clinica..."
+
+#: src/pages/home/HomePage.tsx:109
+msgid "Carregando notas pendentes..."
+msgstr "Caricamento delle note in sospeso..."
+
+#: src/widgets/patient-wallet/PatientWallet.tsx:98
 msgid "Carregando pacientes..."
 msgstr "Caricamento pazienti..."
 
-#: src/widgets/painel-profissional/PainelProfissional.tsx:139
+#: src/widgets/painel-profissional/PainelProfissional.tsx:144
 msgid "Carregando painel..."
 msgstr "Caricamento pannello..."
 
-#: src/features/vinculo/DesvincularVinculo.tsx:53
+#: src/features/patient-schedule/PatientSchedule.tsx:94
+msgid "Carregando sessões..."
+msgstr "Caricamento delle sedute..."
+
+#: src/pages/home/HomePage.tsx:92
+msgid "Carregando sua conta..."
+msgstr "Caricamento dell'account..."
+
+#: src/features/vinculo/DesvincularVinculo.tsx:54
 msgid "Carregando vínculos..."
 msgstr "Caricamento dei collegamenti..."
 
-#: src/features/copilot-byok/CopilotKeySetup.tsx:83
-msgid "Chave de API"
-msgstr "Chiave API"
+#: src/widgets/patient-care/PatientList.tsx:70
+msgid "Carteira profissional"
+msgstr "Cartelle professionali"
 
-#: src/features/copilot-byok/CopilotKeySetup.tsx:31
-msgid "Chaveiro bloqueado. Desbloqueie para cadastrar sua chave de API."
-msgstr "Portachiavi bloccato. Sbloccalo per registrare la tua chiave API."
+#: src/features/online-call/OnlineCall.tsx:100
+msgid "Chamada online"
+msgstr "Chiamata online"
 
-#: src/pages/paciente-hoje/PacienteHojePage.tsx:80
+#: src/pages/paciente-hoje/PacienteHojePage.tsx:82
 msgid "Chaveiro bloqueado. Desbloqueie para registrar o check-in de hoje."
 msgstr "Portachiavi bloccato. Sbloccalo per registrare il check-in di oggi."
 
-#: src/widgets/patient-wallet/PatientWallet.tsx:85
+#: src/widgets/patient-wallet/PatientWallet.tsx:88
 msgid "Chaveiro bloqueado. Desbloqueie para ver a carteira de pacientes."
 msgstr "Portachiavi bloccato. Sbloccalo per vedere il portafoglio pazienti."
 
-#: src/widgets/painel-profissional/PainelProfissional.tsx:129
+#: src/widgets/painel-profissional/PainelProfissional.tsx:134
 msgid "Chaveiro bloqueado. Desbloqueie para ver o painel."
 msgstr "Portachiavi bloccato. Sbloccalo per vedere il pannello."
-
-#. placeholder {0}: grupo.espelho.diasComCheckIn
-#: src/features/partilha/EspelhoP6.tsx:161
-#~ msgid "Check-in compartilhado em {0} de 7 dias"
-#~ msgstr "Check-in condiviso in {0} di 7 giorni"
 
 #: src/features/partilha/EspelhoP6.tsx:163
 msgid "Check-in compartilhado em {diasComCheckIn} de 7 dias"
 msgstr "Check-in condiviso in {diasComCheckIn} di 7 giorni"
 
-#: src/pages/paciente-hoje/PacienteHojePage.tsx:136
+#: src/pages/paciente-hoje/PacienteHojePage.tsx:139
 msgid "Check-in salvo neste dispositivo, mas não foi compartilhado."
 msgstr "Check-in salvato su questo dispositivo, ma non condiviso."
 
-#: src/features/totp-enrollment/TotpSetup.tsx:158
+#: src/features/voice-enrollment/VoiceSettings.tsx:57
+msgid "Cifrando seu perfil de voz..."
+msgstr "Crittografia del profilo vocale..."
+
+#: src/features/totp-enrollment/TotpSetup.tsx:179
 msgid "Código de 6 dígitos do aplicativo autenticador"
 msgstr "Codice a 6 cifre dell'app di autenticazione"
 
-#: src/features/totp-challenge/TotpChallenge.tsx:53
+#: src/widgets/auth-screen/AuthScreen.tsx:207
+msgid "Código de acesso recebido do profissional"
+msgstr "Codice di accesso ricevuto dal professionista"
+
+#: src/features/device-pairing-primary/PairingQr.tsx:161
+#: src/pages/device-pairing/PairNewPage.tsx:41
+msgid "Código de pareamento"
+msgstr "Codice di associazione"
+
+#: src/features/totp-challenge/TotpChallenge.tsx:55
 msgid "Código de verificação"
 msgstr "Codice di verifica"
 
@@ -149,88 +497,140 @@ msgstr "Codice di verifica"
 msgid "Código de vínculo"
 msgstr "Codice di collegamento"
 
-#. placeholder {0}: convite.codigo
-#. placeholder {1}: convite.validade
-#: src/features/vinculo/GerarConviteVinculo.tsx:48
-#~ msgid "Código de vínculo: {0}. Válido até {1}."
-#~ msgstr "Codice di collegamento: {0}. Valido fino al {1}."
-
 #: src/features/vinculo/GerarConviteVinculo.tsx:49
 msgid "Código de vínculo: {codigo}. Válido até {validade}."
 msgstr "Codice di collegamento: {codigo}. Valido fino a {validade}."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:188
+#: src/shared/api/problem-messages.ts:192
 msgid "link.invite_not_found"
 msgstr "Codice non valido o scaduto."
 
-#: src/features/vinculo/ResgatarConviteVinculo.tsx:54
-#~ msgid "Código inválido ou expirado."
-#~ msgstr "Codice non valido o scaduto."
-
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:47
+#: src/shared/api/problem-messages.ts:51
 msgid "auth.totp_invalid_code"
 msgstr "Codice non valido. Controlla l'app di autenticazione o usa un codice di backup."
 
-#: src/features/totp-challenge/TotpChallenge.tsx:60
+#: src/features/totp-challenge/TotpChallenge.tsx:62
 msgid "Código ou código de backup"
 msgstr "Codice o codice di backup"
 
-#: src/features/qr-scan/PairingScan.tsx:63
+#: src/features/qr-scan/PairingScan.tsx:72
 msgid "Código QR inválido. Tente escanear novamente."
 msgstr "Codice QR non valido. Prova a scansionare di nuovo."
 
-#: src/features/device-pairing-primary/PairingQr.tsx:156
+#: src/features/totp-enrollment/TotpSetup.tsx:149
+msgid "Código QR para adicionar esta conta ao aplicativo autenticador"
+msgstr "Codice QR per aggiungere questo account all'app di autenticazione"
+
+#: src/features/device-pairing-primary/PairingQr.tsx:155
 msgid "Código QR para parear novo dispositivo"
 msgstr "Codice QR per abbinare un nuovo dispositivo"
 
-#: src/features/totp-enrollment/TotpSetup.tsx:132
+#: src/features/totp-enrollment/TotpSetup.tsx:153
 msgid "Código secreto"
 msgstr "Codice segreto"
 
-#: src/widgets/auth-screen/AuthScreen.tsx:153
+#: src/widgets/auth-screen/AuthScreen.tsx:172
 msgid "Como você vai usar o Limmiar?"
 msgstr "Come userai Limmiar?"
 
-#: src/features/partilha/PartilhaCheckIns.tsx:53
+#: src/features/device-pairing-primary/PairPrimaryDevice.tsx:93
+msgid "Compare este código com o exibido no outro dispositivo. Continue somente se forem iguais."
+msgstr "Confronta questo codice con quello sull’altro dispositivo. Continua solo se coincidono."
+
+#: src/features/device-pairing-new/PairNewDevice.tsx:115
+msgid "Compare o código nos dois dispositivos antes de liberar o acesso."
+msgstr "Confronta il codice sui due dispositivi prima di consentire l’accesso."
+
+#: src/features/partilha/PartilhaCheckIns.tsx:58
 msgid "Compartilhamento de check-ins desativado. O que muda: os check-ins que você registrar a partir de agora não são compartilhados. O que não muda: os check-ins já compartilhados continuam com a profissional, que pode já tê-los lido, e a Limmiar não consegue apagá-los. O vínculo continua ativo."
 msgstr "Condivisione dei check-in disattivata. Cosa cambia: i check-in che registrerai da ora in poi non vengono condivisi. Cosa non cambia: i check-in già condivisi restano con la professionista, che potrebbe averli già letti, e Limmiar non può eliminarli. Il collegamento resta attivo."
 
-#: src/features/partilha/PartilhaCheckIns.tsx:123
+#: src/features/partilha/PartilhaCheckIns.tsx:128
 msgid "Compartilhar check-ins com esta profissional"
 msgstr "Condividi i check-in con questa professionista"
 
-#: src/features/qr-scan/PairingScan.tsx:113
+#: src/features/qr-scan/PairingScan.tsx:130
 msgid "Concluindo o pareamento..."
 msgstr "Completamento dell'abbinamento..."
 
-#: src/pages/home/HomePage.tsx:28
-msgid "Configurar copiloto de IA"
-msgstr "Configura copilota IA"
+#: src/features/online-call/OnlineCall.tsx:97
+msgid "Conectando a sessão online..."
+msgstr "Connessione alla sessione online..."
 
-#: src/features/totp-enrollment/TotpSetup.tsx:125
+#: src/features/online-call/OnlineCall.tsx:98
+msgid "Conexão interrompida. Tente reconectar."
+msgstr "Connessione interrotta. Prova a riconnetterti."
+
+#: src/features/live-session/SessionReview.tsx:534
+msgid "Conferi o texto e quem falou cada trecho ouvindo o áudio."
+msgstr "Ho verificato il testo e chi ha pronunciato ogni passaggio ascoltando l'audio."
+
+#: src/features/live-session/SessionReview.tsx:534
+msgid "Conferi o texto e quem falou cada trecho."
+msgstr "Ho verificato il testo e chi ha pronunciato ogni passaggio."
+
+#: src/features/totp-enrollment/TotpSetup.tsx:143
 msgid "Configure a verificação em duas etapas"
 msgstr "Configura la verifica in due passaggi"
 
-#: src/features/magic-link-auth/MagicLinkCallback.tsx:153
+#: src/features/magic-link-auth/MagicLinkCallback.tsx:189
 msgid "Confirmando seu acesso..."
 msgstr "Conferma del tuo accesso in corso..."
 
-#: src/features/totp-enrollment/TotpSetup.tsx:178
+#: src/features/totp-enrollment/TotpSetup.tsx:199
 msgid "Confirmar"
 msgstr "Conferma"
 
-#: src/widgets/auth-screen/AuthScreen.tsx:146
-msgid "Conta criada. Você está cadastrado como paciente."
-msgstr "Account creato. Sei registrato come paziente."
+#: src/pages/acervo/AcervoPage.tsx:207
+msgid "Confirmar exclusão"
+msgstr "Conferma eliminazione"
 
-#: src/widgets/auth-screen/AuthScreen.tsx:144
+#: src/features/magic-link-auth/MagicLinkCallback.tsx:160
+msgid "Confirmar meu acesso"
+msgstr "Conferma il mio accesso"
+
+#: src/features/nota-editor/NotaDoAtendimento.tsx:131
+msgid "Confirmar referência na avaliação"
+msgstr "Conferma riferimento nella valutazione"
+
+#: src/features/magic-link-auth/MagicLinkCallback.tsx:154
+msgid "Confirme com sua chave de acesso. Seu nome e contato não serão solicitados."
+msgstr "Conferma con la tua passkey. Non ti verranno richiesti nome o recapiti."
+
+#: src/features/device-pairing-primary/PairPrimaryDevice.tsx:92
+msgid "Confirme o novo dispositivo"
+msgstr "Conferma il nuovo dispositivo"
+
+#: src/features/recovery/RecoveryPhraseSetup.tsx:77
+msgid "Confirme sua senha para criar uma frase que também recupera seus prontuários. Guarde a frase e seus códigos de backup do segundo fator."
+msgstr "Conferma la password per creare una frase che ripristini anche le cartelle dei pazienti. Conserva la frase e i codici di backup del secondo fattore."
+
+#: src/pages/atendimento/AtendimentoPage.tsx:135
+msgid "Consentimento e tipo de sessão"
+msgstr "Consenso e tipo di sessione"
+
+#: src/widgets/patient-care/ConsentimentoPaciente.tsx:36
+msgid "Consentimento informado do paciente"
+msgstr "Consenso informato del paziente"
+
+#: src/pages/home/HomePage.tsx:89
+#: src/widgets/app-shell/AppShell.tsx:57
+msgid "Consultório"
+msgstr "Studio"
+
+#: src/widgets/app-shell/AppShell.tsx:64
+#: src/widgets/app-shell/AppShell.tsx:68
+msgid "Conta"
+msgstr "Account"
+
+#: src/widgets/auth-screen/AuthScreen.tsx:166
 msgid "Conta criada. Você está cadastrado como profissional."
 msgstr "Account creato. Sei registrato come professionista."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:69
+#: src/shared/api/problem-messages.ts:73
 msgid "auth.account_not_found"
 msgstr "Account non trovato."
 
@@ -238,11 +638,43 @@ msgstr "Account non trovato."
 msgid "Contacto de emergência"
 msgstr "Contatto di emergenza"
 
-#: src/widgets/auth-screen/AuthScreen.tsx:233
+#: src/features/live-session/LiveInsights.tsx:161
+msgid "Contexto e referências"
+msgstr "Contesto e riferimenti"
+
+#: src/widgets/auth-screen/AuthScreen.tsx:250
+msgid "Continuar com meu código"
+msgstr "Continua con il mio codice"
+
+#: src/widgets/auth-screen/AuthScreen.tsx:259
 msgid "Continuar com o Google"
 msgstr "Continua con Google"
 
-#: src/widgets/auth-screen/AuthScreen.tsx:225
+#: src/widgets/online-session/OnlineSession.tsx:68
+msgid "Convite da sessão online"
+msgstr "Invito alla sessione online"
+
+#: src/pages/online-session/OnlineSessionPage.tsx:10
+msgid "Convite inválido. Solicite um novo link ao profissional."
+msgstr "Invito non valido. Chiedi un nuovo link al professionista."
+
+#: src/widgets/online-session/OnlineSession.tsx:86
+msgid "Convite online encerrado."
+msgstr "Invito online chiuso."
+
+#: src/features/live-session/LiveInsights.tsx:160
+msgid "Copiloto"
+msgstr "Copilota"
+
+#: src/features/live-session/LiveInsights.tsx:165
+msgid "Copiloto não liberado. A transcrição segue normalmente, sem análise das falas."
+msgstr "Copilota non abilitato. La trascrizione prosegue normalmente, senza analisi delle frasi."
+
+#: src/features/live-session/SessionReview.tsx:511
+msgid "Corrigir texto e voz por palavra"
+msgstr "Correggi testo e voce per ogni parola"
+
+#: src/widgets/auth-screen/AuthScreen.tsx:249
 msgid "Criar conta"
 msgstr "Crea account"
 
@@ -250,100 +682,235 @@ msgstr "Crea account"
 msgid "CVV 188 · apoio emocional 24 h"
 msgstr "CVV 188 · supporto emotivo 24 h"
 
-#: src/features/vinculo/DesvincularVinculo.tsx:95
+#: src/pages/acervo/AcervoPage.tsx:116
+msgid "Dados do documento carregados. Confira e ajuste antes de guardar."
+msgstr "Dati del documento caricati. Controllali e modificali prima di salvare."
+
+#: src/features/patient-schedule/PatientSchedule.tsx:109
+msgid "Data e horário"
+msgstr "Data e orario"
+
+#: src/pages/device-pairing/PairNewPage.tsx:34
+msgid "Desbloquear este dispositivo"
+msgstr "Sblocca questo dispositivo"
+
+#: src/pages/auth/AuthPage.tsx:28
+msgid "Desbloquear pelo outro dispositivo"
+msgstr "Sblocca con un altro dispositivo"
+
+#: src/features/live-session/SessionReview.tsx:539
+msgid "Descartar alterações"
+msgstr "Scarta modifiche"
+
+#: src/features/nota-editor/NotaDoAtendimento.tsx:132
+msgid "Descartar referência"
+msgstr "Scarta riferimento"
+
+#: src/features/audit-trail/AuditTrail.tsx:65
+msgid "Desde"
+msgstr "Da"
+
+#: src/features/online-call/OnlineCall.tsx:111
+msgid "Desligar meu microfone"
+msgstr "Disattiva il mio microfono"
+
+#: src/features/vinculo/DesvincularVinculo.tsx:96
 msgid "Desvincular"
 msgstr "Scollega"
 
-#. placeholder {0}: vinculo.patientId
-#: src/features/vinculo/DesvincularVinculo.tsx:91
-#~ msgid "Desvincular vínculo com {0}"
-#~ msgstr "Scollega da {0}"
-
-#: src/features/vinculo/DesvincularVinculo.tsx:92
+#: src/features/vinculo/DesvincularVinculo.tsx:93
 msgid "Desvincular vínculo com {patientId}"
 msgstr "Scollega da {patientId}"
 
-#: src/features/totp-challenge/TotpChallenge.tsx:47
+#: src/features/totp-challenge/TotpChallenge.tsx:49
 msgid "Digite o código de 6 dígitos do seu aplicativo autenticador ou um dos seus códigos de backup."
 msgstr "Inserisci il codice a 6 cifre della tua app di autenticazione o uno dei tuoi codici di backup."
 
-#: src/features/recovery/RecoveryScreen.tsx:114
+#: src/features/recovery/RecoveryScreen.tsx:132
 msgid "Digite seu e-mail e sua frase de recuperação para recuperar o acesso à sua conta."
 msgstr "Inserisci la tua e-mail e la tua frase di recupero per recuperare l'accesso al tuo account."
 
-#: src/features/device-pairing-new/PairNewDevice.tsx:99
-#: src/features/device-pairing-primary/PairingQr.tsx:140
-#: src/features/device-pairing-primary/PairPrimaryDevice.tsx:76
-#: src/features/qr-scan/PairingScan.tsx:103
+#: src/features/device-pairing-new/PairNewDevice.tsx:128
+#: src/features/device-pairing-primary/PairingQr.tsx:139
+#: src/features/device-pairing-primary/PairPrimaryDevice.tsx:117
+#: src/features/qr-scan/PairingScan.tsx:119
 msgid "Dispositivo pareado com sucesso."
 msgstr "Dispositivo abbinato con successo."
 
-#: src/features/recovery/RecoveryScreen.tsx:120
-#: src/widgets/auth-screen/AuthScreen.tsx:189
+#: src/pages/home/HomePage.tsx:95
+msgid "Documento recebido. Sua conta aguarda a aprovação da equipe."
+msgstr "Documento ricevuto. Il tuo account è in attesa di approvazione da parte del team."
+
+#: src/features/patient-schedule/PatientSchedule.tsx:110
+msgid "Duração em minutos"
+msgstr "Durata in minuti"
+
+#: src/features/voice-enrollment/VoiceSettings.tsx:88
+msgid "Durante a sessão, escuto com atenção e faço perguntas para compreender melhor."
+msgstr "Durante la seduta, ascolto con attenzione e faccio domande per comprendere meglio."
+
+#: src/features/recovery/RecoveryScreen.tsx:138
+#: src/widgets/auth-screen/AuthScreen.tsx:211
 msgid "E-mail"
 msgstr "E-mail"
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:65
+#: src/shared/api/problem-messages.ts:69
 msgid "auth.invalid_recovery_phrase"
 msgstr "E-mail o frase di recupero non validi."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:25
+#: src/shared/api/problem-messages.ts:29
 msgid "auth.invalid_credentials"
 msgstr "E-mail o password non validi."
 
-#: src/features/device-pairing-primary/PairPrimaryDevice.tsx:66
+#: src/widgets/patient-care/PatientList.tsx:75
+msgid "Elevado"
+msgstr "Elevato"
+
+#: src/widgets/online-session/OnlineSession.tsx:84
+msgid "Encerrar e revogar convite online"
+msgstr "Termina e revoca l’invito online"
+
+#: src/features/live-session/SessionReview.tsx:443
+msgid "Encerrar gravação"
+msgstr "Interrompi registrazione"
+
+#: src/pages/atendimento/AtendimentoPage.tsx:124
+msgid "Encerrar sessão"
+msgstr "Termina seduta"
+
+#: src/features/online-call/OnlineCall.tsx:112
+msgid "Encerrar sessão online"
+msgstr "Termina la sessione online"
+
+#: src/features/audit-trail/AuditTrail.tsx:29
+msgid "Entrada na conta"
+msgstr "Accesso all'account"
+
+#: src/widgets/auth-screen/AuthScreen.tsx:156
+msgid "Entrar"
+msgstr "Accedi"
+
+#: src/features/online-call/OnlineCall.tsx:105
+msgid "Entrar na sessão online"
+msgstr "Entra nella sessione online"
+
+#: src/widgets/patient-care/PatientAccess.tsx:53
+msgid "Entregue este link diretamente ao paciente. Ele confirma o acesso com sua passkey."
+msgstr "Consegna questo link direttamente al paziente. Confermerà l’accesso con la sua passkey."
+
+#: src/widgets/online-session/OnlineSession.tsx:73
+msgid "Entregue este link diretamente ao paciente. Nome e contato não são solicitados."
+msgstr "Consegna questo link direttamente al paziente. Non vengono richiesti nome o recapiti."
+
+#: src/features/device-pairing-primary/PairPrimaryDevice.tsx:107
 msgid "Enviando a chave para o novo dispositivo..."
 msgstr "Invio della chiave al nuovo dispositivo in corso..."
 
-#: src/widgets/auth-screen/AuthScreen.tsx:225
-msgid "Enviar link mágico"
-msgstr "Invia link magico"
+#: src/pages/acervo/AcervoPage.tsx:128
+msgid "Enviando o material cifrado..."
+msgstr "Invio del materiale cifrato..."
 
-#: src/features/device-pairing-primary/PairingQr.tsx:152
+#: src/features/live-session/LiveInsights.tsx:168
+msgid "Enviar"
+msgstr "Invia"
+
+#: src/features/consentimento-votos/ConsentimentoVotos.tsx:12
+msgid "Enviar meus votos de útil / não útil, sem identificação, para melhorar as sugestões"
+msgstr "Invia i miei voti utile / non utile, senza identificazione, per migliorare i suggerimenti"
+
+#: src/pages/home/HomePage.tsx:99
+msgid "Enviar para revisão"
+msgstr "Invia per la revisione"
+
+#: src/features/live-session/LiveInsights.tsx:166
+msgid "Enviar seus votos"
+msgstr "Invia i tuoi voti"
+
+#: src/features/live-session/LiveInsights.tsx:167
+msgid "Enviar seus votos, sem identificação, para melhorar as sugestões?"
+msgstr "Inviare i tuoi voti, senza identificazione, per migliorare i suggerimenti?"
+
+#: src/pages/home/HomePage.tsx:97
+msgid "Envie a referência do documento profissional para revisão."
+msgstr "Invia il riferimento del documento professionale per la revisione."
+
+#: src/pages/device-pairing/PairNewPage.tsx:39
+msgid "Escanear código QR"
+msgstr "Scansiona codice QR"
+
+#: src/features/device-pairing-primary/PairingQr.tsx:151
 msgid "Escaneie este código QR com o dispositivo que você quer parear."
 msgstr "Scansiona questo codice QR con il dispositivo che vuoi abbinare."
 
+#: src/features/live-session/LiveInsights.tsx:210
+msgid "Esclareça o contexto desta fala com o paciente."
+msgstr "Chiarisci il contesto di questa frase con il paziente."
+
+#: src/features/live-session/SessionReview.tsx:469
+msgid "Escolha as referências que o copiloto poderá consultar neste atendimento."
+msgstr "Scegli i riferimenti che il copilota potrà consultare durante questa seduta."
+
+#: src/pages/acervo/AcervoPage.tsx:178
+msgid "Escolha o arquivo primeiro. Título, autores e edição são lidos do documento e liberados para edição em seguida."
+msgstr "Scegli prima il file. Titolo, autori ed edizione vengono letti dal documento e poi resi modificabili."
+
+#: src/features/live-session/SessionReview.tsx:453
+msgid "Escolha um arquivo de áudio válido."
+msgstr "Scegli un file audio valido."
+
+#: src/pages/acervo/AcervoPage.tsx:112
+msgid "Escolha um PDF válido ou texto UTF-8, com até 20 MB."
+msgstr "Scegli un PDF valido o un testo UTF-8, fino a 20 MB."
+
+#: src/features/live-session/SessionReview.tsx:512
+msgid "Escute o áudio para corrigir palavras e trechos atribuídos à voz errada."
+msgstr "Ascolta l'audio per correggere parole e passaggi attribuiti alla voce sbagliata."
+
+#: src/pages/auth/AuthPage.tsx:27
+msgid "Esqueci minha senha"
+msgstr "Ho dimenticato la password"
+
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:73
+#: src/shared/api/problem-messages.ts:77
 msgid "auth.not_a_professional_account"
 msgstr "Questa azione è disponibile solo per gli account professionali."
 
+#: src/features/magic-link-auth/MagicLinkCallback.tsx:112
+msgid "Esta chave de acesso não permite desbloquear seus dados cifrados. Escolha outra chave de acesso."
+msgstr "Questa passkey non consente di sbloccare i tuoi dati cifrati. Scegli un’altra passkey."
+
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:184
+#: src/shared/api/problem-messages.ts:188
 msgid "key_pair.public_key_conflict"
 msgstr "Questo account ha già pubblicato una chiave pubblica diversa."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:81
+#: src/shared/api/problem-messages.ts:85
 msgid "auth.not_in_review"
 msgstr "Questo account non è in attesa di revisione."
 
-#: src/features/recovery/RecoveryPhraseSetup.tsx:83
-msgid "Esta frase não será exibida novamente. Guarde-a em um local seguro: ela é a única forma de recuperar o acesso à sua conta caso você perca todos os seus dispositivos."
-msgstr "Questa frase non verrà mostrata di nuovo. Conservala in un luogo sicuro: è l'unico modo per recuperare l'accesso al tuo account se perdi tutti i tuoi dispositivi."
+#: src/features/live-session/LiveInsights.tsx:154
+msgid "Esta fala ficou sem análise."
+msgstr "Questa frase è rimasta senza analisi."
+
+#: src/features/live-session/LiveInsights.tsx:187
+msgid "Esta fonte foi útil?"
+msgstr "Questa fonte è stata utile?"
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:168
+#: src/shared/api/problem-messages.ts:172
 msgid "notes.signature_not_found"
 msgstr "Questa nota non è ancora stata firmata."
 
-#: src/pages/notas/NotaPage.tsx:91
-msgid "Esta nota já está assinada."
-msgstr "Questa nota è già stata firmata."
-
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:164
+#: src/shared/api/problem-messages.ts:168
 msgid "notes.already_signed"
 msgstr "Questa nota è già stata firmata."
 
-#: src/pages/notas/NotaPage.tsx:132
-msgid "Esta nota já tinha sido assinada. As alterações feitas depois não estão cobertas por essa assinatura."
-msgstr "Questa nota era già stata firmata. Le modifiche fatte dopo non sono coperte da questa firma."
-
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:152
+#: src/shared/api/problem-messages.ts:156
 msgid "agenda.session_cancelled"
 msgstr "Questa sessione è stata annullata."
 
@@ -352,149 +919,405 @@ msgid "Estado da nota"
 msgstr "Stato della nota"
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:112
+#: src/shared/api/problem-messages.ts:116
 msgid "auth.device_pairing_session_not_found"
 msgstr "Questo codice di associazione non è più valido. Generane uno nuovo."
 
-#: src/features/device-pairing-primary/PairingQr.tsx:130
+#: src/features/device-pairing-primary/PairingQr.tsx:129
 msgid "Este código expirou. Volte para gerar um novo."
 msgstr "Questo codice è scaduto. Torna indietro per generarne uno nuovo."
 
+#: src/features/voice-enrollment/VoiceSettings.tsx:89
+msgid "Este é meu cadastro de voz. As falas do paciente devem permanecer separadas das minhas."
+msgstr "Questa è la registrazione della mia voce. Le parole del paziente devono restare separate dalle mie."
+
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:19
+#: src/shared/api/problem-messages.ts:23
 msgid "auth.email_already_registered"
 msgstr "Questa e-mail è già registrata."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:55
+#: src/shared/api/problem-messages.ts:59
 msgid "auth.magic_link_invalid"
 msgstr "Questo link di accesso non è più valido. Richiedine uno nuovo."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:136
+#: src/shared/api/problem-messages.ts:221
+msgid "materials.already_exists"
+msgstr "Questo materiale è già stato salvato. Aggiorna la tua raccolta."
+
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:220
+msgid "materials.not_found"
+msgstr "Questo materiale non è disponibile nella tua raccolta."
+
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:140
 msgid "patients.entry_sequence_conflict"
 msgstr "Questa cartella è cambiata su un altro dispositivo. Ricarica e riprova."
 
-#: src/features/totp-enrollment/TotpSetup.tsx:101
+#: src/features/totp-enrollment/TotpSetup.tsx:119
 msgid "Estes códigos não serão exibidos novamente. Guarde-os em um local seguro: eles são a única forma de recuperar o acesso à sua conta caso você perca o aplicativo autenticador."
 msgstr "Questi codici non verranno mostrati di nuovo. Conservali in un luogo sicuro: sono l'unico modo per recuperare l'accesso al tuo account se perdi l'app di autenticazione."
 
-#: src/pages/notas/NotaPage.tsx:139
-msgid "Falha ao assinar a nota. Tente novamente."
-msgstr "Impossibile firmare la nota. Riprova."
+#: src/pages/acervo/AcervoPage.tsx:208
+msgid "Excluir material"
+msgstr "Elimina materiale"
+
+#: src/pages/acervo/AcervoPage.tsx:207
+msgid "Excluir permanentemente este material?"
+msgstr "Eliminare definitivamente questo materiale?"
+
+#: src/features/audit-trail/AuditTrail.tsx:67
+msgid "Exportar CSV"
+msgstr "Esporta CSV"
+
+#: src/features/nota-editor/EditorSoap.tsx:71
+msgid "Fala do paciente na revisão {revisao}"
+msgstr "Frase del paziente nella revisione {revisao}"
 
 #: src/features/nota-fila/FilaAssinatura.tsx:86
 #: src/widgets/soap-editor/FilaEEditor.tsx:31
 msgid "Fila de assinatura"
 msgstr "Coda di firma"
 
-#: src/features/copilot-byok/CopilotKeySetup.tsx:68
-msgid "Fornecedor"
-msgstr "Fornitore"
+#: src/features/live-session/LiveInsights.tsx:208
+msgid "Fontes pertinentes"
+msgstr "Fonti pertinenti"
 
-#: src/features/recovery/RecoveryScreen.tsx:132
+#: src/features/recovery/RecoveryScreen.tsx:151
+#: src/pages/recovery/RecoveryPhraseSetupPage.tsx:16
+#: src/widgets/app-shell/AppShell.tsx:73
 msgid "Frase de recuperação"
 msgstr "Frase di recupero"
 
-#: src/features/recovery/RecoveryScreen.tsx:56
+#: src/features/recovery/RecoveryScreen.tsx:67
 msgid "Frase de recuperação inválida. Verifique se você digitou todas as palavras corretamente."
 msgstr "Frase di recupero non valida. Controlla di aver digitato tutte le parole correttamente."
 
-#: src/features/recovery/RecoveryPhraseSetup.tsx:59
+#: src/pages/recovery/RecoveryPhraseSetupPage.tsx:17
+msgid "Frase de recuperação salva."
+msgstr "Frase di recupero salvata."
+
+#: src/features/recovery/RecoveryPhraseSetup.tsx:90
 msgid "Gerando sua frase de recuperação..."
 msgstr "Generazione della tua frase di recupero in corso..."
+
+#: src/pages/device-pairing/PairPrimaryPage.tsx:27
+msgid "Gerar código de pareamento"
+msgstr "Genera codice di associazione"
 
 #: src/features/vinculo/GerarConviteVinculo.tsx:67
 msgid "Gerar código de vínculo"
 msgstr "Genera codice di collegamento"
 
-#: src/widgets/auth-screen/AuthScreen.tsx:179
+#: src/widgets/online-session/OnlineSession.tsx:69
+msgid "Gerar convite de sessão online"
+msgstr "Crea un invito alla sessione online"
+
+#: src/features/recovery/RecoveryPhraseSetup.tsx:81
+msgid "Gerar frase de recuperação"
+msgstr "Genera frase di recupero"
+
+#: src/widgets/patient-care/PatientAccess.tsx:48
+msgid "Gerar link privado de acesso"
+msgstr "Genera un link di accesso privato"
+
+#: src/widgets/auth-screen/AuthScreen.tsx:198
 msgid "Gerencie pacientes, prontuários e agenda em um só lugar."
 msgstr "Gestisci pazienti, cartelle cliniche e agenda in un unico posto."
 
-#: src/pages/paciente-hoje/PacienteHojePage.tsx:133
+#: src/features/live-session/SessionReview.tsx:436
+#: src/features/live-session/SessionReview.tsx:437
+msgid "Gravação e transcrição"
+msgstr "Registrazione e trascrizione"
+
+#: src/features/nota-editor/Citacao.tsx:33
+msgid "Gravação original indisponível"
+msgstr "Registrazione originale non disponibile"
+
+#: src/pages/paciente-hoje/PacienteHojePage.tsx:136
 msgid "Guardado"
 msgstr "Salvato"
 
-#: src/pages/paciente-hoje/PacienteHojePage.tsx:131
+#: src/pages/acervo/AcervoPage.tsx:202
+msgid "Guardado · uso não autorizado"
+msgstr "Salvato · uso non autorizzato"
+
+#: src/pages/paciente-hoje/PacienteHojePage.tsx:134
 msgid "Guardar"
 msgstr "Salva"
 
-#: src/features/totp-enrollment/TotpSetup.tsx:98
+#: src/pages/acervo/AcervoPage.tsx:184
+msgid "Guardar no acervo"
+msgstr "Salva nella raccolta"
+
+#: src/features/recovery/RecoveryPhraseSetup.tsx:104
+msgid "Guarde esta frase em um local seguro. Você também precisará do segundo fator ou de um código de backup para recuperar o acesso."
+msgstr "Conserva questa frase in un luogo sicuro. Per ripristinare l'accesso servirà anche il secondo fattore o un codice di backup."
+
+#: src/features/totp-enrollment/TotpSetup.tsx:116
 msgid "Guarde seus códigos de backup"
 msgstr "Salva i tuoi codici di backup"
 
-#: src/features/recovery/RecoveryPhraseSetup.tsx:80
+#: src/features/recovery/RecoveryPhraseSetup.tsx:101
 msgid "Guarde sua frase de recuperação"
 msgstr "Salva la tua frase di recupero"
 
-#: src/features/totp-enrollment/TotpSetup.tsx:114
+#: src/features/totp-enrollment/TotpSetup.tsx:132
 msgid "Guardei meus códigos"
 msgstr "Ho salvato i miei codici"
 
-#: src/features/recovery/RecoveryPhraseSetup.tsx:97
+#: src/features/recovery/RecoveryPhraseSetup.tsx:118
 msgid "Guardei minha frase"
 msgstr "Ho salvato la mia frase"
 
-#: src/pages/paciente-hoje/PacienteHojePage.tsx:117
+#: src/features/live-session/SessionReview.tsx:466
+msgid "Há materiais autorizados que não estão prontos nesta máquina. Verifique seu acervo pessoal."
+msgstr "Alcuni materiali autorizzati non sono pronti su questo computer. Controlla la tua raccolta personale."
+
+#: src/pages/atendimento/AtendimentoPage.tsx:104
+msgid "Há uma gravação ou alterações sem salvar. Sair agora as descarta. Deseja sair?"
+msgstr "C'è una registrazione o ci sono modifiche non salvate. Uscire ora le scarta. Vuoi uscire?"
+
+#: src/features/prontuario/HojeDoPaciente.tsx:70
+#: src/features/prontuario/HojeDoPaciente.tsx:71
+#: src/widgets/painel-profissional/PainelProfissional.tsx:228
+#: src/widgets/painel-profissional/PainelProfissional.tsx:228
+msgid "Hoje"
+msgstr "Oggi"
+
+#: src/pages/paciente-hoje/PacienteHojePage.tsx:80
+#: src/pages/paciente-hoje/PacienteHojePage.tsx:120
 msgid "Hoje: como você está agora?"
 msgstr "Oggi: come ti senti adesso?"
 
-#: src/widgets/painel-profissional/PainelProfissional.tsx:180
+#: src/pages/settings/VoicePage.tsx:6
+#: src/widgets/app-shell/AppShell.tsx:71
+msgid "Identificação da sua voz"
+msgstr "Identificazione della tua voce"
+
+#: src/features/live-session/SessionReview.tsx:479
+msgid "Identificar vozes"
+msgstr "Identifica le voci"
+
+#: src/features/language-switcher/LanguageSwitcher.tsx:20
+#: src/features/language-switcher/LanguageSwitcher.tsx:21
+msgid "Idioma"
+msgstr "Lingua"
+
+#: src/widgets/painel-profissional/PainelProfissional.tsx:207
 msgid "Indicadores"
 msgstr "Indicatori"
 
-#: src/widgets/painel-profissional/PainelProfissional.tsx:164
+#: src/features/live-session/SessionReview.tsx:443
+msgid "Iniciar gravação"
+msgstr "Avvia registrazione"
+
+#: src/widgets/painel-profissional/PainelProfissional.tsx:190
 msgid "Iniciar próxima sessão"
 msgstr "Avvia prossima sessione"
 
-#: src/widgets/painel-profissional/PainelProfissional.tsx:168
+#: src/widgets/painel-profissional/PainelProfissional.tsx:194
 msgid "Iniciar próxima sessão às {hora}"
 msgstr "Avvia prossima sessione alle {hora}"
 
-#: src/widgets/painel-profissional/PainelProfissional.tsx:168
+#: src/widgets/painel-profissional/PainelProfissional.tsx:194
 msgid "Iniciar próxima: {nome} {hora}"
 msgstr "Avvia prossima: {nome} {hora}"
 
+#: src/features/prontuario/HojeDoPaciente.tsx:85
+msgid "Iniciar sessão"
+msgstr "Avvia sessione"
+
+#: src/features/prontuario/HojeDoPaciente.tsx:88
+msgid "Iniciar sessão agora"
+msgstr "Avvia la sessione ora"
+
+#: src/pages/atendimento/AtendimentoPage.tsx:130
+msgid "Insights"
+msgstr "Insight"
+
+#: src/features/live-session/LiveInsights.tsx:162
+msgid "Insights durante a sessão"
+msgstr "Insight durante la sessione"
+
+#: src/features/audit-trail/AuditTrail.tsx:71
+msgid "Instante"
+msgstr "Istante"
+
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:144
+#: src/shared/api/problem-messages.ts:148
 msgid "agenda.slot_taken"
 msgstr "Esiste già una sessione in questo orario."
 
-#: src/features/copilot-byok/CopilotKeySetup.tsx:105
-msgid "Lembrar neste dispositivo"
-msgstr "Ricorda su questo dispositivo"
+#: src/features/magic-link-auth/MagicLinkCallback.tsx:156
+msgid "Já tem um ID no Limmiar? Informe para usar a mesma conta."
+msgstr "Hai già un ID Limmiar? Inseriscilo per usare lo stesso account."
 
-#: src/features/totp-enrollment/TotpSetup.tsx:144
+#: src/features/voice-enrollment/VoiceSettings.tsx:85
+msgid "Leia as três linhas durante 15 segundos, em um lugar silencioso, sem outra pessoa falando."
+msgstr "Leggi le tre righe per 15 secondi in un luogo silenzioso, senza altre persone che parlano."
+
+#: src/pages/acervo/AcervoPage.tsx:108
+msgid "Lendo os dados do documento..."
+msgstr "Lettura dei dati del documento..."
+
+#: src/pages/acervo/AcervoPage.tsx:219
+msgid "Lendo páginas: {completed} de {total}"
+msgstr "Lettura delle pagine: {completed} di {total}"
+
+#: src/features/online-call/OnlineCall.tsx:111
+msgid "Ligar meu microfone"
+msgstr "Attiva il mio microfono"
+
+#: src/widgets/patient-care/PatientAccess.tsx:52
+msgid "Link de acesso do paciente"
+msgstr "Link di accesso del paziente"
+
+#: src/features/totp-enrollment/TotpSetup.tsx:165
 msgid "Link de provisionamento"
 msgstr "Link di provisioning"
 
-#: src/features/magic-link-auth/MagicLinkCallback.tsx:144
+#: src/widgets/online-session/OnlineSession.tsx:72
+msgid "Link privado da sessão online"
+msgstr "Link privato della sessione online"
+
+#: src/widgets/patient-care/PatientAccess.tsx:43
+msgid "Links de acesso pendentes revogados."
+msgstr "Link di accesso in sospeso revocati."
+
+#: src/features/magic-link-auth/MagicLinkCallback.tsx:178
 msgid "Login realizado com sucesso."
 msgstr "Accesso eseguito con successo."
 
+#: src/pages/acervo/AcervoPage.tsx:189
+#: src/pages/acervo/AcervoPage.tsx:190
+msgid "Materiais do acervo"
+msgstr "Materiali della raccolta"
+
+#: src/pages/acervo/AcervoPage.tsx:144
+msgid "Material disponível para selecionar nas suas sessões."
+msgstr "Materiale disponibile per la selezione nelle tue sedute."
+
+#: src/pages/acervo/AcervoPage.tsx:168
+#: src/shared/i18n/texto.test.ts:17
+msgid "Material excluído do seu acervo."
+msgstr "Materiale eliminato dalla tua raccolta."
+
+#: src/pages/acervo/AcervoPage.tsx:133
+msgid "Material guardado. Estamos preparando suas referências em segundo plano."
+msgstr "Materiale salvato. Stiamo preparando i tuoi riferimenti in background."
+
+#: src/pages/acervo/AcervoPage.tsx:195
+msgid "MB"
+msgstr "MB"
+
+#: src/widgets/app-shell/AppShell.tsx:53
+msgid "Menu"
+msgstr "Menu"
+
+#: src/features/live-session/SessionReview.tsx:477
+msgid "Microfone pausado."
+msgstr "Microfono in pausa."
+
+#: src/features/voice-enrollment/VoiceSettings.tsx:87
+msgid "Minha voz ajuda a organizar a conversa, respeitando o tempo de cada pessoa."
+msgstr "La mia voce aiuta a organizzare la conversazione, rispettando il tempo di ciascuna persona."
+
+#: src/widgets/patient-care/PatientList.tsx:75
+msgid "Moderado"
+msgstr "Moderato"
+
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:77
+#: src/shared/api/problem-messages.ts:222
+msgid "rate_limit.too_many_requests"
+msgstr "Troppi tentativi in poco tempo. Attendi un minuto e riprova."
+
+#: src/features/live-session/SessionReview.tsx:438
+msgid "Na sessão online, as trilhas identificam profissional e paciente. Confira o texto antes de salvar."
+msgstr "Nella sessione online, le tracce identificano professionista e paziente. Controlla il testo prima di salvare."
+
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:81
 msgid "auth.invalid_verification_state"
 msgstr "Non è possibile inviare la documentazione con l'account nello stato attuale."
 
-#: src/features/qr-scan/PairingScan.tsx:53
+#: src/pages/atendimento/AtendimentoPage.tsx:36
+msgid "Não encontramos esta sessão na pasta do paciente."
+msgstr "Non abbiamo trovato questa sessione nella cartella del paziente."
+
+#: src/features/nota-editor/NotaDoAtendimento.tsx:118
+msgid "Não foi possível abrir a transcrição desta referência."
+msgstr "Impossibile aprire la trascrizione di questo riferimento."
+
+#: src/features/nota-biblioteca/carregar-biblioteca.ts:16
+msgid "Não foi possível abrir o prontuário de um paciente."
+msgstr "Non è stato possibile aprire la cartella clinica di un paziente."
+
+#: src/features/prontuario/ProntuarioProvider.tsx:41
+msgid "Não foi possível abrir o prontuário."
+msgstr "Impossibile aprire la cartella."
+
+#: src/pages/acervo/AcervoPage.tsx:58
+msgid "Não foi possível abrir seu acervo. Tente novamente."
+msgstr "Impossibile aprire la tua raccolta. Riprova."
+
+#: src/features/live-session/perfil-de-voz.ts:14
+#: src/features/voice-enrollment/VoiceSettings.tsx:41
+msgid "Não foi possível abrir seu perfil de voz. Tente novamente."
+msgstr "Impossibile aprire il tuo profilo vocale. Riprova."
+
+#: src/features/qr-scan/PairingScan.tsx:63
 msgid "Não foi possível acessar a câmera para escanear o código."
 msgstr "Impossibile accedere alla fotocamera per scansionare il codice."
 
-#: src/widgets/painel-profissional/PainelProfissional.tsx:197
+#: src/pages/acervo/AcervoPage.tsx:72
+msgid "Não foi possível acompanhar o preparo. Tente novamente."
+msgstr "Impossibile controllare lo stato della preparazione. Riprova."
+
+#: src/pages/atendimento/AtendimentoPage.tsx:133
+msgid "Não foi possível atualizar o prontuário. Recarregue a página."
+msgstr "Non è stato possibile aggiornare la cartella. Ricarica la pagina."
+
+#: src/features/voice-enrollment/VoiceSettings.tsx:64
+msgid "Não foi possível cadastrar sua voz. Permita o microfone e fale sozinho durante toda a amostra.{causa}"
+msgstr "Impossibile registrare la tua voce. Consenti l’accesso al microfono e parla senza altre persone per tutto il campione.{causa}"
+
+#: src/features/patient-schedule/PatientSchedule.tsx:86
+msgid "Não foi possível cancelar a sessão."
+msgstr "Impossibile annullare la seduta."
+
+#: src/features/prontuario/HojeDoPaciente.tsx:48
+#: src/widgets/painel-profissional/PainelProfissional.tsx:224
 msgid "Não foi possível carregar a agenda."
 msgstr "Impossibile caricare l'agenda."
 
-#: src/widgets/patient-wallet/PatientWallet.tsx:68
+#: src/features/patient-schedule/PatientSchedule.tsx:54
+msgid "Não foi possível carregar a agenda. Atualize para tentar novamente."
+msgstr "Impossibile caricare l’agenda. Aggiorna per riprovare."
+
+#: src/pages/biblioteca/BibliotecaAccountPage.tsx:36
+msgid "Não foi possível carregar a biblioteca. Tente novamente."
+msgstr "Non è stato possibile caricare la biblioteca. Riprova."
+
+#: src/widgets/patient-wallet/PatientWallet.tsx:71
 msgid "Não foi possível carregar a carteira de pacientes. Tente novamente."
 msgstr "Impossibile caricare il portafoglio pazienti. Riprova."
+
+#: src/pages/home/HomePage.tsx:55
+msgid "Não foi possível carregar a conta."
+msgstr "Impossibile caricare l'account."
+
+#: src/pages/home/HomePage.tsx:65
+msgid "Não foi possível carregar as notas pendentes. Tente novamente."
+msgstr "Impossibile caricare le note in sospeso. Riprova."
 
 #: src/features/partilha/EspelhoP6.tsx:193
 msgid "Não foi possível carregar as sessões."
 msgstr "Impossibile caricare le sessioni."
 
-#: src/widgets/painel-profissional/PainelProfissional.tsx:192
+#: src/widgets/painel-profissional/PainelProfissional.tsx:219
 msgid "Não foi possível carregar o painel. Tente novamente."
 msgstr "Impossibile caricare il pannello. Riprova."
 
@@ -502,60 +1325,190 @@ msgstr "Impossibile caricare il pannello. Riprova."
 msgid "Não foi possível carregar os check-ins compartilhados."
 msgstr "Non è stato possibile caricare i check-in condivisi."
 
-#: src/features/partilha/PartilhaCheckIns.tsx:104
+#: src/widgets/patient-care/PatientList.tsx:46
+msgid "Não foi possível carregar os pacientes."
+msgstr "Impossibile caricare i pazienti."
+
+#: src/features/partilha/PartilhaCheckIns.tsx:109
 msgid "Não foi possível carregar suas preferências de compartilhamento. Nada novo será compartilhado até que elas carreguem."
 msgstr "Non è stato possibile caricare le tue preferenze di condivisione. Nulla di nuovo verrà condiviso finché non vengono caricate."
 
-#: src/features/device-pairing-primary/PairPrimaryDevice.tsx:57
+#: src/features/live-session/transcrever-ao-vivo.ts:106
+msgid "Não foi possível concluir a captura."
+msgstr "Impossibile completare la registrazione."
+
+#: src/features/device-pairing-new/PairNewDevice.tsx:59
+#: src/features/device-pairing-new/PairNewDevice.tsx:108
+#: src/features/device-pairing-primary/PairPrimaryDevice.tsx:54
+#: src/features/device-pairing-primary/PairPrimaryDevice.tsx:85
 msgid "Não foi possível concluir o pareamento com segurança. Tente novamente."
 msgstr "Impossibile completare l'abbinamento in sicurezza. Riprova."
 
+#: src/features/nota-editor/NotaDoAtendimento.tsx:93
+#: src/pages/acervo/AcervoPage.tsx:93
+#: src/widgets/patient-care/ConsentimentoPaciente.tsx:31
+#: src/widgets/patient-care/PatientAccess.tsx:27
+#: src/widgets/patient-care/PatientList.tsx:64
+msgid "Não foi possível concluir. Tente novamente."
+msgstr "Impossibile completare la richiesta. Riprova."
+
+#: src/shared/audio/transcricao-servidor.ts:237
+msgid "Não foi possível conectar ao serviço de transcrição."
+msgstr "Impossibile connettersi al servizio di trascrizione."
+
+#: src/features/online-call/OnlineCall.tsx:107
+msgid "Não foi possível conectar. Confira o convite, permita o microfone e tente novamente."
+msgstr "Impossibile connettersi. Controlla l’invito, consenti l’accesso al microfono e riprova."
+
+#: src/features/recovery/RecoveryPhraseSetup.tsx:68
+#: src/features/totp-enrollment/TotpSetup.tsx:62
+#: src/features/totp-enrollment/TotpSetup.tsx:88
+#: src/widgets/auth-screen/AuthScreen.tsx:100
+msgid "Não foi possível conectar. Tente novamente."
+msgstr "Impossibile connettersi. Riprova."
+
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:59
+#: src/shared/api/problem-messages.ts:63
 msgid "auth.webauthn_ceremony_failed"
 msgstr "Impossibile confermare la tua identità su questo dispositivo. Riprova."
 
+#: src/widgets/auth-screen/AuthScreen.tsx:116
+msgid "Não foi possível continuar com o Google. Tente novamente."
+msgstr "Impossibile continuare con Google. Riprova."
+
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:29
+#: src/shared/api/problem-messages.ts:33
 msgid "auth.google_token_invalid"
 msgstr "Impossibile continuare con Google. Riprova."
 
-#: src/features/device-pairing-new/PairNewDevice.tsx:56
+#: src/widgets/online-session/OnlineSession.tsx:53
+msgid "Não foi possível criar o convite da sessão online."
+msgstr "Impossibile creare l’invito alla sessione online."
+
+#: src/features/device-pairing-new/PairNewDevice.tsx:78
 msgid "Não foi possível decifrar a chave recebida. Tente parear novamente."
 msgstr "Impossibile decifrare la chiave ricevuta. Prova ad abbinare di nuovo."
 
-#: src/widgets/patient-wallet/PatientWallet.tsx:113
+#: src/pages/atendimento/AtendimentoPage.tsx:98
+msgid "Não foi possível encerrar a sessão. Tente novamente."
+msgstr "Impossibile terminare la seduta. Riprova."
+
+#: src/pages/home/HomePage.tsx:83
+msgid "Não foi possível enviar o documento."
+msgstr "Impossibile inviare il documento."
+
+#: src/features/live-session/SessionReview.tsx:360
+#: src/features/live-session/transcrever-ao-vivo.ts:71
+msgid "Não foi possível iniciar a gravação."
+msgstr "Impossibile avviare la registrazione."
+
+#: src/features/prontuario/HojeDoPaciente.tsx:65
+msgid "Não foi possível iniciar a sessão."
+msgstr "Non è stato possibile avviare la sessione."
+
+#: src/widgets/patient-wallet/PatientWallet.tsx:116
 msgid "Não foi possível ler"
 msgstr "Impossibile leggere"
 
-#: src/pages/biblioteca/BibliotecaPage.tsx:36
+#: src/features/audit-trail/AuditTrail.tsx:68
+msgid "Não foi possível ler a trilha de auditoria."
+msgstr "Impossibile leggere il registro di audit."
+
+#: src/features/prontuario/abrir-prontuario.ts:34
+#: src/widgets/patient-care/PatientList.tsx:86
+msgid "Não foi possível ler o paciente"
+msgstr "Impossibile leggere la cartella del paziente"
+
+#: src/pages/biblioteca/BibliotecaPage.tsx:68
 msgid "Não foi possível preparar a busca. Tente novamente."
 msgstr "Impossibile preparare la ricerca. Riprova."
 
-#: src/features/copilot-byok/CopilotKeySetup.tsx:63
-msgid "Não foi possível salvar a chave. Tente novamente."
-msgstr "Impossibile salvare la chiave. Riprova."
+#: src/pages/acervo/AcervoPage.tsx:200
+#: src/pages/acervo/AcervoPage.tsx:205
+msgid "Não foi possível preparar este arquivo. Tente novamente."
+msgstr "Impossibile preparare questo file. Riprova."
 
-#: src/pages/paciente-hoje/PacienteHojePage.tsx:121
+#: src/features/live-session/SessionReview.tsx:255
+msgid "Não foi possível processar o áudio."
+msgstr "Impossibile elaborare l'audio."
+
+#: src/features/recovery/RecoveryPhraseSetup.tsx:54
+msgid "Não foi possível proteger a chave. Verifique sua senha e tente novamente."
+msgstr "Impossibile proteggere la chiave. Verifica la password e riprova."
+
+#: src/entities/voz/extrator.ts:30
+msgid "Não foi possível reconhecer a voz localmente."
+msgstr "Impossibile riconoscere la voce localmente."
+
+#: src/features/recovery/RecoveryScreen.tsx:89
+msgid "Não foi possível recuperar o acesso. Verifique sua frase e tente novamente."
+msgstr "Impossibile ripristinare l'accesso. Verifica la frase e riprova."
+
+#: src/features/voice-enrollment/VoiceSettings.tsx:79
+msgid "Não foi possível remover seu perfil de voz."
+msgstr "Impossibile rimuovere il tuo profilo vocale."
+
+#: src/features/live-session/SessionReview.tsx:366
+msgid "Não foi possível reproduzir o áudio."
+msgstr "Impossibile riprodurre l'audio."
+
+#: src/widgets/online-session/OnlineSession.tsx:63
+msgid "Não foi possível revogar o convite. Tente encerrar novamente."
+msgstr "Impossibile revocare l’invito. Prova a terminare di nuovo."
+
+#: src/features/patient-schedule/PatientSchedule.tsx:74
+msgid "Não foi possível salvar a sessão."
+msgstr "Impossibile salvare la seduta."
+
+#: src/features/live-session/SessionReview.tsx:426
+msgid "Não foi possível salvar a transcrição."
+msgstr "Impossibile salvare la trascrizione."
+
+#: src/pages/paciente-hoje/PacienteHojePage.tsx:124
 msgid "Não foi possível salvar o check-in. Tente novamente."
 msgstr "Non è stato possibile salvare il check-in. Riprova."
 
-#: src/features/partilha/PartilhaCheckIns.tsx:128
+#: src/features/partilha/PartilhaCheckIns.tsx:133
 msgid "Não foi possível salvar sua preferência de compartilhamento. Tente novamente."
 msgstr "Non è stato possibile salvare la tua preferenza di condivisione. Riprova."
 
+#: src/features/live-session/SessionReview.tsx:208
+msgid "Não foi possível transcrever a chamada. O áudio não foi salvo."
+msgstr "Impossibile trascrivere la chiamata. L’audio non è stato salvato."
+
+#: src/features/totp-challenge/TotpChallenge.tsx:37
+msgid "Não foi possível verificar o código. Tente novamente."
+msgstr "Impossibile verificare il codice. Riprova."
+
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:41
+#: src/shared/api/problem-messages.ts:45
 msgid "auth.totp_not_pending"
 msgstr "Non c'è nessuna configurazione di verifica in due passaggi in sospeso per questo account."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:204
+#: src/shared/api/problem-messages.ts:208
 msgid "link.not_found"
 msgstr "Non esiste alcun collegamento con questo account."
 
+#: src/features/live-session/SessionReview.tsx:499
+#: src/features/live-session/SessionReview.tsx:524
+msgid "Não identificado"
+msgstr "Non identificato"
+
+#: src/features/live-session/LiveInsights.tsx:191
+msgid "Não útil"
+msgstr "Non utile"
+
+#: src/widgets/app-shell/AppShell.tsx:55
+msgid "Navegação principal"
+msgstr "Navigazione principale"
+
+#: src/features/prontuario/HojeDoPaciente.tsx:74
+msgid "Nenhum agendamento hoje"
+msgstr "Nessun appuntamento oggi"
+
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:160
+#: src/shared/api/problem-messages.ts:164
 msgid "voice.enrollment_not_found"
 msgstr "Nessuna registrazione vocale trovata per questo account."
 
@@ -563,16 +1516,36 @@ msgstr "Nessuna registrazione vocale trovata per questo account."
 msgid "Nenhum check-in compartilhado."
 msgstr "Nessun check-in condiviso."
 
+#: src/widgets/painel-profissional/PainelProfissional.tsx:229
+msgid "Nenhum encontro nos próximos dias."
+msgstr "Nessun incontro nei prossimi giorni."
+
+#: src/widgets/painel-profissional/PainelProfissional.tsx:228
+msgid "Nenhum encontro por começar hoje."
+msgstr "Nessun incontro da iniziare oggi."
+
+#: src/pages/acervo/AcervoPage.tsx:193
+msgid "Nenhum material corresponde à busca."
+msgstr "Nessun materiale corrisponde alla ricerca."
+
+#: src/widgets/patient-care/PatientList.tsx:82
+msgid "Nenhum paciente corresponde à busca."
+msgstr "Nessun paziente corrisponde alla ricerca."
+
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:180
+#: src/shared/api/problem-messages.ts:184
 msgid "key_pair.not_found"
 msgstr "Nessuna coppia di chiavi pubblicata per questo account."
 
-#: src/features/vinculo/DesvincularVinculo.tsx:73
+#: src/features/vinculo/DesvincularVinculo.tsx:74
 msgid "Nenhum vínculo."
 msgstr "Nessun collegamento."
 
-#: src/widgets/biblioteca/BibliotecaNotas.tsx:53
+#: src/features/live-session/SessionReview.tsx:252
+msgid "Nenhuma fala foi reconhecida."
+msgstr "Non è stato riconosciuto alcun parlato."
+
+#: src/widgets/biblioteca/BibliotecaNotas.tsx:57
 msgid "Nenhuma nota encontrada."
 msgstr "Nessuna nota trovata."
 
@@ -581,236 +1554,849 @@ msgid "Nenhuma nota nesta aba."
 msgstr "Nessuna nota in questa scheda."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:208
+#: src/shared/api/problem-messages.ts:212
 msgid "sharing.preferences_not_found"
 msgstr "Nessuna preferenza di condivisione salvata."
 
-#: src/pages/notas/NotaPage.tsx:125
-msgid "Nota assinada em {dataAssinatura}."
-msgstr "Nota firmata il {dataAssinatura}."
+#: src/features/patient-schedule/PatientSchedule.tsx:95
+msgid "Nenhuma sessão agendada nesta semana."
+msgstr "Nessuna seduta prevista questa settimana."
+
+#: src/widgets/patient-care/PatientSessions.tsx:13
+msgid "Nenhuma sessão ainda. Inicie a primeira a partir de um agendamento de hoje."
+msgstr "Nessuna sessione ancora. Avvia la prima da un appuntamento di oggi."
+
+#: src/features/audit-trail/AuditTrail.tsx:71
+msgid "Nº"
+msgstr "N."
+
+#: src/pages/device-pairing/PairNewPage.tsx:38
+msgid "No dispositivo já desbloqueado, abra Parear novo dispositivo. Escaneie o QR ou cole o código de pareamento."
+msgstr "Sul dispositivo già sbloccato, apri Associa nuovo dispositivo. Scansiona il QR o incolla il codice di associazione."
+
+#: src/widgets/patient-care/PatientList.tsx:73
+msgid "Nome do paciente"
+msgstr "Nome del paziente"
+
+#: src/pages/atendimento/AtendimentoPage.tsx:131
+msgid "Nota"
+msgstr "Nota"
+
+#: src/widgets/biblioteca/BibliotecaNotas.tsx:68
+msgid "Nota {numero}"
+msgstr "Nota {numero}"
+
+#: src/features/audit-trail/AuditTrail.tsx:30
+#: src/features/prontuario/EstadoDoAtendimento.tsx:11
+msgid "Nota assinada"
+msgstr "Nota firmata"
+
+#: src/features/nota-editor/NotaDoAtendimento.tsx:89
+msgid "Nota assinada e salva no prontuário."
+msgstr "Nota firmata e salvata nella cartella."
+
+#: src/features/nota-editor/NotaDoAtendimento.tsx:121
+#: src/features/nota-editor/NotaDoAtendimento.tsx:122
+#: src/features/nota-editor/NotaDoAtendimento.tsx:134
+msgid "Nota da sessão"
+msgstr "Nota della sessione"
+
+#: src/features/prontuario/EstadoDoAtendimento.tsx:11
+msgid "Nota pendente"
+msgstr "Nota in sospeso"
+
+#: src/features/nota-editor/NotaDoAtendimento.tsx:90
+msgid "Nota salva no prontuário."
+msgstr "Nota salvata nella cartella."
+
+#: src/features/patient-schedule/PatientSchedule.tsx:108
+msgid "Novo horário da sessão"
+msgstr "Nuovo orario della seduta"
+
+#: src/features/live-session/SessionReview.tsx:454
+msgid "O áudio deve ter até 64 MB."
+msgstr "L'audio non deve superare 64 MB."
+
+#: src/features/live-session/SessionReview.tsx:229
+msgid "O áudio é temporário nesta sessão. Autorize a análise por IA para transcrever."
+msgstr "L'audio è temporaneo in questa sessione. Autorizza l'analisi IA per trascriverlo."
+
+#: src/features/voice-enrollment/VoiceSettings.tsx:91
+msgid "O áudio não é salvo nem enviado ao servidor. Apenas seu perfil de voz cifrado é armazenado na conta."
+msgstr "L’audio non viene salvato né inviato al server. Nell’account viene memorizzato solo il tuo profilo vocale cifrato."
+
+#: src/features/live-session/SessionReview.tsx:477
+msgid "O áudio permanece somente em memória durante a sessão."
+msgstr "L’audio rimane solo in memoria durante la sessione."
+
+#: src/features/online-call/OnlineCall.tsx:102
+msgid "O áudio usa conexão cifrada e não é salvo. Você pode desligar o microfone ou encerrar a qualquer momento."
+msgstr "L’audio usa una connessione cifrata e non viene salvato. Puoi disattivare il microfono o terminare in qualsiasi momento."
+
+#: src/features/live-session/SessionReview.tsx:440
+msgid "O consentimento de gravação é necessário."
+msgstr "È necessario il consenso alla registrazione."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:124
+#: src/shared/api/problem-messages.ts:128
 msgid "auth.device_pairing_payload_not_delivered"
 msgstr "Il dispositivo principale non ha ancora consentito l'accesso. Attendi."
 
-#: src/features/nota-editor/EditorSoap.tsx:29
+#: src/features/live-session/transcrever-ao-vivo.ts:74
+#: src/features/voice-enrollment/capturar-perfil.ts:33
+msgid "O microfone foi interrompido."
+msgstr "Il microfono è stato interrotto."
+
+#: src/features/voice-enrollment/capturar-perfil.ts:20
+#: src/shared/audio/capturar-pcm.ts:62
+msgid "O microfone não concluiu a captura."
+msgstr "Il microfono non ha completato la registrazione."
+
+#: src/shared/audio/transcricao-servidor.ts:167
+msgid "O serviço de transcrição falhou: {detalhe}"
+msgstr "Il servizio di trascrizione non è riuscito: {detalhe}"
+
+#: src/shared/audio/transcricao-servidor.ts:284
+msgid "O serviço de transcrição parou de responder."
+msgstr "Il servizio di trascrizione ha smesso di rispondere."
+
+#: src/features/nota-editor/EditorSoap.tsx:30
 msgid "Objetivo"
 msgstr "Obiettivo"
 
+#: src/features/live-session/SessionReview.tsx:468
+msgid "Obras desta sessão"
+msgstr "Opere per questa seduta"
+
+#: src/pages/acervo/AcervoPage.tsx:175
+msgid "Obras e materiais de referência para o seu trabalho clínico."
+msgstr "Opere e materiali di riferimento per il tuo lavoro clinico."
+
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:15
+#: src/shared/api/problem-messages.ts:19
 msgid "unexpected_error"
 msgstr "Si è verificato un errore imprevisto sul server."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:220
+#: src/shared/api/problem-messages.ts:227
 msgid "errors.generic"
 msgstr "Si è verificato un errore imprevisto. Riprova."
 
-#: src/features/partilha/PartilhaCheckIns.tsx:47
+#: src/pages/atendimento/AtendimentoPage.tsx:140
+msgid "Online, com conexão do paciente"
+msgstr "Online, con il paziente collegato"
+
+#: src/pages/acervo/AcervoPage.tsx:199
+msgid "Organizando o conteúdo e preparando suas referências..."
+msgstr "Organizzazione del contenuto e preparazione dei riferimenti..."
+
+#: src/pages/acervo/AcervoPage.tsx:191
+msgid "Os arquivos são preparados após o envio. Autorize as obras que poderão ser selecionadas em cada sessão."
+msgstr "I file vengono preparati dopo il caricamento. Autorizza le opere che potranno essere selezionate per ogni seduta."
+
+#: src/features/partilha/PartilhaCheckIns.tsx:52
 msgid "Os check-ins que você registrar a partir de agora são compartilhados com esta profissional."
 msgstr "I check-in che registrerai da ora in poi vengono condivisi con questa professionista."
 
-#: src/widgets/auth-screen/AuthScreen.tsx:174
-#: src/widgets/painel-profissional/PainelProfissional.tsx:203
-#: src/widgets/patient-wallet/PatientWallet.tsx:120
+#: src/features/device-pairing-primary/PairPrimaryDevice.tsx:95
+msgid "Os códigos são iguais. Liberar acesso."
+msgstr "I codici coincidono. Consenti accesso."
+
+#: src/pages/settings/CopilotPage.tsx:7
+msgid "Os votos “útil” e “não útil” ficam cifrados neste aparelho. Eles só são enviados se você ligar a opção abaixo."
+msgstr "I tuoi voti “utile” e “non utile” restano cifrati su questo dispositivo. Vengono inviati solo se attivi l’opzione qui sotto."
+
+#: src/features/live-session/SessionReview.tsx:449
+msgid "Ou carregar áudio"
+msgstr "Oppure carica audio"
+
+#: src/features/live-session/SessionReview.tsx:411
+msgid "Outra revisão foi salva. Reabra a transcrição antes de corrigir."
+msgstr "È stata salvata un'altra revisione. Riapri la trascrizione prima di correggerla."
+
+#: src/features/live-session/SessionReview.tsx:501
+msgid "Ouvir esta voz"
+msgstr "Ascolta questa voce"
+
+#: src/features/live-session/SessionReview.tsx:518
+msgid "Ouvir palavra aos {segundos}s"
+msgstr "Ascolta la parola a {segundos}s"
+
+#: src/features/live-session/LiveInsights.tsx:144
+msgid "Ouvir trecho aos {segundos}s"
+msgstr "Ascolta il passaggio a {segundos}s"
+
+#: src/features/live-session/LiveInsights.tsx:140
+#: src/features/live-session/SessionReview.tsx:499
+#: src/features/live-session/SessionReview.tsx:549
+#: src/widgets/auth-screen/AuthScreen.tsx:193
+#: src/widgets/painel-profissional/PainelProfissional.tsx:182
+#: src/widgets/painel-profissional/PainelProfissional.tsx:235
+#: src/widgets/patient-wallet/PatientWallet.tsx:123
 msgid "Paciente"
 msgstr "Paziente"
 
-#: src/widgets/patient-wallet/PatientWallet.tsx:118
+#: src/widgets/patient-care/ConsentimentoPaciente.tsx:38
+msgid "Paciente autorizou a análise por IA local"
+msgstr "Il paziente ha autorizzato l'analisi IA locale"
+
+#: src/widgets/patient-care/ConsentimentoPaciente.tsx:37
+msgid "Paciente autorizou a gravação"
+msgstr "Il paziente ha autorizzato la registrazione"
+
+#: src/pages/atendimento/AtendimentoPage.tsx:116
+#: src/pages/prontuario/ProntuarioPage.tsx:36
+#: src/widgets/app-shell/AppShell.tsx:58
+#: src/widgets/patient-care/PatientList.tsx:69
+#: src/widgets/patient-care/PatientList.tsx:70
+#: src/widgets/patient-wallet/PatientWallet.tsx:121
 msgid "Pacientes"
 msgstr "Pazienti"
 
-#: src/widgets/painel-profissional/PainelProfissional.tsx:182
+#: src/widgets/painel-profissional/PainelProfissional.tsx:209
 msgid "Pacientes ativos"
 msgstr "Pazienti attivi"
 
-#: src/features/device-pairing-primary/PairingQr.tsx:149
+#: src/features/live-session/LiveInsights.tsx:184
+#: src/features/nota-editor/EditorSoap.tsx:69
+msgid "Página {pagina}, parágrafo {paragrafo}"
+msgstr "Pagina {pagina}, paragrafo {paragrafo}"
+
+#: src/widgets/painel-profissional/PainelProfissional.tsx:204
+msgid "Painel do consultório"
+msgstr "Pannello dello studio"
+
+#: src/features/live-session/LiveInsights.tsx:133
+msgid "Palavra por palavra"
+msgstr "Parola per parola"
+
+#: src/features/device-pairing-primary/PairPrimaryDevice.tsx:98
+msgid "Pareamento cancelado. Nenhuma chave foi enviada."
+msgstr "Associazione annullata. Nessuna chiave è stata inviata."
+
+#: src/features/device-pairing-primary/PairingQr.tsx:148
+#: src/pages/device-pairing/PairPrimaryPage.tsx:18
+#: src/widgets/app-shell/AppShell.tsx:74
 msgid "Parear novo dispositivo"
 msgstr "Abbina nuovo dispositivo"
+
+#: src/features/live-session/SessionReview.tsx:448
+msgid "Pausar sessão"
+msgstr "Metti in pausa la sessione"
+
+#: src/pages/acervo/AcervoPage.tsx:177
+msgid "PDF ou texto UTF-8, até 20 MB. O arquivo é armazenado cifrado. Para preparar as referências, seu conteúdo é processado em memória pelo serviço do acervo."
+msgstr "PDF o testo UTF-8, fino a 20 MB. Il file viene archiviato cifrato. Per preparare i riferimenti, il servizio della biblioteca ne elabora il contenuto in memoria."
 
 #: src/features/nota-fila/FilaAssinatura.tsx:41
 msgid "Pendentes"
 msgstr "In attesa"
 
-#: src/features/nota-editor/EditorSoap.tsx:31
+#: src/entities/voz/voice-crypto.ts:21
+#: src/entities/voz/voice-crypto.ts:37
+#: src/entities/voz/voice-crypto.ts:40
+msgid "Perfil de voz inválido."
+msgstr "Profilo vocale non valido."
+
+#: src/features/voice-enrollment/VoiceSettings.tsx:78
+msgid "Perfil de voz removido."
+msgstr "Profilo vocale rimosso."
+
+#: src/features/voice-enrollment/VoiceSettings.tsx:60
+msgid "Perfil de voz salvo. Ele será usado nas próximas sessões."
+msgstr "Profilo vocale salvato. Verrà usato nelle prossime sedute."
+
+#: src/features/live-session/LiveInsights.tsx:140
+msgid "Pessoa {numero}"
+msgstr "Persona {numero}"
+
+#: src/features/nota-editor/EditorSoap.tsx:32
 msgid "Plano"
 msgstr "Piano"
 
-#: src/widgets/biblioteca/BibliotecaNotas.tsx:48
+#: src/features/live-session/LiveInsights.tsx:214
+msgid "Possíveis: confira antes de usar"
+msgstr "Possibili: verifica prima di usare"
+
+#: src/widgets/biblioteca/BibliotecaNotas.tsx:52
 msgid "Preparando a busca..."
 msgstr "Preparazione della ricerca in corso..."
 
-#: src/features/totp-enrollment/TotpSetup.tsx:78
+#: src/features/totp-enrollment/TotpSetup.tsx:96
 msgid "Preparando a verificação em duas etapas..."
 msgstr "Configurazione della verifica in due passaggi in corso..."
 
-#: src/features/device-pairing-primary/PairingQr.tsx:110
+#: src/features/live-session/SessionReview.tsx:236
+msgid "Preparando o áudio para o Nemotron..."
+msgstr "Preparazione dell'audio per Nemotron..."
+
+#: src/features/device-pairing-primary/PairingQr.tsx:109
 msgid "Preparando o código para parear o novo dispositivo..."
 msgstr "Preparazione del codice per abbinare il nuovo dispositivo in corso..."
 
-#: src/widgets/auth-screen/AuthScreen.tsx:164
+#: src/features/voice-enrollment/VoiceSettings.tsx:51
+msgid "Preparando o reconhecimento local. Depois, permita o microfone e leia as três linhas."
+msgstr "Preparazione del riconoscimento locale. Poi consenti l’accesso al microfono e leggi le tre righe."
+
+#: src/pages/acervo/AcervoPage.tsx:219
+msgid "Preparando referências: {completed} de {total}"
+msgstr "Preparazione dei riferimenti: {completed} di {total}"
+
+#: src/features/live-session/SessionReview.tsx:465
+msgid "Preparando seu acervo autorizado para o copiloto local..."
+msgstr "Preparazione della tua raccolta autorizzata per il copilota locale..."
+
+#: src/pages/acervo/AcervoPage.tsx:205
+msgid "Preparar arquivo"
+msgstr "Prepara file"
+
+#: src/pages/atendimento/AtendimentoPage.tsx:139
+msgid "Presencial, com microfone compartilhado"
+msgstr "In presenza, con microfono condiviso"
+
+#: src/features/live-session/LiveInsights.tsx:140
+#: src/features/live-session/SessionReview.tsx:499
+#: src/features/live-session/SessionReview.tsx:549
+#: src/widgets/auth-screen/AuthScreen.tsx:183
 msgid "Profissional"
 msgstr "Professionista"
 
+#: src/features/live-session/SessionReview.tsx:547
+msgid "Profissional responsável: {autor}"
+msgstr "Professionista responsabile: {autor}"
+
+#: src/pages/acervo/AcervoPage.tsx:201
+msgid "Pronto para selecionar na sessão"
+msgstr "Pronto per la selezione nella seduta"
+
+#: src/features/audit-trail/AuditTrail.tsx:29
+msgid "Prontuário aberto"
+msgstr "Cartella clinica aperta"
+
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:128
+#: src/shared/api/problem-messages.ts:11
+msgid "agenda.patient_not_found"
+msgstr "Cartella non disponibile in questo studio. Seleziona di nuovo il paziente."
+
+#. js-lingui-explicit-id
+#: src/shared/api/problem-messages.ts:132
 msgid "patients.not_found"
 msgstr "Cartella non trovata."
 
-#: src/features/copilot-byok/CopilotKeySetup.tsx:34
-#: src/features/copilot-byok/CopilotKeySetup.tsx:117
-msgid "Pular"
-msgstr "Salta"
+#: src/pages/device-pairing/PairNewPage.tsx:35
+msgid "Prontuários desbloqueados neste dispositivo."
+msgstr "Cartelle sbloccate su questo dispositivo."
 
-#: src/features/recovery/RecoveryScreen.tsx:152
+#: src/features/recovery/RecoveryPhraseSetup.tsx:76
+msgid "Proteger o acesso aos prontuários"
+msgstr "Proteggi l'accesso alle cartelle"
+
+#: src/widgets/painel-profissional/PainelProfissional.tsx:229
+#: src/widgets/painel-profissional/PainelProfissional.tsx:229
+msgid "Próximos dias"
+msgstr "Prossimi giorni"
+
+#: src/features/patient-schedule/PatientSchedule.tsx:91
+msgid "Próximos encontros"
+msgstr "Prossimi incontri"
+
+#: src/features/live-session/LiveInsights.tsx:174
+msgid "Quando houver um insight, a fala será marcada com tracejado."
+msgstr "Quando sarà disponibile un insight, il passaggio avrà una sottolineatura tratteggiata."
+
+#: src/widgets/biblioteca/BibliotecaNotas.tsx:69
+msgid "Rascunho"
+msgstr "Bozza"
+
+#: src/features/online-call/OnlineCall.tsx:108
+msgid "Reconectar sessão online"
+msgstr "Riconnetti la sessione online"
+
+#: src/features/recovery/RecoveryScreen.tsx:172
 msgid "Recuperar acesso"
 msgstr "Recupera accesso"
 
-#: src/features/recovery/RecoveryScreen.tsx:111
+#: src/app/routing/router.tsx:131
 msgid "Recuperar acesso à conta"
 msgstr "Recupera l'accesso all'account"
 
-#: src/widgets/painel-profissional/PainelProfissional.tsx:200
-#: src/widgets/painel-profissional/PainelProfissional.tsx:201
+#: src/pages/acervo/AcervoPage.tsx:206
+msgid "Recuperar arquivo"
+msgstr "Recupera file"
+
+#: src/features/nota-editor/EditorSoap.tsx:68
+msgid "Referência bibliográfica"
+msgstr "Riferimento bibliografico"
+
+#: src/pages/acervo/AcervoPage.tsx:183
+msgid "Referência bibliográfica ou edição"
+msgstr "Riferimento bibliografico o edizione"
+
+#: src/pages/home/HomePage.tsx:98
+msgid "Referência do documento"
+msgstr "Riferimento del documento"
+
+#: src/features/nota-editor/NotaDoAtendimento.tsx:113
+msgid "Referência incluída no rascunho. Confira a avaliação antes de salvar ou assinar."
+msgstr "Riferimento incluso nella bozza. Controlla la valutazione prima di salvare o firmare."
+
+#: src/features/nota-editor/NotaDoAtendimento.tsx:124
+msgid "Referência para aprovação"
+msgstr "Riferimento da approvare"
+
+#: src/features/nota-editor/NotaDoAtendimento.tsx:111
+msgid "Referência selecionada para a fala: {frasePaciente}"
+msgstr "Riferimento selezionato per la frase: {frasePaciente}"
+
+#: src/features/audit-trail/AuditTrail.tsx:30
+msgid "Registro acrescentado ao prontuário"
+msgstr "Voce aggiunta alla cartella clinica"
+
+#: src/features/patient-schedule/PatientSchedule.tsx:103
+msgid "Remarcar sessão"
+msgstr "Riprogramma seduta"
+
+#: src/features/voice-enrollment/VoiceSettings.tsx:96
+msgid "Remover perfil de voz"
+msgstr "Rimuovi il profilo vocale"
+
+#: src/widgets/painel-profissional/PainelProfissional.tsx:231
+#: src/widgets/painel-profissional/PainelProfissional.tsx:232
 msgid "Requer você"
 msgstr "Ha bisogno di te"
 
-#: src/widgets/patient-wallet/PatientWallet.tsx:121
+#: src/pages/home/HomePage.tsx:50
+msgid "Resposta de verificação inválida."
+msgstr "Risposta di verifica non valida."
+
+#: src/entities/voz/voice-enrollment.ts:36
+#: src/entities/voz/voice-enrollment.ts:55
+#: src/entities/voz/voice-enrollment.ts:58
+#: src/entities/voz/voice-enrollment.ts:61
+#: src/entities/voz/voice-enrollment.ts:79
+msgid "Resposta de voz inválida."
+msgstr "Risposta non valida dal servizio vocale."
+
+#: src/features/live-session/SessionReview.tsx:448
+msgid "Retomar sessão"
+msgstr "Riprendi la sessione"
+
+#: src/features/live-session/SessionReview.tsx:547
+msgid "Revisão {numeroRevisao}"
+msgstr "Revisione {numeroRevisao}"
+
+#: src/widgets/biblioteca/BibliotecaNotas.tsx:69
+msgid "Revisão {revisao}"
+msgstr "Revisione {revisao}"
+
+#: src/widgets/painel-profissional/PainelProfissional.tsx:176
+msgid "Revisar consentimento"
+msgstr "Rivedi il consenso"
+
+#: src/features/nota-editor/NotaDoAtendimento.tsx:125
+msgid "Revisar referência antes de incluir"
+msgstr "Controlla il riferimento prima di includerlo"
+
+#: src/widgets/painel-profissional/PainelProfissional.tsx:175
+msgid "Revisar risco"
+msgstr "Rivedi il rischio"
+
+#: src/features/live-session/SessionReview.tsx:542
+msgid "Revisões e correções"
+msgstr "Revisioni e correzioni"
+
+#: src/widgets/patient-care/PatientAccess.tsx:49
+msgid "Revogar links de acesso pendentes"
+msgstr "Revoca i link di accesso in sospeso"
+
+#: src/widgets/patient-wallet/PatientWallet.tsx:124
 msgid "Risco"
 msgstr "Rischio"
 
-#: src/pages/home/HomePage.tsx:34
+#: src/widgets/patient-care/PatientList.tsx:74
+msgid "Risco avaliado pelo profissional"
+msgstr "Rischio valutato dal professionista"
+
+#: src/features/audit-trail/AuditTrail.tsx:29
+msgid "Saída da conta"
+msgstr "Uscita dall'account"
+
+#: src/widgets/app-shell/AppShell.tsx:76
 msgid "Sair"
 msgstr "Esci"
 
-#: src/features/copilot-byok/CopilotKeySetup.tsx:114
-msgid "Salvar"
-msgstr "Salva"
+#: src/features/nota-editor/NotaDoAtendimento.tsx:137
+msgid "Salvar nota"
+msgstr "Salva nota"
+
+#: src/features/patient-schedule/PatientSchedule.tsx:111
+msgid "Salvar novo horário"
+msgstr "Salva il nuovo orario"
+
+#: src/features/live-session/SessionReview.tsx:538
+msgid "Salvar transcrição"
+msgstr "Salva trascrizione"
+
+#: src/features/live-session/LiveInsights.tsx:217
+msgid "Salve a revisão da transcrição para usar uma referência na nota."
+msgstr "Salva la revisione della trascrizione per usare un riferimento nella nota."
 
 #: src/widgets/contacto-emergencia/ContactoEmergencia.tsx:14
 msgid "SAMU 192"
 msgstr "SAMU 192"
 
+#: src/pages/atendimento/AtendimentoPage.tsx:129
+msgid "Seções da sessão"
+msgstr "Sezioni della sessione"
+
 #: src/widgets/soap-editor/FilaEEditor.tsx:39
 msgid "Selecione uma nota na fila."
 msgstr "Seleziona una nota nella coda."
+
+#: src/features/live-session/LiveInsights.tsx:172
+msgid "Selecione uma obra para receber referências nesta sessão."
+msgstr "Seleziona un’opera per ricevere riferimenti durante questa seduta."
 
 #: src/features/partilha/EspelhoP6.tsx:170
 msgid "sem check-in"
 msgstr "nessun check-in"
 
-#: src/pages/paciente-hoje/PacienteHojePage.tsx:142
+#: src/shared/audio/transcricao-servidor.ts:166
+msgid "sem detalhe"
+msgstr "nessun dettaglio"
+
+#: src/pages/paciente-hoje/PacienteHojePage.tsx:145
 msgid "sem registo"
 msgstr "nessun dato"
 
-#: src/pages/notas/NotaPage.tsx:95
-msgid "Sem sessão ativa. Não é possível assinar."
-msgstr "Nessuna sessione attiva. Impossibile firmare."
+#: src/features/prontuario/EstadoDoAtendimento.tsx:11
+msgid "Sem transcrição"
+msgstr "Nessuna trascrizione"
 
-#: src/widgets/auth-screen/AuthScreen.tsx:202
+#: src/features/patient-schedule/PatientSchedule.tsx:92
+msgid "Semana a partir de"
+msgstr "Settimana a partire da"
+
+#: src/widgets/auth-screen/AuthScreen.tsx:224
 msgid "Senha"
 msgstr "Password"
 
-#. placeholder {0}: horaDaSessao(sessao.inicioEm, i18n.locale)
-#: src/features/partilha/EspelhoP6.tsx:179
-#~ msgid "Sessão às {0}"
-#~ msgstr "Sessione alle {0}"
+#: src/features/recovery/RecoveryPhraseSetup.tsx:79
+#: src/pages/device-pairing/PairPrimaryPage.tsx:26
+msgid "Senha atual"
+msgstr "Password attuale"
+
+#: src/features/live-session/LiveInsights.tsx:164
+msgid "Serviço do copiloto fora do ar. Tentando de novo."
+msgstr "Il servizio del copilota è offline. Nuovo tentativo in corso."
+
+#: src/features/audit-trail/AuditTrail.tsx:71
+msgid "Sessão"
+msgstr "Sessione"
+
+#: src/features/patient-schedule/PatientSchedule.tsx:71
+msgid "Sessão agendada."
+msgstr "Seduta programmata."
 
 #: src/features/partilha/EspelhoP6.tsx:182
 msgid "Sessão às {inicio}"
 msgstr "Sessione alle {inicio}"
 
+#: src/features/patient-schedule/PatientSchedule.tsx:84
+msgid "Sessão cancelada."
+msgstr "Seduta annullata."
+
+#: src/pages/atendimento/AtendimentoPage.tsx:118
+#: src/pages/atendimento/AtendimentoPage.tsx:121
+#: src/widgets/patient-care/PatientSessions.tsx:17
+msgid "Sessão de {data}"
+msgstr "Sessione del {data}"
+
+#: src/features/prontuario/EstadoDoAtendimento.tsx:11
+#: src/pages/atendimento/AtendimentoPage.tsx:125
+msgid "Sessão encerrada"
+msgstr "Seduta terminata"
+
+#: src/pages/atendimento/AtendimentoPage.tsx:96
+msgid "Sessão encerrada. Os registros estão salvos. A nota permanece disponível para revisão e assinatura."
+msgstr "Seduta terminata. I dati sono salvati. La nota resta disponibile per la revisione e la firma."
+
+#: src/features/patient-schedule/PatientSchedule.tsx:102
+msgid "Sessão iniciada"
+msgstr "Sessione avviata"
+
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:148
+#: src/shared/api/problem-messages.ts:152
 msgid "agenda.session_not_found"
 msgstr "Sessione non trovata."
 
-#: src/widgets/painel-profissional/PainelProfissional.tsx:186
+#: src/features/online-call/OnlineCall.tsx:101
+#: src/pages/online-session/OnlineSessionPage.tsx:10
+msgid "Sessão online"
+msgstr "Sessione online"
+
+#: src/features/online-call/OnlineCall.tsx:97
+msgid "Sessão online conectada."
+msgstr "Sessione online connessa."
+
+#: src/features/online-call/OnlineCall.tsx:98
+msgid "Sessão online encerrada."
+msgstr "Sessione online terminata."
+
+#: src/features/patient-schedule/PatientSchedule.tsx:71
+msgid "Sessão remarcada."
+msgstr "Seduta riprogrammata."
+
+#: src/widgets/patient-care/PatientSessions.tsx:11
+#: src/widgets/patient-care/PatientSessions.tsx:12
+msgid "Sessões do paciente"
+msgstr "Sessioni del paziente"
+
+#: src/widgets/painel-profissional/PainelProfissional.tsx:213
 msgid "Sessões na semana"
 msgstr "Sessioni della settimana"
 
-#: src/pages/paciente-hoje/PacienteHojePage.tsx:124
+#: src/pages/acervo/AcervoPage.tsx:174
+msgid "Seu acervo"
+msgstr "La tua raccolta"
+
+#: src/pages/auth/AuthPage.tsx:20
+#: src/pages/home/HomePage.tsx:89
+msgid "Seu consultório, com privacidade."
+msgstr "Il tuo studio, con privacy."
+
+#: src/widgets/painel-profissional/PainelProfissional.tsx:205
+msgid "Seu dia no consultório"
+msgstr "La tua giornata in studio"
+
+#: src/features/magic-link-auth/MagicLinkCallback.tsx:180
+msgid "Seu ID no Limmiar"
+msgstr "Il tuo ID Limmiar"
+
+#: src/features/online-call/OnlineCall.tsx:113
+msgid "Seu microfone está desligado."
+msgstr "Il tuo microfono è disattivato."
+
+#: src/features/voice-enrollment/VoiceSettings.tsx:83
+#: src/features/voice-enrollment/VoiceSettings.tsx:84
+msgid "Seu perfil de voz"
+msgstr "Il tuo profilo vocale"
+
+#: src/features/live-session/SessionReview.tsx:439
+msgid "Seu perfil de voz identifica o profissional. Confira as falas incertas antes de usar a transcrição."
+msgstr "Il tuo profilo vocale identifica il professionista. Verifica le attribuzioni incerte prima di usare la trascrizione."
+
+#: src/features/live-session/SessionReview.tsx:327
+msgid "Seu perfil de voz não pôde ser aberto. Sem ele não dá para saber quem está falando."
+msgstr "Non è stato possibile aprire il tuo profilo vocale. Senza di esso non si può sapere chi sta parlando."
+
+#: src/pages/pacientes/PacientesPage.tsx:15
+msgid "Seus pacientes"
+msgstr "I tuoi pazienti"
+
+#: src/app/routing/router.tsx:307
+#: src/widgets/app-shell/AppShell.tsx:61
+msgid "Sinais compartilhados pelos pacientes"
+msgstr "Segnali condivisi dai pazienti"
+
+#: src/features/audit-trail/AuditTrail.tsx:64
+msgid "Só metadados: o quê, quando e de que sessão. Nunca conteúdo clínico."
+msgstr "Solo metadati: cosa, quando e da quale sessione. Mai contenuto clinico."
+
+#: src/features/live-session/LiveInsights.tsx:169
+msgid "Só neste aparelho"
+msgstr "Solo su questo dispositivo"
+
+#: src/pages/paciente-hoje/PacienteHojePage.tsx:127
 msgid "Sono"
 msgstr "Sonno"
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:140
+#: src/shared/api/problem-messages.ts:144
 msgid "agenda.not_authorized_to_schedule"
 msgstr "Il tuo account non può ancora programmare sessioni."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:172
+#: src/shared/api/problem-messages.ts:176
 msgid "notes.not_authorized_to_sign"
 msgstr "Il tuo account non può ancora firmare note."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:132
+#: src/shared/api/problem-messages.ts:136
 msgid "patients.not_authorized_to_create_records"
 msgstr "Il tuo account non può ancora creare cartelle."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:176
+#: src/shared/api/problem-messages.ts:180
 msgid "consent.not_authorized_to_record"
 msgstr "Il tuo account non può ancora registrare il consenso."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:200
+#: src/shared/api/problem-messages.ts:204
 msgid "link.not_authorized"
 msgstr "Il tuo account non può partecipare a questo collegamento."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:95
+#: src/shared/api/problem-messages.ts:99
 msgid "auth.refresh_token_invalid"
 msgstr "La tua sessione è scaduta. Accedi di nuovo."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:99
+#: src/shared/api/problem-messages.ts:103
 msgid "auth.access_token_invalid"
 msgstr "La tua sessione è scaduta. Accedi di nuovo."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:85
+#: src/shared/api/problem-messages.ts:89
 msgid "auth.totp_ticket_invalid"
 msgstr "La verifica in due passaggi è scaduta. Accedi di nuovo."
 
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:212
+#: src/shared/api/problem-messages.ts:216
 msgid "sharing.version_conflict"
 msgstr "Le tue preferenze sono cambiate su un altro dispositivo. Riprova."
 
-#: src/features/nota-editor/EditorSoap.tsx:28
+#: src/features/nota-editor/EditorSoap.tsx:29
 msgid "Subjetivo"
 msgstr "Soggettivo"
 
-#: src/widgets/auth-screen/AuthScreen.tsx:155
+#: src/features/voice-enrollment/VoiceSettings.tsx:95
+msgid "Substituir perfil de voz"
+msgstr "Sostituisci il profilo vocale"
+
+#: src/features/live-session/LiveInsights.tsx:144
+#: src/features/live-session/LiveInsights.tsx:144
+msgid "Tempo de fala: {duracao}"
+msgstr "Tempo di parola: {duracao}"
+
+#: src/app/providers/SessionProvider.tsx:92
+msgid "Tentar encerrar no servidor novamente"
+msgstr "Riprova a chiudere la sessione sul server"
+
+#: src/features/prontuario/ProntuarioProvider.tsx:51
+#: src/pages/acervo/AcervoPage.tsx:187
+#: src/pages/biblioteca/BibliotecaAccountPage.tsx:37
+#: src/pages/home/HomePage.tsx:91
+#: src/pages/home/HomePage.tsx:110
+msgid "Tentar novamente"
+msgstr "Riprova"
+
+#: src/features/live-session/SessionReview.tsx:519
+msgid "Texto aos {segundos}s"
+msgstr "Testo a {segundos}s"
+
+#: src/widgets/auth-screen/AuthScreen.tsx:174
 msgid "Tipo de conta"
 msgstr "Tipo di account"
 
-#: src/features/nota-editor/Citacao.tsx:31
+#: src/pages/atendimento/AtendimentoPage.tsx:138
+msgid "Tipo de sessão"
+msgstr "Tipo di sessione"
+
+#: src/pages/acervo/AcervoPage.tsx:181
+msgid "Título da obra"
+msgstr "Titolo dell’opera"
+
+#: src/features/nota-editor/Citacao.tsx:34
 msgid "Tocar áudio de {inicio} a {fim}"
 msgstr "Riproduci audio da {inicio} a {fim}"
+
+#: src/features/live-session/SessionReview.tsx:460
+msgid "Transcrevendo e separando as vozes..."
+msgstr "Trascrizione e separazione delle voci..."
+
+#: src/features/live-session/LiveInsights.tsx:132
+#: src/features/live-session/LiveInsights.tsx:134
+msgid "Transcrição ao vivo"
+msgstr "Trascrizione in diretta"
+
+#: src/features/live-session/SessionReview.tsx:355
+msgid "Transcrição ao vivo. Seu perfil de voz identifica quem está falando."
+msgstr "Trascrizione in tempo reale. Il tuo profilo vocale identifica chi sta parlando."
+
+#: src/features/live-session/SessionReview.tsx:252
+#: src/features/live-session/SessionReview.tsx:311
+msgid "Transcrição concluída. Confirme os papéis das vozes."
+msgstr "Trascrizione completata. Conferma i ruoli delle voci."
+
+#: src/features/live-session/SessionReview.tsx:205
+msgid "Transcrição online ao vivo. Cada trilha identifica quem está falando."
+msgstr "Trascrizione online in diretta. Ogni traccia identifica chi parla."
+
+#: src/features/live-session/SessionReview.tsx:67
+#: src/features/live-session/SessionReview.tsx:386
+msgid "Transcrição recuperada do prontuário. O áudio não é armazenado."
+msgstr "Trascrizione recuperata dalla cartella. L'audio non viene archiviato."
+
+#: src/features/live-session/SessionReview.tsx:536
+msgid "Transcrição revisada."
+msgstr "Trascrizione verificata."
+
+#: src/features/prontuario/EstadoDoAtendimento.tsx:11
+msgid "Transcrição salva"
+msgstr "Trascrizione salvata"
+
+#: src/features/live-session/SessionReview.tsx:423
+msgid "Transcrição salva no prontuário. Somente texto, tempos e identificação das falas foram armazenados."
+msgstr "Trascrizione salvata nella cartella. Sono stati archiviati solo testo, tempi e identificazione delle voci."
+
+#: src/features/audit-trail/AuditTrail.tsx:63
+#: src/pages/settings/AuditPage.tsx:6
+#: src/widgets/app-shell/AppShell.tsx:72
+msgid "Trilha de auditoria"
+msgstr "Registro di audit"
+
+#: src/features/audit-trail/AuditTrail.tsx:30
+msgid "Trilha exportada"
+msgstr "Registro esportato"
 
 #: src/features/partilha/EspelhoP6.tsx:165
 msgid "Últimos 7 dias"
 msgstr "Ultimi 7 giorni"
 
-#: src/pages/paciente-hoje/PacienteHojePage.tsx:127
+#: src/pages/acervo/AcervoPage.tsx:193
+msgid "Uma estante para suas referências"
+msgstr "Uno scaffale per i tuoi riferimenti"
+
+#: src/pages/paciente-hoje/PacienteHojePage.tsx:130
 msgid "Uma frase (opcional)"
 msgstr "Una frase (facoltativa)"
 
-#: src/features/totp-challenge/TotpChallenge.tsx:44
+#: src/pages/device-pairing/PairNewPage.tsx:42
+msgid "Usar código de pareamento"
+msgstr "Usa codice di associazione"
+
+#: src/features/live-session/LiveInsights.tsx:198
+msgid "Usar na nota"
+msgstr "Usa nella nota"
+
+#: src/features/live-session/LiveInsights.tsx:191
+msgid "Útil"
+msgstr "Utile"
+
+#: src/widgets/patient-care/PatientAccess.tsx:54
+msgid "Válido até"
+msgstr "Valido fino al"
+
+#: src/features/nota-editor/EditorSoap.tsx:72
+msgid "Ver fala da referência"
+msgstr "Vedi frase del riferimento"
+
+#: src/features/totp-challenge/TotpChallenge.tsx:46
 msgid "Verificação em duas etapas"
 msgstr "Verifica in due passaggi"
 
-#: src/features/totp-challenge/TotpChallenge.tsx:76
+#: src/pages/home/HomePage.tsx:94
+msgid "Verificação profissional"
+msgstr "Verifica professionale"
+
+#: src/pages/acervo/AcervoPage.tsx:124
+msgid "Verificando e cifrando o material..."
+msgstr "Verifica e cifratura del materiale..."
+
+#: src/features/totp-challenge/TotpChallenge.tsx:78
 msgid "Verificar"
 msgstr "Verifica"
-
-#: src/widgets/auth-screen/AuthScreen.tsx:131
-msgid "Verifique seu e-mail para continuar. Enviamos um link de acesso, se este e-mail existir."
-msgstr "Controlla la tua e-mail per continuare. Abbiamo inviato un link di accesso, se questa e-mail esiste."
 
 #: src/features/vinculo/ResgatarConviteVinculo.tsx:56
 msgid "Vinculada."
@@ -820,12 +2406,59 @@ msgstr "Collegata."
 msgid "Vincular"
 msgstr "Collega"
 
+#: src/features/voice-enrollment/VoiceSettings.tsx:92
+msgid "Você ainda não tem um perfil de voz."
+msgstr "Non hai ancora un profilo vocale."
+
+#: src/pages/atendimento/AtendimentoPage.tsx:114
+#: src/pages/prontuario/ProntuarioPage.tsx:34
+msgid "Você está em"
+msgstr "Ti trovi in"
+
+#: src/features/voice-enrollment/VoiceSettings.tsx:92
+msgid "Você já tem um perfil de voz."
+msgstr "Hai già un profilo vocale."
+
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:105
+#: src/shared/api/problem-messages.ts:109
 msgid "auth.forbidden"
 msgstr "Non hai accesso a questo account."
 
+#: src/app/providers/SessionProvider.tsx:89
+msgid "Você saiu neste dispositivo. Não foi possível encerrar a sessão no servidor."
+msgstr "Hai effettuato la disconnessione su questo dispositivo. Non è stato possibile chiudere la sessione sul server."
+
 #. js-lingui-explicit-id
-#: src/shared/api/problem-messages.ts:194
+#: src/shared/api/problem-messages.ts:198
 msgid "link.already_linked"
 msgstr "Siete già collegati."
+
+#: src/features/patient-schedule/PatientSchedule.tsx:112
+msgid "Voltar a agendar"
+msgstr "Torna alla programmazione"
+
+#: src/features/live-session/LiveInsights.tsx:223
+msgid "Voltar à fala"
+msgstr "Torna al passaggio"
+
+#: src/pages/atendimento/AtendimentoPage.tsx:37
+msgid "Voltar à pasta do paciente"
+msgstr "Torna alla cartella del paziente"
+
+#: src/pages/settings/CopilotPage.tsx:6
+#: src/widgets/app-shell/AppShell.tsx:70
+msgid "Votos do copiloto de IA"
+msgstr "Voti del copilota IA"
+
+#: src/features/live-session/SessionReview.tsx:485
+#: src/features/live-session/SessionReview.tsx:527
+msgid "Voz {numero}"
+msgstr "Voce {numero}"
+
+#: src/features/live-session/SessionReview.tsx:522
+msgid "Voz aos {segundos}s"
+msgstr "Voce a {segundos}s"
+
+#: src/features/live-session/LiveInsights.tsx:140
+msgid "Voz não identificada"
+msgstr "Voce non identificata"

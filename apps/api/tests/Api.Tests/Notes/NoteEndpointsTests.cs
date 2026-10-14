@@ -368,7 +368,9 @@ public sealed class NoteEndpointsTests : IAsyncLifetime
 
         public RefreshSessionResult Refresh(string refreshToken) => throw new NotSupportedException("not needed by the one test that uses this stub");
 
-        public Guid? ValidateAccess(string accessToken) => Guid.TryParse(accessToken, out var accountId) ? accountId : null;
+        public AccessSession? Revoke(string refreshToken) => throw new NotSupportedException("not needed by these tests");
+
+        public AccessSession? ValidateAccess(string accessToken) => Guid.TryParse(accessToken, out var accountId) ? new AccessSession(accountId, accountId) : null;
     }
 
     private sealed class StubTotpProvider : ITotpProvider

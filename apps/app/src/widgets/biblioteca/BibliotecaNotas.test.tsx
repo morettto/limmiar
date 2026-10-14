@@ -7,12 +7,17 @@ import type { ResultadoBusca } from '../../features/nota-biblioteca/indice'
 import { ESTADO_ASSINADA, ESTADO_PENDENTE } from '../../entities/nota/nota'
 import { BibliotecaNotas } from './BibliotecaNotas'
 
+vi.mock('@tanstack/react-router', () => ({
+  Link: ({ to, params, search, children }: { to: string; params: { patientId: string; atendimentoId: string }; search: { aba: string }; children: React.ReactNode }) =>
+    <a href={`${to.replace('$patientId', params.patientId).replace('$atendimentoId', params.atendimentoId)}?aba=${search.aba}`}>{children}</a>,
+}))
+
 const GRUPOS: readonly GrupoPaciente[] = [
   {
     patientId: 'paciente-1',
     itens: [
-      { id: 'nota-1', patientId: 'paciente-1', estado: ESTADO_PENDENTE, revisao: 0, frases: [] },
-      { id: 'nota-2', patientId: 'paciente-1', estado: ESTADO_ASSINADA, revisao: 0, frases: [] },
+      { id: 'nota-1', patientId: 'paciente-1', atendimentoId: 'atendimento', estado: ESTADO_PENDENTE, revisao: 0, frases: [{ id: 'S-0', secao: 'S', texto: 'nota-1', ancoras: [] }] },
+      { id: 'nota-2', patientId: 'paciente-1', atendimentoId: 'atendimento', estado: ESTADO_ASSINADA, revisao: 0, frases: [{ id: 'S-0', secao: 'S', texto: 'nota-2', ancoras: [] }] },
     ],
   },
 ]
@@ -27,6 +32,7 @@ function renderWidget(props?: Partial<{
     <I18nProvider i18n={i18n}>
       <BibliotecaNotas
         grupos={props?.grupos ?? GRUPOS}
+        nomesPacientes={new Map([['paciente-1', 'paciente-1'], ['paciente-2', 'paciente-2']])}
         termo={props?.termo ?? ''}
         onTermoChange={props?.onTermoChange ?? vi.fn()}
         resultado={props?.resultado ?? { estado: 'ocioso' }}
@@ -53,6 +59,13 @@ describe('BibliotecaNotas', () => {
     expect(screen.getByText('nota-2')).toBeTruthy()
   })
 
+  it('cada nota leva à aba da nota da sua sessão', () => {
+    renderWidget()
+
+    expect(screen.getByRole('link', { name: 'Abrir nota 1' }).getAttribute('href')).toBe('/pacientes/paciente-1/sessoes/atendimento?aba=nota')
+    expect(screen.getByRole('link', { name: 'Abrir nota 2' }).getAttribute('href')).toBe('/pacientes/paciente-1/sessoes/atendimento?aba=nota')
+  })
+
   it('pronto com subconjunto de ids: só esses itens aparecem', () => {
     renderWidget({ resultado: { estado: 'pronto', ids: ['nota-1'] } })
 
@@ -72,7 +85,7 @@ describe('BibliotecaNotas', () => {
   it('rascunhos antes das assinadas: o widget preserva a ordem de agruparPorPaciente, não reordena', () => {
     renderWidget({ resultado: { estado: 'ocioso' } })
 
-    const itens = screen.getAllByRole('listitem').map((el) => el.textContent)
+    const itens = screen.getAllByRole('listitem').map((el) => el.querySelector('dd')?.textContent)
     expect(itens).toEqual(['nota-1', 'nota-2'])
   })
 
@@ -81,15 +94,15 @@ describe('BibliotecaNotas', () => {
       {
         patientId: 'paciente-2',
         itens: [
-          { id: 'nota-3', patientId: 'paciente-2', estado: ESTADO_PENDENTE, revisao: 0, frases: [] },
-          { id: 'nota-4', patientId: 'paciente-2', estado: ESTADO_ASSINADA, revisao: 0, frases: [] },
+          { id: 'nota-3', patientId: 'paciente-2', atendimentoId: 'atendimento', estado: ESTADO_PENDENTE, revisao: 0, frases: [{ id: 'S-0', secao: 'S', texto: 'nota-3', ancoras: [] }] },
+          { id: 'nota-4', patientId: 'paciente-2', atendimentoId: 'atendimento', estado: ESTADO_ASSINADA, revisao: 0, frases: [{ id: 'S-0', secao: 'S', texto: 'nota-4', ancoras: [] }] },
         ],
       },
       {
         patientId: 'paciente-1',
         itens: [
-          { id: 'nota-1', patientId: 'paciente-1', estado: ESTADO_PENDENTE, revisao: 0, frases: [] },
-          { id: 'nota-2', patientId: 'paciente-1', estado: ESTADO_ASSINADA, revisao: 0, frases: [] },
+          { id: 'nota-1', patientId: 'paciente-1', atendimentoId: 'atendimento', estado: ESTADO_PENDENTE, revisao: 0, frases: [{ id: 'S-0', secao: 'S', texto: 'nota-1', ancoras: [] }] },
+          { id: 'nota-2', patientId: 'paciente-1', atendimentoId: 'atendimento', estado: ESTADO_ASSINADA, revisao: 0, frases: [{ id: 'S-0', secao: 'S', texto: 'nota-2', ancoras: [] }] },
         ],
       },
     ]
@@ -106,19 +119,19 @@ describe('BibliotecaNotas', () => {
 
     const secaoPaciente2 = screen.getByRole('region', { name: 'paciente-2' })
     const secaoPaciente1 = screen.getByRole('region', { name: 'paciente-1' })
-    expect(within(secaoPaciente2).getAllByRole('listitem').map((el) => el.textContent)).toEqual(['nota-3', 'nota-4'])
-    expect(within(secaoPaciente1).getAllByRole('listitem').map((el) => el.textContent)).toEqual(['nota-1', 'nota-2'])
+    expect(within(secaoPaciente2).getAllByRole('listitem').map((el) => el.querySelector('dd')?.textContent)).toEqual(['nota-3', 'nota-4'])
+    expect(within(secaoPaciente1).getAllByRole('listitem').map((el) => el.querySelector('dd')?.textContent)).toEqual(['nota-1', 'nota-2'])
   })
 
   it('pronto com ids que só batem no primeiro grupo: o grupo vazio não é renderizado', () => {
     const grupos: readonly GrupoPaciente[] = [
       {
         patientId: 'paciente-1',
-        itens: [{ id: 'nota-1', patientId: 'paciente-1', estado: ESTADO_PENDENTE, revisao: 0, frases: [] }],
+        itens: [{ id: 'nota-1', patientId: 'paciente-1', atendimentoId: 'atendimento', estado: ESTADO_PENDENTE, revisao: 0, frases: [{ id: 'S-0', secao: 'S', texto: 'nota-1', ancoras: [] }] }],
       },
       {
         patientId: 'paciente-2',
-        itens: [{ id: 'nota-3', patientId: 'paciente-2', estado: ESTADO_PENDENTE, revisao: 0, frases: [] }],
+        itens: [{ id: 'nota-3', patientId: 'paciente-2', atendimentoId: 'atendimento', estado: ESTADO_PENDENTE, revisao: 0, frases: [{ id: 'S-0', secao: 'S', texto: 'nota-3', ancoras: [] }] }],
       },
     ]
     renderWidget({ grupos, resultado: { estado: 'pronto', ids: ['nota-1'] } })
@@ -134,5 +147,16 @@ describe('BibliotecaNotas', () => {
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'febre' } })
 
     expect(onTermoChange).toHaveBeenCalledWith('febre')
+  })
+
+  it('cada nota mostra o estado, o travessão e a revisão contada a partir de 1', () => {
+    const grupos: readonly GrupoPaciente[] = [{ patientId: 'paciente-1', itens: [
+      { id: 'a', patientId: 'paciente-1', atendimentoId: 'x', estado: ESTADO_PENDENTE, revisao: 0, frases: [{ id: 'S-0', secao: 'S', texto: 'a', ancoras: [] }] },
+      { id: 'b', patientId: 'paciente-1', atendimentoId: 'x', estado: ESTADO_ASSINADA, revisao: 2, frases: [{ id: 'S-0', secao: 'S', texto: 'b', ancoras: [] }] },
+    ] }]
+    renderWidget({ grupos })
+    const itens = screen.getAllByRole('listitem')
+    expect(within(itens[0]!).getByText(/Rascunho/).textContent).toBe('Rascunho — Revisão 1')
+    expect(within(itens[1]!).getByText(/Assinada/).textContent).toBe('Assinada — Revisão 3')
   })
 })

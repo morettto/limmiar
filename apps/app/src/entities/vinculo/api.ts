@@ -114,6 +114,11 @@ export async function criarConviteVinculo(
 
 export type ResgatarConviteVinculoResult = { ok: true; vinculo: Vinculo } | ProblemResult
 
+export async function revogarConvitesVinculo(baseUrl: string, accountId: string, accessToken: string, patientId: string): Promise<{ ok: true } | ProblemResult> {
+  const result = await request(baseUrl, 'DELETE', `/accounts/${accountId}/patients/${patientId}/link-invites`, undefined, accessToken)
+  return result.ok ? { ok: true } : result
+}
+
 export async function resgatarConviteVinculo(
   baseUrl: string,
   accountId: string,

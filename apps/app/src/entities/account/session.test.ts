@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { criarSessaoDeConta, type KeyValueStorage } from './session'
 
-const ACCOUNT = {
+const ACCOUNT = {accessToken: 'test-access', refreshToken: 'test-refresh', accessTokenExpiresAt: '2099-01-01T00:00:00Z',
   id: '11111111-1111-1111-1111-111111111111',
   email: 'user@example.com',
   role: 'Professional' as const,
@@ -23,6 +23,11 @@ function createFakeStorage(): KeyValueStorage {
 }
 
 describe('criarSessaoDeConta', () => {
+  it('recusa persistir um cadastro ainda sem segundo fator concluído', () => {
+    const sessao = criarSessaoDeConta(createFakeStorage())
+    expect(() => sessao.registar({ ...ACCOUNT, twoFactorRequirement: 'SetupRequired', accessToken: null })).toThrow('incomplete authentication')
+    expect(sessao.ler()).toBeNull()
+  })
   it('ler() returns null when nothing was ever recorded', () => {
     const sessao = criarSessaoDeConta(createFakeStorage())
 
@@ -153,5 +158,37 @@ describe('criarSessaoDeConta', () => {
 
     expect(() => sessao.terminar()).not.toThrow()
     expect(sessao.ler()).toBeNull()
+  })
+
+  it.each([
+    ['id que não é texto', { id: 5 }],
+    ['paciente com e-mail', { role: 'Patient' }],
+    ['profissional sem e-mail', { email: null }],
+    ['profissional com e-mail vazio', { email: '' }],
+    ['profissional com e-mail só de espaços', { email: '   ' }],
+    ['segundo fator ainda por configurar', { twoFactorRequirement: 'SetupRequired' }],
+    ['token de acesso que não é texto', { accessToken: 5 }],
+    ['token de acesso vazio', { accessToken: '' }],
+    ['token de renovação que não é texto', { refreshToken: 5 }],
+    ['token de renovação vazio', { refreshToken: '' }],
+    ['validade que não é texto', { accessTokenExpiresAt: 0 }],
+    ['validade que não é data', { accessTokenExpiresAt: 'amanhã' }],
+  ])('ler() recusa o que está guardado com %s', (_caso, alteracao) => {
+    const storage = createFakeStorage()
+    storage.setItem('limmiar:account', JSON.stringify({ ...ACCOUNT, ...alteracao }))
+    expect(criarSessaoDeConta(storage).ler()).toBeNull()
+  })
+
+  it('aceita a conta de paciente sem e-mail', () => {
+    const storage = createFakeStorage()
+    const paciente = { ...ACCOUNT, role: 'Patient' as const, email: null }
+    storage.setItem('limmiar:account', JSON.stringify(paciente))
+    expect(criarSessaoDeConta(storage).ler()).toEqual({ ...paciente, twoFactorTicket: null })
+  })
+
+  it('registar() recusa a conta cujos campos não passam na mesma validação', () => {
+    const sessao = criarSessaoDeConta(createFakeStorage())
+    expect(() => sessao.registar({ ...ACCOUNT, twoFactorRequirement: 'SetupRequired' })).toThrow('incomplete authentication')
+    expect(() => sessao.registar({ ...ACCOUNT, email: '   ' })).toThrow('incomplete authentication')
   })
 })

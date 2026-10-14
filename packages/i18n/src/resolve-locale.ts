@@ -1,16 +1,13 @@
-import { isLocale, type Locale } from './locale'
+import { BASE_LOCALE, isLocale, type Locale } from './locale'
 import type { LocaleStore, ProfileLocaleStore } from './locale-store'
-import { negotiateLocale } from './negotiate'
 
 export interface ResolveLocaleDeps {
   profileStore: ProfileLocaleStore
   deviceStore: LocaleStore
-  preferences: string | readonly string[] | null | undefined
 }
 
-// ADR-S00.5-05's negotiation order: profile, device (localStorage), navigator,
-// base. Levels 3 and 4 are negotiateLocale's (RFC 4647 lookup); this only puts
-// the two higher-priority levels in front of it.
+// Order: profile, device (localStorage), base. The browser's language is deliberately absent: the
+// product opens in pt-BR until the person picks another locale.
 export async function resolveLocale(deps: ResolveLocaleDeps): Promise<Locale> {
   const profileLocale = await deps.profileStore.get()
   if (isLocale(profileLocale)) return profileLocale
@@ -18,7 +15,7 @@ export async function resolveLocale(deps: ResolveLocaleDeps): Promise<Locale> {
   const deviceLocale = await deps.deviceStore.get()
   if (isLocale(deviceLocale)) return deviceLocale
 
-  return negotiateLocale(deps.preferences)
+  return BASE_LOCALE
 }
 
 export interface PersistLocaleDeps {

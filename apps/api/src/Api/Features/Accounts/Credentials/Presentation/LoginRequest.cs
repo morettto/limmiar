@@ -4,7 +4,7 @@ public sealed record LoginRequest(string Email, byte[] PasswordVerifier);
 
 public sealed record LoginResponse(
     Guid Id,
-    string Email,
+    string? Email,
     AccountRole Role,
     TwoFactorRequirement TwoFactorRequirement,
     string? TwoFactorTicket = null,

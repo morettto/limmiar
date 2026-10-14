@@ -1,0 +1,16 @@
+@theme inline {
+  --color-neutral-50: var(--color-vellum);
+  --color-neutral-100: var(--color-bone);
+  --color-neutral-200: var(--color-ash);
+  --color-neutral-300: var(--color-ash);
+  --color-neutral-400: var(--color-lichen);
+  --color-neutral-500: var(--color-lichen);
+  --color-neutral-600: var(--color-lichen);
+  --color-neutral-700: var(--color-olive-char);
+  --color-neutral-800: var(--color-carbon);
+  --color-neutral-900: var(--color-carbon);
+  --color-neutral-950: var(--color-carbon);
+  --radius-md: var(--radius-sm);
+  --font-serif: var(--font-editorial);
+  --font-mono: var(--font-interface);
+}

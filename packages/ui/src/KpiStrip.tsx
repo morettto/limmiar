@@ -7,9 +7,9 @@ export interface KpiStripItemProps {
 
 function KpiStripItem({ label, value }: KpiStripItemProps) {
   return (
-    <div className="min-w-[65%] shrink-0 snap-start rounded-lg border border-neutral-300 bg-white p-3 md:min-w-0 md:shrink md:snap-none">
-      <div className="text-xs text-neutral-500">{label}</div>
-      <div className="text-xl text-neutral-900">{value}</div>
+    <div className="min-w-[65%] shrink-0 snap-start rounded-lg border border-neutral-300 bg-white p-6 md:min-w-0 md:shrink md:snap-none">
+      <div className="editorial-eyebrow">{label}</div>
+      <div className="font-serif text-2xl text-neutral-950">{value}</div>
     </div>
   )
 }

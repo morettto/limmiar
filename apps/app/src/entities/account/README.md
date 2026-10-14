@@ -30,7 +30,7 @@ compilação, não só em prosa.
    `"null"` incluídos); objeto sem `id` string não-vazio.
 4. `terminar()` remove a entrada de `sessionStorage`. Desde S18-02, `SessionProvider.terminarSessao()`
    chama-o e depois dispara a purga de outros dados da conta (ver `app/providers/SessionProvider.tsx`
-   e `features/copilot-byok/README.md`, ponto 5) -- esta slice continua sem saber nada dessa purga.
+   e `app/providers/README.md`) -- esta slice continua sem saber nada dessa purga.
 
 ## Pontos de entrada
 
@@ -62,7 +62,7 @@ compilação, não só em prosa.
   `app`, então três route components (`IndexRouteComponent`, `CopilotKeyRouteComponent`,
   `BibliotecaRouteComponent`) existiam só para chamar `useSession()` em `app/routing` e passar o
   resultado como prop. `entities` já é camada que `pages` pode importar -- descer o contexto
-  (React puro, sem `clearApiKey`/`purgarOpfsDaConta` -- então `purgarIndiceBusca`, ver
+  (React puro, sem `purgarOpfsDaConta` -- então `purgarIndiceBusca`, ver
   Decisões, "purgarOpfsDaConta" -- que ficaram em `SessionProvider.tsx`) apagou
   os três wrappers sem mudar nenhum comportamento observável.
 - **`ler()` valida `id`, `email`, `role` e `twoFactorRequirement` (S18-02, review de segurança).**
@@ -97,11 +97,26 @@ compilação, não só em prosa.
   `terminar()` precisam deles; o storage real (`window.sessionStorage`) já implementa os três,
   só a interface injetada é que ficou maior para o teste poder dopar os quatro ramos de `ler()`.
 
-## Fora de âmbito
+## Chave clínica e recuperação
 
-- **Chaveiro (KEK) real** -- `entities/account` não sabe nada de criptografia de repouso; quem
-  monta o chaveiro é a spec S01, ainda não ligada a `SessionProvider`.
+`account-keys.ts` implementa a hierarquia S01: senha → Argon2id → KEK não extraível
+→ DEK por paciente. A derivação da KEK usa domínio e salt diferentes do verificador
+enviado ao servidor. `SessionProvider` mantém a KEK apenas em memória.
+
+A frase BIP39 deriva outra KEK, também separada do verificador de recuperação.
+O envelope de recuperação contém uma DEK selada (60 bytes) e a KEK clínica cifrada
+sob essa DEK (60 bytes). O AAD liga cada parte à conta, finalidade e versão.
+Senha e frase nunca saem do cliente; buffers de material de chave são zerados.
+
+A configuração confirma a senha contra a KEK da sessão antes de gerar a frase.
+Só registra verificador e envelope juntos depois da confirmação “Guardei minha
+frase”; uma tentativa abortada preserva a recuperação anterior. Uma repetição de
+gravação conserva a mesma frase e cifra. O restauro abre a mesma KEK sem a senha
+antiga e só a entrega à sessão depois de completar o segundo fator.
+
+Rotas de produto: `/recover` e `/settings/recovery`. Nenhum token, senha ou chave
+é recebido pela URL. Uma conta sem envelope não é tratada como restauro completo.
 
 [[S18-02 Sair da conta por um ponto único de purga|S18-02]] fechou o botão "Sair" e a purga por
 conta (`app/providers/purgar-conta.ts`, `PURGAS`/`purgarConta`) -- fora desta slice, ver
-`features/copilot-byok/README.md` ponto 5 para o desenho completo.
+`app/providers/README.md` para o desenho completo.

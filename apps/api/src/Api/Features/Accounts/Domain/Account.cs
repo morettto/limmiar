@@ -2,7 +2,7 @@ namespace Api.Accounts;
 
 public sealed record Account(
     Guid Id,
-    string Email,
+    string? Email,
     AccountRole Role,
     byte[]? PasswordVerifier,
     string? GoogleSubjectId,
@@ -17,4 +17,5 @@ public sealed record Account(
     uint? WebAuthnSignCount = null,
     Guid? WebAuthnAaGuid = null,
     byte[]? RecoveryVerifier = null,
-    VoiceEnrollment? VoiceEnrollment = null);
+    VoiceEnrollment? VoiceEnrollment = null,
+    byte[]? RecoveryEnvelope = null);

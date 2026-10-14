@@ -6,13 +6,11 @@ export type LerSelado = () => Promise<Uint8Array<ArrayBuffer> | null>
 export type GravarSelado = (selado: Uint8Array<ArrayBuffer>) => Promise<void>
 export type ApagarSelado = () => Promise<void>
 
-// Um único ficheiro por diretório (o índice de busca é um blob por conta, não um chunk por
-// seq como live-session/chunk-store.ts) -- o chamador escolhe o `dir` já escopado à conta.
+// O chamador fornece o diretório isolado da conta.
 const ARQUIVO_INDICE = 'indice-busca'
 
 /**
- * A única função autorizada a tocar a API OPFS para o índice de busca, tal como `opfsWriter` em
- * `chunk-store.ts`: `ler`/`gravar` nunca lidam com plaintext, só com o blob já selado.
+ * Acesso OPFS do índice: `ler`/`gravar` recebem somente o blob já selado.
  */
 export function opfsIndice(
   dir: FileSystemDirectoryHandle,
@@ -76,7 +74,7 @@ export async function restaurarIndice(
   if (indice === null) {
     // Rejeição de `apagar` ignorada de propósito: o `gravar` seguinte usa `createWritable()`,
     // que trunca o ficheiro, então o blob obsoleto é sobrescrito de qualquer forma. Propagar
-    // deixaria o blob em claro no disco E a página presa no erro.
+    // deixaria o blob cifrado obsoleto no disco e a página presa no erro.
     await store.apagar().catch(() => {})
     return null
   }

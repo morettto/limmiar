@@ -79,11 +79,7 @@ public sealed class TwoFactorEndpointsTests : IAsyncLifetime
         using var factory = CreateFactoryWithTicketBypass();
         using var client = factory.CreateClient();
 
-        var registerResponse = await client.PostAsJsonAsync(
-            "/auth/register",
-            new RegisterRequest("totp-patient@example.com", SomeVerifier, AccountRole.Patient),
-            AccountsJsonContext.Default.RegisterRequest);
-        var registered = await registerResponse.Content.ReadFromJsonAsync(AccountsJsonContext.Default.RegisterResponse);
+        var registered = await AnonymousAccountFixture.CreateAsync(factory.Services);
 
         var response = await PostBeginAsync(client, registered!.Id, "any-ticket");
 

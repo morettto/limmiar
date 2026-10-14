@@ -19,7 +19,7 @@ public sealed class PostgresAccountStore(NpgsqlDataSource dataSource, TotpSecret
         rejection_reason, verification_submitted_at, totp_secret_encrypted, totp_enabled_at,
         totp_backup_code_hashes, webauthn_credential_id, webauthn_cose_public_key,
         webauthn_sign_count, webauthn_aaguid, recovery_verifier_sha256, voice_wrapped_dek,
-        voice_sealed_embedding
+        voice_sealed_embedding, recovery_key_envelope
         """;
 
     public Task<Account?> FindByEmailAsync(string normalizedEmail, CancellationToken cancellationToken)
@@ -27,6 +27,26 @@ public sealed class PostgresAccountStore(NpgsqlDataSource dataSource, TotpSecret
 
     public Task<Account?> FindByIdAsync(Guid id, CancellationToken cancellationToken)
         => FindOneAsync("id = @id", "id", id, cancellationToken, ("app.tenant_id", id.ToString()));
+
+    public async Task<string?> GetOrCreatePendingTotpSecretAsync(Guid id, string candidate, CancellationToken cancellationToken)
+    {
+        await using var scope = await dataSource.OpenTenantScopedTransactionAsync(id, cancellationToken);
+        var secret = await scope.QuerySingleAsync(
+            """
+            UPDATE accounts SET totp_secret_encrypted = COALESCE(totp_secret_encrypted, @candidate)
+            WHERE id = @id AND role = 'Professional' AND totp_enabled_at IS NULL
+            RETURNING totp_secret_encrypted
+            """,
+            reader => totpSecretCipher.Decrypt(id, reader.GetFieldValue<byte[]>(0)),
+            cancellationToken,
+            command =>
+            {
+                command.Parameters.AddWithValue("id", id);
+                command.Parameters.AddWithValue("candidate", totpSecretCipher.Encrypt(id, candidate));
+            });
+        await scope.Transaction.CommitAsync(cancellationToken);
+        return secret;
+    }
 
     private async Task<Account?> FindOneAsync(
         string predicate,
@@ -57,13 +77,13 @@ public sealed class PostgresAccountStore(NpgsqlDataSource dataSource, TotpSecret
                 rejection_reason, verification_submitted_at, totp_secret_encrypted, totp_enabled_at,
                 totp_backup_code_hashes, webauthn_credential_id, webauthn_cose_public_key,
                 webauthn_sign_count, webauthn_aaguid, recovery_verifier_sha256, voice_wrapped_dek,
-                voice_sealed_embedding)
+                voice_sealed_embedding, recovery_key_envelope)
             VALUES (
                 @id, @email, @role, @passwordVerifier, @googleSubjectId, @verificationStatus,
                 @rejectionReason, @verificationSubmittedAt, @totpSecret, @totpEnabledAt,
                 @totpBackupCodeHashes, @webauthnCredentialId, @webauthnCosePublicKey,
                 @webauthnSignCount, @webauthnAaGuid, @recoveryVerifier, @voiceWrappedDek,
-                @voiceSealedEmbedding)
+                @voiceSealedEmbedding, @recoveryEnvelope)
             """;
         AddAccountParameters(insertCommand, account);
         await insertCommand.ExecuteNonQueryAsync(cancellationToken);
@@ -71,9 +91,16 @@ public sealed class PostgresAccountStore(NpgsqlDataSource dataSource, TotpSecret
         await scope.Transaction.CommitAsync(cancellationToken);
     }
 
-    public async Task UpdateAsync(Account account, CancellationToken cancellationToken)
+    public async Task<Account?> MutateAsync(Guid id, Func<Account, Account?> mutation, CancellationToken cancellationToken)
     {
-        await using var scope = await dataSource.OpenTenantScopedTransactionAsync(account.Id, cancellationToken);
+        await using var scope = await dataSource.OpenTenantScopedTransactionAsync(id, cancellationToken);
+        var current = await scope.QuerySingleAsync(
+            $"SELECT {SelectColumns} FROM accounts WHERE id = @id FOR UPDATE",
+            ReadAccount, cancellationToken, command => command.Parameters.AddWithValue("id", id));
+        if (current is null) return null;
+        var account = mutation(current);
+        if (account is null) return null;
+        if (account.Id != id) throw new ArgumentException("An account mutation cannot change its identity.", nameof(mutation));
 
         await using var updateCommand = scope.Connection.CreateCommand();
         updateCommand.Transaction = scope.Transaction;
@@ -94,13 +121,15 @@ public sealed class PostgresAccountStore(NpgsqlDataSource dataSource, TotpSecret
                 webauthn_aaguid = @webauthnAaGuid,
                 recovery_verifier_sha256 = @recoveryVerifier,
                 voice_wrapped_dek = @voiceWrappedDek,
-                voice_sealed_embedding = @voiceSealedEmbedding
+                voice_sealed_embedding = @voiceSealedEmbedding,
+                recovery_key_envelope = @recoveryEnvelope
             WHERE id = @id
             """;
         AddAccountParameters(updateCommand, account);
         await updateCommand.ExecuteNonQueryAsync(cancellationToken);
 
         await scope.Transaction.CommitAsync(cancellationToken);
+        return account;
     }
 
     public async Task<IReadOnlyList<Account>> ListPendingDocumentReviewAsync(CancellationToken cancellationToken)
@@ -132,7 +161,7 @@ public sealed class PostgresAccountStore(NpgsqlDataSource dataSource, TotpSecret
     private void AddAccountParameters(NpgsqlCommand command, Account account)
     {
         command.Parameters.AddWithValue("id", account.Id);
-        command.Parameters.AddWithValue("email", account.Email);
+        command.Parameters.AddWithValue("email", NpgsqlTypes.NpgsqlDbType.Text, (object?)account.Email ?? DBNull.Value);
         command.Parameters.AddWithValue("role", account.Role.ToString());
         command.Parameters.AddWithValue("passwordVerifier", (object?)account.PasswordVerifier ?? DBNull.Value);
         command.Parameters.AddWithValue("googleSubjectId", (object?)account.GoogleSubjectId ?? DBNull.Value);
@@ -147,6 +176,7 @@ public sealed class PostgresAccountStore(NpgsqlDataSource dataSource, TotpSecret
         command.Parameters.AddWithValue("webauthnSignCount", account.WebAuthnSignCount is { } signCount ? (long)signCount : DBNull.Value);
         command.Parameters.AddWithValue("webauthnAaGuid", (object?)account.WebAuthnAaGuid ?? DBNull.Value);
         command.Parameters.AddWithValue("recoveryVerifier", (object?)account.RecoveryVerifier ?? DBNull.Value);
+        command.Parameters.AddWithValue("recoveryEnvelope", (object?)account.RecoveryEnvelope ?? DBNull.Value);
         command.Parameters.AddWithValue("voiceWrappedDek", (object?)account.VoiceEnrollment?.WrappedDek ?? DBNull.Value);
         command.Parameters.AddWithValue("voiceSealedEmbedding", (object?)account.VoiceEnrollment?.SealedEmbedding ?? DBNull.Value);
     }
@@ -158,7 +188,7 @@ public sealed class PostgresAccountStore(NpgsqlDataSource dataSource, TotpSecret
         var sealedEmbedding = reader.IsDBNull(Ord("voice_sealed_embedding")) ? null : reader.GetFieldValue<byte[]>(Ord("voice_sealed_embedding"));
         return new Account(
             Id: reader.GetGuid(Ord("id")),
-            Email: reader.GetString(Ord("email")),
+            Email: reader.IsDBNull(Ord("email")) ? null : reader.GetString(Ord("email")),
             Role: Enum.Parse<AccountRole>(reader.GetString(Ord("role"))),
             PasswordVerifier: reader.IsDBNull(Ord("password_verifier_sha256")) ? null : reader.GetFieldValue<byte[]>(Ord("password_verifier_sha256")),
             GoogleSubjectId: reader.IsDBNull(Ord("google_subject_id")) ? null : reader.GetString(Ord("google_subject_id")),
@@ -173,7 +203,8 @@ public sealed class PostgresAccountStore(NpgsqlDataSource dataSource, TotpSecret
             WebAuthnSignCount: reader.IsDBNull(Ord("webauthn_sign_count")) ? null : (uint)reader.GetInt64(Ord("webauthn_sign_count")),
             WebAuthnAaGuid: reader.IsDBNull(Ord("webauthn_aaguid")) ? null : reader.GetGuid(Ord("webauthn_aaguid")),
             RecoveryVerifier: reader.IsDBNull(Ord("recovery_verifier_sha256")) ? null : reader.GetFieldValue<byte[]>(Ord("recovery_verifier_sha256")),
-            VoiceEnrollment: ReadVoiceEnrollment(wrappedDek, sealedEmbedding));
+            VoiceEnrollment: ReadVoiceEnrollment(wrappedDek, sealedEmbedding),
+            RecoveryEnvelope: reader.IsDBNull(Ord("recovery_key_envelope")) ? null : reader.GetFieldValue<byte[]>(Ord("recovery_key_envelope")));
     }
 
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage(Justification =

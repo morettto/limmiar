@@ -1,11 +1,10 @@
 import { test, expect } from '@playwright/test'
-import { API_BASE_URL } from '../playwright.config'
 import { componentAxeBuilder } from '../src/test-support/axe'
 import { computeTotpCode } from './fixtures/totp'
 
-// S18-02: entra pelo caminho do profissional (registo + TOTP via /auth/screen), não magic-link --
-// evita WebAuthn/CDP (ver magic-link-login.spec.ts para essa outra rota). Prova o ponto único de
-// purga (SessionProvider.purgarConta) num browser real: sessionStorage vazio depois do logout.
+// S18-02: entra pelo caminho do profissional (registo + TOTP em `/`), não magic-link -- evita
+// WebAuthn/CDP. Prova o ponto único de purga (SessionProvider.purgarConta): sessionStorage vazio
+// depois do logout. A KEK só vive na memória da página, então nada aqui recarrega.
 
 test.describe.configure({ mode: 'serial' })
 test.use({ locale: 'pt-BR' })
@@ -18,7 +17,7 @@ test('a professional logs in, then logs out via the "Sair" button, and the sessi
   const email = uniqueProfessionalEmail('sair')
   const password = 'Senha-Segura!123'
 
-  await page.goto(`/auth/screen?${new URLSearchParams({ baseUrl: API_BASE_URL, role: 'Professional' }).toString()}`)
+  await page.goto('/')
   await page.getByLabel('E-mail').fill(email)
   await page.getByLabel('Senha').fill(password)
   await page.getByRole('button', { name: 'Criar conta' }).click()
@@ -33,7 +32,6 @@ test('a professional logs in, then logs out via the "Sair" button, and the sessi
   await page.getByRole('button', { name: 'Confirmar' }).click()
   await page.getByRole('button', { name: 'Guardei meus códigos' }).click()
 
-  await page.goto('/')
   await expect(page.locator('#app-shell')).toBeVisible()
   await expect(page.getByTestId('conta-sessao')).toHaveText(email)
 
@@ -42,7 +40,8 @@ test('a professional logs in, then logs out via the "Sair" button, and the sessi
   await page.getByRole('button', { name: 'Sair' }).press('Enter')
 
   await expect(page.getByRole('button', { name: 'Sair' })).toHaveCount(0)
-  await expect(page.locator('#app-shell')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Bem-vindo ao Limmiar' })).toBeVisible()
+  await expect(page.locator('#app-shell')).toHaveCount(0)
   expect(await page.evaluate(() => window.sessionStorage.length)).toBe(0)
 
   expect((await componentAxeBuilder(page).analyze()).violations).toEqual([])

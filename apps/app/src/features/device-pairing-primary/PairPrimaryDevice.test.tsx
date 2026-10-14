@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { I18nProvider } from '@lingui/react'
 import { decrypt, deriveChannelKey, generateKeyPair, getSharedSecret } from '@limmiar/crypto'
 import { i18n, dynamicActivate } from '../../shared/i18n'
@@ -98,6 +98,10 @@ describe('PairPrimaryDevice', () => {
     // Trigger the claim-status poll that discovers the (fake) claim, then let the
     // getKekForTransfer -> encrypt -> submitPairingPayload chain settle.
     await vi.advanceTimersByTimeAsync(1000)
+    await flushUntil(() => screen.queryByTestId('pairing-confirmation') !== null)
+    expect(getKekForTransfer).not.toHaveBeenCalled()
+    expect(submitPairingPayloadMock).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Os códigos são iguais. Liberar acesso.' }))
     await flushUntil(() => screen.queryByRole('status')?.textContent === 'Dispositivo pareado com sucesso.')
 
     // waitFor's retry loop uses a real setTimeout, which never fires under fake timers. The
@@ -153,6 +157,10 @@ describe('PairPrimaryDevice', () => {
     // Trigger the claim-status poll that discovers the (fake) claim, then let the
     // getKekForTransfer -> encrypt -> submitPairingPayload chain settle.
     await vi.advanceTimersByTimeAsync(1000)
+    await flushUntil(() => screen.queryByTestId('pairing-confirmation') !== null)
+    expect(getKekForTransfer).not.toHaveBeenCalled()
+    expect(submitPairingPayloadMock).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Os códigos são iguais. Liberar acesso.' }))
     await flushUntil(() => screen.queryByRole('status')?.textContent === 'Enviando a chave para o novo dispositivo...')
 
     expect(screen.getByRole('status').textContent).toBe('Enviando a chave para o novo dispositivo...')
@@ -198,6 +206,10 @@ describe('PairPrimaryDevice', () => {
     // Trigger the claim-status poll that discovers the (fake) claim, then let the
     // getKekForTransfer -> encrypt -> submitPairingPayload chain settle.
     await vi.advanceTimersByTimeAsync(1000)
+    await flushUntil(() => screen.queryByTestId('pairing-confirmation') !== null)
+    expect(getKekForTransfer).not.toHaveBeenCalled()
+    expect(submitPairingPayloadMock).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Os códigos são iguais. Liberar acesso.' }))
     await flushUntil(() => screen.queryByRole('alert') !== null)
 
     expect(screen.getByRole('alert')).toBeTruthy()
@@ -236,6 +248,10 @@ describe('PairPrimaryDevice', () => {
     // Trigger the claim-status poll that discovers the (fake) claim, then let the
     // getKekForTransfer -> encrypt -> submitPairingPayload chain settle.
     await vi.advanceTimersByTimeAsync(1000)
+    await flushUntil(() => screen.queryByTestId('pairing-confirmation') !== null)
+    expect(getKekForTransfer).not.toHaveBeenCalled()
+    expect(submitPairingPayloadMock).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Os códigos são iguais. Liberar acesso.' }))
     await flushUntil(() => screen.queryByRole('alert') !== null)
 
     expect(screen.getByRole('alert').textContent).toBe(
@@ -277,6 +293,10 @@ describe('PairPrimaryDevice', () => {
     // Trigger the claim-status poll that discovers the (fake) claim, then let the
     // getKekForTransfer -> encrypt -> submitPairingPayload chain settle.
     await vi.advanceTimersByTimeAsync(1000)
+    await flushUntil(() => screen.queryByTestId('pairing-confirmation') !== null)
+    expect(getKekForTransfer).not.toHaveBeenCalled()
+    expect(submitPairingPayloadMock).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Os códigos são iguais. Liberar acesso.' }))
     await flushUntil(() => screen.queryByRole('status')?.textContent === 'Dispositivo pareado com sucesso.')
 
     expect(screen.getByRole('status').textContent).toBe('Dispositivo pareado com sucesso.')

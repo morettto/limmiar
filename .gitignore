@@ -1,4 +1,6 @@
 node_modules/
+.local/
+.scratch/
 dist/
 .wrangler/
 playwright-report/
@@ -19,11 +21,8 @@ TestResults/
 *.user
 
 # Artefacto de diff da cadeia de review (efémero, 1.3.0)
-.harness/diff/
 
-# Artefactos de ASR (glue WASM + .data com os pesos) usados só em dev local
-# por apps/app/src/session/nemotron-loader.ts; produção serve de object
-# store externo (VITE_ASR_MODEL_BASE_URL) -- ver S05-02 fatia 6.
+# Modelo e worker do TitaNet (identidade de voz), gerados por tools/voice-identity/setup.mjs.
 apps/app/public/models/
 
 # Relatório JSON do vitest (`--reporter=json --outputFile`), escrito por quem

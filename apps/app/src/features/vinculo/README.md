@@ -19,7 +19,7 @@ resgatá-lo (lado paciente), e desvincular (partilhado pelos dois papéis).
 ## Invariantes
 
 - Nenhum dos três monta em rota de produção: não existe `KeychainProvider` ainda (mesmo
-  `ponytail:` de `CopilotKeyPage`/`NotaPage`/`/hoje`, `router.tsx`). Só alcançáveis por
+  `ponytail:` de `/hoje`, `router.tsx`). Só alcançáveis por
   `E2eVinculoScaffold` atrás de `VITE_ENABLE_E2E_TEST_ROUTES`.
 - `link.invite_not_found` (código inválido, expirado ou já usado) mostra sempre "Código inválido
   ou expirado." -- não distingue os três casos (Specs S11, Cenário E2E, passos 9-10). Vem direto

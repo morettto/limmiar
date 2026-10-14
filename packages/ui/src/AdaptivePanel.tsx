@@ -27,8 +27,8 @@ export function AdaptivePanel({ children, label }: AdaptivePanelProps) {
 
   if (breakpoint === 'sm') {
     return (
-      <div className="rounded-lg border border-neutral-300">
-        <button {...triggerProps} className="flex min-h-11 w-full items-center justify-between px-3 text-left">
+      <div className="rounded-lg border border-neutral-300 bg-white">
+        <button {...triggerProps} className="button-secondary flex min-h-11 w-full items-center justify-between px-3 text-left">
           {label}
         </button>
         {isOpen && (
@@ -43,14 +43,14 @@ export function AdaptivePanel({ children, label }: AdaptivePanelProps) {
   // md/lg (T): 40%-width on-demand drawer over the content.
   return (
     <div className="relative">
-      <button {...triggerProps} className="min-h-11 min-w-11 rounded-md border border-neutral-300 px-3">
+      <button {...triggerProps} className="button-secondary min-h-11 min-w-11 rounded-sm border border-neutral-300 px-3">
         {label}
       </button>
       {isOpen && (
         <div
           id={panelId}
           aria-label={label}
-          className="absolute inset-y-0 right-0 w-2/5 border-l border-neutral-300 bg-white p-3 shadow-lg"
+          className="absolute inset-y-0 right-0 w-2/5 border-l border-neutral-300 bg-white p-3"
         >
           {children}
         </div>

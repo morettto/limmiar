@@ -28,6 +28,14 @@ function renderTotpChallenge(onVerified: (account: Account) => void = vi.fn()) {
 }
 
 describe('TotpChallenge', () => {
+  it('reabilita a verificação e informa uma falha de rede', async () => {
+    verifyTotpChallengeMock.mockRejectedValueOnce(new Error('rede'))
+    renderTotpChallenge()
+    fireEvent.change(screen.getByLabelText(/código/i), { target: { value: '123456' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Verificar' }))
+    expect((await screen.findByRole('alert')).textContent).toBe('Não foi possível verificar o código. Tente novamente.')
+    expect((screen.getByRole('button', { name: 'Verificar' }) as HTMLButtonElement).disabled).toBe(false)
+  })
   beforeAll(async () => {
     await dynamicActivate('pt-BR')
   })
@@ -68,7 +76,7 @@ describe('TotpChallenge', () => {
   })
 
   it('submits a 6-digit code as { code } (with the ticket) and calls onVerified with the authenticated account', async () => {
-    const account: Account = {
+    const account: Account = {accessToken: 'test-access', refreshToken: 'test-refresh', accessTokenExpiresAt: '2099-01-01T00:00:00Z',
       id: ACCOUNT_ID,
       email: 'user@example.com',
       role: 'Professional',
@@ -89,7 +97,7 @@ describe('TotpChallenge', () => {
   })
 
   it('submits a value with a trailing 6-digit run but a non-digit prefix as { backupCode }, not { code }', async () => {
-    const account: Account = {
+    const account: Account = {accessToken: 'test-access', refreshToken: 'test-refresh', accessTokenExpiresAt: '2099-01-01T00:00:00Z',
       id: ACCOUNT_ID,
       email: 'user@example.com',
       role: 'Professional',
@@ -110,7 +118,7 @@ describe('TotpChallenge', () => {
   })
 
   it('submits digits followed by text as { backupCode }, not { code }', async () => {
-    verifyTotpChallengeMock.mockResolvedValue({ ok: true, account: {
+    verifyTotpChallengeMock.mockResolvedValue({ ok: true, account: {accessToken: 'test-access', refreshToken: 'test-refresh', accessTokenExpiresAt: '2099-01-01T00:00:00Z',
       id: ACCOUNT_ID,
       email: 'user@example.com',
       role: 'Professional',
@@ -130,7 +138,7 @@ describe('TotpChallenge', () => {
   })
 
   it('submits a hyphenated backup code as { backupCode } (with the ticket) and calls onVerified', async () => {
-    const account: Account = {
+    const account: Account = {accessToken: 'test-access', refreshToken: 'test-refresh', accessTokenExpiresAt: '2099-01-01T00:00:00Z',
       id: ACCOUNT_ID,
       email: 'user@example.com',
       role: 'Professional',

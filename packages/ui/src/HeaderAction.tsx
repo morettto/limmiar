@@ -39,7 +39,7 @@ export function HeaderAction({
       disabled={disabled}
       aria-label={ariaLabel}
       style={{ bottom }}
-      className="fixed inset-x-4 z-10 min-h-12 rounded-lg bg-neutral-900 px-4 text-sm text-white shadow-lg md:static md:inset-auto md:mb-0 md:min-h-11 md:w-auto md:shadow-none xl:min-h-8"
+      className="button-primary fixed inset-x-4 z-10 min-h-12 rounded-sm px-4 text-sm shadow-none md:static md:inset-auto md:mb-0 md:min-h-11 md:w-auto xl:min-h-8"
     >
       {children}
     </button>

@@ -56,7 +56,7 @@ public sealed class DevicePairingEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        var (accountId, _) = await RegisterAsync(client, "pairing-create-no-token@example.com");
+        var (accountId, _) = await RegisterAsync(factory, client, "pairing-create-no-token@example.com");
         client.DefaultRequestHeaders.Authorization = null;
 
         var response = await PostCreateAsync(client, accountId);
@@ -71,7 +71,7 @@ public sealed class DevicePairingEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        var (accountId, _) = await RegisterAsync(client, "pairing-create-basic-auth@example.com");
+        var (accountId, _) = await RegisterAsync(factory, client, "pairing-create-basic-auth@example.com");
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", "not-a-bearer-token");
 
         var response = await PostCreateAsync(client, accountId);
@@ -86,7 +86,7 @@ public sealed class DevicePairingEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        var (accountId, _) = await RegisterAsync(client, "pairing-create-unknown-token@example.com");
+        var (accountId, _) = await RegisterAsync(factory, client, "pairing-create-unknown-token@example.com");
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "never-issued-token");
 
         var response = await PostCreateAsync(client, accountId);
@@ -101,10 +101,10 @@ public sealed class DevicePairingEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        var (victimAccountId, _) = await RegisterAsync(client, "pairing-create-victim@example.com");
+        var (victimAccountId, _) = await RegisterAsync(factory, client, "pairing-create-victim@example.com");
         // RegisterAsync leaves the client carrying the LAST registered account's token, so
         // registering the attacker second makes the client the attacker.
-        await RegisterAsync(client, "pairing-create-attacker@example.com");
+        await RegisterAsync(factory, client, "pairing-create-attacker@example.com");
 
         var response = await PostCreateAsync(client, victimAccountId);
 
@@ -117,7 +117,7 @@ public sealed class DevicePairingEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        var (accountId, _) = await RegisterAsync(client, "pairing-create-ok@example.com");
+        var (accountId, _) = await RegisterAsync(factory, client, "pairing-create-ok@example.com");
         var before = DateTimeOffset.UtcNow;
 
         var response = await PostCreateAsync(client, accountId);
@@ -148,7 +148,7 @@ public sealed class DevicePairingEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        var sessionId = await CreateSessionAsync(client, "pairing-claim-ok@example.com");
+        var sessionId = await CreateSessionAsync(factory, client, "pairing-claim-ok@example.com");
         // The scanning device has no session for this account -- that's the point of pairing -- so this call must succeed with no credential.
         client.DefaultRequestHeaders.Authorization = null;
 
@@ -166,7 +166,7 @@ public sealed class DevicePairingEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        var sessionId = await CreateSessionAsync(client, "pairing-claim-replay@example.com");
+        var sessionId = await CreateSessionAsync(factory, client, "pairing-claim-replay@example.com");
         var firstResponse = await PostClaimAsync(client, sessionId);
         Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
 
@@ -181,7 +181,7 @@ public sealed class DevicePairingEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        var (accountId, _) = await RegisterAsync(client, "pairing-status-pending@example.com");
+        var (accountId, _) = await RegisterAsync(factory, client, "pairing-status-pending@example.com");
         var sessionId = await CreateSessionForAsync(client, accountId);
 
         var response = await GetClaimStatusAsync(client, accountId, sessionId);
@@ -198,7 +198,7 @@ public sealed class DevicePairingEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        var (accountId, _) = await RegisterAsync(client, "pairing-status-claimed@example.com");
+        var (accountId, _) = await RegisterAsync(factory, client, "pairing-status-claimed@example.com");
         var sessionId = await CreateSessionForAsync(client, accountId);
         await PostClaimAsync(client, sessionId);
 
@@ -216,7 +216,7 @@ public sealed class DevicePairingEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        var (accountId, _) = await RegisterAsync(client, "pairing-status-no-token@example.com");
+        var (accountId, _) = await RegisterAsync(factory, client, "pairing-status-no-token@example.com");
         var sessionId = await CreateSessionForAsync(client, accountId);
         client.DefaultRequestHeaders.Authorization = null;
 
@@ -232,9 +232,9 @@ public sealed class DevicePairingEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        var (victimAccountId, _) = await RegisterAsync(client, "pairing-status-victim@example.com");
+        var (victimAccountId, _) = await RegisterAsync(factory, client, "pairing-status-victim@example.com");
         var victimSessionId = await CreateSessionForAsync(client, victimAccountId);
-        var (attackerAccountId, _) = await RegisterAsync(client, "pairing-status-attacker@example.com");
+        var (attackerAccountId, _) = await RegisterAsync(factory, client, "pairing-status-attacker@example.com");
 
         var response = await GetClaimStatusAsync(client, attackerAccountId, victimSessionId);
 
@@ -248,7 +248,7 @@ public sealed class DevicePairingEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        var (accountId, _) = await RegisterAsync(client, "pairing-payload-not-claimed@example.com");
+        var (accountId, _) = await RegisterAsync(factory, client, "pairing-payload-not-claimed@example.com");
         var sessionId = await CreateSessionForAsync(client, accountId);
 
         var response = await PostPayloadAsync(client, accountId, sessionId);
@@ -262,7 +262,7 @@ public sealed class DevicePairingEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        var (accountId, _) = await RegisterAsync(client, "pairing-payload-ok@example.com");
+        var (accountId, _) = await RegisterAsync(factory, client, "pairing-payload-ok@example.com");
         var sessionId = await CreateSessionForAsync(client, accountId);
         await PostClaimAsync(client, sessionId);
 
@@ -277,7 +277,7 @@ public sealed class DevicePairingEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        var (accountId, _) = await RegisterAsync(client, "pairing-payload-twice@example.com");
+        var (accountId, _) = await RegisterAsync(factory, client, "pairing-payload-twice@example.com");
         var sessionId = await CreateSessionForAsync(client, accountId);
         await PostClaimAsync(client, sessionId);
         var firstResponse = await PostPayloadAsync(client, accountId, sessionId);
@@ -294,7 +294,7 @@ public sealed class DevicePairingEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        var (accountId, _) = await RegisterAsync(client, "pairing-payload-no-token@example.com");
+        var (accountId, _) = await RegisterAsync(factory, client, "pairing-payload-no-token@example.com");
         var sessionId = await CreateSessionForAsync(client, accountId);
         await PostClaimAsync(client, sessionId);
         client.DefaultRequestHeaders.Authorization = null;
@@ -311,7 +311,7 @@ public sealed class DevicePairingEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        var (accountId, _) = await RegisterAsync(client, "pairing-payload-unknown@example.com");
+        var (accountId, _) = await RegisterAsync(factory, client, "pairing-payload-unknown@example.com");
 
         var response = await PostPayloadAsync(client, accountId, "not-a-real-session-id");
 
@@ -325,7 +325,7 @@ public sealed class DevicePairingEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        var sessionId = await CreateSessionAsync(client, "pairing-fetch-early@example.com");
+        var sessionId = await CreateSessionAsync(factory, client, "pairing-fetch-early@example.com");
         await PostClaimAsync(client, sessionId);
         client.DefaultRequestHeaders.Authorization = null;
 
@@ -340,7 +340,7 @@ public sealed class DevicePairingEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        var (accountId, _) = await RegisterAsync(client, "pairing-fetch-ok@example.com");
+        var (accountId, _) = await RegisterAsync(factory, client, "pairing-fetch-ok@example.com");
         var sessionId = await CreateSessionForAsync(client, accountId);
         await PostClaimAsync(client, sessionId);
         await PostPayloadAsync(client, accountId, sessionId);
@@ -361,7 +361,7 @@ public sealed class DevicePairingEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        var (accountId, _) = await RegisterAsync(client, "pairing-fetch-twice@example.com");
+        var (accountId, _) = await RegisterAsync(factory, client, "pairing-fetch-twice@example.com");
         var sessionId = await CreateSessionForAsync(client, accountId);
         await PostClaimAsync(client, sessionId);
         await PostPayloadAsync(client, accountId, sessionId);
@@ -382,7 +382,7 @@ public sealed class DevicePairingEndpointsTests : IAsyncLifetime
         var (factory, sender) = CreateFactoryWithNewDeviceAlertCapture();
         using var factoryDisposable = factory;
         using var client = factory.CreateClient();
-        var (accountId, _) = await RegisterAsync(client, email);
+        var (accountId, _) = await RegisterAsync(factory, client, email);
         var sessionId = await CreateSessionForAsync(client, accountId);
         await PostClaimAsync(client, sessionId);
 
@@ -398,7 +398,7 @@ public sealed class DevicePairingEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        var (accountId, _) = await RegisterAsync(client, "pairing-alert-swallowed@example.com");
+        var (accountId, _) = await RegisterAsync(factory, client, "pairing-alert-swallowed@example.com");
         var sessionId = await CreateSessionForAsync(client, accountId);
         await PostClaimAsync(client, sessionId);
 
@@ -415,7 +415,7 @@ public sealed class DevicePairingEndpointsTests : IAsyncLifetime
         using var primary = factory.CreateClient();
         // A second client with no credentials at all -- the device doing the scanning.
         using var newDevice = factory.CreateClient();
-        var (accountId, _) = await RegisterAsync(primary, "pairing-full-flow@example.com");
+        var (accountId, _) = await RegisterAsync(factory, primary, "pairing-full-flow@example.com");
 
         var sessionId = await CreateSessionForAsync(primary, accountId);
 
@@ -449,7 +449,7 @@ public sealed class DevicePairingEndpointsTests : IAsyncLifetime
         using var factory = CreateFactory().WithWebHostBuilder(builder =>
             builder.UseSetting("DevicePairing:SessionLifetimeSeconds", "30"));
         using var client = factory.CreateClient();
-        var (accountId, _) = await RegisterAsync(client, "pairing-lifetime-override@example.com");
+        var (accountId, _) = await RegisterAsync(factory, client, "pairing-lifetime-override@example.com");
         var before = DateTimeOffset.UtcNow;
 
         var response = await PostCreateAsync(client, accountId);
@@ -479,9 +479,9 @@ public sealed class DevicePairingEndpointsTests : IAsyncLifetime
             AccountsJsonContext.Default.ClaimPairingSessionRequest);
 
     /// <summary>Registers a fresh account and opens a pairing session, returning the session id the primary device would encode into its QR code; leaves client authenticated as that account.</summary>
-    private static async Task<string> CreateSessionAsync(HttpClient client, string email)
+    private static async Task<string> CreateSessionAsync(WebApplicationFactory<Program> factory, HttpClient client, string email)
     {
-        var (accountId, _) = await RegisterAsync(client, email);
+        var (accountId, _) = await RegisterAsync(factory, client, email);
         return await CreateSessionForAsync(client, accountId);
     }
 
@@ -500,13 +500,14 @@ public sealed class DevicePairingEndpointsTests : IAsyncLifetime
             AccountsJsonContext.Default.CreatePairingSessionRequest);
 
     /// <summary>Registers a Patient account (2FA NotApplicable per ADR-S02-03, so registration yields a real access token with no TOTP flow) and leaves client carrying it as the default Bearer header.</summary>
-    private static async Task<(Guid AccountId, string AccessToken)> RegisterAsync(HttpClient client, string email)
+    private static async Task<(Guid AccountId, string AccessToken)> RegisterAsync(WebApplicationFactory<Program> factory, HttpClient client, string email)
     {
-        var response = await client.PostAsJsonAsync(
-            "/auth/register",
-            new RegisterRequest(email, SomeVerifier, AccountRole.Patient),
-            AccountsJsonContext.Default.RegisterRequest);
-        var body = await response.Content.ReadFromJsonAsync(AccountsJsonContext.Default.RegisterResponse);
+        var account = new Account(Guid.NewGuid(), email, AccountRole.Professional, null, null,
+            TotpSecret: "SOMESECRET", TotpEnabledAt: DateTimeOffset.UtcNow);
+        await factory.Services.GetRequiredService<IAccountStore>().InsertAsync(account, CancellationToken.None);
+        var session = factory.Services.GetRequiredService<ISessionTokenIssuer>().IssuePair(account.Id);
+        var body = new RegisterResponse(account.Id, email, AccountRole.Professional, TwoFactorRequirement.ChallengeRequired,
+            AccessToken: session.AccessToken);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", body!.AccessToken);
         return (body.Id, body.AccessToken!);
     }

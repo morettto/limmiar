@@ -5,8 +5,10 @@ using System.Text;
 using System.Text.Json;
 using Api.Accounts;
 using Api.Billing;
+using Api.Patients;
 using Api.Platform;
 using Api.Scheduling;
+using Api.Serialization;
 using Api.Tests.Infrastructure;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -257,11 +259,7 @@ public sealed class PublicBookingEndpointsTests : IAsyncLifetime
         factory.Services.GetRequiredService<FakeAbacatePayClient>();
         using var client = factory.CreateClient();
         var accountId = await RegisterActiveProfessionalAsync(client, "pubbook-retry@example.com");
-        var occupy = await client.PostAsJsonAsync(
-            $"/accounts/{accountId}/agenda/sessions",
-            new ScheduleSessionRequest(Guid.NewGuid(), SomeStart, 50),
-            SchedulingJsonContext.Default.ScheduleSessionRequest);
-        Assert.Equal(HttpStatusCode.Created, occupy.StatusCode);
+        await ScheduleViaBearerAsync(client, accountId, SomeStart);
         var token = await SeedLinkAsync(accountId, null);
 
         var conflicted = await PostReserveAsync(client, token, SomeStart, "Maria", "maria@example.com");
@@ -441,10 +439,15 @@ public sealed class PublicBookingEndpointsTests : IAsyncLifetime
 
     private static async Task<Guid> ScheduleViaBearerAsync(HttpClient client, Guid accountId, DateTimeOffset startsAt)
     {
+        var patientId = Guid.NewGuid();
+        var patientResponse = await client.PostAsJsonAsync($"/accounts/{accountId}/patients",
+            new CreatePatientRequest(patientId, new byte[60], new byte[60]), PatientsJsonContext.Default.CreatePatientRequest);
+        Assert.Equal(HttpStatusCode.Created, patientResponse.StatusCode);
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/agenda/sessions",
-            new ScheduleSessionRequest(Guid.NewGuid(), startsAt, 50),
+            new ScheduleSessionRequest(patientId, startsAt, 50),
             SchedulingJsonContext.Default.ScheduleSessionRequest);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var created = await response.Content.ReadFromJsonAsync(SchedulingJsonContext.Default.ScheduledSessionResponse);
         return created!.SessionId;
     }

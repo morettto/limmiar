@@ -143,7 +143,7 @@ public sealed class PublicBookingService(
             externalId, tenantId.Value, created.Id, created.Url,
             AbacatePayMapper.ToPaymentStatus(created.Status), created.Amount, cancellationToken);
 
-        var scheduled = await scheduling.ScheduleAsync(
+        var scheduled = await scheduling.SchedulePublicAsync(
             tenantId.Value, Guid.NewGuid(), command.StartsAt, DefaultDurationMinutes, cancellationToken);
         return await scheduled.Match(
             async session =>

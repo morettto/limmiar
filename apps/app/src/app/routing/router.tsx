@@ -2,6 +2,7 @@ import { createRootRoute, createRoute, createRouter, Navigate, Outlet } from '@t
 import { AuthPage } from '../../pages/auth/AuthPage'
 import { HomePage } from '../../pages/home/HomePage'
 import { PacienteHojePage } from '../../pages/paciente-hoje/PacienteHojePage'
+import { AppShell } from '../../widgets/app-shell/AppShell'
 import { ContactoEmergencia } from '../../widgets/contacto-emergencia/ContactoEmergencia'
 import { E2ePacienteHojeScaffold } from './E2ePacienteHojeScaffold'
 import { MagicLinkCallback } from '../../features/magic-link-auth/MagicLinkCallback'
@@ -9,14 +10,25 @@ import { RecoveryScreen } from '../../features/recovery/RecoveryScreen'
 import { RecoveryPhraseSetupPage } from '../../pages/recovery/RecoveryPhraseSetupPage'
 import { PairPrimaryPage } from '../../pages/device-pairing/PairPrimaryPage'
 import { PairNewPage } from '../../pages/device-pairing/PairNewPage'
-import { CopilotKeyPage } from '../../pages/settings/CopilotKeyPage'
-import { NotaPage } from '../../pages/notas/NotaPage'
-import { BibliotecaPage } from '../../pages/biblioteca/BibliotecaPage'
+import { CopilotPage } from '../../pages/settings/CopilotPage'
+import { VoicePage } from '../../pages/settings/VoicePage'
+import { AuditPage } from '../../pages/settings/AuditPage'
+import { PartilhaCheckIns } from '../../features/partilha/PartilhaCheckIns'
+import { EspelhoP6 } from '../../features/partilha/EspelhoP6'
+import { PacientesPage } from '../../pages/pacientes/PacientesPage'
+import { ProntuarioPage } from '../../pages/prontuario/ProntuarioPage'
+import { AtendimentoPage } from '../../pages/atendimento/AtendimentoPage'
+import { ABA_INSIGHTS, ABA_NOTA, type AbaDoAtendimento } from '../../entities/atendimento/atendimento'
+import { ProntuarioProvider } from '../../features/prontuario/ProntuarioProvider'
+import { BibliotecaAccountPage } from '../../pages/biblioteca/BibliotecaAccountPage'
+import { AcervoPage } from '../../pages/acervo/AcervoPage'
 import { parseEstadoConsentimento, type EstadoConsentimento } from '../../entities/consentimento/api'
 import { useSession } from '../../entities/account/session-context'
+import { Trans } from '@lingui/react/macro'
 import { E2eMicrofoneScaffold } from './E2eMicrofoneScaffold'
 import { E2eVinculoScaffold } from './E2eVinculoScaffold'
 import { E2ePartilhaScaffold } from './E2ePartilhaScaffold'
+import { OnlineSessionPage } from '../../pages/online-session/OnlineSessionPage'
 
 function readSearchString(search: Record<string, unknown>, key: string): string {
   const value = search[key]
@@ -30,21 +42,28 @@ const E2E_ROUTES_LIGADAS = import.meta.env.VITE_ENABLE_E2E_TEST_ROUTES === 'true
 // terceiros num link de magic link chega a escolher o servidor.
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 
-// The root route's component is deliberately unset: TanStack Router's default root already
-// renders an <Outlet/> for the matched child, which is exactly this app's shell, so an explicit
-// one would be equivalent.
+const onlineSessionRoute = createRoute({ getParentRoute: () => rootRoute, path: '/session/online',
+  component: () => <OnlineSessionPage baseUrl={API_BASE_URL} /> })
 
-const rootRoute = createRootRoute()
+const rootRoute = createRootRoute({ component: () => <AppShell><Outlet /></AppShell> })
 
-// ponytail: sem KeychainProvider ainda, `chaveiro` fica sempre `null` -- painel em "chaveiro
-// bloqueado", falha fechada por decisão humana. `notas` vazia pelo mesmo motivo (sem GET de nota).
+const acervoRoute = createRoute({ getParentRoute: () => rootRoute, path: '/acervo', component: AcervoRouteComponent })
+function AcervoRouteComponent() {
+  const { sessao, kek } = useSession()
+  if (sessao === null || sessao.role !== 'Professional' || sessao.accessToken === null || kek === null) return <Navigate to="/" />
+  return <AcervoPage baseUrl={API_BASE_URL} accountId={sessao.id} accessToken={sessao.accessToken} kek={kek} />
+}
+
 function IndexRouteComponent() {
-  const { sessao } = useSession()
+  const { sessao, kek, iniciarSessao } = useSession()
+  if (sessao === null || sessao.accessToken === null || (sessao.role === 'Professional' && kek === null)) {
+    return <AuthPage baseUrl={API_BASE_URL} role="Professional" onAuthenticated={iniciarSessao} pairingAvailable={sessao?.role === 'Professional' && sessao.accessToken !== null} />
+  }
   // S11-01: o role já chega em produção (validado em entities/account/session.ts), redirect real.
-  if (sessao?.role === 'Patient') {
+  if (sessao.role === 'Patient') {
     return <Navigate to="/hoje" />
   }
-  return <HomePage chaveiro={null} notas={[]} />
+  return <HomePage baseUrl={API_BASE_URL} chaveiro={{ kek: kek!, accountId: sessao.id, accessToken: sessao.accessToken }} />
 }
 
 const indexRoute = createRoute({
@@ -69,12 +88,13 @@ const magicLinkCallbackRoute = createRoute({
 function MagicLinkCallbackRouteComponent() {
   const { token } = magicLinkCallbackRoute.useSearch()
   const { iniciarSessao } = useSession()
-  return <MagicLinkCallback baseUrl={API_BASE_URL} token={token} onAuthenticated={iniciarSessao} />
+  return <main className="settings-page">
+    <header><h1>Limmiar</h1></header>
+    <MagicLinkCallback key={token} baseUrl={API_BASE_URL} token={token} onAuthenticated={iniciarSessao} />
+  </main>
 }
 
-// S02-04 fatia 7 / S02-05 — E2E scaffolding, not production UI: these screens have no navigation
-// entry point yet, so the routes below let Playwright reach each one by URL, with the ids, tokens
-// and a fixed KEK off the query string. Replace them once the real entry points exist.
+// /auth/screen é andaime exclusivo de E2E; as rotas de pareamento abaixo são de produção.
 
 interface AuthScreenE2ESearch {
   baseUrl: string
@@ -98,93 +118,55 @@ function AuthScreenE2ERouteComponent() {
   return <AuthPage baseUrl={baseUrl} role={role} onAuthenticated={iniciarSessao} />
 }
 
-interface RecoveryScreenE2ESearch {
-  baseUrl: string
-}
-
-const recoveryScreenE2ERoute = createRoute({
+const recoveryRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/auth/recover',
-  validateSearch: (search: Record<string, unknown>): RecoveryScreenE2ESearch => ({
-    baseUrl: readSearchString(search, 'baseUrl'),
-  }),
-  component: RecoveryScreenE2ERouteComponent,
+  path: '/recover',
+  component: RecoveryRouteComponent,
 })
 
-function RecoveryScreenE2ERouteComponent() {
-  const { baseUrl } = recoveryScreenE2ERoute.useSearch()
-  const { iniciarSessao } = useSession()
-  return <RecoveryScreen baseUrl={baseUrl} onRecovered={iniciarSessao} />
+function RecoveryRouteComponent() {
+  const { sessao, kek, iniciarSessao } = useSession()
+  if (sessao?.accessToken && kek) return <Navigate to="/" />
+  return <main className="settings-page">
+    <header><h1><Trans>Recuperar acesso à conta</Trans></h1></header>
+    <RecoveryScreen baseUrl={API_BASE_URL} onRecovered={iniciarSessao} />
+  </main>
 }
 
-// Judgment call (S02-06): same "no navigation entry point yet" situation as the pairing routes
-// above — RecoveryPhraseSetup is only reached from inside a real Professional session, so
-// account-recovery.spec.ts needs a direct-by-URL way in, with the same query-string shortcut.
-interface RecoveryPhraseSetupE2ESearch {
-  baseUrl: string
-  accountId: string
-  accessToken: string
-  email: string
-}
-
-const recoveryPhraseSetupE2ERoute = createRoute({
+const recoverySetupRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/auth/recovery-phrase-setup',
-  validateSearch: (search: Record<string, unknown>): RecoveryPhraseSetupE2ESearch => ({
-    baseUrl: readSearchString(search, 'baseUrl'),
-    accountId: readSearchString(search, 'accountId'),
-    accessToken: readSearchString(search, 'accessToken'),
-    email: readSearchString(search, 'email'),
-  }),
-  component: RecoveryPhraseSetupE2ERouteComponent,
+  path: '/settings/recovery',
+  component: RecoverySetupRouteComponent,
 })
 
-function RecoveryPhraseSetupE2ERouteComponent() {
-  const { baseUrl, accountId, accessToken, email } = recoveryPhraseSetupE2ERoute.useSearch()
-  return <RecoveryPhraseSetupPage baseUrl={baseUrl} accountId={accountId} accessToken={accessToken} email={email} />
-}
-
-interface PairPrimarySearch {
-  baseUrl: string
-  accountId: string
-  accessToken: string
-  // Base64 of a fixed 32-byte test KEK -- see the file-level doc comment above.
-  kek: string
+function RecoverySetupRouteComponent() {
+  const { sessao, kek } = useSession()
+  if (sessao === null || sessao.role !== 'Professional' || sessao.email === null || sessao.accessToken === null || kek === null) return <Navigate to="/" />
+  return <RecoveryPhraseSetupPage baseUrl={API_BASE_URL} accountId={sessao.id} accessToken={sessao.accessToken} email={sessao.email} kek={kek} />
 }
 
 const pairPrimaryRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/devices/pair-primary',
-  validateSearch: (search: Record<string, unknown>): PairPrimarySearch => ({
-    baseUrl: readSearchString(search, 'baseUrl'),
-    accountId: readSearchString(search, 'accountId'),
-    accessToken: readSearchString(search, 'accessToken'),
-    kek: readSearchString(search, 'kek'),
-  }),
   component: PairPrimaryRouteComponent,
 })
 
 function PairPrimaryRouteComponent() {
-  const { baseUrl, accountId, accessToken, kek } = pairPrimaryRoute.useSearch()
-  return <PairPrimaryPage baseUrl={baseUrl} accountId={accountId} accessToken={accessToken} kek={kek} />
-}
-
-interface PairNewSearch {
-  baseUrl: string
+  const { sessao, kek } = useSession()
+  if (sessao?.role !== 'Professional' || !sessao.accessToken || sessao.email === null || kek === null) return <Navigate to="/" />
+  return <PairPrimaryPage baseUrl={API_BASE_URL} accountId={sessao.id} accessToken={sessao.accessToken} email={sessao.email} kek={kek} />
 }
 
 const pairNewRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/devices/pair-new',
-  validateSearch: (search: Record<string, unknown>): PairNewSearch => ({
-    baseUrl: readSearchString(search, 'baseUrl'),
-  }),
   component: PairNewRouteComponent,
 })
 
 function PairNewRouteComponent() {
-  const { baseUrl } = pairNewRoute.useSearch()
-  return <PairNewPage baseUrl={baseUrl} />
+  const { sessao, iniciarSessao } = useSession()
+  if (sessao?.role !== 'Professional' || !sessao.accessToken) return <Navigate to="/" />
+  return <PairNewPage baseUrl={API_BASE_URL} onUnlocked={key => iniciarSessao(sessao, key)} />
 }
 
 // S10-02 fatia 6: andaime de E2E sem equivalente de producao -- o consentimento chega por query
@@ -294,34 +276,109 @@ function E2ePartilhaRouteComponent() {
 // playwright.config.ts exercises a real `vite build`, not `vite dev`.
 
 
-const copilotSettingsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/settings/copilot',
-  component: CopilotKeyPage,
-})
-
-// ponytail: mesma situação, mesmo motivo do `dek={null}` de BibliotecaRouteComponent --
-// sem KeychainProvider ainda. `kek`/`accessToken` continuam `null` até existir Keychain --
-// fora de âmbito; a página lê a própria sessão via useSession() (S18-18).
-function NotaRouteComponent() {
-  return <NotaPage kek={null} accessToken={null} />
+function CopilotRouteComponent() {
+  const { sessao } = useSession()
+  if (sessao === null || sessao.role !== 'Professional') return <Navigate to="/" />
+  return <CopilotPage accountId={sessao.id} />
 }
 
-// Ticket S08-01, fatia 2/5: Tela P4.1 (fila de assinatura + editor SOAP). Monta com uma
-// nota em memória -- ver o comentário no topo de pages/notas/NotaPage.tsx.
-const notaRoute = createRoute({
+const copilotSettingsRoute = createRoute({ getParentRoute: () => rootRoute, path: '/settings/copilot', component: CopilotRouteComponent })
+
+function VoiceRouteComponent() {
+  const { sessao, kek } = useSession()
+  if (sessao === null || sessao.role !== 'Professional' || sessao.accessToken === null || kek === null) return <Navigate to="/" />
+  return <VoicePage baseUrl={API_BASE_URL} accountId={sessao.id} accessToken={sessao.accessToken} kek={kek} />
+}
+
+const voiceSettingsRoute = createRoute({ getParentRoute: () => rootRoute, path: '/settings/voice', component: VoiceRouteComponent })
+
+function AuditRouteComponent() {
+  const { sessao } = useSession()
+  if (sessao === null || sessao.accessToken === null) return <Navigate to="/" />
+  return <AuditPage baseUrl={API_BASE_URL} accountId={sessao.id} accessToken={sessao.accessToken} />
+}
+
+const auditSettingsRoute = createRoute({ getParentRoute: () => rootRoute, path: '/settings/audit', component: AuditRouteComponent })
+
+function EspelhoRouteComponent() {
+  const { sessao, kek } = useSession()
+  if (sessao === null || sessao.role !== 'Professional' || sessao.accessToken === null || kek === null) return <Navigate to="/" />
+  return <main className="settings-page">
+    <header><h1><Trans>Sinais compartilhados pelos pacientes</Trans></h1></header>
+    <EspelhoP6 baseUrl={API_BASE_URL} accountId={sessao.id} accessToken={sessao.accessToken} kek={kek} />
+  </main>
+}
+
+const espelhoRoute = createRoute({ getParentRoute: () => rootRoute, path: '/espelho', component: EspelhoRouteComponent })
+
+function PacientesRouteComponent() {
+  const { sessao, kek } = useSession()
+  if (sessao === null || sessao.role !== 'Professional' || sessao.accessToken === null || kek === null) return <Navigate to="/" />
+  return <PacientesPage key={sessao.id} baseUrl={API_BASE_URL} accountId={sessao.id} accessToken={sessao.accessToken} kek={kek} />
+}
+
+const pacientesRoute = createRoute({ getParentRoute: () => rootRoute, path: '/pacientes', component: PacientesRouteComponent })
+
+function ProntuarioLayoutComponent() {
+  const { sessao, kek } = useSession()
+  const { patientId } = prontuarioRoute.useParams()
+  if (sessao === null || sessao.role !== 'Professional' || sessao.accessToken === null || kek === null) return <Navigate to="/" />
+  return <ProntuarioProvider key={patientId} baseUrl={API_BASE_URL} accountId={sessao.id} accessToken={sessao.accessToken} kek={kek} patientId={patientId}>
+    <Outlet />
+  </ProntuarioProvider>
+}
+
+// Fora do layout `paciente` (abaixo): é a pasta do profissional, não um ecrã do papel Patient.
+const prontuarioRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/notas',
-  component: NotaRouteComponent,
+  path: '/pacientes/$patientId',
+  component: ProntuarioLayoutComponent,
 })
 
-// ponytail: mesma situação do `kek={null}` de CopilotKeyPage/NotaPage -- sem KeychainProvider
-// ainda. `chaveIndice={null}` deixa BibliotecaPage em `a-preparar` sem abrir OPFS; a página lê a
-// própria sessão via useSession() (S18-10). Só falta o chaveiro, fora de âmbito desta spec.
-const BIBLIOTECA_STORE_FIXTURE = { ler: async () => null, gravar: async () => {}, apagar: async () => {} }
+interface ProntuarioSearch {
+  agendamento?: string
+}
+
+const prontuarioIndexRoute = createRoute({
+  getParentRoute: () => prontuarioRoute,
+  path: '/',
+  validateSearch: (search: Record<string, unknown>): ProntuarioSearch => ({
+    agendamento: readSearchString(search, 'agendamento') || undefined,
+  }),
+  component: ProntuarioRouteComponent,
+})
+
+function ProntuarioRouteComponent() {
+  const { sessao } = useSession()
+  const { patientId } = prontuarioIndexRoute.useParams()
+  const { agendamento } = prontuarioIndexRoute.useSearch()
+  return <ProntuarioPage baseUrl={API_BASE_URL} accountId={sessao!.id} accessToken={sessao!.accessToken!} patientId={patientId} agendamento={agendamento} />
+}
+
+interface AtendimentoSearch {
+  aba: AbaDoAtendimento
+}
+
+const atendimentoRoute = createRoute({
+  getParentRoute: () => prontuarioRoute,
+  path: 'sessoes/$atendimentoId',
+  validateSearch: (search: Record<string, unknown>): AtendimentoSearch => ({
+    aba: search.aba === ABA_NOTA ? ABA_NOTA : ABA_INSIGHTS,
+  }),
+  component: AtendimentoRouteComponent,
+})
+
+function AtendimentoRouteComponent() {
+  const { sessao, kek } = useSession()
+  const { patientId, atendimentoId } = atendimentoRoute.useParams()
+  const { aba } = atendimentoRoute.useSearch()
+  return <AtendimentoPage baseUrl={API_BASE_URL} accountId={sessao!.id} accessToken={sessao!.accessToken!} kek={kek!} patientId={patientId} atendimentoId={atendimentoId} aba={aba} />
+}
 
 function BibliotecaRouteComponent() {
-  return <BibliotecaPage notas={[]} chaveIndice={null} store={BIBLIOTECA_STORE_FIXTURE} />
+  const { sessao, kek } = useSession()
+  if (sessao === null || sessao.role !== 'Professional' || sessao.accessToken === null || kek === null) return <Navigate to="/" />
+  return <BibliotecaAccountPage key={sessao.id} baseUrl={API_BASE_URL} accountId={sessao.id} accessToken={sessao.accessToken} kek={kek} />
 }
 
 // Ticket S08-02, fatias 4-5: biblioteca de notas com busca cifrada no cliente. Rota normal
@@ -344,21 +401,22 @@ const pacienteLayoutRoute = createRoute({
 
 function PacienteLayoutComponent() {
   return (
-    <>
+    <main>
       <ContactoEmergencia />
       <Outlet />
-    </>
+    </main>
   )
 }
 
 function PacienteHojeRouteComponent() {
-  const { sessao } = useSession()
-  return <PacienteHojePage accountId={sessao?.id ?? null} kek={null} />
+  const { sessao, kek } = useSession()
+  if (sessao === null || sessao.role !== 'Patient' || sessao.accessToken === null) return <Navigate to="/" />
+  return <>
+    <PacienteHojePage accountId={sessao.id} kek={kek} partilha={{ baseUrl: API_BASE_URL, accessToken: sessao.accessToken }} />
+    {kek && <PartilhaCheckIns baseUrl={API_BASE_URL} accountId={sessao.id} accessToken={sessao.accessToken} kek={kek} />}
+  </>
 }
 
-// ponytail: `kek` fixo em `null`, mesma situação do `kek={null}` de CopilotKeyPage/NotaPage --
-// sem KeychainProvider ainda. O critério "3 toques" só é provado em E2E (/e2e/paciente-hoje, com
-// uma KEK de teste pela query string), o mesmo precedente de pairPrimaryRoute.
 const pacienteHojeRoute = createRoute({
   getParentRoute: () => pacienteLayoutRoute,
   path: '/hoje',
@@ -395,11 +453,21 @@ const routeTree =
   rootRoute.addChildren([
         indexRoute,
         magicLinkCallbackRoute,
+        onlineSessionRoute,
         copilotSettingsRoute,
-        notaRoute,
+        voiceSettingsRoute,
+        auditSettingsRoute,
+        espelhoRoute,
+        recoveryRoute,
+        recoverySetupRoute,
+        pacientesRoute,
+        prontuarioRoute.addChildren([prontuarioIndexRoute, atendimentoRoute]),
         bibliotecaRoute,
+        acervoRoute,
+        pairPrimaryRoute,
+        pairNewRoute,
         pacienteLayoutWithChildren,
-        ...(E2E_ROUTES_LIGADAS ? [authScreenE2ERoute, pairPrimaryRoute, pairNewRoute, recoveryScreenE2ERoute, recoveryPhraseSetupE2ERoute, e2eMicrofoneRoute, e2eVinculoRoute, e2ePartilhaRoute] : []),
+        ...(E2E_ROUTES_LIGADAS ? [authScreenE2ERoute, e2eMicrofoneRoute, e2eVinculoRoute, e2ePartilhaRoute] : []),
       ])
 
 export const router = createRouter({ routeTree })

@@ -7,15 +7,16 @@ public sealed class AccountServiceProfessionalVerificationTests
     private static readonly byte[] SomeVerifier = CreateVerifier(0x01);
 
     [Fact]
-    public async Task RegisterAsync_WithPatientRole_CreatesAccountAlreadyActive()
+    public async Task RegisterAsync_WithPatientRole_RejectsEmailRegistration()
     {
         var store = new FakeAccountStore();
         var handler = new RegisterHandler(store, new TwoFactorTicketIssuer(), new SessionTokenIssuer());
 
         var result = await handler.Handle(new RegisterCommand("patient@example.com", SomeVerifier, AccountRole.Patient), CancellationToken.None);
 
-        Assert.True(result.Succeeded);
-        Assert.Equal(AccountVerificationStatus.Active, result.Account!.VerificationStatus);
+        Assert.False(result.Succeeded);
+        Assert.Null(result.Account);
+        Assert.Null(result.Session);
     }
 
     [Fact]
@@ -44,7 +45,7 @@ public sealed class AccountServiceProfessionalVerificationTests
     }
 
     [Fact]
-    public async Task GoogleAuthAsync_WithNewPatientAccount_CreatesAccountActive()
+    public async Task GoogleAuthAsync_WithNewPatientAccount_RejectsIdentityProvider()
     {
         var store = new FakeAccountStore();
         var identity = new GoogleIdentity("new-patient-via-google@example.com", "google-subject-2");
@@ -52,8 +53,7 @@ public sealed class AccountServiceProfessionalVerificationTests
 
         var result = await handler.Handle(new ContinueWithGoogleCommand("valid-id-token", AccountRole.Patient), CancellationToken.None);
 
-        Assert.True(result.TryGetValue(out var success));
-        Assert.Equal(AccountVerificationStatus.Active, success.Account.VerificationStatus);
+        Assert.False(result.TryGetValue(out _));
     }
 
     [Fact]
@@ -273,16 +273,27 @@ public sealed class AccountServiceProfessionalVerificationTests
         public Task<Account?> FindByIdAsync(Guid id, CancellationToken cancellationToken) =>
             Task.FromResult(_accountsById.GetValueOrDefault(id));
 
+        public async Task<string?> GetOrCreatePendingTotpSecretAsync(Guid id, string candidate, CancellationToken cancellationToken)
+        {
+            var account = await FindByIdAsync(id, cancellationToken);
+            if (account is null || account.Role != AccountRole.Professional || account.TotpEnabledAt is not null) return null;
+            var secret = account.TotpSecret ?? candidate;
+            await MutateAsync(account.Id, current => current with { TotpSecret = secret }, cancellationToken);
+            return secret;
+        }
+
         public Task InsertAsync(Account account, CancellationToken cancellationToken)
         {
             _accountsById[account.Id] = account;
             return Task.CompletedTask;
         }
 
-        public Task UpdateAsync(Account account, CancellationToken cancellationToken)
+        public Task<Account?> MutateAsync(Guid id, Func<Account, Account?> mutation, CancellationToken cancellationToken)
         {
-            _accountsById[account.Id] = account;
-            return Task.CompletedTask;
+            if (!_accountsById.TryGetValue(id, out var current)) return Task.FromResult<Account?>(null);
+            var updated = mutation(current);
+            if (updated is not null) _accountsById[id] = updated;
+            return Task.FromResult(updated);
         }
 
         public Task<IReadOnlyList<Account>> ListPendingDocumentReviewAsync(CancellationToken cancellationToken) =>

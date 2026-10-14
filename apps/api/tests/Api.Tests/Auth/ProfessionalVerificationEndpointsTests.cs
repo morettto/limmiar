@@ -46,6 +46,86 @@ public sealed class ProfessionalVerificationEndpointsTests : IAsyncLifetime
 
     private static readonly byte[] SomeVerifier = CreateVerifier(0x01);
 
+    [Theory]
+    [InlineData(true, AccountVerificationStatus.Active, null)]
+    [InlineData(false, AccountVerificationStatus.Rejected, "Documento ilegível.")]
+    public async Task GetStatus_TracksDocumentReviewAndStaffDecision(
+        bool approved, AccountVerificationStatus finalStatus, string? rejectionReason)
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        var accountId = await RegisterProfessionalAsync(client, "status@example.com");
+        var path = $"/accounts/{accountId}/professional-verification";
+
+        var pending = await client.GetFromJsonAsync(path, AccountsJsonContext.Default.SubmitProfessionalCredentialResponse);
+        Assert.Equal(AccountVerificationStatus.Pending, pending!.Status);
+        Assert.Null(pending.DocumentReviewSlaBusinessDays);
+
+        var submitted = await client.PostAsJsonAsync(path,
+            new SubmitProfessionalCredentialRequest(ProfessionalCredentialType.Document, null, null, "document-reference"),
+            AccountsJsonContext.Default.SubmitProfessionalCredentialRequest);
+        Assert.Equal(HttpStatusCode.OK, submitted.StatusCode);
+
+        var inReview = await client.GetFromJsonAsync(path, AccountsJsonContext.Default.SubmitProfessionalCredentialResponse);
+        Assert.Equal(AccountVerificationStatus.InReview, inReview!.Status);
+        Assert.Equal(SubmitProfessionalCredentialHandler.DocumentReviewSlaBusinessDays, inReview.DocumentReviewSlaBusinessDays);
+
+        AddStaffApiKey(client);
+        var decision = await client.PostAsJsonAsync($"{path}/decision",
+            new ProfessionalVerificationDecisionRequest(approved, rejectionReason),
+            AccountsJsonContext.Default.ProfessionalVerificationDecisionRequest);
+        Assert.Equal(HttpStatusCode.OK, decision.StatusCode);
+
+        var decided = await client.GetFromJsonAsync(path, AccountsJsonContext.Default.SubmitProfessionalCredentialResponse);
+        Assert.Equal(accountId, decided!.AccountId);
+        Assert.Equal(finalStatus, decided.Status);
+        Assert.Equal(rejectionReason, decided.RejectionReason);
+        Assert.Null(decided.DocumentReviewSlaBusinessDays);
+    }
+
+    [Fact]
+    public async Task GetStatus_WithoutAccessToken_Returns401()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        var accountId = await RegisterProfessionalAsync(client, "status-no-token@example.com");
+        client.DefaultRequestHeaders.Authorization = null;
+
+        var response = await client.GetAsync($"/accounts/{accountId}/professional-verification");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetStatus_WithUnknownAccount_Returns404()
+    {
+        using var factory = CreateFactoryWithSessionBypass(new StubCouncilRegistryVerifier(verified: true));
+        using var client = factory.CreateClient();
+        var accountId = Guid.NewGuid();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accountId.ToString());
+
+        var response = await client.GetAsync($"/accounts/{accountId}/professional-verification");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("auth.account_not_found", body.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task GetStatus_WithPatientAccount_Returns409()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        var registered = await AnonymousAccountFixture.CreateAsync(factory.Services);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", registered!.AccessToken);
+
+        var response = await client.GetAsync($"/accounts/{registered.Id}/professional-verification");
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("auth.not_a_professional_account", body.RootElement.GetProperty("code").GetString());
+    }
+
     [Fact]
     public async Task PostSubmit_WithVerifiedCrp_Returns200WithActiveStatus()
     {
@@ -202,11 +282,7 @@ public sealed class ProfessionalVerificationEndpointsTests : IAsyncLifetime
         using var factory = CreateFactory(new StubCouncilRegistryVerifier(verified: true));
         using var client = factory.CreateClient();
 
-        var registerResponse = await client.PostAsJsonAsync(
-            "/auth/register",
-            new RegisterRequest("patient-submits@example.com", SomeVerifier, AccountRole.Patient),
-            AccountsJsonContext.Default.RegisterRequest);
-        var registered = await registerResponse.Content.ReadFromJsonAsync(AccountsJsonContext.Default.RegisterResponse);
+        var registered = await AnonymousAccountFixture.CreateAsync(factory.Services);
         // A Patient's TwoFactorRequirement is always NotApplicable (ADR-S02-03), so register already returned a real session.
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", registered!.AccessToken);
 
@@ -535,7 +611,9 @@ public sealed class ProfessionalVerificationEndpointsTests : IAsyncLifetime
 
         public RefreshSessionResult Refresh(string refreshToken) => throw new NotSupportedException("not needed by the one test that uses this stub");
 
-        public Guid? ValidateAccess(string accessToken) => Guid.TryParse(accessToken, out var accountId) ? accountId : null;
+        public AccessSession? Revoke(string refreshToken) => throw new NotSupportedException("not needed by these tests");
+
+        public AccessSession? ValidateAccess(string accessToken) => Guid.TryParse(accessToken, out var accountId) ? new AccessSession(accountId, accountId) : null;
     }
 
     private static byte[] CreateVerifier(byte fill)

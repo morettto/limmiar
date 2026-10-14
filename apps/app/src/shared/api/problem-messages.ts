@@ -8,6 +8,10 @@ import { problemCodes, type ProblemCode } from './problem-codes'
 // code a type error instead of a silent generic fallback.
 // Stryker disable all
 const knownProblemMessages: Record<ProblemCode, MessageDescriptor> = {
+  'agenda.patient_not_found': msg({
+    id: 'agenda.patient_not_found',
+    message: 'Prontuário indisponível nesta carteira. Atualize a seleção do paciente.',
+  }),
   'health.database_unreachable': msg({
     id: 'health.database_unreachable',
     message: 'Banco de dados indisponível no momento.',
@@ -213,6 +217,9 @@ const knownProblemMessages: Record<ProblemCode, MessageDescriptor> = {
     id: 'sharing.version_conflict',
     message: 'Suas preferências mudaram em outro dispositivo. Tente novamente.',
   }),
+  'materials.not_found': msg({ id: 'materials.not_found', message: 'Este material não está disponível no seu acervo.' }),
+  'materials.already_exists': msg({ id: 'materials.already_exists', message: 'Este material já foi guardado. Atualize seu acervo.' }),
+  'rate_limit.too_many_requests': msg({ id: 'rate_limit.too_many_requests', message: 'Muitas tentativas em pouco tempo. Aguarde um minuto e tente de novo.' }),
 }
 
 // Fallback for a backend `code` not in the registry above. The raw code string must
@@ -232,11 +239,15 @@ function isAnswerable(code: string): code is ProblemCode {
   return answerableCodes.has(code)
 }
 
+export function problemMessage(code: string, params: Record<string, string>): MessageDescriptor {
+  const descriptor = isAnswerable(code) ? knownProblemMessages[code] : genericProblemMessage
+  return { ...descriptor, values: params }
+}
+
 export function translateProblemCode(
   code: string,
   params: Record<string, string>,
   i18nInstance: typeof i18n,
 ): string {
-  const descriptor = isAnswerable(code) ? knownProblemMessages[code] : genericProblemMessage
-  return i18nInstance._({ ...descriptor, values: params })
+  return i18nInstance._(problemMessage(code, params))
 }

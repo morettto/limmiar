@@ -8,26 +8,28 @@ ser chamado direto de qualquer `pages/` -- este módulo deixou de ser o único s
 
 ## Fluxo principal
 
-1. `router.tsx` declara uma rota por `createRoute`. Rotas cuja página não precisa de nada além da
-   própria sessão (`/settings/copilot`) apontam `component` direto para a página --
-   `CopilotKeyPage` -- sem route component intermédio; `/` só passa por `IndexRouteComponent` para
-   o redirect de paciente (S11-01, passo 6). `HomePage` e `CopilotKeyPage` chamam `useSession()`
-   sozinhas (S18-10, ver `entities/account/README.md` e os READMEs das duas páginas). As que
-   precisam de search params ainda têm um route component próprio (`MagicLinkCallbackRouteComponent`,
-   `AuthScreenE2ERouteComponent`, `RecoveryScreenE2ERouteComponent`, `NotaRouteComponent`,
+1. `router.tsx` declara uma rota por `createRoute`. `/` passa por `IndexRouteComponent` para o
+   redirect de paciente (S11-01, passo 6); `HomePage` chama `useSession()` sozinha (S18-10, ver
+   `entities/account/README.md`). `/settings/copilot` tem `CopilotRouteComponent`: sem conta
+   profissional redireciona para `/`; com ela monta `CopilotPage` (só o interruptor de envio dos
+   votos, `features/consentimento-votos`). As que precisam de search params também têm um route
+   component próprio (`MagicLinkCallbackRouteComponent`,
+   `AuthScreenE2ERouteComponent`, `RecoveryRouteComponent`, `NotaRouteComponent`,
    `BibliotecaRouteComponent`); nenhum destes monta JSX de produto próprio -- só liga
    `useSession()`/search params a props e repassa para uma página/componente em
-   `pages/`/`features/`. `MagicLinkCallbackRouteComponent`/`RecoveryScreenE2ERouteComponent`
+   `pages/`/`features/`. `MagicLinkCallbackRouteComponent`/`RecoveryRouteComponent`
    montam `MagicLinkCallback`/`RecoveryScreen` (de `features/`) diretamente desde S18-06 -- os
    wrappers `pages/magic-link-callback/MagicLinkCallbackPage.tsx` e `pages/recovery/RecoveryPage.tsx`
    foram apagados por reencaminharem todas as props sem tocar em nenhuma (nada como o
    `role: string` -> `AccountRole` de `AuthPage.tsx`); não há regra `.dependency-cruiser.cjs` a
-   proibir `app -> features` (só `pages -> app`), e `SessionProvider` já importava direto de
-   `features/copilot-byok`.
-2. `routeTree` regista as rotas E2E-only (`/auth/screen`, `/devices/pair-*`, `/auth/recover`,
-   `/auth/recovery-phrase-setup`, `/e2e/microfone`, `/e2e/vinculo`, `/e2e/partilha`) só quando
+   proibir `app -> features` (só `pages -> app`).
+2. `routeTree` regista as rotas E2E-only (`/auth/screen`, `/devices/pair-*`,
+   `/e2e/microfone`, `/e2e/vinculo`, `/e2e/partilha`) só quando
    `VITE_ENABLE_E2E_TEST_ROUTES === 'true'` -- gate de build-time, não `import.meta.env.DEV`,
    porque `playwright.config.ts` corre um `vite build` real, não `vite dev`.
+   `/recover` e `/settings/recovery` são rotas normais. A configuração exige conta
+   profissional com token e KEK desbloqueada; o restauro adota a KEK após o segundo
+   fator e retorna ao consultório. Só o host de API do build é usado.
 3. `magicLinkCallbackRoute` passa sempre `baseUrl={API_BASE_URL}`
    (`import.meta.env.VITE_API_BASE_URL ?? ''`, constante de build) ao `MagicLinkCallback` --
    `MagicLinkCallbackSearch` só tem `token`, lido por `readSearchString`. Nenhum ramo, gate de e2e
@@ -50,6 +52,21 @@ ser chamado direto de qualquer `pages/` -- este módulo deixou de ser o único s
    entrar como filho deste layout perde a emergência -- não é opcional.
 6. `IndexRouteComponent` redireciona `sessao?.role === 'Patient'` para `/hoje` via `<Navigate/>`,
    antes de montar `HomePage` (S11-01).
+7. `/pacientes` (`pages/pacientes`) é a carteira do profissional, com a mesma guarda
+   (profissional, token e KEK desbloqueada). `/pacientes/:patientId` é o layout da pasta do profissional (fora do layout `paciente`, que é só
+   do papel Patient): exige profissional, token e KEK desbloqueada e abre o prontuário uma vez por
+   paciente com `ProntuarioProvider` (`key={patientId}`). Filhos: o índice (`pages/prontuario`,
+   `?agendamento=`) e `sessoes/:atendimentoId` (`pages/atendimento`, `?aba=insights|nota`, qualquer
+   outro valor cai em `insights`). Rota nova do profissional sobre um paciente entra como filha daqui.
+   `/biblioteca` exige o mesmo (profissional, token e KEK desbloqueada).
+   `BibliotecaAccountPage` carrega e confere as notas reais e cria o índice cifrado
+   no diretório da conta. A barra do consultório (item 8) leva a ambas as páginas.
+8. A rota raiz é o `AppShell` (`widgets/app-shell`: a barra de navegação do profissional
+   desbloqueado, ver o README do widget) em volta de `<Outlet/>`. O `LanguageSwitcher`
+   (`features/language-switcher`) aparece em todo ecrã, uma só vez: dentro da barra para o profissional
+   desbloqueado; nos demais, depois do conteúdo no DOM para o 1.º `Tab` de um ecrã de paciente continuar
+   a ser o CVV (ADR-S11-04), e o CSS (`#root > .language-switcher`, `order: -1`) o põe no topo. O idioma
+   abre sempre em pt-BR, sem olhar para o navegador, e a escolha fica no `localStorage` (`shared/i18n`).
 
 ## Pontos de entrada
 
@@ -63,7 +80,7 @@ ser chamado direto de qualquer `pages/` -- este módulo deixou de ser o único s
 ## Decisões relevantes
 
 - **A fronteira de confiança do `baseUrl` apaga o ramo em vez de o acrescentar (S18-13, revisto no
-  S18-17).** `/auth/magic-link` é a única rota de autenticação que fica fora do portão
+  S18-17).** `/auth/magic-link` e `/recover` são rotas de autenticação fora do portão
   `VITE_ENABLE_E2E_TEST_ROUTES`, e é alcançada por um link que chega ao utilizador de fora. Aceitar
   `baseUrl` da query string aí punha `verifyMagicLink` e `completeWebAuthnCeremony` a falar com o
   servidor que o remetente do link escolhesse, e a entregar-lhe o resultado da cerimónia WebAuthn --
@@ -83,22 +100,23 @@ ser chamado direto de qualquer `pages/` -- este módulo deixou de ser o único s
   origem única em `shared/api/client.ts` é spec própria, fora deste ticket.
   **Nota de calibração que acompanha o dia em que `VITE_API_BASE_URL` ganhar um valor real:** essa
   constante passa a ser a única âncora de confiança do host da cerimónia de autenticação, e tem de
-  entrar em `connect-src` de `apps/app/security-headers.ts` no mesmo diff -- esse ficheiro já deriva
-  `connect-src` de `SUPPORTED_PROVIDERS` (ver `features/copilot-byok/README.md`, secção "Fora deste
-  módulo, mas lê dele") e já tem o seu próprio ponytail a marcar que `'self'` só cobre a API .NET
-  enquanto ela partilhar esta origem; sem esse diff em conjunto, o browser bloqueia as chamadas de
-  `/auth/magic-link` para o novo host.
+  entrar em `connect-src` de `apps/app/security-headers.ts` no mesmo diff -- `'self'` só cobre a
+  API .NET enquanto ela partilhar esta origem; sem esse diff em conjunto, o browser bloqueia as
+  chamadas de `/auth/magic-link` para o novo host.
 - **`IndexRouteComponent`/`CopilotKeyRouteComponent` foram apagados (S18-10); `IndexRouteComponent`
   voltou no S09 só com `chaveiro`/`notas`.** Existiam só
   para converter `sessao` em props porque `useSession()` vivia em `app/providers`, atrás da
   fronteira `fsd-pages-no-app`. Descer `useSession()` para `entities/account/session-context.tsx`
-  (camada que `pages` já podia importar) tornou os dois wrappers desnecessários -- `HomePage` e
-  `CopilotKeyPage` chamam `useSession()` diretamente. O S09 reintroduziu `IndexRouteComponent`
-  (com `useSession()` só para o redirect de paciente do S11-01, passo 6): passa a `HomePage` só `chaveiro` (sempre `null` enquanto não existe
-  `KeychainProvider` -- falha fechada, decisão humana) e `notas` (vazia, sem GET de nota); ver
-  `pages/home/README.md` e `widgets/painel-profissional/README.md`. `BibliotecaRouteComponent` fica porque a rota ainda fixa fixtures de
-  produto (`chaveIndice`, `store`) que não fazem sentido dentro da página; deixou só de chamar
-  `useSession()`, já que `BibliotecaPage` passou a ler a própria sessão.
+  (camada que `pages` já podia importar) tornou os dois wrappers desnecessários -- `HomePage` chama
+  `useSession()` diretamente. A rota de configuração do copiloto voltou a ter route component ao
+  perder o BYOK: `CopilotRouteComponent` só guarda a rota e passa o `accountId`, no molde de
+  `/settings/audit`. O S09 reintroduziu `IndexRouteComponent`
+  e agora exige sessão profissional, token e KEK desbloqueada antes de passar o
+  chaveiro real e `baseUrl` à Home. A composição atual monta prontuário e sessão
+  ao vivo; painel e agenda ainda têm integrações pendentes.
+  `/biblioteca` usa `BibliotecaAccountPage`, que carrega notas reais e mantém o
+  índice cifrado no diretório da conta. Nenhuma fixture de chave ou store entra
+  nessas rotas de produto. Ver `pages/home/README.md` e `pages/biblioteca/README.md`.
 - **`BibliotecaPage` já não recebe `accountId` por prop (S18-10).** A página lê
   `useSession().sessao?.id ?? null` sozinha; nenhum `?? ''` em lado nenhum desta cadeia --
   ver `entities/account/README.md` e `pages/biblioteca/README.md`.

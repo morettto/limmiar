@@ -11,17 +11,10 @@ public static class MagicLinkEndpoints
 {
     public static void MapMagicLinkEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapPost("/auth/magic-link/request", HandleMagicLinkRequestAsync)
-            .WithName("PostAuthMagicLinkRequest")
-            .WithSummary("Request a magic-link sign-in for a patient e-mail")
-            .WithDescription("Always returns the same response regardless of whether the e-mail matches an existing Patient account, an existing Professional account, or nothing at all -- account enumeration mitigation (S02-05).")
-            .Produces<MagicLinkRequestResponse>(StatusCodes.Status200OK)
-            .Produces<LimmiarProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json");
-
         app.MapPost("/auth/magic-link/verify", HandleVerifyMagicLinkAsync)
             .WithName("PostAuthMagicLinkVerify")
-            .WithSummary("Burn a magic-link token and start the WebAuthn ceremony")
-            .WithDescription("Resolves whether the e-mail needs a new WebAuthn credential (registration) or already has one (assertion), and returns a fresh challenge plus a short-lived magicLinkTicket to complete it with.")
+            .WithSummary("Start a passkey ceremony for an anonymous patient invitation")
+            .WithDescription("Resolves an opaque, professional-issued invitation and its existing patient passkey, and returns a fresh challenge plus a short-lived magicLinkTicket to complete it with.")
             .Produces<VerifyMagicLinkResponse>(StatusCodes.Status200OK)
             .Produces<LimmiarProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json");
@@ -35,41 +28,6 @@ public static class MagicLinkEndpoints
             .Produces<LimmiarProblemDetails>(StatusCodes.Status401Unauthorized, "application/problem+json");
     }
 
-    // Only mapped by MagicLinkComposition.MapMagicLink when MagicLink:TestCaptureEndpoint=true.
-    public static void MapMagicLinkDebugEndpoints(this IEndpointRouteBuilder app)
-    {
-        app.MapGet("/auth/magic-link/_debug-last", HandleMagicLinkDebugLastAsync)
-            .WithName("GetAuthMagicLinkDebugLast")
-            .WithSummary("E2E-only: read back the token the last magic-link request captured for this e-mail")
-            .WithDescription("Never mapped unless MagicLink:TestCaptureEndpoint=true -- there is no real e-mail delivery to intercept otherwise (see CapturingMagicLinkEmailSender's own doc comment).")
-            .Produces<MagicLinkDebugLastResponse>(StatusCodes.Status200OK)
-            .Produces(StatusCodes.Status404NotFound);
-    }
-
-    private static Results<Ok<MagicLinkDebugLastResponse>, NotFound> HandleMagicLinkDebugLastAsync(
-        string? email, CapturingMagicLinkEmailSender sender)
-    {
-        if (string.IsNullOrWhiteSpace(email))
-        {
-            return TypedResults.NotFound();
-        }
-
-        var token = sender.LastTokenSentTo(email);
-        return token is null ? TypedResults.NotFound() : TypedResults.Ok(new MagicLinkDebugLastResponse(token));
-    }
-
-    private static async Task<Results<Ok<MagicLinkRequestResponse>, JsonHttpResult<LimmiarProblemDetails>>> HandleMagicLinkRequestAsync(
-        MagicLinkRequestRequest request, ISender sender, CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(request.Email))
-        {
-            return ValidationProblem("email");
-        }
-
-        await sender.Send(new RequestMagicLinkCommand(request.Email), cancellationToken);
-        return TypedResults.Ok(new MagicLinkRequestResponse());
-    }
-
     private static async Task<Results<Ok<VerifyMagicLinkResponse>, JsonHttpResult<LimmiarProblemDetails>>> HandleVerifyMagicLinkAsync(
         VerifyMagicLinkRequest request, ISender sender, WebAuthnRelyingPartyOptions relyingPartyOptions, CancellationToken cancellationToken)
     {
@@ -78,7 +36,7 @@ public static class MagicLinkEndpoints
             return ValidationProblem("token");
         }
 
-        var result = await sender.Send(new VerifyMagicLinkCommand(request.Token), cancellationToken);
+        var result = await sender.Send(new VerifyMagicLinkCommand(request.Token, request.PatientAccountId), cancellationToken);
         if (!result.Succeeded)
         {
             return ProblemJson(StatusCodes.Status401Unauthorized, "Invalid magic link", AccountsProblemCodes.AuthMagicLinkInvalid);
@@ -89,7 +47,7 @@ public static class MagicLinkEndpoints
             result.CeremonyType!.Value,
             Convert.ToBase64String(result.Challenge!),
             relyingPartyOptions.RelyingPartyId,
-            result.CredentialId is null ? null : Convert.ToBase64String(result.CredentialId)));
+            result.CredentialId is null ? null : Convert.ToBase64String(result.CredentialId), result.AccountId!.Value));
     }
 
     private static async Task<Results<Ok<CompleteMagicLinkWebAuthnResponse>, JsonHttpResult<LimmiarProblemDetails>>> HandleCompleteMagicLinkWebAuthnAsync(
@@ -172,11 +130,7 @@ public static class MagicLinkEndpoints
     }
 }
 
-public sealed record MagicLinkRequestRequest(string Email);
-
-public sealed record MagicLinkRequestResponse;
-
-public sealed record VerifyMagicLinkRequest(string Token);
+public sealed record VerifyMagicLinkRequest(string Token, Guid? PatientAccountId = null);
 
 // CredentialId is set only for an assertion ceremony (CeremonyType); Challenge is raw base64 bytes for navigator.credentials.create()/.get().
 public sealed record VerifyMagicLinkResponse(
@@ -184,7 +138,8 @@ public sealed record VerifyMagicLinkResponse(
     MagicLinkCeremonyType CeremonyType,
     string Challenge,
     string RelyingPartyId,
-    string? CredentialId);
+    string? CredentialId,
+    Guid AccountId);
 
 // AttestationObject is set for a registration response; AuthenticatorData/Signature for an assertion response -- which pair applies is decided server-side by MagicLinkTicket.
 public sealed record CompleteMagicLinkWebAuthnRequest(
@@ -196,6 +151,5 @@ public sealed record CompleteMagicLinkWebAuthnRequest(
     string? Signature);
 
 public sealed record CompleteMagicLinkWebAuthnResponse(
-    Guid Id, string Email, AccountRole Role, string AccessToken, string RefreshToken, DateTimeOffset AccessTokenExpiresAt);
+    Guid Id, string? Email, AccountRole Role, string AccessToken, string RefreshToken, DateTimeOffset AccessTokenExpiresAt);
 
-public sealed record MagicLinkDebugLastResponse(string Token);

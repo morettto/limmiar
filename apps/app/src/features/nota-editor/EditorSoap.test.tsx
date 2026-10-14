@@ -8,6 +8,7 @@ import { EditorSoap } from './EditorSoap'
 const NOTA: Nota = {
   id: 'nota-1',
   patientId: 'paciente-1',
+  atendimentoId: 'atendimento-1',
   revisao: 0,
   frases: [
     { id: 'S-0', secao: 'S', texto: 'queixa principal', ancoras: [{ inicioMs: 0, fimMs: 1000 }] },
@@ -18,7 +19,7 @@ const NOTA: Nota = {
   estado: ESTADO_PENDENTE,
 }
 
-function renderEditor(props?: Partial<{ nota: Nota; onChange: (nota: Nota) => void; aoTocar: (ancora: unknown) => void; aoAssinar: (nota: Nota) => void }>) {
+function renderEditor(props?: Partial<{ nota: Nota; onChange: (nota: Nota) => void; aoTocar: (ancora: unknown) => void; aoAssinar: (nota: Nota) => void; aoAbrirTranscricao(id: string, revisao: number): void }>) {
   return render(
     <I18nProvider i18n={i18n}>
       <EditorSoap
@@ -26,12 +27,28 @@ function renderEditor(props?: Partial<{ nota: Nota; onChange: (nota: Nota) => vo
         onChange={props?.onChange ?? vi.fn()}
         aoTocar={(props?.aoTocar as (ancora: { inicioMs: number; fimMs: number }) => void) ?? vi.fn()}
         aoAssinar={props?.aoAssinar ?? vi.fn()}
+        aoAbrirTranscricao={props?.aoAbrirTranscricao}
       />
     </I18nProvider>,
   )
 }
 
 describe('EditorSoap', () => {
+  it.each([true, false])('mostra proveniência bibliográfica e abre somente com ação conectada: %s', conectado => {
+    const referencia = { trechoId: 'fonte', titulo: 'Livro', autor: 'Autor', pagina: 4, paragrafo: 2,
+      citacaoLiteral: 'Citação literal', transcriptId: 'sessao', revisaoTranscricao: 1, frasePaciente: 'Fala original.' }
+    const nota: Nota = { ...NOTA, estado: ESTADO_ASSINADA, frases: [{ ...NOTA.frases[2]!, referencias: [referencia] }] }
+    const aoAbrirTranscricao = vi.fn()
+    renderEditor({ nota, aoAbrirTranscricao: conectado ? aoAbrirTranscricao : undefined })
+    fireEvent.click(screen.getByText('Referência bibliográfica · Livro'))
+    expect(screen.getByText('Citação literal')).toBeTruthy()
+    expect(screen.getByText('Fala do paciente na revisão 2: Fala original.')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Ver fala da referência' }))
+    expect(screen.getByRole('button', { name: 'Ver fala da referência' })).toHaveProperty('disabled', !conectado)
+    if (conectado) expect(aoAbrirTranscricao).toHaveBeenCalledWith('sessao', 1)
+    else expect(aoAbrirTranscricao).not.toHaveBeenCalled()
+    expect(screen.getByRole('textbox', { name: 'Avaliação 1' })).toHaveProperty('readOnly', true)
+  })
   beforeAll(async () => {
     await dynamicActivate('pt-BR')
   })

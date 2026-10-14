@@ -10,10 +10,10 @@ public enum MagicLinkCeremonyType
 }
 
 public sealed record MagicLinkTicketData(
-    string Email,
+    PatientAccessInvitation Invitation,
     MagicLinkCeremonyType CeremonyType,
     byte[] Challenge,
-    Guid? AccountId = null,
+    Guid AccountId,
     byte[]? CredentialId = null,
     byte[]? StoredCosePublicKey = null,
     uint? StoredSignCount = null);

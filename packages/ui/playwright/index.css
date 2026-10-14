@@ -1,3 +1,5 @@
+@import "@limmiar/ui/tokens.css";
+@import "@limmiar/ui/tailwind.css";
 @import "tailwindcss";
 
 /* Playwright CT's Vite root is this `playwright/` dir, a sibling of `../src`

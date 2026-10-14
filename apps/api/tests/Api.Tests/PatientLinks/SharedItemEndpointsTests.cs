@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Api.Accounts;
 using Api.PatientLinks;
+using Api.Patients;
 using Api.Tests.Infrastructure;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -57,7 +58,7 @@ public sealed class SharedItemEndpointsTests : IAsyncLifetime
         var professionalId = await RegisterActiveProfessionalAsync(professionalClient, "shared-professional@example.com");
 
         using var patientClient = factory.CreateClient();
-        var patientAccountId = await RegisterPatientAsync(patientClient, "shared-patient@example.com");
+        var patientAccountId = await RegisterPatientAsync(factory, patientClient, "shared-patient@example.com");
         await LinkAsync(professionalClient, professionalId, patientClient, patientAccountId);
 
         var ciphertext = SomeCiphertext(0xC1);
@@ -85,7 +86,7 @@ public sealed class SharedItemEndpointsTests : IAsyncLifetime
         var professionalId = await RegisterActiveProfessionalAsync(professionalClient, "shared-post-wrong-side-professional@example.com");
 
         using var patientClient = factory.CreateClient();
-        var patientAccountId = await RegisterPatientAsync(patientClient, "shared-post-wrong-side-patient@example.com");
+        var patientAccountId = await RegisterPatientAsync(factory, patientClient, "shared-post-wrong-side-patient@example.com");
         await LinkAsync(professionalClient, professionalId, patientClient, patientAccountId);
 
         var response = await professionalClient.PostAsJsonAsync(
@@ -108,7 +109,7 @@ public sealed class SharedItemEndpointsTests : IAsyncLifetime
         var professionalId = await RegisterActiveProfessionalAsync(professionalClient, "shared-get-wrong-side-professional@example.com");
 
         using var patientClient = factory.CreateClient();
-        var patientAccountId = await RegisterPatientAsync(patientClient, "shared-get-wrong-side-patient@example.com");
+        var patientAccountId = await RegisterPatientAsync(factory, patientClient, "shared-get-wrong-side-patient@example.com");
         await LinkAsync(professionalClient, professionalId, patientClient, patientAccountId);
 
         var response = await patientClient.GetAsync($"/accounts/{patientAccountId}/links/{professionalId}/shared-items");
@@ -127,7 +128,7 @@ public sealed class SharedItemEndpointsTests : IAsyncLifetime
         var professionalId = await RegisterActiveProfessionalAsync(professionalClient, "shared-unlink-professional@example.com");
 
         using var patientClient = factory.CreateClient();
-        var patientAccountId = await RegisterPatientAsync(patientClient, "shared-unlink-patient@example.com");
+        var patientAccountId = await RegisterPatientAsync(factory, patientClient, "shared-unlink-patient@example.com");
         await LinkAsync(professionalClient, professionalId, patientClient, patientAccountId);
         await patientClient.PostAsJsonAsync(
             $"/accounts/{patientAccountId}/links/{professionalId}/shared-items",
@@ -166,7 +167,7 @@ public sealed class SharedItemEndpointsTests : IAsyncLifetime
         var professionalId = await RegisterActiveProfessionalAsync(professionalClient, "received-unlink-professional@example.com");
 
         using var patientClient = factory.CreateClient();
-        var patientAccountId = await RegisterPatientAsync(patientClient, "received-unlink-patient@example.com");
+        var patientAccountId = await RegisterPatientAsync(factory, patientClient, "received-unlink-patient@example.com");
         await LinkAsync(professionalClient, professionalId, patientClient, patientAccountId);
 
         var ciphertext = SomeCiphertext(0xC2);
@@ -197,7 +198,7 @@ public sealed class SharedItemEndpointsTests : IAsyncLifetime
         var professionalId = await RegisterActiveProfessionalAsync(professionalClient, "received-patient-side-professional@example.com");
 
         using var patientClient = factory.CreateClient();
-        var patientAccountId = await RegisterPatientAsync(patientClient, "received-patient-side-patient@example.com");
+        var patientAccountId = await RegisterPatientAsync(factory, patientClient, "received-patient-side-patient@example.com");
         await LinkAsync(professionalClient, professionalId, patientClient, patientAccountId);
 
         var response = await patientClient.GetAsync($"/accounts/{patientAccountId}/received-shares");
@@ -223,10 +224,10 @@ public sealed class SharedItemEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        await RegisterPatientAsync(client, "received-forbidden-owner@example.com");
+        await RegisterPatientAsync(factory, client, "received-forbidden-owner@example.com");
 
         using var otherClient = factory.CreateClient();
-        var otherAccountId = await RegisterPatientAsync(otherClient, "received-forbidden-target@example.com");
+        var otherAccountId = await RegisterPatientAsync(factory, otherClient, "received-forbidden-target@example.com");
 
         var response = await client.GetAsync($"/accounts/{otherAccountId}/received-shares");
 
@@ -241,7 +242,7 @@ public sealed class SharedItemEndpointsTests : IAsyncLifetime
         var professionalId = await RegisterActiveProfessionalAsync(professionalClient, "shared-short-professional@example.com");
 
         using var patientClient = factory.CreateClient();
-        var patientAccountId = await RegisterPatientAsync(patientClient, "shared-short-patient@example.com");
+        var patientAccountId = await RegisterPatientAsync(factory, patientClient, "shared-short-patient@example.com");
         await LinkAsync(professionalClient, professionalId, patientClient, patientAccountId);
 
         var response = await patientClient.PostAsJsonAsync(
@@ -264,7 +265,7 @@ public sealed class SharedItemEndpointsTests : IAsyncLifetime
         var professionalId = await RegisterActiveProfessionalAsync(professionalClient, "shared-oversized-professional@example.com");
 
         using var patientClient = factory.CreateClient();
-        var patientAccountId = await RegisterPatientAsync(patientClient, "shared-oversized-patient@example.com");
+        var patientAccountId = await RegisterPatientAsync(factory, patientClient, "shared-oversized-patient@example.com");
         await LinkAsync(professionalClient, professionalId, patientClient, patientAccountId);
 
         var response = await patientClient.PostAsJsonAsync(
@@ -298,10 +299,10 @@ public sealed class SharedItemEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        await RegisterPatientAsync(client, "shared-post-wrong-owner@example.com");
+        await RegisterPatientAsync(factory, client, "shared-post-wrong-owner@example.com");
 
         using var otherClient = factory.CreateClient();
-        var otherAccountId = await RegisterPatientAsync(otherClient, "shared-post-wrong-owner-target@example.com");
+        var otherAccountId = await RegisterPatientAsync(factory, otherClient, "shared-post-wrong-owner-target@example.com");
 
         var response = await client.PostAsJsonAsync(
             $"/accounts/{otherAccountId}/links/{Guid.NewGuid()}/shared-items",
@@ -327,10 +328,10 @@ public sealed class SharedItemEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        await RegisterPatientAsync(client, "shared-get-wrong-owner@example.com");
+        await RegisterPatientAsync(factory, client, "shared-get-wrong-owner@example.com");
 
         using var otherClient = factory.CreateClient();
-        var otherAccountId = await RegisterPatientAsync(otherClient, "shared-get-wrong-owner-target@example.com");
+        var otherAccountId = await RegisterPatientAsync(factory, otherClient, "shared-get-wrong-owner-target@example.com");
 
         var response = await client.GetAsync($"/accounts/{otherAccountId}/links/{Guid.NewGuid()}/shared-items");
 
@@ -339,7 +340,11 @@ public sealed class SharedItemEndpointsTests : IAsyncLifetime
 
     private static async Task LinkAsync(HttpClient professionalClient, Guid professionalId, HttpClient patientClient, Guid patientAccountId)
     {
-        var inviteResponse = await professionalClient.PostAsync($"/accounts/{professionalId}/patients/{Guid.NewGuid()}/link-invites", null);
+        var patientId = Guid.NewGuid();
+        var created = await professionalClient.PostAsJsonAsync($"/accounts/{professionalId}/patients",
+            new CreatePatientRequest(patientId, new byte[60], new byte[28]), PatientsJsonContext.Default.CreatePatientRequest);
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var inviteResponse = await professionalClient.PostAsync($"/accounts/{professionalId}/patients/{patientId}/link-invites", null);
         var invite = await inviteResponse.Content.ReadFromJsonAsync(PatientLinksJsonContext.Default.CreateLinkInviteResponse);
         await patientClient.PostAsJsonAsync(
             $"/accounts/{patientAccountId}/links",
@@ -390,13 +395,9 @@ public sealed class SharedItemEndpointsTests : IAsyncLifetime
         return accountId;
     }
 
-    private static async Task<Guid> RegisterPatientAsync(HttpClient client, string email)
+    private static async Task<Guid> RegisterPatientAsync(WebApplicationFactory<Program> factory, HttpClient client, string email)
     {
-        var registerResponse = await client.PostAsJsonAsync(
-            "/auth/register",
-            new RegisterRequest(email, SomeVerifier, AccountRole.Patient),
-            AccountsJsonContext.Default.RegisterRequest);
-        var registered = await registerResponse.Content.ReadFromJsonAsync(AccountsJsonContext.Default.RegisterResponse);
+        var registered = await AnonymousAccountFixture.CreateAsync(factory.Services);
 
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", registered!.AccessToken);
         return registered.Id;

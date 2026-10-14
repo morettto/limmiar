@@ -1,9 +1,12 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { I18nProvider } from '@lingui/react'
 import { webcrypto as limmiarWebcrypto } from '@limmiar/crypto'
 import { i18n, dynamicActivate } from '../../shared/i18n'
+import * as checkinStore from '../../entities/checkin/checkin-store'
 import { guardarCheckIn, lerCheckIns } from '../../entities/checkin/checkin-store'
+import type { CheckIn } from '../../entities/checkin/checkin'
+import { deferred } from '../../test-support/deferred'
 import { partilharCheckIn } from '../../features/partilha/partilhar-checkin'
 import { PacienteHojePage } from './PacienteHojePage'
 
@@ -43,6 +46,7 @@ describe('PacienteHojePage', () => {
     cleanup()
     localStorage.clear()
     vi.mocked(partilharCheckIn).mockReset()
+    vi.restoreAllMocks()
   })
 
   it('shows a locked status and no form when kek is null', () => {
@@ -214,5 +218,82 @@ describe('PacienteHojePage', () => {
 
     await screen.findByText('Check-in salvo neste dispositivo, mas não foi compartilhado.')
     expect(await lerCheckIns(kek, ACCOUNT_ID)).toEqual([{ dia: '2026-01-15', sono: 3, ansiedade: 2, frase: null }])
+  })
+
+  it('marca só o nível escolhido em cada grupo', () => {
+    renderPage({ accountId: ACCOUNT_ID, kek: {} as CryptoKey })
+    const sono = screen.getByRole('group', { name: 'Sono' })
+    const ansiedade = screen.getByRole('group', { name: 'Ansiedade' })
+    expect(within(sono).getAllByRole('radio').every((radio) => !(radio as HTMLInputElement).checked)).toBe(true)
+    fireEvent.click(within(sono).getByRole('radio', { name: '4' }))
+    fireEvent.click(within(ansiedade).getByRole('radio', { name: '2' }))
+    expect(within(sono).getAllByRole('radio').map((radio) => (radio as HTMLInputElement).checked)).toEqual([false, false, false, true, false])
+    expect(within(ansiedade).getAllByRole('radio').map((radio) => (radio as HTMLInputElement).checked)).toEqual([false, true, false, false, false])
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.queryByRole('status')).toBeNull()
+  })
+
+  it.each([
+    ['só o sono', 'Sono'],
+    ['só a ansiedade', 'Ansiedade'],
+  ])('guardar com %s escolhido não grava nada', async (_caso, grupo) => {
+    const kek = await makeKek()
+    const guardar = vi.spyOn(checkinStore, 'guardarCheckIn')
+    renderPage({ accountId: ACCOUNT_ID, kek })
+    fireEvent.click(within(screen.getByRole('group', { name: grupo })).getByRole('radio', { name: '3' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)) })
+    expect(guardar).not.toHaveBeenCalled()
+    expect(screen.queryByText('Guardado')).toBeNull()
+  })
+
+  it.each([
+    ['sem chave', null, ACCOUNT_ID],
+    ['sem conta', 'chave', null],
+    ['sem chave nem conta', null, null],
+  ])('bloqueada %s: não lê nada e mostra só o aviso', async (_caso, chave, conta) => {
+    const kek = chave === null ? null : await makeKek()
+    const ler = vi.spyOn(checkinStore, 'lerCheckIns')
+    renderPage({ accountId: conta, kek })
+    expect(screen.getByRole('status').textContent).toBe('Chaveiro bloqueado. Desbloqueie para registrar o check-in de hoje.')
+    expect(screen.queryByRole('button', { name: 'Guardar' })).toBeNull()
+    expect(ler).not.toHaveBeenCalled()
+  })
+
+  it('recomeça a leitura quando a conta muda e ignora a resposta tardia da anterior', async () => {
+    const kek = await makeKek()
+    const antiga = deferred<CheckIn[]>()
+    const ler = vi.spyOn(checkinStore, 'lerCheckIns').mockReturnValueOnce(antiga.promise).mockResolvedValue([{ dia: '2026-01-15', sono: 1, ansiedade: 1, frase: null }])
+    const view = renderPage({ accountId: ACCOUNT_ID, kek })
+    view.rerender(<I18nProvider i18n={i18n}><PacienteHojePage agora={AGORA} accountId="outra-conta" kek={kek} /></I18nProvider>)
+    await waitFor(() => expect(ler).toHaveBeenCalledTimes(2))
+    expect(ler).toHaveBeenLastCalledWith(kek, 'outra-conta')
+    expect((await screen.findAllByRole('listitem'))[6]!.textContent).toContain('2026-01-15: 1/1')
+
+    await act(async () => antiga.resolve([{ dia: '2026-01-15', sono: 5, ansiedade: 5, frase: null }]))
+
+    expect(screen.getAllByRole('listitem')[6]!.textContent).toContain('2026-01-15: 1/1')
+  })
+
+  it('uma falha tardia da conta anterior não acende o alerta', async () => {
+    const kek = await makeKek()
+    const antiga = deferred<CheckIn[]>()
+    const ler = vi.spyOn(checkinStore, 'lerCheckIns').mockReturnValueOnce(antiga.promise).mockResolvedValue([])
+    const view = renderPage({ accountId: ACCOUNT_ID, kek })
+    view.rerender(<I18nProvider i18n={i18n}><PacienteHojePage agora={AGORA} accountId="outra-conta" kek={kek} /></I18nProvider>)
+    await waitFor(() => expect(ler).toHaveBeenCalledTimes(2))
+
+    await act(async () => antiga.reject(new Error('tardia')))
+
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('o dia muda a série: ler de novo quando passa para outro dia', async () => {
+    const kek = await makeKek()
+    const ler = vi.spyOn(checkinStore, 'lerCheckIns').mockResolvedValue([])
+    const view = renderPage({ accountId: ACCOUNT_ID, kek })
+    await waitFor(() => expect(ler).toHaveBeenCalledTimes(1))
+    view.rerender(<I18nProvider i18n={i18n}><PacienteHojePage agora={new Date(2026, 0, 16, 10, 0)} accountId={ACCOUNT_ID} kek={kek} /></I18nProvider>)
+    await waitFor(() => expect(ler).toHaveBeenCalledTimes(2))
   })
 })

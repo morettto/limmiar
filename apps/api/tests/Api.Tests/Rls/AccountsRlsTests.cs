@@ -39,7 +39,7 @@ public sealed class AccountsRlsTests : IAsyncLifetime
             INSERT INTO accounts (id, email, role, verification_status) VALUES
                 (@activeId, @activeEmail, 'Professional', 'Active'),
                 (@inReviewId, @inReviewEmail, 'Professional', 'InReview'),
-                (@patientInReviewId, @patientInReviewEmail, 'Patient', 'InReview');
+                (@patientInReviewId, NULL, 'Patient', 'InReview');
             """;
         seedCommand.Parameters.AddWithValue("activeId", ActiveAccountId);
         seedCommand.Parameters.AddWithValue("activeEmail", ActiveAccountEmail);

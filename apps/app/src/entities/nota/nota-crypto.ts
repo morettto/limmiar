@@ -19,6 +19,14 @@ export async function selarAssinatura(
   return webcrypto.encrypt(dek, await digestNota(nota), notaAssinaturaAad(noteId, nota.revisao))
 }
 
+export async function verificarAssinatura(dek: CryptoKey, nota: Nota, signature: Uint8Array<ArrayBuffer>): Promise<boolean> {
+  try {
+    const assinado = await webcrypto.decrypt(dek, signature, notaAssinaturaAad(nota.id, nota.revisao))
+    const atual = await digestNota(nota)
+    return assinado.length === atual.length && assinado.every((byte, indice) => byte === atual[indice])
+  } catch { return false }
+}
+
 // Serializador dedicado, distinto de `textoCanonico` (nota.ts): aquele omite `noteId` porque é a
 // superfície que a assinatura cobre, e a entrada de prontuário precisa de saber a que nota
 // pertence. Só o map de `frases` é partilhado, via `serializarFrases`.
@@ -27,6 +35,7 @@ export function notaParaEntrada(nota: Nota): Uint8Array<ArrayBuffer> {
     JSON.stringify({
       tipo: 'nota',
       noteId: nota.id,
+      atendimentoId: nota.atendimentoId,
       revisao: nota.revisao,
       frases: serializarFrases(nota.frases),
     }),

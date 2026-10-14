@@ -76,21 +76,21 @@ public static class PublicBookingEndpoints
         ScheduledSessionStore sessions,
         CancellationToken cancellationToken)
     {
-        var accountId = authorization?.StartsWith("Bearer ", StringComparison.Ordinal) is true
+        var accessSession = authorization?.StartsWith("Bearer ", StringComparison.Ordinal) is true
             ? sessionTokenIssuer.ValidateAccess(authorization!["Bearer ".Length..])
             : null;
-        if (accountId is null)
+        if (accessSession is null)
         {
             return AccessTokenUnauthorizedProblem(httpContext);
         }
 
-        var marked = await sessions.TryMarkNoShowAsync(accountId.Value, sessionId, cancellationToken);
+        var marked = await sessions.TryMarkNoShowAsync(accessSession.AccountId, sessionId, cancellationToken);
         if (!marked)
         {
             return ProblemJson(StatusCodes.Status404NotFound, "Session not found", SchedulingProblemCodes.AgendaSessionNotFound);
         }
 
-        var previas = await sessions.CountPriorNoShowsAsync(accountId.Value, sessionId, cancellationToken);
+        var previas = await sessions.CountPriorNoShowsAsync(accessSession.AccountId, sessionId, cancellationToken);
         return TypedResults.Ok(new NoShowResponse(NoShowPolicy.Decide(previas)));
     }
 }

@@ -16,6 +16,7 @@ public enum SchedulingFailureReason
 {
     AccountNotFound,
     NotAuthorizedToSchedule,
+    PatientNotFound,
     SessionNotFound,
     SessionCancelled,
     RecordingActive,
@@ -24,8 +25,16 @@ public enum SchedulingFailureReason
 
 public sealed class SchedulingService(IAccountStore accounts, ScheduledSessionStore store)
 {
-    public async Task<Result<ScheduledSession, SchedulingFailureReason>> ScheduleAsync(
+    public Task<Result<ScheduledSession, SchedulingFailureReason>> ScheduleAsync(
         Guid professionalId, Guid patientId, DateTimeOffset startsAt, int durationMinutes, CancellationToken cancellationToken)
+        => ScheduleAsync(professionalId, patientId, startsAt, durationMinutes, false, cancellationToken);
+
+    public Task<Result<ScheduledSession, SchedulingFailureReason>> SchedulePublicAsync(
+        Guid professionalId, Guid patientId, DateTimeOffset startsAt, int durationMinutes, CancellationToken cancellationToken)
+        => ScheduleAsync(professionalId, patientId, startsAt, durationMinutes, true, cancellationToken);
+
+    private async Task<Result<ScheduledSession, SchedulingFailureReason>> ScheduleAsync(
+        Guid professionalId, Guid patientId, DateTimeOffset startsAt, int durationMinutes, bool publicBooking, CancellationToken cancellationToken)
     {
         var authorizationFailure = await AuthorizeAsync(professionalId, cancellationToken);
         if (authorizationFailure is not null)
@@ -36,8 +45,10 @@ public sealed class SchedulingService(IAccountStore accounts, ScheduledSessionSt
         try
         {
             // timestamptz requires a zero-offset (UTC) value from Npgsql.
-            var session = await store.InsertAsync(professionalId, patientId, startsAt.ToUniversalTime(), durationMinutes, cancellationToken);
-            return session;
+            var session = publicBooking
+                ? await store.InsertPublicAsync(professionalId, patientId, startsAt.ToUniversalTime(), durationMinutes, cancellationToken)
+                : await store.InsertAsync(professionalId, patientId, startsAt.ToUniversalTime(), durationMinutes, cancellationToken);
+            return session is null ? SchedulingFailureReason.PatientNotFound : session;
         }
         catch (ScheduledSessionSlotConflictException)
         {

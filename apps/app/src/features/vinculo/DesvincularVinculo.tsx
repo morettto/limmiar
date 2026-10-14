@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Trans, useLingui } from '@lingui/react/macro'
-import { translateProblemCode } from '../../shared/api'
+import type { MessageDescriptor } from '@lingui/core'
+import { problemMessage } from '../../shared/api'
 import { desvincular, listarVinculos, type Vinculo } from '../../entities/vinculo/api'
 
 export interface DesvincularVinculoProps {
@@ -12,7 +13,7 @@ export interface DesvincularVinculoProps {
 type ListaState =
   | { status: 'carregando' }
   | { status: 'pronta'; vinculos: Vinculo[] }
-  | { status: 'erro'; mensagem: string }
+  | { status: 'erro'; mensagem: MessageDescriptor }
 
 // Vale para as duas pontas: o outro lado do vínculo é o que não é `accountId`.
 function outraContaDoVinculo(vinculo: Vinculo, accountId: string): string {
@@ -22,14 +23,14 @@ function outraContaDoVinculo(vinculo: Vinculo, accountId: string): string {
 export function DesvincularVinculo({ baseUrl, accountId, accessToken }: DesvincularVinculoProps) {
   const { i18n, t } = useLingui()
   const [estado, setEstado] = useState<ListaState>({ status: 'carregando' })
-  const [erroPorConta, setErroPorConta] = useState<Record<string, string>>({})
+  const [erroPorConta, setErroPorConta] = useState<Record<string, MessageDescriptor>>({})
 
   async function carregar() {
     const result = await listarVinculos(baseUrl, accountId, accessToken)
     if (result.ok) {
       setEstado({ status: 'pronta', vinculos: result.vinculos })
     } else {
-      setEstado({ status: 'erro', mensagem: translateProblemCode(result.code, result.params, i18n) })
+      setEstado({ status: 'erro', mensagem: problemMessage(result.code, result.params) })
     }
   }
 
@@ -43,7 +44,7 @@ export function DesvincularVinculo({ baseUrl, accountId, accessToken }: Desvincu
       await carregar()
       return
     }
-    setErroPorConta((atual) => ({ ...atual, [outraContaId]: translateProblemCode(result.code, result.params, i18n) }))
+    setErroPorConta((atual) => ({ ...atual, [outraContaId]: problemMessage(result.code, result.params) }))
   }
 
   if (estado.status === 'carregando') {
@@ -60,7 +61,7 @@ export function DesvincularVinculo({ baseUrl, accountId, accessToken }: Desvincu
     return (
       <div className="mx-auto max-w-sm p-4">
         <p role="alert" className="text-sm text-red-700">
-          {estado.mensagem}
+          {i18n._(estado.mensagem)}
         </p>
       </div>
     )
@@ -97,7 +98,7 @@ export function DesvincularVinculo({ baseUrl, accountId, accessToken }: Desvincu
             </div>
             {mensagemErro !== undefined ? (
               <p role="alert" className="text-sm text-red-700">
-                {mensagemErro}
+                {i18n._(mensagemErro)}
               </p>
             ) : null}
           </li>

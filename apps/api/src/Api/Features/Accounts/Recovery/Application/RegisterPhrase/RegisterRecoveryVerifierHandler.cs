@@ -19,8 +19,13 @@ public sealed class RegisterRecoveryVerifierHandler(IAccountStore store) : IRequ
         }
 
         // Same discipline as RegisterHandler: only SHA256(verifier) is ever stored.
-        var updated = account with { RecoveryVerifier = SHA256.HashData(request.RecoveryVerifier) };
-        await store.UpdateAsync(updated, cancellationToken);
-        return RegisterRecoveryVerifierResult.Success(updated);
+        var verifier = SHA256.HashData(request.RecoveryVerifier);
+        var updated = await store.MutateAsync(account.Id, current => current with
+        {
+            RecoveryVerifier = verifier,
+            RecoveryEnvelope = request.RecoveryEnvelope,
+        }, cancellationToken);
+        return updated is null ? RegisterRecoveryVerifierResult.Failure(RegisterRecoveryVerifierFailureReason.AccountNotFound)
+            : RegisterRecoveryVerifierResult.Success(updated);
     }
 }

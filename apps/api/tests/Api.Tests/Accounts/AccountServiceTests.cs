@@ -5,6 +5,15 @@ namespace Api.Tests.Accounts;
 
 public sealed class AccountServiceTests
 {
+    [Fact]
+    public async Task GoogleAuth_ProfessionalRequestCannotReuseAPatientIdentity()
+    {
+        var patient = new Account(Guid.NewGuid(), "invalid-stored-identity@example.test", AccountRole.Patient, null, null);
+        var handler = new ContinueWithGoogleHandler(new StubGoogleIdentityProvider(new GoogleIdentity(patient.Email!, "subject")),
+            new FakeAccountStore(patient), new TwoFactorTicketIssuer(), new SessionTokenIssuer());
+        var result = await handler.Handle(new ContinueWithGoogleCommand("token", AccountRole.Professional), CancellationToken.None);
+        Assert.False(result.TryGetValue(out _));
+    }
     private static readonly byte[] SomeVerifier = CreateVerifier(0x01);
 
     [Fact]
@@ -35,7 +44,7 @@ public sealed class AccountServiceTests
         var store = new FakeAccountStore();
         var handler = new RegisterHandler(store, new TwoFactorTicketIssuer(), new SessionTokenIssuer());
 
-        var result = await handler.Handle(new RegisterCommand("hashed@example.com", SomeVerifier, AccountRole.Patient), CancellationToken.None);
+        var result = await handler.Handle(new RegisterCommand("hashed@example.com", SomeVerifier, AccountRole.Professional), CancellationToken.None);
 
         Assert.True(result.Succeeded);
         Assert.NotEqual(SomeVerifier, result.Account!.PasswordVerifier);
@@ -62,7 +71,7 @@ public sealed class AccountServiceTests
     [Fact]
     public async Task LoginAsync_WithCorrectVerifier_ReturnsSuccessWithAccount()
     {
-        var existingAccount = new Account(Guid.NewGuid(), "known@example.com", AccountRole.Patient, SomeVerifier, null);
+        var existingAccount = new Account(Guid.NewGuid(), "known@example.com", AccountRole.Professional, SomeVerifier, null);
         var store = new FakeAccountStore(existingAccount);
         var handler = new LoginHandler(store, new StubPasswordVerifierComparer(alwaysMatches: true), new TwoFactorTicketIssuer(), new SessionTokenIssuer());
 
@@ -185,14 +194,14 @@ public sealed class AccountServiceTests
     }
 
     [Fact]
-    public async Task GoogleAuthAsync_WithEmailAlreadyRegistered_ResolvesExistingRole_IgnoringRequestedRole()
+    public async Task GoogleAuthAsync_WithEmailAlreadyRegistered_UsesExistingProfessionalAccount()
     {
         var existingAccount = new Account(Guid.NewGuid(), "already-here@example.com", AccountRole.Professional, SomeVerifier, null);
         var store = new FakeAccountStore(existingAccount);
         var identity = new GoogleIdentity("already-here@example.com", "google-subject-2");
         var handler = new ContinueWithGoogleHandler(new StubGoogleIdentityProvider(identity), store, new TwoFactorTicketIssuer(), new SessionTokenIssuer());
 
-        var result = await handler.Handle(new ContinueWithGoogleCommand("valid-id-token", AccountRole.Patient), CancellationToken.None);
+        var result = await handler.Handle(new ContinueWithGoogleCommand("valid-id-token", AccountRole.Professional), CancellationToken.None);
 
         Assert.True(result.TryGetValue(out var success));
         Assert.False(success.IsNewAccount);
@@ -206,7 +215,7 @@ public sealed class AccountServiceTests
         var store = new FakeAccountStore();
         var handler = new ContinueWithGoogleHandler(new StubGoogleIdentityProvider(identity: null), store, new TwoFactorTicketIssuer(), new SessionTokenIssuer());
 
-        var result = await handler.Handle(new ContinueWithGoogleCommand("bad-id-token", AccountRole.Patient), CancellationToken.None);
+        var result = await handler.Handle(new ContinueWithGoogleCommand("bad-id-token", AccountRole.Professional), CancellationToken.None);
 
         var failureReason = result.Match(
             _ => throw new InvalidOperationException("expected a failure"),
@@ -223,32 +232,43 @@ public sealed class AccountServiceTests
 
     private sealed class FakeAccountStore : IAccountStore
     {
-        private readonly Dictionary<string, Account> _accountsByEmail = new(StringComparer.Ordinal);
+        private readonly Dictionary<Guid, Account> _accountsByEmail = new();
 
         public FakeAccountStore(params Account[] seed)
         {
             foreach (var account in seed)
             {
-                _accountsByEmail[account.Email] = account;
+                _accountsByEmail[account.Id] = account;
             }
         }
 
         public Task<Account?> FindByEmailAsync(string normalizedEmail, CancellationToken cancellationToken) =>
-            Task.FromResult(_accountsByEmail.GetValueOrDefault(normalizedEmail));
+            Task.FromResult(_accountsByEmail.Values.FirstOrDefault(account => account.Email == normalizedEmail));
 
         public Task<Account?> FindByIdAsync(Guid id, CancellationToken cancellationToken) =>
             Task.FromResult(_accountsByEmail.Values.FirstOrDefault(account => account.Id == id));
 
+        public async Task<string?> GetOrCreatePendingTotpSecretAsync(Guid id, string candidate, CancellationToken cancellationToken)
+        {
+            var account = await FindByIdAsync(id, cancellationToken);
+            if (account is null || account.Role != AccountRole.Professional || account.TotpEnabledAt is not null) return null;
+            var secret = account.TotpSecret ?? candidate;
+            await MutateAsync(account.Id, current => current with { TotpSecret = secret }, cancellationToken);
+            return secret;
+        }
+
         public Task InsertAsync(Account account, CancellationToken cancellationToken)
         {
-            _accountsByEmail[account.Email] = account;
+            _accountsByEmail[account.Id] = account;
             return Task.CompletedTask;
         }
 
-        public Task UpdateAsync(Account account, CancellationToken cancellationToken)
+        public Task<Account?> MutateAsync(Guid id, Func<Account, Account?> mutation, CancellationToken cancellationToken)
         {
-            _accountsByEmail[account.Email] = account;
-            return Task.CompletedTask;
+            if (!_accountsByEmail.TryGetValue(id, out var current)) return Task.FromResult<Account?>(null);
+            var updated = mutation(current);
+            if (updated is not null) _accountsByEmail[id] = updated;
+            return Task.FromResult(updated);
         }
 
         public Task<IReadOnlyList<Account>> ListPendingDocumentReviewAsync(CancellationToken cancellationToken) =>

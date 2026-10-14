@@ -1,0 +1,29 @@
+#root .app-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 16px;margin-bottom:32px;border-bottom:1px solid var(--color-ash)}
+#root .app-bar-brand{display:inline-flex;min-height:44px;align-items:center;color:var(--color-ink);font:400 24px/1 var(--font-editorial);letter-spacing:-.05em;text-decoration:none}
+.app-bar-panel{display:none;flex-basis:100%;flex-direction:column;gap:16px;padding-bottom:16px}
+.app-bar-panel[data-aberto]{display:flex}
+.app-bar ul{display:flex;flex-direction:column;gap:2px;margin:0;padding:0;list-style:none}
+#root .app-bar-link{display:flex;min-height:44px;align-items:center;padding:8px 12px;border:0 solid transparent;border-left-width:3px;border-radius:var(--radius-nav);color:var(--color-carbon);font:400 14px/20px var(--font-interface);text-decoration:none}
+#root .app-bar-link:hover,#root .app-bar button:hover:not(:disabled),#root .app-bar button[aria-expanded="true"]{background:var(--color-bone);color:var(--color-ink)}
+#root .app-bar-link[aria-current="page"]{border-color:var(--color-ink);color:var(--color-ink);font-weight:500}
+#root .app-bar-link[aria-disabled="true"]{background:none;color:var(--color-lichen);cursor:not-allowed}
+#root .app-bar button{display:inline-flex;align-items:center;gap:10px}
+#root .app-bar button:not(:disabled){cursor:pointer}
+.app-bar-chevron{width:7px;height:7px;border:solid currentColor;border-width:0 2px 2px 0;rotate:45deg;translate:0 -2px}
+[aria-expanded="true"] .app-bar-chevron{rotate:225deg;translate:0 2px}
+.app-bar-account{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding-top:16px;border-top:1px solid var(--color-ash)}
+.app-bar-email{max-width:28ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.app-bar-settings{flex-basis:100%}
+#root .app-bar-aviso{flex-basis:100%;margin:0 0 8px}
+@media (min-width:1024px){
+#root .app-bar{display:grid;grid-template:"brand account" auto "nav nav" auto "aviso aviso" auto/auto 1fr}
+.app-bar-brand{grid-area:brand}
+#root .app-bar .app-bar-toggle{display:none}
+.app-bar-panel,.app-bar-panel[data-aberto]{display:contents}
+.app-bar-nav{grid-area:nav}
+.app-bar-nav ul{flex-direction:row;flex-wrap:wrap;gap:4px;margin-bottom:-1px}
+#root .app-bar-nav .app-bar-link{border-width:0 0 2px;border-radius:var(--radius-nav) var(--radius-nav) 0 0}
+.app-bar-account{grid-area:account;justify-self:end;position:relative;padding:0;border:0}
+.app-bar-settings{position:absolute;top:calc(100% + 4px);right:0;z-index:20;min-width:280px;padding:8px;border:1px solid var(--color-ash);border-radius:var(--radius-lg);background:var(--color-paper)}
+.app-bar-aviso{grid-area:aviso}
+}

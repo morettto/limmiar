@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { montarTranscricaoCanonica } from './canonico'
-import type { PalavraAtribuida } from './merge'
+import type { PalavraAtribuida } from './palavra'
 import type { RotuloLocutor } from './classify'
 
 function palavra(texto: string, locutor: string | null): PalavraAtribuida {

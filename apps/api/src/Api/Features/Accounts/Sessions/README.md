@@ -14,8 +14,15 @@ lado (`Api.Accounts.Credentials`, `Api.Accounts.MagicLink`, etc.).
   min, refresh 30 dias, tokens aleatórios de 32 bytes via `RandomNumberGenerator`, não JWT).
   `Refresh` troca um refresh token válido por um par novo da MESMA família (`FamilyId`);
   reutilizar um refresh já trocado revoga a família inteira (deteção de roubo por reuso).
+  A troca usa `ConcurrentDictionary.TryUpdate` para consumir o token atomicamente:
+  duas apresentações simultâneas não emitem duas gerações, e a segunda revoga a família.
   `ValidateAccess` devolve `Guid?` -- a conta dona do token, ou `null` se o token não existe, a
   família foi revogada, ou expirou.
+  `Revoke` encerra a família identificada por qualquer refresh emitido nela, incluindo
+  gerações trocadas ou expiradas. `POST /auth/logout` recebe esse token e retorna 204
+  tanto na primeira revogação quanto nas repetições e tokens desconhecidos. Uma rotação
+  em andamento pode terminar, mas os tokens novos pertencem à família revogada e falham
+  na validação. Outras sessões, inclusive da mesma conta, continuam independentes.
 - `RequireAccountAccessMiddleware` (`Presentation/RequireAccountAccessMiddleware.cs`) -- a
   fronteira HTTP, fechada por omissão: protege TODO `RouteEndpoint` cujo `RoutePattern` declare
   `{accountId}`, sem nenhum marcador por rota. Registado uma única vez em

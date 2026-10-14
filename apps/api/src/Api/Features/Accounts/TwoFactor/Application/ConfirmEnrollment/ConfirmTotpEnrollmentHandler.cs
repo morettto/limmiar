@@ -25,8 +25,11 @@ public sealed class ConfirmTotpEnrollmentHandler(IAccountStore store, ITotpProvi
 
         var backupCodes = BackupCodeGenerator.GenerateCodes();
         IReadOnlyList<string> backupCodeHashes = backupCodes.Select(BackupCodeGenerator.Hash).ToList();
-        var confirmed = account with { TotpEnabledAt = DateTimeOffset.UtcNow, TotpBackupCodeHashes = backupCodeHashes };
-        await store.UpdateAsync(confirmed, cancellationToken);
+        var confirmed = await store.MutateAsync(account.Id, current =>
+            current.TotpSecret == account.TotpSecret && current.TotpEnabledAt is null
+                ? current with { TotpEnabledAt = DateTimeOffset.UtcNow, TotpBackupCodeHashes = backupCodeHashes } : null,
+            cancellationToken);
+        if (confirmed is null) return ConfirmTotpEnrollmentResult.Failure(ConfirmTotpEnrollmentFailureReason.NotPending);
 
         return ConfirmTotpEnrollmentResult.Success(confirmed, backupCodes, sessionTokenIssuer.IssuePair(confirmed.Id));
     }

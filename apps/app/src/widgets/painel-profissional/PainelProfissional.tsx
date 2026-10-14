@@ -29,6 +29,10 @@ export interface PainelProfissionalProps {
   /** null = the keychain is locked; the panel shows no names and makes no request. */
   chaveiro: Chaveiro | null
   notas: readonly Nota[]
+  versao?: number
+  onStart?(patientId: string, agendamentoId: string): void
+  /** Com `atendimentoId`, a pendência é a nota dessa sessão. */
+  onOpenItem?(patientId: string, atendimentoId?: string): void
   /** Test seam; defaults to the real Web Worker decrypt path. */
   openSummaries?: (kek: CryptoKey, items: SealedSummary[], signal?: AbortSignal) => Promise<SummaryResult[]>
 }
@@ -41,7 +45,7 @@ type EstadoPainel =
       sessoes: ResultadoFonte<readonly SessaoAgendada[]>
     }
 
-export function PainelProfissional({ baseUrl, chaveiro, notas, openSummaries = openSummariesInWorker }: PainelProfissionalProps) {
+export function PainelProfissional({ baseUrl, chaveiro, notas, versao, onStart, onOpenItem, openSummaries = openSummariesInWorker }: PainelProfissionalProps) {
   const { i18n, t } = useLingui()
   const [estado, setEstado] = useState<EstadoPainel>({ status: 'a-carregar' })
 
@@ -78,7 +82,7 @@ export function PainelProfissional({ baseUrl, chaveiro, notas, openSummaries = o
       // (`{ok:false}`) caem ambos fora da lista -- nenhum dos dois é exceção de domínio.
       const resultados = await Promise.all(
         decifrados.map(async (resumo): Promise<ConsentimentosPorPaciente[]> => {
-          const resultado = await obterConsentimentos(baseUrl, accId, tokenAtual(), resumo.patientId).catch(() => null)
+          const resultado = await obterConsentimentos(baseUrl, accId, tokenAtual(), resumo.patientId).catch(() => undefined)
           return resultado?.ok ? [{ patientId: resumo.patientId, consentimentos: resultado.consentimentos }] : []
         }),
       )
@@ -104,6 +108,7 @@ export function PainelProfissional({ baseUrl, chaveiro, notas, openSummaries = o
       ])
       if (cancelled) return
 
+      // Stryker disable next-line StringLiteral: equivalent, the render below handles any state left after the early returns.
       setEstado({ status: 'pronto', pacientes, sessoes })
     }
 
@@ -120,7 +125,7 @@ export function PainelProfissional({ baseUrl, chaveiro, notas, openSummaries = o
     // `i18n`/`t` de propósito fora daqui -- eles só traduzem no render (ver `traduzirFalha*`
     // abaixo); `chaveiro.accessToken` também fica fora -- lido via ref em `tokenAtual` (ver
     // README).
-  }, [chaveiro?.kek, chaveiro?.accountId, baseUrl, openSummaries])
+  }, [chaveiro?.kek, chaveiro?.accountId, baseUrl, openSummaries, versao])
 
   if (chaveiro === null) {
     return (
@@ -158,6 +163,27 @@ export function PainelProfissional({ baseUrl, chaveiro, notas, openSummaries = o
 
   const agora = new Date()
   const proxima = sessoes.ok ? proximaSessao(sessoes.dados, agora) : null
+  const proximas = sessoes.ok ? sessoes.dados.filter(sessao => new Date(sessao.inicioEm).getTime() >= agora.getTime()) : []
+  const hoje = proximas.filter(sessao => new Date(sessao.inicioEm).toDateString() === agora.toDateString())
+  const outrosDias = proximas.filter(sessao => new Date(sessao.inicioEm).toDateString() !== agora.toDateString())
+
+  function podeAbrir(patientId: string): boolean {
+    return nomeDoPaciente(patientId) !== null
+  }
+
+  function rotuloPendencia(fonte: 'risco' | 'assinatura' | 'consentimento'): string {
+    if (fonte === 'risco') return t`Revisar risco`
+    return fonte === 'assinatura' ? t`Assinar nota pendente` : t`Revisar consentimento`
+  }
+
+  function encontros(lista: readonly SessaoAgendada[]) {
+    return <ul className="dashboard-sessions">{lista.map(sessao => <li key={sessao.sessionId}>
+      <button type="button" disabled={!onStart || !podeAbrir(sessao.patientId)} onClick={() => onStart!(sessao.patientId, sessao.sessionId)}>
+        <span>{nomeDoPaciente(sessao.patientId) ?? t`Paciente`}</span>
+        <time dateTime={sessao.inicioEm}>{i18n.date(new Date(sessao.inicioEm))} · {horaDaSessao(sessao.inicioEm, i18n.locale)}</time>
+      </button>
+    </li>)}</ul>
+  }
 
   function rotuloAcaoPrincipal(): string {
     if (proxima === null) {
@@ -175,8 +201,9 @@ export function PainelProfissional({ baseUrl, chaveiro, notas, openSummaries = o
   ])
 
   return (
-    <div className="mx-auto max-w-3xl p-4">
-      <button type="button">▶ {rotuloAcaoPrincipal()}</button>
+    <section className="workspace-card professional-dashboard" aria-label={t`Painel do consultório`}>
+      <h2><Trans>Seu dia no consultório</Trans></h2>
+      <button type="button" className="button-primary" disabled={!onStart || proxima === null || !podeAbrir(proxima.patientId)} onClick={() => onStart!(proxima!.patientId, proxima!.sessionId)}>▶ {rotuloAcaoPrincipal()}</button>
       <KpiStrip aria-label={t`Indicadores`}>
         <KpiStrip.Item
           label={t`Pacientes ativos`}
@@ -197,13 +224,19 @@ export function PainelProfissional({ baseUrl, chaveiro, notas, openSummaries = o
           {traduzirFalha(sessoes.falha, t`Não foi possível carregar a agenda.`)}
         </p>
       )}
+      <div className="dashboard-agenda">
+        <section aria-label={t`Hoje`}><h3><Trans>Hoje</Trans></h3>{hoje.length ? encontros(hoje) : <p><Trans>Nenhum encontro por começar hoje.</Trans></p>}</section>
+        <section aria-label={t`Próximos dias`}><h3><Trans>Próximos dias</Trans></h3>{outrosDias.length ? encontros(outrosDias) : <p><Trans>Nenhum encontro nos próximos dias.</Trans></p>}</section>
+      </div>
       <AdaptivePanel label={t`Requer você`}>
         <ul aria-label={t`Requer você`}>
           {itens.map((item) => (
-            <li key={item.id}>{nomeDoPaciente(item.patientId) ?? t`Paciente`}</li>
+            <li key={item.id}><button type="button" disabled={!onOpenItem || !podeAbrir(item.patientId)} onClick={() => onOpenItem!(item.patientId, item.atendimentoId)}>
+              {nomeDoPaciente(item.patientId) ?? t`Paciente`} · {rotuloPendencia(item.fonte)}
+            </button></li>
           ))}
         </ul>
       </AdaptivePanel>
-    </div>
+    </section>
   )
 }

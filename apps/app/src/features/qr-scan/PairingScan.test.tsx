@@ -4,6 +4,8 @@ import { I18nProvider } from '@lingui/react'
 import { i18n, dynamicActivate } from '../../shared/i18n'
 import * as deviceApi from '../../entities/device/api'
 import { PairingScan } from './PairingScan'
+import { generateKeyPair } from '@limmiar/crypto'
+import { encodeBase64 } from '../../shared/lib/base64'
 
 vi.mock('../../entities/device/api', async () => {
   const actual = await vi.importActual<typeof import('../../entities/device/api')>('../../entities/device/api')
@@ -16,7 +18,7 @@ vi.mock('../../entities/device/api', async () => {
 const claimPairingSessionMock = vi.mocked(deviceApi.claimPairingSession)
 
 const NEW_DEVICE_PUBLIC_KEY = 'bmV3LWRldmljZS1wdWJsaWMta2V5'
-const PRIMARY_PUBLIC_KEY = 'cHJpbWFyeS1wdWJsaWMta2V5'
+const PRIMARY_PUBLIC_KEY = encodeBase64(generateKeyPair().publicKey)
 const SESSION_ID = 'session-abc'
 const BASE_URL = 'http://api.test'
 const VALID_QR_TEXT = JSON.stringify({ s: SESSION_ID, k: PRIMARY_PUBLIC_KEY, u: BASE_URL })
@@ -24,12 +26,46 @@ const VALID_QR_TEXT = JSON.stringify({ s: SESSION_ID, k: PRIMARY_PUBLIC_KEY, u: 
 function renderPairingScan(decode: () => Promise<string>, onClaimed: (key: string, sessionId: string) => void = vi.fn()) {
   return render(
     <I18nProvider i18n={i18n}>
-      <PairingScan decode={decode} newDevicePublicKeyBase64={NEW_DEVICE_PUBLIC_KEY} onClaimed={onClaimed} />
+      <PairingScan baseUrl={BASE_URL} decode={decode} newDevicePublicKeyBase64={NEW_DEVICE_PUBLIC_KEY} onClaimed={onClaimed} />
     </I18nProvider>,
   )
 }
 
 describe('PairingScan', () => {
+  it('usa a origem do app quando a API está no mesmo host', async () => {
+    claimPairingSessionMock.mockResolvedValue({ ok: true, primaryPublicKey: PRIMARY_PUBLIC_KEY })
+    const claimed = vi.fn()
+    render(<I18nProvider i18n={i18n}><PairingScan baseUrl="" decode={async () => JSON.stringify({ s: SESSION_ID, k: PRIMARY_PUBLIC_KEY, u: '' })} newDevicePublicKeyBase64={NEW_DEVICE_PUBLIC_KEY} onClaimed={claimed} /></I18nProvider>)
+    await waitFor(() => expect(claimed).toHaveBeenCalledWith(PRIMARY_PUBLIC_KEY, SESSION_ID))
+    expect(claimPairingSessionMock).toHaveBeenCalledWith('', SESSION_ID, NEW_DEVICE_PUBLIC_KEY)
+  })
+  it.each(['http://%', 'http://user:password@api.test', 'http://:password@api.test'])('recusa URL inválida ou com credenciais (%s)', async url => {
+    renderPairingScan(vi.fn().mockResolvedValue(JSON.stringify({ s: SESSION_ID, k: PRIMARY_PUBLIC_KEY, u: url })))
+    await screen.findByRole('alert')
+    expect(claimPairingSessionMock).not.toHaveBeenCalled()
+  })
+  it.each(['', 's'.repeat(129)])('recusa sessão sem identificador válido (%s)', async session => {
+    renderPairingScan(vi.fn().mockResolvedValue(JSON.stringify({ s: session, k: PRIMARY_PUBLIC_KEY, u: BASE_URL })))
+    await screen.findByRole('alert')
+    expect(claimPairingSessionMock).not.toHaveBeenCalled()
+  })
+  it('recusa outro servidor antes de fazer uma requisição', async () => {
+    renderPairingScan(vi.fn().mockResolvedValue(JSON.stringify({ s: SESSION_ID, k: PRIMARY_PUBLIC_KEY, u: 'https://outro.invalid' })))
+    await screen.findByRole('alert')
+    expect(claimPairingSessionMock).not.toHaveBeenCalled()
+  })
+  it('recusa a substituição da chave do QR pelo servidor', async () => {
+    claimPairingSessionMock.mockResolvedValue({ ok: true, primaryPublicKey: encodeBase64(generateKeyPair().publicKey) })
+    const claimed = vi.fn()
+    renderPairingScan(vi.fn().mockResolvedValue(VALID_QR_TEXT), claimed)
+    expect((await screen.findByRole('alert')).textContent).toContain('não corresponde ao código QR')
+    expect(claimed).not.toHaveBeenCalled()
+  })
+  it.each(['', '%%%'])('recusa uma chave inválida sem consultar o servidor (%s)', async key => {
+    renderPairingScan(vi.fn().mockResolvedValue(JSON.stringify({ s: SESSION_ID, k: key, u: BASE_URL })))
+    await screen.findByRole('alert')
+    expect(claimPairingSessionMock).not.toHaveBeenCalled()
+  })
   beforeAll(async () => {
     await dynamicActivate('pt-BR')
   })
@@ -99,7 +135,7 @@ describe('PairingScan', () => {
 
     renderPairingScan(decode)
 
-    expect((await screen.findByRole('alert')).textContent).toBeTruthy()
+    expect((await screen.findByRole('alert')).textContent).toBe('Este código de pareamento não é mais válido. Gere um novo.')
   })
 
   it('renders an error and never calls claimPairingSession when the decoded text is not valid pairing JSON', async () => {
@@ -129,6 +165,9 @@ describe('PairingScan', () => {
     ['k not a string', JSON.stringify({ s: SESSION_ID, k: 1, u: BASE_URL })],
     ['missing u', JSON.stringify({ s: SESSION_ID, k: PRIMARY_PUBLIC_KEY })],
     ['u not a string', JSON.stringify({ s: SESSION_ID, k: PRIMARY_PUBLIC_KEY, u: 1 })],
+    ['s an array holding a session id', JSON.stringify({ s: [SESSION_ID], k: PRIMARY_PUBLIC_KEY, u: BASE_URL })],
+    ['k an array holding a valid key', JSON.stringify({ s: SESSION_ID, k: [PRIMARY_PUBLIC_KEY], u: BASE_URL })],
+    ['u an array holding the right server', JSON.stringify({ s: SESSION_ID, k: PRIMARY_PUBLIC_KEY, u: [BASE_URL] })],
   ])('renders an error and never calls claimPairingSession when the decoded JSON is %s', async (_label, text) => {
     const decode = vi.fn().mockResolvedValue(text)
 
@@ -141,7 +180,7 @@ describe('PairingScan', () => {
   it('falls back to the real decodeFromCamera implementation when decode is not overridden', async () => {
     render(
       <I18nProvider i18n={i18n}>
-        <PairingScan newDevicePublicKeyBase64={NEW_DEVICE_PUBLIC_KEY} onClaimed={vi.fn()} />
+        <PairingScan baseUrl={BASE_URL} newDevicePublicKeyBase64={NEW_DEVICE_PUBLIC_KEY} onClaimed={vi.fn()} />
       </I18nProvider>,
     )
 
@@ -216,5 +255,27 @@ describe('PairingScan', () => {
 
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(onClaimed).not.toHaveBeenCalled()
+  })
+
+  it('aceita um identificador de sessão de exatamente 128 caracteres', async () => {
+    const sessao = 's'.repeat(128)
+    claimPairingSessionMock.mockResolvedValue({ ok: true, primaryPublicKey: PRIMARY_PUBLIC_KEY })
+    const onClaimed = vi.fn()
+    renderPairingScan(vi.fn().mockResolvedValue(JSON.stringify({ s: sessao, k: PRIMARY_PUBLIC_KEY, u: BASE_URL })), onClaimed)
+    await waitFor(() => expect(onClaimed).toHaveBeenCalledWith(PRIMARY_PUBLIC_KEY, sessao))
+  })
+
+  it('mostra a câmera só quando lê pela câmera, com o nome acessível', () => {
+    const comCamera = render(<I18nProvider i18n={i18n}><PairingScan baseUrl={BASE_URL} newDevicePublicKeyBase64={NEW_DEVICE_PUBLIC_KEY} onClaimed={vi.fn()} /></I18nProvider>)
+    expect(comCamera.container.querySelector('video')?.getAttribute('aria-label')).toBe('Câmera para escanear o código QR')
+    comCamera.unmount()
+    const comDecode = renderPairingScan(vi.fn().mockReturnValue(new Promise(() => {})))
+    expect(comDecode.container.querySelector('video')).toBeNull()
+  })
+
+  it.each(['http://api.test.evil', 'http://api.test:8080', 'https://api.test'])('recusa um servidor diferente do esperado (%s)', async (url) => {
+    renderPairingScan(vi.fn().mockResolvedValue(JSON.stringify({ s: SESSION_ID, k: PRIMARY_PUBLIC_KEY, u: url })))
+    await screen.findByRole('alert')
+    expect(claimPairingSessionMock).not.toHaveBeenCalled()
   })
 })

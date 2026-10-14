@@ -43,3 +43,17 @@ docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=limmiar_
 
 The config runs `--migrate-only` against it before starting the app; `AbacatePay__WebhookSecret`
 still needs to be set in the environment running Playwright (e.g. `AbacatePay__WebhookSecret=e2e-local`).
+
+## Security headers and bundle budget
+
+`security-headers.ts` is the single source of the response headers; `public/_headers` must repeat its
+baseline verbatim (`security-headers.test.ts` checks). The baseline CSP is `default-src 'self'` with
+`connect-src 'self'`: `pnpm dev` proxies the API, `/copiloto` and `/speech` (the transcription WebSocket, `tools/nemotron`) to the same origin.
+A hosted build (`docs/ambiente-de-teste.md`) names the other origins in `VITE_API_BASE_URL`,
+`VITE_COPILOTO_BASE_URL`, `VITE_SPEECH_BASE_URL` and, only if the browser ever calls it, `VITE_JUIZ_BASE_URL`; the build adds each one
+and its `ws:`/`wss:` twin to `connect-src` in the `_headers` of the output directory. The e2e iframe origin is added by
+`e2e/fixtures/allow-frame-origin.mjs`. The dev server drops
+the CSP (React refresh injects inline scripts).
+
+`pnpm build && pnpm check:bundle` fails when the gzip size of the entry JS, the lazy JS or the CSS passes
+the ceilings written in `scripts/check-bundle.mjs` (first clean build plus about 5%).

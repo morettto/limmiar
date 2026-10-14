@@ -63,7 +63,8 @@ public sealed class PostgresAccountStoreTests : IAsyncLifetime
             WebAuthnSignCount: 7,
             WebAuthnAaGuid: Guid.NewGuid(),
             RecoveryVerifier: SomeBytes(32, 0x04),
-            VoiceEnrollment: new VoiceEnrollment(SomeBytes(28, 0x05), SomeBytes(28, 0x06)));
+            VoiceEnrollment: new VoiceEnrollment(SomeBytes(28, 0x05), SomeBytes(28, 0x06)),
+            RecoveryEnvelope: SomeBytes(120, 0x07));
 
         var store = new PostgresAccountStore(_dataSource, SomeTotpSecretCipher);
         await store.InsertAsync(account, CancellationToken.None);
@@ -106,17 +107,77 @@ public sealed class PostgresAccountStoreTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task UpdateAsync_PersistsChangedFields()
+    public async Task MutateAsync_PersistsChangedFields()
     {
         var account = MinimalAccount("postgres-store-update@example.com");
         var store = new PostgresAccountStore(_dataSource, SomeTotpSecretCipher);
         await store.InsertAsync(account, CancellationToken.None);
 
-        var updated = account with { VerificationStatus = AccountVerificationStatus.Active, RejectionReason = null };
-        await store.UpdateAsync(updated, CancellationToken.None);
+        var updated = account with
+        {
+            VerificationStatus = AccountVerificationStatus.Active, RejectionReason = null,
+            RecoveryVerifier = SomeBytes(32, 0x04), RecoveryEnvelope = SomeBytes(120, 0x07),
+        };
+        await store.MutateAsync(updated.Id, _ => updated, CancellationToken.None);
 
         var found = await store.FindByIdAsync(account.Id, CancellationToken.None);
         Assert.Equal(AccountVerificationStatus.Active, found!.VerificationStatus);
+        Assert.Equal(updated.RecoveryEnvelope, found.RecoveryEnvelope);
+    }
+
+    [Fact]
+    public async Task MutateAsync_ConcurrentSettingsPreserveVoiceTwoFactorAndRecovery()
+    {
+        var account = MinimalAccount("pg-concurrent-settings@example.com");
+        var store = new PostgresAccountStore(_dataSource, SomeTotpSecretCipher);
+        await store.InsertAsync(account, CancellationToken.None);
+        var voice = new VoiceEnrollment(SomeBytes(60, 0x05), SomeBytes(796, 0x06));
+        var verifier = SomeBytes(32, 0x04);
+        await Task.WhenAll(
+            store.MutateAsync(account.Id, current => current with { VoiceEnrollment = voice }, CancellationToken.None),
+            store.MutateAsync(account.Id, current => current with { TotpSecret = "SOMESECRET", TotpEnabledAt = DateTimeOffset.UtcNow, TotpBackupCodeHashes = ["hash-a"] }, CancellationToken.None),
+            store.MutateAsync(account.Id, current => current with { RecoveryVerifier = verifier, RecoveryEnvelope = SomeBytes(120, 0x07) }, CancellationToken.None));
+        var found = await store.FindByIdAsync(account.Id, CancellationToken.None);
+        Assert.Equal(voice.WrappedDek, found!.VoiceEnrollment!.WrappedDek);
+        Assert.Equal(voice.SealedEmbedding, found.VoiceEnrollment.SealedEmbedding);
+        Assert.Equal("SOMESECRET", found.TotpSecret);
+        Assert.Equal(["hash-a"], found.TotpBackupCodeHashes);
+        Assert.Equal(verifier, found.RecoveryVerifier);
+    }
+
+    [Fact]
+    public async Task MutateAsync_RejectsMissingRejectedAndChangedIdentityWithoutPersisting()
+    {
+        var store = new PostgresAccountStore(_dataSource, SomeTotpSecretCipher);
+        Assert.Null(await store.MutateAsync(Guid.NewGuid(), _ => throw new InvalidOperationException(), CancellationToken.None));
+        var account = MinimalAccount("pg-rejected-mutation@example.com");
+        await store.InsertAsync(account, CancellationToken.None);
+        Assert.Null(await store.MutateAsync(account.Id, _ => null, CancellationToken.None));
+        await Assert.ThrowsAsync<ArgumentException>(() => store.MutateAsync(account.Id,
+            current => current with { Id = Guid.NewGuid(), VerificationStatus = AccountVerificationStatus.Active }, CancellationToken.None));
+        Assert.Equivalent(account, await store.FindByIdAsync(account.Id, CancellationToken.None));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task VerifyBackupCode_ConcurrentRequestsConsumeEachCodeAtMostOnce(bool sameCode)
+    {
+        var account = MinimalAccount("pg-concurrent-backup@example.com") with
+        {
+            TotpSecret = "SOMESECRET", TotpEnabledAt = DateTimeOffset.UtcNow,
+            TotpBackupCodeHashes = [BackupCodeGenerator.Hash("first"), BackupCodeGenerator.Hash("second")],
+        };
+        var store = new PostgresAccountStore(_dataSource, SomeTotpSecretCipher);
+        await store.InsertAsync(account, CancellationToken.None);
+        var handler = new VerifyTotpChallengeHandler(store, new TotpProvider(), new SessionTokenIssuer());
+        var results = await Task.WhenAll(
+            handler.Handle(new(account.Id, null, "first"), CancellationToken.None).AsTask(),
+            handler.Handle(new(account.Id, null, sameCode ? "first" : "second"), CancellationToken.None).AsTask());
+        Assert.Equal(sameCode ? 1 : 2, results.Count(result => result.Succeeded));
+        var found = await store.FindByIdAsync(account.Id, CancellationToken.None);
+        Assert.Equal(sameCode ? 1 : 0, found!.TotpBackupCodeHashes!.Count);
+        Assert.All(results.Where(result => !result.Succeeded), result => Assert.Equal(VerifyTotpChallengeFailureReason.InvalidCode, result.FailureReason));
     }
 
     [Fact]
@@ -151,7 +212,45 @@ public sealed class PostgresAccountStoreTests : IAsyncLifetime
     }
 
     private static Account MinimalAccount(string email, AccountRole role = AccountRole.Professional) =>
-        new(Guid.NewGuid(), email, role, PasswordVerifier: SomeBytes(32, 0x09), GoogleSubjectId: null);
+        new(Guid.NewGuid(), role == AccountRole.Patient ? null : email, role, PasswordVerifier: role == AccountRole.Patient ? null : SomeBytes(32, 0x09), GoogleSubjectId: null);
+
+    [Fact]
+    public async Task ConcurrentPendingTotpInitialization_ReturnsTheSameSecretAndPreservesOtherFields()
+    {
+        var account = MinimalAccount("pg-totp-race@example.com") with
+        {
+            RecoveryVerifier = SomeBytes(32, 0x04),
+            RecoveryEnvelope = SomeBytes(120, 0x07),
+            VerificationStatus = AccountVerificationStatus.InReview,
+        };
+        var store = new PostgresAccountStore(_dataSource, SomeTotpSecretCipher);
+        await store.InsertAsync(account, CancellationToken.None);
+        var secrets = await Task.WhenAll(
+            store.GetOrCreatePendingTotpSecretAsync(account.Id, "FIRSTSECRET", CancellationToken.None),
+            store.GetOrCreatePendingTotpSecretAsync(account.Id, "SECONDSECRET", CancellationToken.None));
+        Assert.NotNull(secrets[0]);
+        Assert.Equal(secrets[0], secrets[1]);
+        var restored = await new PostgresAccountStore(_dataSource, SomeTotpSecretCipher).FindByIdAsync(account.Id, CancellationToken.None);
+        Assert.Equal(secrets[0], restored!.TotpSecret);
+        Assert.Equal(account.RecoveryEnvelope, restored.RecoveryEnvelope);
+        Assert.Equal(account.VerificationStatus, restored.VerificationStatus);
+        var repeated = await store.GetOrCreatePendingTotpSecretAsync(account.Id, "THIRDSECRET", CancellationToken.None);
+        Assert.Equal(secrets[0], repeated);
+    }
+
+    [Theory]
+    [InlineData("missing")]
+    [InlineData("patient")]
+    [InlineData("enabled")]
+    public async Task PendingTotpInitialization_RefusesIneligibleAccount(string condition)
+    {
+        var store = new PostgresAccountStore(_dataSource, SomeTotpSecretCipher);
+        var account = MinimalAccount("pg-totp-ineligible@example.com", condition == "patient" ? AccountRole.Patient : AccountRole.Professional);
+        if (condition == "enabled") account = account with { TotpSecret = "ORIGINALSECRET", TotpEnabledAt = DateTimeOffset.UtcNow };
+        if (condition != "missing") await store.InsertAsync(account, CancellationToken.None);
+        Assert.Null(await store.GetOrCreatePendingTotpSecretAsync(account.Id, "NEWSECRET", CancellationToken.None));
+        if (condition == "enabled") Assert.Equal("ORIGINALSECRET", (await store.FindByIdAsync(account.Id, CancellationToken.None))!.TotpSecret);
+    }
 
     private static byte[] SomeBytes(int length, byte fill)
     {

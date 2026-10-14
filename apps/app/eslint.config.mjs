@@ -49,9 +49,9 @@ export default tseslint.config(
         'error',
         {
           // "Limmiar" is the product name, identical in all 4 locales, so wrapping it would be
-          // extraction noise. A bare URL path is routing config, not copy — matched by value, since
+          // extraction noise. A bare URL path (with `$param` segments) is routing config, not copy — matched by value, since
           // ignoreNames would exempt every future attribute called `to`, copy included.
-          ignore: ['^Limmiar$', '^/[a-z0-9/-]*$'],
+          ignore: ['^Limmiar$', '^/[a-zA-Z0-9/$-]*$'],
           ignoreNames: [
             { regex: { pattern: 'className', flags: 'i' } },
             'id',
@@ -83,6 +83,9 @@ export default tseslint.config(
             // entities/partilha's TipoPartilhavel discriminator (e.g. PartilhaCheckIns.tsx's
             // `tipo: 'checkin'`) -- same kind of internal tag as `status` above.
             'tipo',
+            // API enum fields and HTTP methods carry protocol identifiers.
+            'role',
+            'decisao',
           ],
           // DOM/browser APIs whose string argument is an element id/selector,
           // never user-visible copy.
@@ -90,11 +93,15 @@ export default tseslint.config(
             '*.getElementById',
             '*.querySelector',
             '*.querySelectorAll',
-            // translateProblemCode's `code` argument is a backend problem-code key
+            // translateProblemCode's/problemMessage's `code` argument is a backend problem-code key
             // looked up in problem-messages.ts's registry, not copy rendered as-is.
             'translateProblemCode',
+            'problemMessage',
             // router.tsx's own helper -- its 2nd argument is a URL search-param key.
             'readSearchString',
+            'request',
+            '*.getDirectoryHandle',
+            '*.addEventListener',
             // Error messages are developer-facing diagnostics (thrown/rejected, never
             // rendered UI), same convention already used across this repo's *.ts files.
             'Error',

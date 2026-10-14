@@ -1,0 +1,11 @@
+*
+!pnpm-workspace.yaml
+!package.json
+!pnpm-lock.yaml
+!apps/gateway-fala/package.json
+!apps/gateway-fala/src
+!packages/diarization/package.json
+!packages/diarization/src
+**/*.test.ts
+**/test-support
+**/fixtures

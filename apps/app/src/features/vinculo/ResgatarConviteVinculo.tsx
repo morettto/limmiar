@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import type { CryptoKey } from '@limmiar/crypto'
-import { translateProblemCode } from '../../shared/api'
+import type { MessageDescriptor } from '@lingui/core'
+import { problemMessage } from '../../shared/api'
 import { resgatarConviteVinculo, type Vinculo } from '../../entities/vinculo/api'
 import { garantirParDeChaves } from '../../entities/vinculo/par-de-chaves'
 
@@ -14,10 +15,9 @@ export interface ResgatarConviteVinculoProps {
 }
 
 type ResgateState =
-  | { status: 'idle' }
   | { status: 'resgatando' }
   | { status: 'vinculada' }
-  | { status: 'erro'; mensagem: string }
+  | { status: 'erro'; mensagem: MessageDescriptor }
 
 export function ResgatarConviteVinculo({
   baseUrl,
@@ -28,7 +28,7 @@ export function ResgatarConviteVinculo({
 }: ResgatarConviteVinculoProps) {
   const { i18n } = useLingui()
   const [codigo, setCodigo] = useState('')
-  const [resgate, setResgate] = useState<ResgateState>({ status: 'idle' })
+  const [resgate, setResgate] = useState<ResgateState | null>(null)
 
   // Mesma decisão do GerarConviteVinculo: garante a pública publicada ao abrir o ecrã, sem
   // bloquear o resgate se isto falhar.
@@ -46,10 +46,10 @@ export function ResgatarConviteVinculo({
       onVinculada?.(result.vinculo)
       return
     }
-    setResgate({ status: 'erro', mensagem: translateProblemCode(result.code, result.params, i18n) })
+    setResgate({ status: 'erro', mensagem: problemMessage(result.code, result.params) })
   }
 
-  if (resgate.status === 'vinculada') {
+  if (resgate?.status === 'vinculada') {
     return (
       <div className="mx-auto max-w-sm p-4">
         <p role="status">
@@ -73,15 +73,15 @@ export function ResgatarConviteVinculo({
         />
       </label>
 
-      {resgate.status === 'erro' ? (
+      {resgate?.status === 'erro' ? (
         <p role="alert" className="mb-4 text-sm text-red-700">
-          {resgate.mensagem}
+          {i18n._(resgate.mensagem)}
         </p>
       ) : null}
 
       <button
         type="button"
-        disabled={resgate.status === 'resgatando'}
+        disabled={resgate?.status === 'resgatando'}
         onClick={() => void handleVincular()}
         className="w-full rounded-md bg-neutral-900 px-4 py-2 text-white"
       >

@@ -1,51 +1,62 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import { validateMnemonic } from '@limmiar/crypto'
-import { translateProblemCode } from '../../shared/api'
-import { deriveEmailSalt, deriveRecoveryVerifier, recoverAccess, type Account } from '../../entities/account'
+import type { MessageDescriptor } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
+import { problemMessage } from '../../shared/api'
+import { deriveEmailSalt, deriveRecoveryVerifier, openRecoveryEnvelope, recoverAccess, type Account } from '../../entities/account'
 import { TotpChallenge } from '../totp-challenge/TotpChallenge'
 import { TotpSetup } from '../totp-enrollment/TotpSetup'
 
 export interface RecoveryScreenProps {
   baseUrl: string
-  onRecovered?: (account: Account) => void
+  onRecovered?: (account: Account, kek: CryptoKey) => void
 }
 
 type SubmitState =
-  | { status: 'idle' }
   | { status: 'submitting' }
-  | { status: 'error'; message: string }
+  | { status: 'error'; message: MessageDescriptor }
   | { status: 'success'; account: Account }
-  | { status: 'totp-setup'; account: Account }
-  | { status: 'totp-challenge'; account: Account }
+  | { status: 'totp-setup'; account: Account; kek: CryptoKey }
+  | { status: 'totp-challenge'; account: Account; kek: CryptoKey }
 
 export function RecoveryScreen({ baseUrl, onRecovered }: RecoveryScreenProps) {
-  const { i18n, t } = useLingui()
+  const { i18n } = useLingui()
   const [email, setEmail] = useState('')
   const [mnemonic, setMnemonic] = useState('')
-  const [state, setState] = useState<SubmitState>({ status: 'idle' })
+  const [state, setState] = useState<SubmitState | null>(null)
+  // Stryker disable next-line BooleanLiteral: equivalent, the effect below sets the flag before any async work.
+  const active = useRef(true)
 
-  function handleRecovered(account: Account) {
-    onRecovered?.(account)
+  // Stryker disable ArrayDeclaration: equivalent, any constant dependency list runs the effect once.
+  useEffect(() => {
+    active.current = true
+    return () => { active.current = false }
+  }, [])
+  // Stryker restore ArrayDeclaration
+
+  function handleRecovered(account: Account, kek: CryptoKey) {
+    onRecovered?.(account, kek)
     setState({ status: 'success', account })
   }
 
-  function handleAccount(account: Account) {
+  function handleAccount(account: Account, kek: CryptoKey) {
     switch (account.twoFactorRequirement) {
       case 'SetupRequired':
-        setState({ status: 'totp-setup', account })
+        setState({ status: 'totp-setup', account, kek })
         break
       case 'ChallengeRequired':
-        setState({ status: 'totp-challenge', account })
+        setState({ status: 'totp-challenge', account, kek })
         break
       case 'NotApplicable':
-        handleRecovered(account)
+        handleRecovered(account, kek)
         break
     }
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (state?.status === 'submitting') return
 
     const trimmedMnemonic = mnemonic.trim()
     if (!validateMnemonic(trimmedMnemonic)) {
@@ -53,47 +64,57 @@ export function RecoveryScreen({ baseUrl, onRecovered }: RecoveryScreenProps) {
       // brute-force the phrase one word at a time.
       setState({
         status: 'error',
-        message: t`Frase de recuperação inválida. Verifique se você digitou todas as palavras corretamente.`,
+        message: msg`Frase de recuperação inválida. Verifique se você digitou todas as palavras corretamente.`,
       })
       return
     }
 
     setState({ status: 'submitting' })
-
-    const salt = await deriveEmailSalt(email)
-    const recoveryVerifier = await deriveRecoveryVerifier(trimmedMnemonic, salt)
-    const result = await recoverAccess(baseUrl, { email, recoveryVerifier })
-
-    if (result.ok) {
-      handleAccount(result.account)
-    } else {
-      setState({ status: 'error', message: translateProblemCode(result.code, result.params, i18n) })
+    try {
+      const salt = await deriveEmailSalt(email)
+      const recoveryVerifier = await deriveRecoveryVerifier(trimmedMnemonic, salt)
+      if (!active.current) return
+      const result = await recoverAccess(baseUrl, { email, recoveryVerifier })
+      if (!active.current) return
+      if (!result.ok) {
+        setState({ status: 'error', message: problemMessage(result.code, result.params) })
+        return
+      }
+      const kek = await openRecoveryEnvelope(trimmedMnemonic, email, result.account.id, result.recoveryEnvelope)
+      if (!active.current) return
+      // Stryker disable next-line StringLiteral: equivalent, the form unmounts right after, so the cleared phrase is never rendered.
+      setMnemonic('')
+      handleAccount(result.account, kek)
+    } catch {
+      setState({ status: 'error', message: msg`Não foi possível recuperar o acesso. Verifique sua frase e tente novamente.` })
     }
   }
 
-  if (state.status === 'totp-setup') {
+  if (state?.status === 'totp-setup') {
     return (
       <TotpSetup
         baseUrl={baseUrl}
         accountId={state.account.id}
         ticket={state.account.twoFactorTicket!}
-        onDone={() => handleRecovered(state.account)}
+        onDone={(tokens) => handleRecovered({
+          ...state.account, ...tokens, twoFactorRequirement: 'ChallengeRequired', twoFactorTicket: null,
+        }, state.kek)}
       />
     )
   }
 
-  if (state.status === 'totp-challenge') {
+  if (state?.status === 'totp-challenge') {
     return (
       <TotpChallenge
         baseUrl={baseUrl}
         accountId={state.account.id}
         ticket={state.account.twoFactorTicket!}
-        onVerified={handleRecovered}
+        onVerified={(account) => handleRecovered(account, state.kek)}
       />
     )
   }
 
-  if (state.status === 'success') {
+  if (state?.status === 'success') {
     return (
       <div className="mx-auto max-w-sm p-4">
         <p role="status">
@@ -103,13 +124,10 @@ export function RecoveryScreen({ baseUrl, onRecovered }: RecoveryScreenProps) {
     )
   }
 
-  const isSubmitting = state.status === 'submitting'
+  const isSubmitting = state?.status === 'submitting'
 
   return (
     <div className="mx-auto max-w-sm p-4">
-      <h2 className="mb-2 text-lg font-semibold">
-        <Trans>Recuperar acesso à conta</Trans>
-      </h2>
       <p className="mb-4 text-sm text-neutral-600">
         <Trans>Digite seu e-mail e sua frase de recuperação para recuperar o acesso à sua conta.</Trans>
       </p>
@@ -121,6 +139,7 @@ export function RecoveryScreen({ baseUrl, onRecovered }: RecoveryScreenProps) {
           </span>
           <input
             type="email"
+            disabled={isSubmitting}
             required
             value={email}
             onChange={(event) => setEmail(event.target.value)}
@@ -132,6 +151,7 @@ export function RecoveryScreen({ baseUrl, onRecovered }: RecoveryScreenProps) {
             <Trans>Frase de recuperação</Trans>
           </span>
           <textarea
+            disabled={isSubmitting}
             required
             autoComplete="off"
             spellCheck={false}
@@ -142,9 +162,9 @@ export function RecoveryScreen({ baseUrl, onRecovered }: RecoveryScreenProps) {
           />
         </label>
 
-        {state.status === 'error' ? (
+        {state?.status === 'error' ? (
           <p role="alert" className="mb-4 text-sm text-red-700">
-            {state.message}
+            {i18n._(state.message)}
           </p>
         ) : null}
 

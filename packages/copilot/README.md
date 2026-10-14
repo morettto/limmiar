@@ -14,7 +14,7 @@ Entidade de rascunho gerado por copiloto de IA (spec S07, BYOK) e a camada de pr
 
 ## Camada de procedência (`src/provenancia.ts`)
 
-- `separarPorAncora(afirmacoes)` — mantém só afirmações com `ancoras.length > 0`; devolve `{ comAncora, descartadas }`. `Ancora` (`{ inicioMs, fimMs }`) é compatível em forma com o intervalo de tempo de `PalavraAsr` em `packages/diarization`, mas é um tipo próprio deste package, não importado: `PalavraAsr` carrega `texto` e outros campos de transcrição que uma citação não precisa, e este package não depende de `diarization`.
+- `separarPorAncora(afirmacoes)` — mantém só afirmações com `ancoras.length > 0`; devolve `{ comAncora, descartadas }`. `Ancora` (`{ inicioMs, fimMs }`) é compatível em forma com o intervalo de tempo de `PalavraAtribuida` em `packages/diarization`, mas é um tipo próprio deste package, não importado: `PalavraAtribuida` carrega `texto` e outros campos de transcrição que uma citação não precisa, e este package não depende de `diarization`.
 - `deveAvisarVencimento(criadaEm, agora)` — `true` na janela `[23 dias, 30 dias)` desde `criadaEm`.
 - `deveDescartarPorVencimento(criadaEm, agora)` — `true` a partir dos 30 dias (`>=`).
 - Estas duas funções são puras e não mexem no contexto da máquina diretamente — o adapter fora do package é responsável por chamá-las (ex.: num timer) e enviar `AVISO_VENCIMENTO`/`VENCEU` como eventos.

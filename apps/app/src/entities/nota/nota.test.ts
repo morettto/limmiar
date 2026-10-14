@@ -1,10 +1,11 @@
-import type { Afirmacao } from '@limmiar/copilot'
 import { describe, expect, it } from 'vitest'
 import {
   digestNota,
   editarFrase,
-  rascunhoParaNota,
+  ESTADO_PENDENTE,
+  ORDEM_SECOES,
   textoCanonico,
+  type Nota,
   type SecaoSoap,
 } from './nota'
 
@@ -16,6 +17,8 @@ function bytesToHex(bytes: Uint8Array): string {
 
 const PATIENT_ID = '11111111-1111-1111-1111-111111111111'
 
+interface Afirmacao { texto: string; ancoras: { inicioMs: number; fimMs: number }[] }
+
 function afirmacao(texto: string, ancoras: Afirmacao['ancoras'] = [{ inicioMs: 0, fimMs: 1000 }]): Afirmacao {
   return { texto, ancoras }
 }
@@ -24,49 +27,10 @@ function porSecaoVazio(): Record<SecaoSoap, readonly Afirmacao[]> {
   return { S: [], O: [], A: [], P: [] }
 }
 
-describe('rascunhoParaNota', () => {
-  it('ordena as frases por S, O, A, P e, dentro de cada secção, pela ordem do array de entrada, com revisao 0', () => {
-    const porSecao = {
-      ...porSecaoVazio(),
-      S: [afirmacao('queixa 1'), afirmacao('queixa 2')],
-      A: [afirmacao('hipótese 1')],
-      P: [afirmacao('plano 1')],
-    }
-
-    const nota = rascunhoParaNota('nota-1', PATIENT_ID, porSecao)
-
-    expect(nota.revisao).toBe(0)
-    expect(nota.patientId).toBe(PATIENT_ID)
-    expect(nota.frases.map((frase) => [frase.secao, frase.texto])).toEqual([
-      ['S', 'queixa 1'],
-      ['S', 'queixa 2'],
-      ['A', 'hipótese 1'],
-      ['P', 'plano 1'],
-    ])
-  })
-
-  it('preserva as âncoras de cada afirmação sem as alterar', () => {
-    const ancoras = [
-      { inicioMs: 1000, fimMs: 2000 },
-      { inicioMs: 3000, fimMs: 4000 },
-    ]
-    const porSecao = { ...porSecaoVazio(), S: [afirmacao('queixa', ancoras)] }
-
-    const nota = rascunhoParaNota('nota-1', PATIENT_ID, porSecao)
-
-    expect(nota.frases[0]?.ancoras).toEqual(ancoras)
-  })
-
-  it('gera ids estáveis e determinísticos (secção + índice), iguais em duas chamadas com a mesma entrada', () => {
-    const porSecao = { ...porSecaoVazio(), S: [afirmacao('a'), afirmacao('b')], O: [afirmacao('c')] }
-
-    const primeira = rascunhoParaNota('nota-1', PATIENT_ID, porSecao)
-    const segunda = rascunhoParaNota('nota-1', PATIENT_ID, porSecao)
-
-    expect(primeira.frases.map((frase) => frase.id)).toEqual(segunda.frases.map((frase) => frase.id))
-    expect(primeira.frases.map((frase) => frase.id)).toEqual(['S-0', 'S-1', 'O-0'])
-  })
-})
+function rascunhoParaNota(id: string, patientId: string, porSecao: Record<SecaoSoap, readonly Afirmacao[]>, atendimentoId = 'atendimento-1'): Nota {
+  const frases = ORDEM_SECOES.flatMap((secao) => porSecao[secao].map((item, indice) => ({ id: `${secao}-${indice}`, secao, ...item })))
+  return { id, patientId, atendimentoId, revisao: 0, frases, estado: ESTADO_PENDENTE }
+}
 
 describe('editarFrase', () => {
   it('devolve uma nota nova, com revisao incrementada e só o texto da frase alvo trocado, sem mutar a nota de entrada', () => {
@@ -113,6 +77,13 @@ describe('textoCanonico', () => {
     expect(textoCanonico(notaA)).not.toBe(textoCanonico(notaB))
   })
 
+  it('muda quando troca o atendimento — a assinatura atesta a sessão da nota', () => {
+    const porSecao = { ...porSecaoVazio(), S: [afirmacao('queixa')] }
+
+    expect(textoCanonico(rascunhoParaNota('nota-1', PATIENT_ID, porSecao, 'atendimento-1')))
+      .not.toBe(textoCanonico(rascunhoParaNota('nota-1', PATIENT_ID, porSecao, 'atendimento-2')))
+  })
+
   it('muda quando só uma âncora troca — a assinatura tem de cobrir a citação, não só o texto', () => {
     const porSecao = {
       ...porSecaoVazio(),
@@ -138,7 +109,7 @@ describe('digestNota', () => {
 
     const resultado = await digestNota(nota)
 
-    expect(bytesToHex(resultado)).toBe('b75bb3a41f6a7252028f851ea60f9d0b28c999991a15aa06717ba5cec477a12a')
+    expect(bytesToHex(resultado)).toBe('a709a2f1e4c78bc90b7ca3a8feb88ea32eb8a5f82691c79a797195051492c38a')
   })
 })
 

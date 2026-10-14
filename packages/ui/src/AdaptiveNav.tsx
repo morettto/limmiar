@@ -38,7 +38,7 @@ export function AdaptiveNav({ items, brandLabel = 'Menu', moreLabel = 'Mais' }: 
             key={item.key}
             href={item.href}
             aria-current={item.current ? 'page' : undefined}
-            className="flex min-h-8 items-center gap-2 rounded-md px-2 text-sm"
+            className="flex min-h-8 items-center gap-2 rounded-sm px-2 text-sm"
           >
             <span aria-hidden="true">{item.icon}</span>
             {item.label}
@@ -70,21 +70,21 @@ export function AdaptiveNav({ items, brandLabel = 'Menu', moreLabel = 'Mais' }: 
           <div className="relative flex-1">
             <button
               {...triggerProps}
-              className="flex min-h-11 w-full flex-col items-center justify-center gap-0.5 py-1 text-xs"
+              className="button-secondary flex min-h-11 w-full flex-col items-center justify-center gap-0.5 py-1 text-xs"
             >
               {moreLabel}
             </button>
             {isOpen && (
               <div
                 id={panelId}
-                className="absolute right-0 bottom-full mb-1 w-40 rounded-lg border border-neutral-300 bg-white p-1 shadow-lg"
+                className="absolute right-0 bottom-full mb-1 w-40 rounded-sm border border-neutral-300 bg-white p-1"
               >
                 {overflow.map((item) => (
                   <a
                     key={item.key}
                     href={item.href}
                     aria-current={item.current ? 'page' : undefined}
-                    className="flex min-h-11 items-center gap-2 rounded-md px-2 text-sm"
+                    className="flex min-h-11 items-center gap-2 rounded-sm px-2 text-sm"
                   >
                     <span aria-hidden="true">{item.icon}</span>
                     {item.label}
@@ -107,7 +107,7 @@ export function AdaptiveNav({ items, brandLabel = 'Menu', moreLabel = 'Mais' }: 
       <button
         {...triggerProps}
         aria-label={brandLabel}
-        className="mb-2 flex min-h-11 min-w-11 items-center justify-center rounded-md"
+        className="button-secondary mb-2 flex min-h-11 min-w-11 items-center justify-center rounded-sm"
       >
         ☰
       </button>
@@ -117,7 +117,7 @@ export function AdaptiveNav({ items, brandLabel = 'Menu', moreLabel = 'Mais' }: 
           href={item.href}
           aria-current={item.current ? 'page' : undefined}
           aria-label={item.label}
-          className="flex min-h-11 w-11 items-center justify-center rounded-md"
+          className="flex min-h-11 w-11 items-center justify-center rounded-sm"
         >
           <span aria-hidden="true">{item.icon}</span>
         </a>
@@ -125,14 +125,14 @@ export function AdaptiveNav({ items, brandLabel = 'Menu', moreLabel = 'Mais' }: 
       {isOpen && (
         <div
           id={panelId}
-          className="absolute inset-y-0 left-full z-10 w-40 border-r border-neutral-300 bg-white p-2 shadow-lg"
+          className="absolute inset-y-0 left-full z-10 w-40 border-r border-neutral-300 bg-white p-2"
         >
           {items.map((item) => (
             <a
               key={item.key}
               href={item.href}
               aria-current={item.current ? 'page' : undefined}
-              className="flex min-h-11 items-center gap-2 rounded-md px-2 text-sm"
+              className="flex min-h-11 items-center gap-2 rounded-sm px-2 text-sm"
             >
               <span aria-hidden="true">{item.icon}</span>
               {item.label}

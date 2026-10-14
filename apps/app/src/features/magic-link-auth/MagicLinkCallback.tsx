@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react'
 import { Trans, useLingui } from '@lingui/react/macro'
-import { translateProblemCode } from '../../shared/api'
+import { Link } from '@tanstack/react-router'
+import type { MessageDescriptor } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
+import { problemMessage } from '../../shared/api'
 import { decodeBase64, encodeBase64 } from '../../shared/lib/base64'
 import { completeWebAuthnCeremony, verifyMagicLink, type Account } from '../../entities/account'
 import {
   createCredentialWithBrowser,
   getCredentialWithBrowser,
+  PasskeySemCifraError,
   type WebAuthnAssertionCredential,
   type WebAuthnAssertionInput,
   type WebAuthnRegistrationCredential,
@@ -17,10 +21,11 @@ export interface MagicLinkCallbackProps {
   token: string
   createCredential?: (input: WebAuthnRegistrationInput) => Promise<WebAuthnRegistrationCredential>
   getCredential?: (input: WebAuthnAssertionInput) => Promise<WebAuthnAssertionCredential>
-  onAuthenticated?: (account: Account) => void
+  onAuthenticated?: (account: Account, kek: CryptoKey) => void
+  patientAccountId?: string
 }
 
-type CallbackState = { status: 'in-progress' } | { status: 'success' } | { status: 'error'; message: string }
+type CallbackState = { status: 'in-progress' } | { status: 'success' } | { status: 'error'; message: MessageDescriptor }
 
 interface CompleteCeremonyParams {
   magicLinkTicket: string
@@ -37,35 +42,44 @@ export function MagicLinkCallback({
   createCredential = createCredentialWithBrowser,
   getCredential = getCredentialWithBrowser,
   onAuthenticated,
+  patientAccountId,
 }: MagicLinkCallbackProps) {
   const { i18n } = useLingui()
   const [state, setState] = useState<CallbackState>({ status: 'in-progress' })
+  const [authenticatedId, setAuthenticatedId] = useState<string | null>(null)
+  const [started, setStarted] = useState(false)
+  const [existingId, setExistingId] = useState(patientAccountId ?? '')
 
   useEffect(() => {
+    if (!started) return
     let cancelled = false
+    const controller = new AbortController()
 
     async function run() {
-      const verifyResult = await verifyMagicLink(baseUrl, { token })
+      const verifyResult = await verifyMagicLink(baseUrl, { token, ...(existingId.trim() ? { patientAccountId: existingId.trim() } : {}) })
       if (cancelled) {
         return
       }
       if (!verifyResult.ok) {
-        setState({ status: 'error', message: translateProblemCode(verifyResult.code, verifyResult.params, i18n) })
+        setState({ status: 'error', message: problemMessage(verifyResult.code, verifyResult.params) })
         return
       }
 
       const challenge = decodeBase64(verifyResult.challenge)
       let completeParams: CompleteCeremonyParams
+      let kek: CryptoKey
 
       try {
         if (verifyResult.ceremonyType === 'Register') {
-          const userId = new TextEncoder().encode(verifyResult.magicLinkTicket)
+          const userId = new TextEncoder().encode(verifyResult.accountId)
           const credential = await createCredential({
             challenge,
             relyingPartyId: verifyResult.relyingPartyId,
             userId,
-            userName: verifyResult.magicLinkTicket,
+            userName: verifyResult.accountId,
+            signal: controller.signal,
           })
+          kek = credential.kek
           completeParams = {
             magicLinkTicket: verifyResult.magicLinkTicket,
             credentialId: encodeBase64(credential.credentialId),
@@ -78,7 +92,9 @@ export function MagicLinkCallback({
             challenge,
             relyingPartyId: verifyResult.relyingPartyId,
             credentialId,
+            signal: controller.signal,
           })
+          kek = credential.kek
           completeParams = {
             magicLinkTicket: verifyResult.magicLinkTicket,
             credentialId: encodeBase64(credential.credentialId),
@@ -87,16 +103,19 @@ export function MagicLinkCallback({
             signature: encodeBase64(credential.signature),
           }
         } else {
-          setState({ status: 'error', message: translateProblemCode('auth.webauthn_ceremony_failed', {}, i18n) })
+          setState({ status: 'error', message: problemMessage('auth.webauthn_ceremony_failed', {}) })
           return
         }
-      } catch {
+      } catch (error) {
         if (!cancelled) {
-          setState({ status: 'error', message: translateProblemCode('auth.webauthn_ceremony_failed', {}, i18n) })
+          setState({ status: 'error', message: error instanceof PasskeySemCifraError
+            ? msg`Esta chave de acesso não permite desbloquear seus dados cifrados. Escolha outra chave de acesso.`
+            : problemMessage('auth.webauthn_ceremony_failed', {}) })
         }
         return
       }
 
+      if (cancelled) return
       const completeResult = await completeWebAuthnCeremony(baseUrl, completeParams)
       if (cancelled) {
         return
@@ -104,34 +123,49 @@ export function MagicLinkCallback({
       if (!completeResult.ok) {
         setState({
           status: 'error',
-          message: translateProblemCode(completeResult.code, completeResult.params, i18n),
+          message: problemMessage(completeResult.code, completeResult.params),
         })
         return
       }
 
       const account: Account = {
-        id: completeResult.account.id,
-        email: completeResult.account.email,
-        role: completeResult.account.role,
+        ...completeResult.account,
         twoFactorRequirement: 'NotApplicable',
         twoFactorTicket: null,
       }
-      onAuthenticated?.(account)
+      if (account.role !== 'Patient' || account.email !== null || account.id !== verifyResult.accountId) throw new Error('Invalid anonymous patient account')
+      onAuthenticated?.(account, kek)
+      setAuthenticatedId(account.id)
       setState({ status: 'success' })
     }
 
-    void run()
+    void run().catch(() => {
+      if (!cancelled) setState({ status: 'error', message: problemMessage('unexpected_error', {}) })
+    })
 
     return () => {
       cancelled = true
+      controller.abort()
     }
-  }, [])
+  }, [started])
+
+  if (!started) return <section className="workspace-card mx-auto max-w-sm">
+    <h2><Trans>Acesso privado do paciente</Trans></h2>
+    <p><Trans>Confirme com sua chave de acesso. Seu nome e contato não serão solicitados.</Trans></p>
+    <form onSubmit={(event) => { event.preventDefault(); setStarted(true) }}>
+      <label><Trans>Já tem um ID no Limmiar? Informe para usar a mesma conta.</Trans>
+        <input value={existingId} onChange={(event) => setExistingId(event.target.value)} autoComplete="off"
+          pattern="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}" />
+      </label>
+      <button type="submit" className="button-primary"><Trans>Confirmar meu acesso</Trans></button>
+    </form>
+  </section>
 
   if (state.status === 'error') {
     return (
       <div className="mx-auto max-w-sm p-4">
         <p role="alert" className="text-sm text-red-700">
-          {state.message}
+          {i18n._(state.message)}
         </p>
       </div>
     )
@@ -143,6 +177,8 @@ export function MagicLinkCallback({
         <p role="status">
           <Trans>Login realizado com sucesso.</Trans>
         </p>
+        <p><Trans>Seu ID no Limmiar</Trans>{': '}{authenticatedId}</p>
+        <Link to="/hoje"><Trans>Abrir meu acompanhamento</Trans></Link>
       </div>
     )
   }

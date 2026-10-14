@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Trans, useLingui } from '@lingui/react/macro'
-import { translateProblemCode } from '../../shared/api'
+import type { MessageDescriptor } from '@lingui/core'
+import { msg } from '@lingui/core/macro'
+import { problemMessage } from '../../shared/api'
 import { verifyTotpChallenge, type Account } from '../../entities/account'
 
 export interface TotpChallengeProps {
@@ -10,7 +12,7 @@ export interface TotpChallengeProps {
   onVerified: (account: Account) => void
 }
 
-type SubmitState = { status: 'idle' } | { status: 'submitting' } | { status: 'error'; message: string }
+type SubmitState = { status: 'idle' } | { status: 'submitting' } | { status: 'error'; message: MessageDescriptor }
 
 const SIX_DIGIT_CODE = /^\d{6}$/u
 
@@ -27,12 +29,12 @@ export function TotpChallenge({ baseUrl, accountId, ticket, onVerified }: TotpCh
     event.preventDefault()
     setState({ status: 'submitting' })
 
-    const result = await verifyTotpChallenge(baseUrl, accountId, ticket, toTotpChallengeParams(value))
-
-    if (result.ok) {
-      onVerified(result.account)
-    } else {
-      setState({ status: 'error', message: translateProblemCode(result.code, result.params, i18n) })
+    try {
+      const result = await verifyTotpChallenge(baseUrl, accountId, ticket, toTotpChallengeParams(value))
+      if (result.ok) onVerified(result.account)
+      else setState({ status: 'error', message: problemMessage(result.code, result.params) })
+    } catch {
+      setState({ status: 'error', message: msg`Não foi possível verificar o código. Tente novamente.` })
     }
   }
 
@@ -64,7 +66,7 @@ export function TotpChallenge({ baseUrl, accountId, ticket, onVerified }: TotpCh
 
         {state.status === 'error' ? (
           <p role="alert" className="mb-4 text-sm text-red-700">
-            {state.message}
+            {i18n._(state.message)}
           </p>
         ) : null}
 

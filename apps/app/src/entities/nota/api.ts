@@ -1,5 +1,5 @@
 import { request, type ProblemResult } from '../../shared/api'
-import { encodeBase64 } from '../../shared/lib/base64'
+import { decodeBase64, encodeBase64 } from '../../shared/lib/base64'
 
 export type AssinarNotaResult = { ok: true; noteId: string; revision: number; signedAt: string } | ProblemResult
 
@@ -26,8 +26,7 @@ export async function assinarNota(
   return { ok: true, noteId, revision: body.revision, signedAt: body.signedAt }
 }
 
-// ponytail: teto -- `noteId`/`revision`/`signedAt` sem consumidor (só `r.ok` é lido); upgrade: ecrã de "assinada em" os usa, ou o tipo encolhe para `{ ok: true }`.
-export type ObterAssinaturaResult = { ok: true; noteId: string; revision: number; signedAt: string } | ProblemResult
+export type ObterAssinaturaResult = { ok: true; noteId: string; revision: number; signedAt: string; signature: Uint8Array<ArrayBuffer> } | ProblemResult
 
 export async function obterAssinatura(
   baseUrl: string,
@@ -41,8 +40,6 @@ export async function obterAssinatura(
     return result
   }
 
-  // O blob `signature` do body é descartado de propósito: decodificá-lo só serviria a uma
-  // verificação client-side que nenhum critério pede e nenhum chamador faz.
   const body = (await result.response.json()) as { revision: number; signature: string; signedAt: string }
-  return { ok: true, noteId, revision: body.revision, signedAt: body.signedAt }
+  return { ok: true, noteId, revision: body.revision, signedAt: body.signedAt, signature: decodeBase64(body.signature) }
 }

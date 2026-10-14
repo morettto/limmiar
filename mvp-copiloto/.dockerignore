@@ -1,0 +1,5 @@
+*
+!pyproject.toml
+!src/copiloto/*.py
+!data/limiares-juiz-llm.json
+!data/juiz-v2/registro.jsonl

@@ -45,16 +45,23 @@ export async function openRecord(
   record: { wrappedDek: Uint8Array<ArrayBuffer>; entries: { sequence: number; ciphertext: Uint8Array<ArrayBuffer> }[] },
   patientId: string,
 ): Promise<{ dek: CryptoKey; plaintexts: Uint8Array<ArrayBuffer>[] }> {
-  const sorted = [...record.entries].sort((a, b) => a.sequence - b.sequence)
+  const dek = await webcrypto.unwrapDek(kek, record.wrappedDek, patientDekAad(patientId))
+  return { dek, plaintexts: await openEntries(dek, record.entries, patientId) }
+}
+
+export async function openEntries(
+  dek: CryptoKey,
+  entries: { sequence: number; ciphertext: Uint8Array<ArrayBuffer> }[],
+  patientId: string,
+): Promise<Uint8Array<ArrayBuffer>[]> {
+  const sorted = [...entries].sort((a, b) => a.sequence - b.sequence)
   sorted.forEach((entry, index) => {
     if (entry.sequence !== index + 1) {
       throw new Error(`patient record has a gap or duplicate at sequence ${index + 1} (got ${entry.sequence})`)
     }
   })
 
-  const dek = await webcrypto.unwrapDek(kek, record.wrappedDek, patientDekAad(patientId))
-  const plaintexts = await Promise.all(
+  return Promise.all(
     sorted.map((entry) => webcrypto.decrypt(dek, entry.ciphertext, patientEntryAad(patientId, entry.sequence))),
   )
-  return { dek, plaintexts }
 }

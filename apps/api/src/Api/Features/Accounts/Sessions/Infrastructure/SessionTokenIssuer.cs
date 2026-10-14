@@ -43,7 +43,7 @@ public sealed class SessionTokenIssuer : ISessionTokenIssuer
             return RefreshSessionResult.Failure();
         }
 
-        if (record.Used)
+        if (record.Used || !_refreshTokens.TryUpdate(refreshToken, record with { Used = true }, record))
         {
             // Reuse of an already-exchanged token revokes the whole family: a copy is
             // circulating and any other token in the family may already be compromised.
@@ -51,12 +51,11 @@ public sealed class SessionTokenIssuer : ISessionTokenIssuer
             return RefreshSessionResult.Failure();
         }
 
-        _refreshTokens[refreshToken] = record with { Used = true };
         var pair = IssuePairForFamily(record.AccountId, record.FamilyId);
         return RefreshSessionResult.Success(pair);
     }
 
-    public Guid? ValidateAccess(string accessToken)
+    public AccessSession? ValidateAccess(string accessToken)
     {
         if (!_accessTokens.TryGetValue(accessToken, out var record))
         {
@@ -68,7 +67,18 @@ public sealed class SessionTokenIssuer : ISessionTokenIssuer
             return null;
         }
 
-        return record.ExpiresAt > _clock() ? record.AccountId : null;
+        return record.ExpiresAt > _clock() ? new AccessSession(record.AccountId, record.FamilyId) : null;
+    }
+
+    public AccessSession? Revoke(string refreshToken)
+    {
+        if (!_refreshTokens.TryGetValue(refreshToken, out var record))
+        {
+            return null;
+        }
+
+        _revokedFamilies[record.FamilyId] = 0;
+        return new AccessSession(record.AccountId, record.FamilyId);
     }
 
     private SessionTokenPair IssuePairForFamily(Guid accountId, Guid familyId)

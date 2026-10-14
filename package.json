@@ -18,6 +18,7 @@
     ]
   },
   "scripts": {
+    "dev": "node tools/dev.mjs",
     "test:lint-rules": "node --test tools/oxlint-plugin-comments/index.test.js && node tools/branch-sync-guard.mjs --demo"
   }
 }

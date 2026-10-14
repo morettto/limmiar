@@ -48,6 +48,23 @@ public sealed class PatientLinkStoreTests : IAsyncLifetime
     public async Task DisposeAsync() => await _dataSource.DisposeAsync();
 
     [Fact]
+    public async Task RevokeInvites_DeletesOnlyOwnedRecordAndPreservesOtherInvitations()
+    {
+        var store = new PatientLinkStore(_dataSource);
+        await SeedAccountsAsync(ProfessionalId, PatientAccountId);
+        var first = await store.CreateInviteAsync(ProfessionalId, PatientId, CancellationToken.None);
+        var second = await store.CreateInviteAsync(ProfessionalId, PatientId, CancellationToken.None);
+        var other = await store.CreateInviteAsync(ProfessionalId, Guid.NewGuid(), CancellationToken.None);
+        Assert.False(await store.RevokeInvitesAsync(PatientAccountId, PatientId, CancellationToken.None));
+        Assert.True(await store.RevokeInvitesAsync(ProfessionalId, PatientId, CancellationToken.None));
+        Assert.False(await store.RevokeInvitesAsync(ProfessionalId, PatientId, CancellationToken.None));
+        var access = new Api.Accounts.PostgresAnonymousPatientAccessStore(_dataSource);
+        Assert.Null(await access.FindInvitationAsync(first.Code, CancellationToken.None));
+        Assert.Null(await access.FindInvitationAsync(second.Code, CancellationToken.None));
+        Assert.NotNull(await access.FindInvitationAsync(other.Code, CancellationToken.None));
+    }
+
+    [Fact]
     public async Task RedeemAsync_SameCodeTwice_SecondIsInviteNotFound()
     {
         var store = new PatientLinkStore(_dataSource);
@@ -473,15 +490,13 @@ public sealed class PatientLinkStoreTests : IAsyncLifetime
     [Fact]
     public async Task ListReceivedSharesAsync_AfterUnlink_ReturnsPriorItemsWithUnlinkedAt()
     {
-        var clock = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
-        var store = new PatientLinkStore(_dataSource, () => clock);
+        var store = new PatientLinkStore(_dataSource);
         await SeedAccountsAsync(ProfessionalId, PatientAccountId);
         var invite = await store.CreateInviteAsync(ProfessionalId, PatientId, CancellationToken.None);
         await store.RedeemAsync(invite.Code, PatientAccountId, CancellationToken.None);
         var ciphertext = SomeCiphertext(0x0A);
         await store.ShareAsync(PatientAccountId, ProfessionalId, ciphertext, CancellationToken.None);
 
-        clock = clock.AddDays(1);
         await store.UnlinkAsync(PatientAccountId, ProfessionalId, CancellationToken.None);
 
         var shares = await store.ListReceivedSharesAsync(ProfessionalId, CancellationToken.None);
@@ -489,8 +504,9 @@ public sealed class PatientLinkStoreTests : IAsyncLifetime
         var share = Assert.Single(shares);
         Assert.Equal(PatientAccountId, share.PatientAccountId);
         Assert.Equal(PatientId, share.PatientId);
-        Assert.Equal(clock, share.UnlinkedAt);
         var item = Assert.Single(share.Items);
+        Assert.NotNull(share.UnlinkedAt);
+        Assert.True(share.UnlinkedAt >= item.SharedAt);
         Assert.Equal(ciphertext, item.Ciphertext);
     }
 
@@ -640,7 +656,7 @@ public sealed class PatientLinkStoreTests : IAsyncLifetime
         foreach (var (id, email) in accounts)
         {
             await accountStore.InsertAsync(
-                new Api.Accounts.Account(id, email, Api.Accounts.AccountRole.Patient, PasswordVerifier: null, GoogleSubjectId: null),
+                new Api.Accounts.Account(id, id == ProfessionalId ? email : null, id == ProfessionalId ? Api.Accounts.AccountRole.Professional : Api.Accounts.AccountRole.Patient, PasswordVerifier: null, GoogleSubjectId: null),
                 CancellationToken.None);
         }
     }

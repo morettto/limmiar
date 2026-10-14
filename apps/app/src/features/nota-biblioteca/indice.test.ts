@@ -25,6 +25,7 @@ describe('notaParaDoc', () => {
     const nota: Nota = {
       id: 'nota-1',
       patientId: 'p1',
+      atendimentoId: 'a1',
       revisao: 0,
       frases: [
         { id: 'S-0', secao: 'S', texto: 'febre há 3 dias', ancoras: [] },
@@ -39,7 +40,7 @@ describe('notaParaDoc', () => {
 
 describe('impressaoDigital', () => {
   function notaComRevisao(id: string, revisao: number): Nota {
-    return { id, patientId: 'p1', revisao, frases: [], estado: ESTADO_PENDENTE }
+    return { id, patientId: 'p1', atendimentoId: 'a1', revisao, frases: [], estado: ESTADO_PENDENTE }
   }
 
   it('é a mesma independentemente da ordem das notas', () => {

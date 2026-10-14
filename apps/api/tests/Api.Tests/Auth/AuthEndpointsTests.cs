@@ -5,11 +5,6 @@ using System.Text.Json;
 using Api.Accounts;
 using Api.Serialization;
 using Api.Tests.Accounts;
-// Api.Accounts also has an internal CapturingMagicLinkEmailSender (production fixture),
-// invisible here until S12-01 added InternalsVisibleTo to Api.csproj for AbacatePayClient's
-// internal seam. That IVT made both types resolvable, so the unqualified name became
-// ambiguous; this alias pins it back to the test fake this file always meant.
-using CapturingMagicLinkEmailSender = Api.Tests.Accounts.CapturingMagicLinkEmailSender;
 using Api.Tests.Infrastructure;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -24,6 +19,46 @@ namespace Api.Tests.Auth;
 public sealed class AuthEndpointsTests : IAsyncLifetime
 {
     private static readonly byte[] SomeVerifier = CreateVerifier(0x01);
+
+    [Fact]
+    public async Task PostLogout_RevokesTheFamilyIncludingAccessTokens_AndIsIdempotent()
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        var issuer = factory.Services.GetRequiredService<ISessionTokenIssuer>();
+        var accountId = Guid.NewGuid();
+        var first = issuer.IssuePair(accountId);
+        var current = issuer.Refresh(first.RefreshToken).TokenPair!;
+
+        foreach (var token in new[] { first.RefreshToken, current.RefreshToken, "never-issued" })
+        {
+            var response = await client.PostAsJsonAsync("/auth/logout", new RefreshTokenRequest(token),
+                AccountsJsonContext.Default.RefreshTokenRequest);
+            Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+            Assert.Empty(await response.Content.ReadAsStringAsync());
+        }
+        var refresh = await client.PostAsJsonAsync("/auth/refresh", new RefreshTokenRequest(current.RefreshToken),
+            AccountsJsonContext.Default.RefreshTokenRequest);
+        Assert.Equal(HttpStatusCode.Unauthorized, refresh.StatusCode);
+        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", current.AccessToken);
+        var access = await client.GetAsync($"/accounts/{accountId}/agenda/sessions?from=2026-10-03&to=2026-10-04");
+        Assert.Equal(HttpStatusCode.Unauthorized, access.StatusCode);
+        Assert.Null(issuer.ValidateAccess(first.AccessToken));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    public async Task PostLogout_MissingTokenReturnsValidationProblem(string token)
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        var response = await client.PostAsJsonAsync("/auth/logout", new RefreshTokenRequest(token),
+            AccountsJsonContext.Default.RefreshTokenRequest);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("refreshToken", body.RootElement.GetProperty("params").GetProperty("field").GetString());
+    }
 
     private readonly PostgresContainerFixture _fixture;
     private Respawner _respawner = null!;
@@ -74,7 +109,7 @@ public sealed class AuthEndpointsTests : IAsyncLifetime
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
 
-        var request = new RegisterRequest("taken@example.com", SomeVerifier, AccountRole.Patient);
+        var request = new RegisterRequest("taken@example.com", SomeVerifier, AccountRole.Professional);
         await client.PostAsJsonAsync("/auth/register", request, AccountsJsonContext.Default.RegisterRequest);
 
         var response = await client.PostAsJsonAsync("/auth/register", request, AccountsJsonContext.Default.RegisterRequest);
@@ -186,7 +221,7 @@ public sealed class AuthEndpointsTests : IAsyncLifetime
 
     /// <summary>A Patient owes no 2FA (ADR-S02-03), so login must return a session immediately -- the other half of PostLogin_WithCorrectVerifier_Returns200WithAccountBody's Professional/2FA-pending case.</summary>
     [Fact]
-    public async Task PostLogin_WithPatientRole_ReturnsSessionTokens()
+    public async Task PostLogin_WithPatientRole_RejectsPatientIdentity()
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
@@ -200,11 +235,7 @@ public sealed class AuthEndpointsTests : IAsyncLifetime
             new LoginRequest("login-patient-tokens@example.com", SomeVerifier),
             AccountsJsonContext.Default.LoginRequest);
 
-        var body = await response.Content.ReadFromJsonAsync(AccountsJsonContext.Default.LoginResponse);
-        Assert.NotNull(body);
-        Assert.NotNull(body!.AccessToken);
-        Assert.NotNull(body.RefreshToken);
-        Assert.NotNull(body.AccessTokenExpiresAt);
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     [Fact]
@@ -270,7 +301,7 @@ public sealed class AuthEndpointsTests : IAsyncLifetime
 
     /// <summary>S02-01 AC: Google resolves the account's existing role and ignores the requested one when the e-mail is already registered.</summary>
     [Fact]
-    public async Task PostGoogle_WithEmailAlreadyRegistered_ResolvesExistingRole_IgnoringRequestedRole()
+    public async Task PostGoogle_WithExistingProfessional_UsesExistingAccount()
     {
         using var factory = CreateFactory(new StubGoogleIdentityProvider(
             ("existing-google-token", new GoogleIdentity("already-here@example.com", "google-subject-existing"))));
@@ -283,7 +314,7 @@ public sealed class AuthEndpointsTests : IAsyncLifetime
 
         var response = await client.PostAsJsonAsync(
             "/auth/google",
-            new GoogleAuthRequest("existing-google-token", AccountRole.Patient),
+            new GoogleAuthRequest("existing-google-token", AccountRole.Professional),
             AccountsJsonContext.Default.GoogleAuthRequest);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -293,9 +324,8 @@ public sealed class AuthEndpointsTests : IAsyncLifetime
         Assert.False(body.IsNewAccount);
     }
 
-    /// <summary>A Patient owes no 2FA (ADR-S02-03), so Google auth must return a session immediately -- the other half of PostGoogle_WithNewEmail_Returns200WithRequestedRoleAndIsNewAccountTrue's Professional/2FA-pending case.</summary>
     [Fact]
-    public async Task PostGoogle_WithNewPatientEmail_ReturnsSessionTokens()
+    public async Task PostGoogle_WithNewPatientEmail_RejectsPatientIdentity()
     {
         using var factory = CreateFactory(new StubGoogleIdentityProvider(
             ("new-patient-google-token", new GoogleIdentity("new-patient-via-google@example.com", "google-subject-new-patient"))));
@@ -306,11 +336,7 @@ public sealed class AuthEndpointsTests : IAsyncLifetime
             new GoogleAuthRequest("new-patient-google-token", AccountRole.Patient),
             AccountsJsonContext.Default.GoogleAuthRequest);
 
-        var body = await response.Content.ReadFromJsonAsync(AccountsJsonContext.Default.GoogleAuthResponse);
-        Assert.NotNull(body);
-        Assert.NotNull(body!.AccessToken);
-        Assert.NotNull(body.RefreshToken);
-        Assert.NotNull(body.AccessTokenExpiresAt);
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     [Fact]
@@ -352,7 +378,7 @@ public sealed class AuthEndpointsTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task PostRegister_WithPatientRole_ReturnsSessionTokens()
+    public async Task PostRegister_WithPatientRole_RejectsPatientIdentity()
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
@@ -362,12 +388,9 @@ public sealed class AuthEndpointsTests : IAsyncLifetime
             new RegisterRequest("patient-tokens@example.com", SomeVerifier, AccountRole.Patient),
             AccountsJsonContext.Default.RegisterRequest);
 
-        var body = await response.Content.ReadFromJsonAsync(AccountsJsonContext.Default.RegisterResponse);
-        Assert.NotNull(body!.AccessToken);
-        Assert.NotNull(body.RefreshToken);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
-    /// <summary>A professional still owes 2FA at register time (ADR-S02-03), so no session exists yet.</summary>
     [Fact]
     public async Task PostRegister_WithProfessionalRole_DoesNotReturnSessionTokens()
     {
@@ -390,11 +413,7 @@ public sealed class AuthEndpointsTests : IAsyncLifetime
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
 
-        var registerResponse = await client.PostAsJsonAsync(
-            "/auth/register",
-            new RegisterRequest("refresh-ok@example.com", SomeVerifier, AccountRole.Patient),
-            AccountsJsonContext.Default.RegisterRequest);
-        var issued = await registerResponse.Content.ReadFromJsonAsync(AccountsJsonContext.Default.RegisterResponse);
+        var issued = await AnonymousAccountFixture.CreateAsync(factory.Services);
 
         var response = await client.PostAsJsonAsync(
             "/auth/refresh",
@@ -415,11 +434,7 @@ public sealed class AuthEndpointsTests : IAsyncLifetime
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
 
-        var registerResponse = await client.PostAsJsonAsync(
-            "/auth/register",
-            new RegisterRequest("refresh-reuse@example.com", SomeVerifier, AccountRole.Patient),
-            AccountsJsonContext.Default.RegisterRequest);
-        var issued = await registerResponse.Content.ReadFromJsonAsync(AccountsJsonContext.Default.RegisterResponse);
+        var issued = await AnonymousAccountFixture.CreateAsync(factory.Services);
         await client.PostAsJsonAsync(
             "/auth/refresh", new RefreshTokenRequest(issued!.RefreshToken!), AccountsJsonContext.Default.RefreshTokenRequest);
 
@@ -439,11 +454,7 @@ public sealed class AuthEndpointsTests : IAsyncLifetime
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
 
-        var registerResponse = await client.PostAsJsonAsync(
-            "/auth/register",
-            new RegisterRequest("refresh-compare@example.com", SomeVerifier, AccountRole.Patient),
-            AccountsJsonContext.Default.RegisterRequest);
-        var issued = await registerResponse.Content.ReadFromJsonAsync(AccountsJsonContext.Default.RegisterResponse);
+        var issued = await AnonymousAccountFixture.CreateAsync(factory.Services);
         await client.PostAsJsonAsync(
             "/auth/refresh", new RefreshTokenRequest(issued!.RefreshToken!), AccountsJsonContext.Default.RefreshTokenRequest);
         var reusedResponse = await client.PostAsJsonAsync(
@@ -472,76 +483,8 @@ public sealed class AuthEndpointsTests : IAsyncLifetime
         Assert.Equal("refreshToken", doc.RootElement.GetProperty("params").GetProperty("field").GetString());
     }
 
-    // Must match what CreateMagicLinkAuthenticator's callers sign fake WebAuthn responses with.
     private const string WebAuthnRelyingPartyId = "limmiar.test";
     private const string WebAuthnOrigin = "https://limmiar.test";
-
-    [Fact]
-    public async Task PostMagicLinkRequest_WithValidEmail_Returns200()
-    {
-        var (factory, _) = CreateFactoryWithMagicLinkCapture();
-        using var factoryDisposable = factory;
-        using var client = factory.CreateClient();
-
-        var response = await client.PostAsJsonAsync(
-            "/auth/magic-link/request",
-            new MagicLinkRequestRequest("someone@example.com"),
-            AccountsJsonContext.Default.MagicLinkRequestRequest);
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task PostMagicLinkRequest_WithRealEmailSenderRegistration_Returns200WithEmptyBody()
-    {
-        using var factory = CreateFactory();
-        using var client = factory.CreateClient();
-
-        var response = await client.PostAsJsonAsync(
-            "/auth/magic-link/request",
-            new MagicLinkRequestRequest("real-sender@example.com"),
-            AccountsJsonContext.Default.MagicLinkRequestRequest);
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadAsStringAsync();
-        Assert.Equal("{}", body);
-    }
-
-    [Fact]
-    public async Task PostMagicLinkRequest_WithMissingEmail_Returns400WithValidationProblemDetails()
-    {
-        var (factory, _) = CreateFactoryWithMagicLinkCapture();
-        using var factoryDisposable = factory;
-        using var client = factory.CreateClient();
-
-        var response = await client.PostAsJsonAsync(
-            "/auth/magic-link/request",
-            new MagicLinkRequestRequest(""),
-            AccountsJsonContext.Default.MagicLinkRequestRequest);
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        var body = await response.Content.ReadAsStringAsync();
-        using var doc = JsonDocument.Parse(body);
-        Assert.Equal("validation.invalid_field", doc.RootElement.GetProperty("code").GetString());
-        Assert.Equal("email", doc.RootElement.GetProperty("params").GetProperty("field").GetString());
-    }
-
-    /// <summary>Exercises Program.Composition.cs's MagicLink:TokenLifetimeSeconds E2E override branch -- same precedent as DevicePairing:SessionLifetimeSeconds.</summary>
-    [Fact]
-    public async Task PostMagicLinkRequest_WithConfiguredTokenLifetimeOverride_StillReturns200()
-    {
-        var (baseFactory, _) = CreateFactoryWithMagicLinkCapture();
-        using var factory = baseFactory.WithWebHostBuilder(builder =>
-            builder.UseSetting("MagicLink:TokenLifetimeSeconds", "5"));
-        using var client = factory.CreateClient();
-
-        var response = await client.PostAsJsonAsync(
-            "/auth/magic-link/request",
-            new MagicLinkRequestRequest("override@example.com"),
-            AccountsJsonContext.Default.MagicLinkRequestRequest);
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-    }
 
     [Fact]
     public async Task PostMagicLinkVerify_WithInvalidToken_Returns401WithMagicLinkInvalidProblemDetails()
@@ -615,7 +558,6 @@ public sealed class AuthEndpointsTests : IAsyncLifetime
         Assert.Equal("credentialId", doc.RootElement.GetProperty("params").GetProperty("field").GetString());
     }
 
-    /// <summary>Empty string (not merely non-base64) is the other half of TryDecodeBase64's required-field check.</summary>
     [Fact]
     public async Task PostMagicLinkWebAuthnComplete_WithEmptyCredentialId_Returns400WithValidationProblemDetails()
     {
@@ -728,228 +670,6 @@ public sealed class AuthEndpointsTests : IAsyncLifetime
         Assert.Equal("signature", doc.RootElement.GetProperty("params").GetProperty("field").GetString());
     }
 
-    [Fact]
-    public async Task MagicLinkFlow_RegistrationCeremony_EndToEnd_ReturnsSessionForNewPatientAccount()
-    {
-        var (factory, sender) = CreateFactoryWithMagicLinkCapture();
-        using var factoryDisposable = factory;
-        using var client = factory.CreateClient();
-        const string email = "e2e-register@example.com";
-
-        await client.PostAsJsonAsync(
-            "/auth/magic-link/request", new MagicLinkRequestRequest(email), AccountsJsonContext.Default.MagicLinkRequestRequest);
-        var token = sender.LastTokenSentTo(email)!;
-
-        var verifyResponse = await client.PostAsJsonAsync(
-            "/auth/magic-link/verify", new VerifyMagicLinkRequest(token), AccountsJsonContext.Default.VerifyMagicLinkRequest);
-        Assert.Equal(HttpStatusCode.OK, verifyResponse.StatusCode);
-        var verifyBody = await verifyResponse.Content.ReadFromJsonAsync(AccountsJsonContext.Default.VerifyMagicLinkResponse);
-        Assert.NotNull(verifyBody);
-        Assert.Equal(MagicLinkCeremonyType.Register, verifyBody!.CeremonyType);
-        Assert.Equal(WebAuthnRelyingPartyId, verifyBody.RelyingPartyId);
-        Assert.Null(verifyBody.CredentialId);
-
-        var authenticator = new SoftwareAuthenticator();
-        var challengeBytes = Convert.FromBase64String(verifyBody.Challenge);
-        var challenge = Base64Url.EncodeToString(challengeBytes);
-        var clientDataJson = SoftwareAuthenticator.ClientDataJson("webauthn.create", challenge, WebAuthnOrigin);
-        var attestationObject = authenticator.AttestationObject(WebAuthnRelyingPartyId);
-
-        var completeResponse = await client.PostAsJsonAsync(
-            "/auth/magic-link/webauthn/complete",
-            new CompleteMagicLinkWebAuthnRequest(
-                verifyBody.MagicLinkTicket,
-                Convert.ToBase64String(authenticator.CredentialId),
-                Convert.ToBase64String(clientDataJson),
-                Convert.ToBase64String(attestationObject),
-                null,
-                null),
-            AccountsJsonContext.Default.CompleteMagicLinkWebAuthnRequest);
-
-        Assert.Equal(HttpStatusCode.OK, completeResponse.StatusCode);
-        var completeBody = await completeResponse.Content.ReadFromJsonAsync(AccountsJsonContext.Default.CompleteMagicLinkWebAuthnResponse);
-        Assert.NotNull(completeBody);
-        Assert.Equal(email, completeBody!.Email);
-        Assert.Equal(AccountRole.Patient, completeBody.Role);
-        Assert.NotEmpty(completeBody.AccessToken);
-        Assert.NotEmpty(completeBody.RefreshToken);
-    }
-
-    [Fact]
-    public async Task MagicLinkFlow_AssertionCeremony_EndToEnd_ReturnsSessionForReturningPatient()
-    {
-        var (factory, sender) = CreateFactoryWithMagicLinkCapture();
-        using var factoryDisposable = factory;
-        using var client = factory.CreateClient();
-        const string email = "e2e-assert@example.com";
-        var authenticator = new SoftwareAuthenticator();
-
-        await CompleteRegistrationCeremonyOverHttp(client, sender, email, authenticator);
-
-        await client.PostAsJsonAsync(
-            "/auth/magic-link/request", new MagicLinkRequestRequest(email), AccountsJsonContext.Default.MagicLinkRequestRequest);
-        var assertToken = sender.LastTokenSentTo(email)!;
-        var verifyResponse = await client.PostAsJsonAsync(
-            "/auth/magic-link/verify", new VerifyMagicLinkRequest(assertToken), AccountsJsonContext.Default.VerifyMagicLinkRequest);
-        var verifyBody = await verifyResponse.Content.ReadFromJsonAsync(AccountsJsonContext.Default.VerifyMagicLinkResponse);
-        Assert.Equal(MagicLinkCeremonyType.Assert, verifyBody!.CeremonyType);
-        Assert.Equal(Convert.ToBase64String(authenticator.CredentialId), verifyBody.CredentialId);
-
-        var challenge = Base64Url.EncodeToString(Convert.FromBase64String(verifyBody.Challenge));
-        var clientDataJson = SoftwareAuthenticator.ClientDataJson("webauthn.get", challenge, WebAuthnOrigin);
-        var authenticatorData = SoftwareAuthenticator.AuthenticatorData(WebAuthnRelyingPartyId, userPresent: true, userVerified: true, signCount: 5);
-        var signature = authenticator.Sign(authenticatorData, clientDataJson);
-
-        var completeResponse = await client.PostAsJsonAsync(
-            "/auth/magic-link/webauthn/complete",
-            new CompleteMagicLinkWebAuthnRequest(
-                verifyBody.MagicLinkTicket,
-                Convert.ToBase64String(authenticator.CredentialId),
-                Convert.ToBase64String(clientDataJson),
-                null,
-                Convert.ToBase64String(authenticatorData),
-                Convert.ToBase64String(signature)),
-            AccountsJsonContext.Default.CompleteMagicLinkWebAuthnRequest);
-
-        Assert.Equal(HttpStatusCode.OK, completeResponse.StatusCode);
-        var completeBody = await completeResponse.Content.ReadFromJsonAsync(AccountsJsonContext.Default.CompleteMagicLinkWebAuthnResponse);
-        Assert.NotNull(completeBody);
-        Assert.Equal(email, completeBody!.Email);
-        Assert.NotEmpty(completeBody.AccessToken);
-    }
-
-    /// <summary>A tampered signature must surface as the collapsed WebAuthn-ceremony problem code.</summary>
-    [Fact]
-    public async Task MagicLinkFlow_AssertionCeremony_WithTamperedSignature_Returns401WithCeremonyFailedProblemDetails()
-    {
-        var (factory, sender) = CreateFactoryWithMagicLinkCapture();
-        using var factoryDisposable = factory;
-        using var client = factory.CreateClient();
-        const string email = "e2e-tampered@example.com";
-        var authenticator = new SoftwareAuthenticator();
-
-        await CompleteRegistrationCeremonyOverHttp(client, sender, email, authenticator);
-
-        await client.PostAsJsonAsync(
-            "/auth/magic-link/request", new MagicLinkRequestRequest(email), AccountsJsonContext.Default.MagicLinkRequestRequest);
-        var assertToken = sender.LastTokenSentTo(email)!;
-        var verifyResponse = await client.PostAsJsonAsync(
-            "/auth/magic-link/verify", new VerifyMagicLinkRequest(assertToken), AccountsJsonContext.Default.VerifyMagicLinkRequest);
-        var verifyBody = await verifyResponse.Content.ReadFromJsonAsync(AccountsJsonContext.Default.VerifyMagicLinkResponse);
-
-        var challenge = Base64Url.EncodeToString(Convert.FromBase64String(verifyBody!.Challenge));
-        var clientDataJson = SoftwareAuthenticator.ClientDataJson("webauthn.get", challenge, WebAuthnOrigin);
-        var authenticatorData = SoftwareAuthenticator.AuthenticatorData(WebAuthnRelyingPartyId, userPresent: true, userVerified: true, signCount: 1);
-        var signature = authenticator.Sign(authenticatorData, clientDataJson);
-        signature[^1] ^= 0xFF;
-
-        var completeResponse = await client.PostAsJsonAsync(
-            "/auth/magic-link/webauthn/complete",
-            new CompleteMagicLinkWebAuthnRequest(
-                verifyBody.MagicLinkTicket,
-                Convert.ToBase64String(authenticator.CredentialId),
-                Convert.ToBase64String(clientDataJson),
-                null,
-                Convert.ToBase64String(authenticatorData),
-                Convert.ToBase64String(signature)),
-            AccountsJsonContext.Default.CompleteMagicLinkWebAuthnRequest);
-
-        Assert.Equal(HttpStatusCode.Unauthorized, completeResponse.StatusCode);
-        var body = await completeResponse.Content.ReadAsStringAsync();
-        using var doc = JsonDocument.Parse(body);
-        Assert.Equal("auth.webauthn_ceremony_failed", doc.RootElement.GetProperty("code").GetString());
-    }
-
-    private static async Task CompleteRegistrationCeremonyOverHttp(
-        HttpClient client, CapturingMagicLinkEmailSender sender, string email, SoftwareAuthenticator authenticator)
-    {
-        await client.PostAsJsonAsync(
-            "/auth/magic-link/request", new MagicLinkRequestRequest(email), AccountsJsonContext.Default.MagicLinkRequestRequest);
-        var token = sender.LastTokenSentTo(email)!;
-        var verifyResponse = await client.PostAsJsonAsync(
-            "/auth/magic-link/verify", new VerifyMagicLinkRequest(token), AccountsJsonContext.Default.VerifyMagicLinkRequest);
-        var verifyBody = await verifyResponse.Content.ReadFromJsonAsync(AccountsJsonContext.Default.VerifyMagicLinkResponse);
-
-        var challenge = Base64Url.EncodeToString(Convert.FromBase64String(verifyBody!.Challenge));
-        var clientDataJson = SoftwareAuthenticator.ClientDataJson("webauthn.create", challenge, WebAuthnOrigin);
-        var attestationObject = authenticator.AttestationObject(WebAuthnRelyingPartyId);
-
-        var completeResponse = await client.PostAsJsonAsync(
-            "/auth/magic-link/webauthn/complete",
-            new CompleteMagicLinkWebAuthnRequest(
-                verifyBody.MagicLinkTicket,
-                Convert.ToBase64String(authenticator.CredentialId),
-                Convert.ToBase64String(clientDataJson),
-                Convert.ToBase64String(attestationObject),
-                null,
-                null),
-            AccountsJsonContext.Default.CompleteMagicLinkWebAuthnRequest);
-        Assert.Equal(HttpStatusCode.OK, completeResponse.StatusCode);
-    }
-
-    /// <summary>The route is only mapped when MagicLink:TestCaptureEndpoint is true; proves it is genuinely unmapped, not merely unauthorized or empty.</summary>
-    [Fact]
-    public async Task GetMagicLinkDebugLast_WithoutTestCaptureFlag_RouteIsNotMapped()
-    {
-        using var factory = CreateFactory();
-        using var client = factory.CreateClient();
-
-        var response = await client.GetAsync("/auth/magic-link/_debug-last?email=someone@example.com");
-
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task GetMagicLinkDebugLast_WithTestCaptureFlagAndNoEmailQueryParam_Returns404()
-    {
-        using var factory = CreateFactoryWithTestCaptureEndpoint();
-        using var client = factory.CreateClient();
-
-        var response = await client.GetAsync("/auth/magic-link/_debug-last");
-
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task GetMagicLinkDebugLast_WithTestCaptureFlagAndNothingCapturedForThatEmail_Returns404()
-    {
-        using var factory = CreateFactoryWithTestCaptureEndpoint();
-        using var client = factory.CreateClient();
-
-        var response = await client.GetAsync("/auth/magic-link/_debug-last?email=never-requested@example.com");
-
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task GetMagicLinkDebugLast_WithTestCaptureFlagAfterARequest_ReturnsAWorkingToken()
-    {
-        using var factory = CreateFactoryWithTestCaptureEndpoint();
-        using var client = factory.CreateClient();
-        const string email = "debug-endpoint@example.com";
-
-        var requestResponse = await client.PostAsJsonAsync(
-            "/auth/magic-link/request", new MagicLinkRequestRequest(email), AccountsJsonContext.Default.MagicLinkRequestRequest);
-        Assert.Equal(HttpStatusCode.OK, requestResponse.StatusCode);
-
-        var debugResponse = await client.GetAsync($"/auth/magic-link/_debug-last?email={Uri.EscapeDataString(email)}");
-        Assert.Equal(HttpStatusCode.OK, debugResponse.StatusCode);
-
-        var debugBody = await debugResponse.Content.ReadFromJsonAsync(AccountsJsonContext.Default.MagicLinkDebugLastResponse);
-        Assert.NotNull(debugBody);
-        Assert.False(string.IsNullOrWhiteSpace(debugBody!.Token));
-
-        // Not just "looks like a token" -- the exact token a real /auth/magic-link/verify call accepts.
-        var verifyResponse = await client.PostAsJsonAsync(
-            "/auth/magic-link/verify", new VerifyMagicLinkRequest(debugBody.Token), AccountsJsonContext.Default.VerifyMagicLinkRequest);
-        Assert.Equal(HttpStatusCode.OK, verifyResponse.StatusCode);
-    }
-
-    /// <summary>Sets MagicLink:TestCaptureEndpoint=true instead of overriding IMagicLinkEmailSender directly -- these tests are specifically about that config-gated wiring.</summary>
-    private WebApplicationFactory<Program> CreateFactoryWithTestCaptureEndpoint() =>
-        CreateFactory().WithWebHostBuilder(builder =>
-            builder.UseSetting("MagicLink:TestCaptureEndpoint", "true"));
-
     private WebApplicationFactory<Program> CreateFactory() =>
         new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>
@@ -965,16 +685,6 @@ public sealed class AuthEndpointsTests : IAsyncLifetime
                 builder.UseSetting("Totp:EncryptionKey", TotpTestEncryptionKey.Base64);
             });
 
-    /// <summary>Overrides the production IMagicLinkEmailSender registration with a capturing fake so a test can read back the token a request "sent".</summary>
-    private (WebApplicationFactory<Program> Factory, CapturingMagicLinkEmailSender Sender) CreateFactoryWithMagicLinkCapture()
-    {
-        var sender = new CapturingMagicLinkEmailSender();
-        var factory = CreateFactory().WithWebHostBuilder(builder =>
-            builder.ConfigureTestServices(services => services.AddSingleton<IMagicLinkEmailSender>(sender)));
-        return (factory, sender);
-    }
-
-    /// <summary>Real Google ID token verification is out of scope for S02-01; overrides the production IGoogleIdentityProvider registration with a fake.</summary>
     private WebApplicationFactory<Program> CreateFactory(IGoogleIdentityProvider googleIdentityProvider) =>
         CreateFactory().WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services =>

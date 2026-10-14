@@ -44,7 +44,29 @@ public sealed class RecoveryEndpointsTests : IAsyncLifetime
     public Task DisposeAsync() => Task.CompletedTask;
 
     private static readonly byte[] SomeVerifier = CreateVerifier(0x01);
+    private static readonly byte[] SomeEnvelope = Enumerable.Repeat((byte)0x07, 120).ToArray();
     private static readonly byte[] SomeRecoveryVerifier = CreateVerifier(0x02);
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(0)]
+    [InlineData(119)]
+    [InlineData(121)]
+    public async Task PostRecoveryPhrase_RequiresCompleteEncryptedKeyEnvelope(int? length)
+    {
+        using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        var id = await RegisterProfessionalAsync(client, "recovery-envelope@example.com");
+        var response = await client.PostAsJsonAsync($"/accounts/{id}/recovery-phrase",
+            new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier, length is null ? null! : new byte[length.Value]),
+            AccountsJsonContext.Default.RegisterRecoveryVerifierRequest);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("recoveryEnvelope", doc.RootElement.GetProperty("params").GetProperty("field").GetString());
+        var recover = await client.PostAsJsonAsync("/auth/recover", new RecoverAccessRequest("recovery-envelope@example.com", SomeRecoveryVerifier),
+            AccountsJsonContext.Default.RecoverAccessRequest);
+        Assert.Equal(HttpStatusCode.Unauthorized, recover.StatusCode);
+    }
 
     [Fact]
     public async Task PostAccountRecoveryPhrase_WithValidAccessToken_Returns200()
@@ -55,7 +77,7 @@ public sealed class RecoveryEndpointsTests : IAsyncLifetime
 
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/recovery-phrase",
-            new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier),
+            new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier, SomeEnvelope),
             AccountsJsonContext.Default.RegisterRecoveryVerifierRequest);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -74,7 +96,7 @@ public sealed class RecoveryEndpointsTests : IAsyncLifetime
 
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/recovery-phrase",
-            new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier),
+            new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier, SomeEnvelope),
             AccountsJsonContext.Default.RegisterRecoveryVerifierRequest);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
@@ -93,7 +115,7 @@ public sealed class RecoveryEndpointsTests : IAsyncLifetime
 
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/recovery-phrase",
-            new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier),
+            new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier, SomeEnvelope),
             AccountsJsonContext.Default.RegisterRecoveryVerifierRequest);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
@@ -114,7 +136,7 @@ public sealed class RecoveryEndpointsTests : IAsyncLifetime
 
         var response = await client.PostAsJsonAsync(
             $"/accounts/{victimAccountId}/recovery-phrase",
-            new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier),
+            new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier, SomeEnvelope),
             AccountsJsonContext.Default.RegisterRecoveryVerifierRequest);
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
@@ -132,7 +154,7 @@ public sealed class RecoveryEndpointsTests : IAsyncLifetime
 
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/recovery-phrase",
-            new RegisterRecoveryVerifierRequest(new byte[] { 1, 2, 3 }),
+            new RegisterRecoveryVerifierRequest(new byte[] { 1, 2, 3 }, SomeEnvelope),
             AccountsJsonContext.Default.RegisterRecoveryVerifierRequest);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -148,17 +170,13 @@ public sealed class RecoveryEndpointsTests : IAsyncLifetime
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
 
-        var registerResponse = await client.PostAsJsonAsync(
-            "/auth/register",
-            new RegisterRequest("recovery-patient@example.com", SomeVerifier, AccountRole.Patient),
-            AccountsJsonContext.Default.RegisterRequest);
-        var registered = await registerResponse.Content.ReadFromJsonAsync(AccountsJsonContext.Default.RegisterResponse);
+        var registered = await AnonymousAccountFixture.CreateAsync(factory.Services);
         // A Patient's TwoFactorRequirement is always NotApplicable (ADR-S02-03), so register already returned a real session.
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", registered!.AccessToken);
 
         var response = await client.PostAsJsonAsync(
             $"/accounts/{registered.Id}/recovery-phrase",
-            new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier),
+            new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier, SomeEnvelope),
             AccountsJsonContext.Default.RegisterRecoveryVerifierRequest);
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
@@ -178,7 +196,7 @@ public sealed class RecoveryEndpointsTests : IAsyncLifetime
 
         var response = await client.PostAsJsonAsync(
             $"/accounts/{unknownAccountId}/recovery-phrase",
-            new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier),
+            new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier, SomeEnvelope),
             AccountsJsonContext.Default.RegisterRecoveryVerifierRequest);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -217,7 +235,7 @@ public sealed class RecoveryEndpointsTests : IAsyncLifetime
         var accountId = await RegisterProfessionalAsync(client, "recover-ok@example.com");
         await client.PostAsJsonAsync(
             $"/accounts/{accountId}/recovery-phrase",
-            new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier),
+            new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier, SomeEnvelope),
             AccountsJsonContext.Default.RegisterRecoveryVerifierRequest);
 
         var response = await client.PostAsJsonAsync(
@@ -229,6 +247,7 @@ public sealed class RecoveryEndpointsTests : IAsyncLifetime
         var body = await response.Content.ReadFromJsonAsync(AccountsJsonContext.Default.RecoverAccessResponse);
         Assert.NotNull(body);
         Assert.Equal("recover-ok@example.com", body!.Email);
+        Assert.Equal(SomeEnvelope, body.RecoveryEnvelope);
         Assert.Equal(AccountRole.Professional, body.Role);
         // 2FA is mandatory on every login for a Professional (ADR-S02-03/S02-04); recovery re-authenticates but still owes a fresh TOTP challenge before a session is issued.
         Assert.Equal(TwoFactorRequirement.ChallengeRequired, body.TwoFactorRequirement);
@@ -247,7 +266,7 @@ public sealed class RecoveryEndpointsTests : IAsyncLifetime
         // seed here mirrors that invariant so the real ConstantTimePasswordVerifierComparer
         // matches the raw verifier the request below submits.
         var account = new Account(
-            Guid.NewGuid(), email, AccountRole.Patient, SHA256.HashData(SomeVerifier), null, RecoveryVerifier: SHA256.HashData(recoveryVerifier));
+            Guid.NewGuid(), email, AccountRole.Patient, SHA256.HashData(SomeVerifier), null, RecoveryVerifier: SHA256.HashData(recoveryVerifier), RecoveryEnvelope: SomeEnvelope);
         using var factory = CreateFactory().WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services => services.AddSingleton<IAccountStore>(new SeededAccountStore(account))));
         using var client = factory.CreateClient();
@@ -275,7 +294,7 @@ public sealed class RecoveryEndpointsTests : IAsyncLifetime
         var accountId = await RegisterProfessionalAsync(client, "recover-wrong@example.com");
         await client.PostAsJsonAsync(
             $"/accounts/{accountId}/recovery-phrase",
-            new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier),
+            new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier, SomeEnvelope),
             AccountsJsonContext.Default.RegisterRecoveryVerifierRequest);
 
         var response = await client.PostAsJsonAsync(
@@ -297,7 +316,7 @@ public sealed class RecoveryEndpointsTests : IAsyncLifetime
         var accountId = await RegisterProfessionalAsync(client, "recover-compare@example.com");
         await client.PostAsJsonAsync(
             $"/accounts/{accountId}/recovery-phrase",
-            new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier),
+            new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier, SomeEnvelope),
             AccountsJsonContext.Default.RegisterRecoveryVerifierRequest);
 
         var wrongVerifierResponse = await client.PostAsJsonAsync(
@@ -437,37 +456,50 @@ public sealed class RecoveryEndpointsTests : IAsyncLifetime
 
         public RefreshSessionResult Refresh(string refreshToken) => throw new NotSupportedException("not needed by the one test that uses this stub");
 
-        public Guid? ValidateAccess(string accessToken) => Guid.TryParse(accessToken, out var accountId) ? accountId : null;
+        public AccessSession? Revoke(string refreshToken) => throw new NotSupportedException("not needed by these tests");
+
+        public AccessSession? ValidateAccess(string accessToken) => Guid.TryParse(accessToken, out var accountId) ? new AccessSession(accountId, accountId) : null;
     }
 
     private sealed class SeededAccountStore : IAccountStore
     {
-        private readonly Dictionary<string, Account> _accountsByEmail = new(StringComparer.Ordinal);
+        private readonly Dictionary<Guid, Account> _accountsByEmail = new();
 
         public SeededAccountStore(params Account[] seed)
         {
             foreach (var account in seed)
             {
-                _accountsByEmail[account.Email] = account;
+                _accountsByEmail[account.Id] = account;
             }
         }
 
         public Task<Account?> FindByEmailAsync(string normalizedEmail, CancellationToken cancellationToken) =>
-            Task.FromResult(_accountsByEmail.GetValueOrDefault(normalizedEmail));
+            Task.FromResult(_accountsByEmail.Values.FirstOrDefault(account => account.Email == normalizedEmail));
 
         public Task<Account?> FindByIdAsync(Guid id, CancellationToken cancellationToken) =>
             Task.FromResult(_accountsByEmail.Values.FirstOrDefault(account => account.Id == id));
 
+        public async Task<string?> GetOrCreatePendingTotpSecretAsync(Guid id, string candidate, CancellationToken cancellationToken)
+        {
+            var account = await FindByIdAsync(id, cancellationToken);
+            if (account is null || account.Role != AccountRole.Professional || account.TotpEnabledAt is not null) return null;
+            var secret = account.TotpSecret ?? candidate;
+            await MutateAsync(account.Id, current => current with { TotpSecret = secret }, cancellationToken);
+            return secret;
+        }
+
         public Task InsertAsync(Account account, CancellationToken cancellationToken)
         {
-            _accountsByEmail[account.Email] = account;
+            _accountsByEmail[account.Id] = account;
             return Task.CompletedTask;
         }
 
-        public Task UpdateAsync(Account account, CancellationToken cancellationToken)
+        public Task<Account?> MutateAsync(Guid id, Func<Account, Account?> mutation, CancellationToken cancellationToken)
         {
-            _accountsByEmail[account.Email] = account;
-            return Task.CompletedTask;
+            if (!_accountsByEmail.TryGetValue(id, out var current)) return Task.FromResult<Account?>(null);
+            var updated = mutation(current);
+            if (updated is not null) _accountsByEmail[id] = updated;
+            return Task.FromResult(updated);
         }
 
         public Task<IReadOnlyList<Account>> ListPendingDocumentReviewAsync(CancellationToken cancellationToken) =>

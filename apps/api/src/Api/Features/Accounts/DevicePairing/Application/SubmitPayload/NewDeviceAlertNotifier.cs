@@ -5,14 +5,14 @@ public sealed class NewDeviceAlertNotifier(IAccountStore store, INewDeviceAlertS
     public async Task NotifyNewDeviceLinkedAsync(Guid accountId, CancellationToken cancellationToken)
     {
         var account = await store.FindByIdAsync(accountId, cancellationToken);
-        if (account is null)
+        if (account?.Email is not { } email)
         {
             return;
         }
 
         try
         {
-            await newDeviceAlertSender.SendAsync(account.Email, cancellationToken);
+            await newDeviceAlertSender.SendAsync(email, cancellationToken);
         }
         catch (Exception)
         {

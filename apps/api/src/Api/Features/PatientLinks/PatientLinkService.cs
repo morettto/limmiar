@@ -1,5 +1,6 @@
 using Api.Accounts;
 using Api.Platform;
+using Api.Patients;
 
 namespace Api.PatientLinks;
 
@@ -8,16 +9,20 @@ public enum CreateInviteFailure
     AccountNotFound,
 
     NotAuthorized,
+
+    PatientNotFound,
 }
 
 /// <summary>Same shape as <see cref="AccountKeyPair"/>: the fields the client needs to encrypt/decrypt to the peer, never the peer's private material.</summary>
 public sealed record LinkView(Guid ProfessionalAccountId, Guid PatientAccountId, Guid PatientId, DateTimeOffset LinkedAt, byte[]? PeerPublicKey);
 
+public sealed record RevokedInvites(bool Revoked);
+
 /// <summary>
 /// Role checks and account lookups around <see cref="PatientLinkStore"/>: the store knows
 /// nothing about accounts or roles, only codes and pairs of ids.
 /// </summary>
-public sealed class PatientLinkService(IAccountStore accounts, PatientLinkStore links)
+public sealed class PatientLinkService(IAccountStore accounts, PatientLinkStore links, PatientRecordStore records)
 {
     /// <summary>Same guard as ConsentService.RecordAsync/NoteService.SignAsync: generating an invite for a patientId carries the same authorization risk as creating a patient record.</summary>
     public async Task<Result<LinkInvite, CreateInviteFailure>> CreateInviteAsync(
@@ -32,6 +37,11 @@ public sealed class PatientLinkService(IAccountStore accounts, PatientLinkStore 
         if (!AccountAuthorizationGuard.CanCreatePatientRecords(account))
         {
             return CreateInviteFailure.NotAuthorized;
+        }
+
+        if (await records.GetLastSequenceAsync(professionalAccountId, patientId, cancellationToken) is null)
+        {
+            return CreateInviteFailure.PatientNotFound;
         }
 
         return await links.CreateInviteAsync(professionalAccountId, patientId, cancellationToken);
@@ -58,6 +68,15 @@ public sealed class PatientLinkService(IAccountStore accounts, PatientLinkStore 
                 return new LinkView(link.Link.ProfessionalAccountId, link.Link.PatientAccountId, link.Link.PatientId, link.Link.LinkedAt, link.PeerPublicKey);
             },
             failure => Task.FromResult<Result<LinkView, RedeemFailure>>(failure));
+    }
+
+    public async Task<Result<RevokedInvites, CreateInviteFailure>> RevokeInvitesAsync(Guid professionalAccountId, Guid patientId, CancellationToken cancellationToken)
+    {
+        var account = await accounts.FindByIdAsync(professionalAccountId, cancellationToken);
+        if (account is null) return CreateInviteFailure.AccountNotFound;
+        if (!AccountAuthorizationGuard.CanCreatePatientRecords(account)) return CreateInviteFailure.NotAuthorized;
+        if (await records.GetLastSequenceAsync(professionalAccountId, patientId, cancellationToken) is null) return CreateInviteFailure.PatientNotFound;
+        return new RevokedInvites(await links.RevokeInvitesAsync(professionalAccountId, patientId, cancellationToken));
     }
 
     public async Task<IReadOnlyList<LinkView>> ListAsync(Guid accountId, CancellationToken cancellationToken)

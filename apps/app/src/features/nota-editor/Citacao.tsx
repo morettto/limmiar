@@ -5,7 +5,7 @@ export interface CitacaoProps {
   ancora: Ancora
   /** Vem do reprodutor real (fatia 3, `features/nota-audio/reprodutor.ts`), passado pelo
    *  chamador (hoje `NotaPage`). */
-  aoTocar: (ancora: Ancora) => void
+  aoTocar?: (ancora: Ancora) => void
 }
 
 function formatarMs(ms: number): string {
@@ -22,12 +22,15 @@ export function Citacao({ ancora, aoTocar }: CitacaoProps) {
   const { t } = useLingui()
   const inicio = formatarMs(ancora.inicioMs)
   const fim = formatarMs(ancora.fimMs)
+  const tocar = aoTocar === undefined ? undefined : () => aoTocar(ancora)
   return (
     <button
       type="button"
-      onClick={() => aoTocar(ancora)}
-      onMouseEnter={() => aoTocar(ancora)}
-      onFocus={() => aoTocar(ancora)}
+      disabled={aoTocar === undefined}
+      onClick={tocar}
+      onMouseEnter={tocar}
+      onFocus={tocar}
+      title={aoTocar === undefined ? t`Gravação original indisponível` : undefined}
       aria-label={t`Tocar áudio de ${inicio} a ${fim}`}
       className="min-h-11 min-w-11 rounded-md border border-neutral-300 px-2 text-xs"
     >

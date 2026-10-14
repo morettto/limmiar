@@ -54,7 +54,7 @@ public sealed class SharingPreferencesEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        var accountId = await RegisterPatientAsync(client, "prefs-roundtrip@example.com");
+        var accountId = await RegisterPatientAsync(factory, client, "prefs-roundtrip@example.com");
         var wrappedDek = SomeBlob(0xD1);
         var ciphertext = SomeBlob(0xC1);
 
@@ -80,7 +80,7 @@ public sealed class SharingPreferencesEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        var accountId = await RegisterPatientAsync(client, "prefs-never-saved@example.com");
+        var accountId = await RegisterPatientAsync(factory, client, "prefs-never-saved@example.com");
 
         var response = await client.GetAsync($"/accounts/{accountId}/sharing-preferences");
 
@@ -95,7 +95,7 @@ public sealed class SharingPreferencesEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        var accountId = await RegisterPatientAsync(client, "prefs-stale@example.com");
+        var accountId = await RegisterPatientAsync(factory, client, "prefs-stale@example.com");
         await client.PutAsJsonAsync(
             $"/accounts/{accountId}/sharing-preferences",
             new PutSharingPreferencesRequest(0, SomeBlob(0xD1), SomeBlob(0xC1)),
@@ -117,7 +117,7 @@ public sealed class SharingPreferencesEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        var accountId = await RegisterPatientAsync(client, "prefs-negative-version@example.com");
+        var accountId = await RegisterPatientAsync(factory, client, "prefs-negative-version@example.com");
 
         var response = await client.PutAsJsonAsync(
             $"/accounts/{accountId}/sharing-preferences",
@@ -136,7 +136,7 @@ public sealed class SharingPreferencesEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        var accountId = await RegisterPatientAsync(client, "prefs-short-wrapped-dek@example.com");
+        var accountId = await RegisterPatientAsync(factory, client, "prefs-short-wrapped-dek@example.com");
 
         var response = await client.PutAsJsonAsync(
             $"/accounts/{accountId}/sharing-preferences",
@@ -154,7 +154,7 @@ public sealed class SharingPreferencesEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        var accountId = await RegisterPatientAsync(client, "prefs-oversized-wrapped-dek@example.com");
+        var accountId = await RegisterPatientAsync(factory, client, "prefs-oversized-wrapped-dek@example.com");
 
         var response = await client.PutAsJsonAsync(
             $"/accounts/{accountId}/sharing-preferences",
@@ -172,7 +172,7 @@ public sealed class SharingPreferencesEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        var accountId = await RegisterPatientAsync(client, "prefs-short-ciphertext@example.com");
+        var accountId = await RegisterPatientAsync(factory, client, "prefs-short-ciphertext@example.com");
 
         var response = await client.PutAsJsonAsync(
             $"/accounts/{accountId}/sharing-preferences",
@@ -190,7 +190,7 @@ public sealed class SharingPreferencesEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        var accountId = await RegisterPatientAsync(client, "prefs-oversized-ciphertext@example.com");
+        var accountId = await RegisterPatientAsync(factory, client, "prefs-oversized-ciphertext@example.com");
 
         var response = await client.PutAsJsonAsync(
             $"/accounts/{accountId}/sharing-preferences",
@@ -222,10 +222,10 @@ public sealed class SharingPreferencesEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        await RegisterPatientAsync(client, "prefs-put-wrong-owner@example.com");
+        await RegisterPatientAsync(factory, client, "prefs-put-wrong-owner@example.com");
 
         using var otherClient = factory.CreateClient();
-        var otherAccountId = await RegisterPatientAsync(otherClient, "prefs-put-wrong-owner-target@example.com");
+        var otherAccountId = await RegisterPatientAsync(factory, otherClient, "prefs-put-wrong-owner-target@example.com");
 
         var response = await client.PutAsJsonAsync(
             $"/accounts/{otherAccountId}/sharing-preferences",
@@ -251,10 +251,10 @@ public sealed class SharingPreferencesEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        await RegisterPatientAsync(client, "prefs-get-wrong-owner@example.com");
+        await RegisterPatientAsync(factory, client, "prefs-get-wrong-owner@example.com");
 
         using var otherClient = factory.CreateClient();
-        var otherAccountId = await RegisterPatientAsync(otherClient, "prefs-get-wrong-owner-target@example.com");
+        var otherAccountId = await RegisterPatientAsync(factory, otherClient, "prefs-get-wrong-owner-target@example.com");
 
         var response = await client.GetAsync($"/accounts/{otherAccountId}/sharing-preferences");
 
@@ -268,13 +268,9 @@ public sealed class SharingPreferencesEndpointsTests : IAsyncLifetime
         return blob;
     }
 
-    private static async Task<Guid> RegisterPatientAsync(HttpClient client, string email)
+    private static async Task<Guid> RegisterPatientAsync(WebApplicationFactory<Program> factory, HttpClient client, string email)
     {
-        var registerResponse = await client.PostAsJsonAsync(
-            "/auth/register",
-            new RegisterRequest(email, SomeVerifier, AccountRole.Patient),
-            AccountsJsonContext.Default.RegisterRequest);
-        var registered = await registerResponse.Content.ReadFromJsonAsync(AccountsJsonContext.Default.RegisterResponse);
+        var registered = await AnonymousAccountFixture.CreateAsync(factory.Services);
 
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", registered!.AccessToken);
         return registered.Id;

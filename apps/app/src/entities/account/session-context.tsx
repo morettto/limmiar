@@ -3,7 +3,8 @@ import type { Account } from './account'
 
 export interface ContextoSessao {
   sessao: Account | null
-  iniciarSessao(account: Account): void
+  kek: CryptoKey | null
+  iniciarSessao(account: Account, kek?: CryptoKey): void
   terminarSessao(): void
 }
 

@@ -1,9 +1,10 @@
-name: Deploy app to Cloudflare Workers
+name: Deploy app (ambiente de teste)
 
+# Só manual: o ambiente de teste não recebe deploy a cada push (docs/ambiente-de-teste.md).
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
+
+concurrency: deploy-app
 
 permissions:
   contents: read
@@ -43,12 +44,33 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - uses: actions/cache@v4
+        with:
+          path: apps/app/public/models/voice-identity
+          key: voice-wasm-${{ runner.os }}-${{ hashFiles('tools/voice-identity/Dockerfile', 'tools/voice-identity/CMakeLists.txt', 'tools/voice-identity/embedding.cpp', 'tools/voice-identity/worker.js', 'tools/voice-identity/setup.mjs') }}
+
+      - name: Prepare verified browser voice model and runtime for E2E
+        run: node tools/voice-identity/setup.mjs
+
       - name: E2E (crossOriginIsolated + iframe de terceiro)
         run: pnpm --filter app exec playwright install --with-deps chromium
       - run: pnpm --filter app test:e2e
 
+      # Origens do ambiente de teste entram como constante de build e na CSP (apps/app/security-headers.ts).
+      # VITE_JUIZ_BASE_URL fica vazia: só o orquestrador chama o juiz.
       - name: Build
-        run: pnpm --filter app build
+        run: |
+          test -n "$VITE_API_BASE_URL" && test -n "$VITE_COPILOTO_BASE_URL" && test -n "$VITE_SPEECH_BASE_URL" || { echo 'Defina as variáveis VITE_API_BASE_URL, VITE_COPILOTO_BASE_URL e VITE_SPEECH_BASE_URL do repositório' >&2; exit 1; }
+          pnpm --filter app build
+        env:
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+          VITE_COPILOTO_BASE_URL: ${{ vars.VITE_COPILOTO_BASE_URL }}
+          VITE_SPEECH_BASE_URL: ${{ vars.VITE_SPEECH_BASE_URL }}
+          VITE_JUIZ_BASE_URL: ${{ vars.VITE_JUIZ_BASE_URL }}
 
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3

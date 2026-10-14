@@ -73,7 +73,7 @@ describe('obterAssinatura', () => {
 
     const result = await obterAssinatura('http://api.test', ACCOUNT_ID, ACCESS_TOKEN, NOTE_ID)
 
-    expect(result).toEqual({ ok: true, noteId: NOTE_ID, revision: 2, signedAt: '2026-08-27T10:00:00Z' })
+    expect(result).toEqual({ ok: true, noteId: NOTE_ID, revision: 2, signedAt: '2026-08-27T10:00:00Z', signature: SIGNATURE })
     expect(fetchMock).toHaveBeenCalledWith(`http://api.test/accounts/${ACCOUNT_ID}/notes/${NOTE_ID}/signature`, {
       headers: { Authorization: `Bearer ${ACCESS_TOKEN}` },
     })

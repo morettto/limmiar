@@ -5,13 +5,49 @@ import {
   confirmTotpEnrollment,
   continueWithGoogle,
   login,
+  logoutSession,
   recoverAccess,
   register,
   registerRecoveryPhrase,
-  requestMagicLink,
+  refreshSession,
   verifyMagicLink,
   verifyTotpChallenge,
 } from './api'
+
+describe('logoutSession', () => {
+  afterEach(() => vi.unstubAllGlobals())
+  it('revoga com o refresh token sem precisar de access token ainda válido e aceita 204 vazio', async () => {
+    const fetch = vi.fn().mockResolvedValue(new Response(null, { status: 204 }))
+    vi.stubGlobal('fetch', fetch)
+    expect(await logoutSession('/api', 'refresh')).toEqual({ ok: true })
+    expect(fetch).toHaveBeenCalledWith('/api/auth/logout', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refreshToken: 'refresh' }),
+    })
+  })
+  it('devolve falha de validação e não engole a falha de conexão', async () => {
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ code: 'validation.invalid_field', params: { field: 'refreshToken' } }), { status: 400 }))
+      .mockRejectedValueOnce(new Error('sem conexão')))
+    expect(await logoutSession('', '')).toMatchObject({ ok: false, code: 'validation.invalid_field' })
+    await expect(logoutSession('', 'refresh')).rejects.toThrow('sem conexão')
+  })
+  it('não trata HTML da interface com 200 como confirmação de revogação', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('<html>Limmiar</html>', { status: 200 })))
+    await expect(logoutSession('', 'refresh')).rejects.toThrow('Invalid logout response')
+  })
+})
+
+describe('refreshSession', () => {
+  afterEach(() => vi.unstubAllGlobals())
+  it('renova os tokens e preserva uma resposta de rejeição do servidor', async () => {
+    const tokens = { accessToken: 'novo', refreshToken: 'novo-refresh', accessTokenExpiresAt: '2099-01-01T00:00:00Z' }
+    const fetch = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify(tokens))).mockResolvedValueOnce(new Response(JSON.stringify({ code: 'auth.refresh_token_invalid', params: {} }), { status: 401 }))
+    vi.stubGlobal('fetch', fetch)
+    expect(await refreshSession('', 'refresh')).toEqual({ ok: true, ...tokens })
+    expect(fetch.mock.calls[0]?.[1]).toMatchObject({ method: 'POST', body: JSON.stringify({ refreshToken: 'refresh' }) })
+    expect(await refreshSession('', 'refresh')).toMatchObject({ ok: false, code: 'auth.refresh_token_invalid' })
+  })
+})
 
 // 32 bytes of 0x0a, base64-encoded — exactly how System.Text.Json serializes
 // a .NET byte[] (RegisterRequest/LoginRequest.PasswordVerifier), so this
@@ -27,7 +63,7 @@ describe('register', () => {
   it('POSTs email/passwordVerifier(base64)/role and returns the created account on 201', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
-        JSON.stringify({
+        JSON.stringify({accessToken: 'test-access', refreshToken: 'test-refresh', accessTokenExpiresAt: '2099-01-01T00:00:00Z',
           id: '11111111-1111-1111-1111-111111111111',
           email: 'user@example.com',
           role: 'Professional',
@@ -47,7 +83,7 @@ describe('register', () => {
 
     expect(result).toEqual({
       ok: true,
-      account: {
+      account: {accessToken: 'test-access', refreshToken: 'test-refresh', accessTokenExpiresAt: '2099-01-01T00:00:00Z',
         id: '11111111-1111-1111-1111-111111111111',
         email: 'user@example.com',
         role: 'Professional',
@@ -97,7 +133,7 @@ describe('login', () => {
   it('POSTs email/passwordVerifier(base64) (no role) and returns the account on 200', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
-        JSON.stringify({
+        JSON.stringify({accessToken: 'test-access', refreshToken: 'test-refresh', accessTokenExpiresAt: '2099-01-01T00:00:00Z',
           id: '22222222-2222-2222-2222-222222222222',
           email: 'user@example.com',
           role: 'Patient',
@@ -113,7 +149,7 @@ describe('login', () => {
 
     expect(result).toEqual({
       ok: true,
-      account: {
+      account: {accessToken: 'test-access', refreshToken: 'test-refresh', accessTokenExpiresAt: '2099-01-01T00:00:00Z',
         id: '22222222-2222-2222-2222-222222222222',
         email: 'user@example.com',
         role: 'Patient',
@@ -155,7 +191,7 @@ describe('continueWithGoogle', () => {
   it('POSTs idToken/requestedRole and returns the account + isNewAccount on 200', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
-        JSON.stringify({
+        JSON.stringify({accessToken: 'test-access', refreshToken: 'test-refresh', accessTokenExpiresAt: '2099-01-01T00:00:00Z',
           id: '33333333-3333-3333-3333-333333333333',
           email: 'user@example.com',
           role: 'Professional',
@@ -175,7 +211,7 @@ describe('continueWithGoogle', () => {
 
     expect(result).toEqual({
       ok: true,
-      account: {
+      account: {accessToken: 'test-access', refreshToken: 'test-refresh', accessTokenExpiresAt: '2099-01-01T00:00:00Z',
         id: '33333333-3333-3333-3333-333333333333',
         email: 'user@example.com',
         role: 'Professional',
@@ -289,7 +325,7 @@ describe('confirmTotpEnrollment', () => {
   it('POSTs { ticket, code } and returns the 10 backup codes on 200', async () => {
     const backupCodes = Array.from({ length: 10 }, (_, index) => `abcde-${index}0000`)
     const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ backupCodes }), {
+      new Response(JSON.stringify({ backupCodes, accessToken: 'test-access', refreshToken: 'test-refresh', accessTokenExpiresAt: '2099-01-01T00:00:00Z' }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       }),
@@ -298,7 +334,7 @@ describe('confirmTotpEnrollment', () => {
 
     const result = await confirmTotpEnrollment('http://api.test', ACCOUNT_ID, TICKET, '123456')
 
-    expect(result).toEqual({ ok: true, backupCodes })
+    expect(result).toEqual({accessToken: 'test-access', refreshToken: 'test-refresh', accessTokenExpiresAt: '2099-01-01T00:00:00Z',  ok: true, backupCodes })
     expect(fetchMock).toHaveBeenCalledWith(`http://api.test/accounts/${ACCOUNT_ID}/totp/confirm`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -333,7 +369,7 @@ describe('verifyTotpChallenge', () => {
   it('POSTs { ticket, code } and returns the authenticated account on 200', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
-        JSON.stringify({
+        JSON.stringify({accessToken: 'test-access', refreshToken: 'test-refresh', accessTokenExpiresAt: '2099-01-01T00:00:00Z',
           id: ACCOUNT_ID,
           email: 'user@example.com',
           role: 'Professional',
@@ -349,7 +385,7 @@ describe('verifyTotpChallenge', () => {
 
     expect(result).toEqual({
       ok: true,
-      account: {
+      account: {accessToken: 'test-access', refreshToken: 'test-refresh', accessTokenExpiresAt: '2099-01-01T00:00:00Z',
         id: ACCOUNT_ID,
         email: 'user@example.com',
         role: 'Professional',
@@ -367,7 +403,7 @@ describe('verifyTotpChallenge', () => {
   it('POSTs { ticket, backupCode } and returns the authenticated account on 200', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
-        JSON.stringify({
+        JSON.stringify({accessToken: 'test-access', refreshToken: 'test-refresh', accessTokenExpiresAt: '2099-01-01T00:00:00Z',
           id: ACCOUNT_ID,
           email: 'user@example.com',
           role: 'Professional',
@@ -383,7 +419,7 @@ describe('verifyTotpChallenge', () => {
 
     expect(result).toEqual({
       ok: true,
-      account: {
+      account: {accessToken: 'test-access', refreshToken: 'test-refresh', accessTokenExpiresAt: '2099-01-01T00:00:00Z',
         id: ACCOUNT_ID,
         email: 'user@example.com',
         role: 'Professional',
@@ -419,6 +455,8 @@ describe('verifyTotpChallenge', () => {
 
 const RECOVERY_VERIFIER = new Uint8Array(32).fill(0x0b)
 const RECOVERY_VERIFIER_BASE64 = 'CwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCws='
+const RECOVERY_ENVELOPE = new Uint8Array(120).fill(7)
+const RECOVERY_ENVELOPE_BASE64 = btoa(String.fromCharCode(...RECOVERY_ENVELOPE))
 
 describe('recoverAccess', () => {
   afterEach(() => {
@@ -428,12 +466,13 @@ describe('recoverAccess', () => {
   it('POSTs email/recoveryVerifier(base64) and returns the account on 200', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
-        JSON.stringify({
+        JSON.stringify({accessToken: 'test-access', refreshToken: 'test-refresh', accessTokenExpiresAt: '2099-01-01T00:00:00Z',
           id: '66666666-6666-6666-6666-666666666666',
           email: 'pro@example.com',
           role: 'Professional',
           twoFactorRequirement: 'ChallengeRequired',
           twoFactorTicket: 'ticket-recover',
+          recoveryEnvelope: RECOVERY_ENVELOPE_BASE64,
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
@@ -447,13 +486,14 @@ describe('recoverAccess', () => {
 
     expect(result).toEqual({
       ok: true,
-      account: {
+      account: {accessToken: 'test-access', refreshToken: 'test-refresh', accessTokenExpiresAt: '2099-01-01T00:00:00Z',
         id: '66666666-6666-6666-6666-666666666666',
         email: 'pro@example.com',
         role: 'Professional',
         twoFactorRequirement: 'ChallengeRequired',
         twoFactorTicket: 'ticket-recover',
       },
+      recoveryEnvelope: RECOVERY_ENVELOPE,
     })
     expect(fetchMock).toHaveBeenCalledWith('http://api.test/auth/recover', {
       method: 'POST',
@@ -484,46 +524,6 @@ describe('recoverAccess', () => {
   })
 })
 
-describe('requestMagicLink', () => {
-  afterEach(() => {
-    vi.unstubAllGlobals()
-  })
-
-  it('POSTs { email } and resolves { ok: true } on 200', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({}), { status: 200, headers: { 'Content-Type': 'application/json' } }),
-    )
-    vi.stubGlobal('fetch', fetchMock)
-
-    const result = await requestMagicLink('http://api.test', { email: 'patient@example.com' })
-
-    expect(result).toEqual({ ok: true })
-    expect(fetchMock).toHaveBeenCalledWith('http://api.test/auth/magic-link/request', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'patient@example.com' }),
-    })
-  })
-
-  it('returns { ok: false, code, params } parsed from problem+json on 400 (missing e-mail)', async () => {
-    const problem = {
-      type: 'about:blank',
-      title: 'Invalid request',
-      status: 400,
-      code: 'validation.invalid_field',
-      params: { field: 'email' },
-    }
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify(problem), { status: 400, headers: { 'Content-Type': 'application/problem+json' } }),
-    )
-    vi.stubGlobal('fetch', fetchMock)
-
-    const result = await requestMagicLink('http://api.test', { email: '' })
-
-    expect(result).toEqual({ ok: false, code: 'validation.invalid_field', params: { field: 'email' } })
-  })
-})
-
 const MAGIC_LINK_TICKET = 'magic-link-ticket-abc'
 const CHALLENGE_BASE64 = 'Y2hhbGxlbmdlLWJ5dGVz'
 const RELYING_PARTY_ID = 'limmiar.test'
@@ -543,6 +543,7 @@ describe('verifyMagicLink', () => {
           challenge: CHALLENGE_BASE64,
           relyingPartyId: RELYING_PARTY_ID,
           credentialId: null,
+          accountId: ACCOUNT_ID,
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
@@ -558,6 +559,7 @@ describe('verifyMagicLink', () => {
       challenge: CHALLENGE_BASE64,
       relyingPartyId: RELYING_PARTY_ID,
       credentialId: null,
+          accountId: ACCOUNT_ID,
     })
     expect(fetchMock).toHaveBeenCalledWith('http://api.test/auth/magic-link/verify', {
       method: 'POST',
@@ -575,13 +577,15 @@ describe('verifyMagicLink', () => {
           challenge: CHALLENGE_BASE64,
           relyingPartyId: RELYING_PARTY_ID,
           credentialId: CREDENTIAL_ID_BASE64,
+      accountId: ACCOUNT_ID,
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
     )
     vi.stubGlobal('fetch', fetchMock)
 
-    const result = await verifyMagicLink('http://api.test', { token: 'raw-magic-link-token' })
+    const result = await verifyMagicLink('http://api.test', { token: 'raw-magic-link-token', patientAccountId: ACCOUNT_ID })
+    expect(fetchMock.mock.calls[0]![1].body).toBe(JSON.stringify({ token: 'raw-magic-link-token', patientAccountId: ACCOUNT_ID }))
 
     expect(result).toEqual({
       ok: true,
@@ -590,6 +594,7 @@ describe('verifyMagicLink', () => {
       challenge: CHALLENGE_BASE64,
       relyingPartyId: RELYING_PARTY_ID,
       credentialId: CREDENTIAL_ID_BASE64,
+      accountId: ACCOUNT_ID,
     })
   })
 
@@ -627,7 +632,7 @@ describe('completeWebAuthnCeremony', () => {
       new Response(
         JSON.stringify({
           id: '88888888-8888-8888-8888-888888888888',
-          email: 'patient@example.com',
+          email: null,
           role: 'Patient',
           accessToken: 'access-token-magic',
           refreshToken: 'refresh-token-magic',
@@ -649,7 +654,7 @@ describe('completeWebAuthnCeremony', () => {
       ok: true,
       account: {
         id: '88888888-8888-8888-8888-888888888888',
-        email: 'patient@example.com',
+        email: null,
         role: 'Patient',
         accessToken: 'access-token-magic',
         refreshToken: 'refresh-token-magic',
@@ -673,7 +678,7 @@ describe('completeWebAuthnCeremony', () => {
       new Response(
         JSON.stringify({
           id: '99999999-9999-9999-9999-999999999999',
-          email: 'patient@example.com',
+          email: null,
           role: 'Patient',
           accessToken: 'access-token-magic-2',
           refreshToken: 'refresh-token-magic-2',
@@ -743,13 +748,13 @@ describe('registerRecoveryPhrase', () => {
     )
     vi.stubGlobal('fetch', fetchMock)
 
-    const result = await registerRecoveryPhrase('http://api.test', ACCOUNT_ID, ACCESS_TOKEN, RECOVERY_VERIFIER)
+    const result = await registerRecoveryPhrase('http://api.test', ACCOUNT_ID, ACCESS_TOKEN, RECOVERY_VERIFIER, RECOVERY_ENVELOPE)
 
     expect(result).toEqual({ ok: true })
     expect(fetchMock).toHaveBeenCalledWith(`http://api.test/accounts/${ACCOUNT_ID}/recovery-phrase`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ACCESS_TOKEN}` },
-      body: JSON.stringify({ recoveryVerifier: RECOVERY_VERIFIER_BASE64 }),
+      body: JSON.stringify({ recoveryVerifier: RECOVERY_VERIFIER_BASE64, recoveryEnvelope: RECOVERY_ENVELOPE_BASE64 }),
     })
   })
 
@@ -766,7 +771,7 @@ describe('registerRecoveryPhrase', () => {
     )
     vi.stubGlobal('fetch', fetchMock)
 
-    const result = await registerRecoveryPhrase('http://api.test', ACCOUNT_ID, ACCESS_TOKEN, RECOVERY_VERIFIER)
+    const result = await registerRecoveryPhrase('http://api.test', ACCOUNT_ID, ACCESS_TOKEN, RECOVERY_VERIFIER, RECOVERY_ENVELOPE)
 
     expect(result).toEqual({ ok: false, code: 'auth.not_a_professional_account', params: {} })
   })

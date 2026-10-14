@@ -28,17 +28,11 @@ public sealed class VerifyTotpChallengeHandler(IAccountStore store, ITotpProvide
         if (!string.IsNullOrEmpty(request.BackupCode))
         {
             var hash = BackupCodeGenerator.Hash(request.BackupCode);
-            var hashes = account.TotpBackupCodeHashes ?? [];
-            var matchIndex = hashes.ToList().FindIndex(stored => stored == hash);
-            if (matchIndex < 0)
-            {
-                return VerifyTotpChallengeResult.Failure(VerifyTotpChallengeFailureReason.InvalidCode);
-            }
-
-            // Single-use: drop the matched hash so this backup code can never be consumed again.
-            IReadOnlyList<string> remainingHashes = hashes.Where((_, index) => index != matchIndex).ToList();
-            var updated = account with { TotpBackupCodeHashes = remainingHashes };
-            await store.UpdateAsync(updated, cancellationToken);
+            var updated = await store.MutateAsync(account.Id, current =>
+                current.TotpEnabledAt is not null && (current.TotpBackupCodeHashes ?? []).Contains(hash)
+                    ? current with { TotpBackupCodeHashes = current.TotpBackupCodeHashes!.Where(stored => stored != hash).ToList() }
+                    : null, cancellationToken);
+            if (updated is null) return VerifyTotpChallengeResult.Failure(VerifyTotpChallengeFailureReason.InvalidCode);
             return VerifyTotpChallengeResult.Success(updated, sessionTokenIssuer.IssuePair(updated.Id));
         }
 

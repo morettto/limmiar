@@ -1,4 +1,4 @@
-// Duplo mínimo da File System Access API (OPFS), partilhado pelos testes de chunk-store,
+// Duplo mínimo da File System Access API (OPFS), partilhado pelos testes de índice,
 // reprodutor e indice-store: só a superfície que os três usam. Nasceu na terceira duplicação
 // do duplo local (S08-02).
 
