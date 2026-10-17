@@ -16,8 +16,7 @@ vi.mock('../../entities/device/pairing-channel', async (importOriginal) => {
 const canalAtual = async () => (await vi.mocked(preparePairingChannel).mock.results.at(-1)!.value) as { channelKey: Uint8Array }
 
 async function flush(ready: () => boolean) {
-  for (let n = 0; n < 500 && !ready(); n++) await vi.advanceTimersByTimeAsync(0)
-  expect(ready()).toBe(true)
+  await vi.waitFor(() => expect(ready()).toBe(true))
 }
 async function start(getKekForTransfer: () => Promise<Uint8Array>, key = encodeBase64(generateKeyPair().publicKey)) {
   vi.mocked(api.createPairingSession).mockResolvedValue({ ok: true, sessionId: 'session', expiresAt: new Date(Date.now() + 120000).toISOString() })

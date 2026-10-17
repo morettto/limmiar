@@ -27,18 +27,8 @@ const SESSION_ID = 'session-primary-flow'
 const BASE_URL = 'http://api.test'
 const KEK = new Uint8Array(32).fill(0x42)
 
-// QRCode finishes through zlib, whose callbacks land on the libuv thread pool -- fake timers
-// cannot schedule those, so a fixed number of ticks is a race that loses under CI load (it
-// already flaked on main, run 32451615191). Tick until the awaited state is really on screen.
-async function flushUntil(ready: () => boolean, maxTicks = 500) {
-  for (let tick = 0; tick < maxTicks; tick++) {
-    if (ready()) {
-      return
-    }
-    await vi.advanceTimersByTimeAsync(0)
-  }
-
-  throw new Error(`flushUntil: still false after ${maxTicks} ticks`)
+async function flushUntil(ready: () => boolean) {
+  await vi.waitFor(() => expect(ready()).toBe(true))
 }
 
 describe('PairPrimaryDevice', () => {
@@ -104,9 +94,6 @@ describe('PairPrimaryDevice', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Os códigos são iguais. Liberar acesso.' }))
     await flushUntil(() => screen.queryByRole('status')?.textContent === 'Dispositivo pareado com sucesso.')
 
-    // waitFor's retry loop uses a real setTimeout, which never fires under fake timers. The
-    // microtask-flush loop above already drains the whole submit chain, so a direct assertion is
-    // both enough and correct.
     expect(submitPairingPayloadMock).toHaveBeenCalledTimes(1)
     expect(onDelivered).toHaveBeenCalledTimes(1)
     expect(screen.getByRole('status').textContent).toBe('Dispositivo pareado com sucesso.')
