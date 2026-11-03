@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 
-from . import acervo_profissional, continuacao, decisao, embedder, juiz_llm, metadados, qualificacao, traducao, votos
+from . import acervo_profissional, decisao, embedder, juiz_pequeno, metadados, qualificacao, votos
 
 app = FastAPI(title="Copiloto Limmiar")
 if ORIGEM_APP := os.environ.get("COPILOTO_APP_ORIGEM"):
@@ -22,7 +22,6 @@ if ORIGEM_APP := os.environ.get("COPILOTO_APP_ORIGEM"):
                        allow_headers=["Authorization", "Content-Type"])
 VERSAO = metadados.versao()
 ESTADO_INICIAL = metadados.estado_arquivos()
-trava_inferencia = threading.Lock()
 trava_votos = threading.Lock()
 trava_preparos = threading.Lock()
 preparos: dict[tuple[str, str], dict] = {}
@@ -33,26 +32,17 @@ MAX_CORPO_VOTO = 16 * 1024
 def arrancar() -> None:
     log = logging.getLogger("uvicorn.error")
     log.info("Carregando o modelo de busca %s", embedder.PADRAO)
-    embedder.carregar()
-    embedder.codificar_consultas(["Consulta sintética de aquecimento."], lote=1)
-    log.info("Carregando os modelos de tradução")
-    traducao.aquecer()
+    embedder.codificar_consultas(["Consulta sintética de aquecimento."])
+    log.info("Carregando o juiz %s de %s", juiz_pequeno.VERSAO, juiz_pequeno.PASTA)
+    juiz_pequeno.principal("Frase sintética de aquecimento.", ["Trecho sintético de aquecimento."])
 
 
 class CorpoConsulta(BaseModel):
     frase: str = Field(min_length=1, max_length=2000)
-    idioma: Annotated[str, Field(max_length=35, pattern=r"^[A-Za-z]{2,3}([-_][A-Za-z0-9]{1,8})*$")] = "pt-BR"
     falante: Literal["paciente", "terapeuta", "desconhecido"] = "paciente"
     contexto: list[Annotated[str, Field(min_length=1, max_length=2000)]] = Field(default_factory=list, max_length=5)
-    cursor: str | None = Field(default=None, min_length=48, max_length=48)
     accountId: UUID | None = None
     materialIds: list[UUID] | None = None
-
-    @field_validator("idioma")
-    @classmethod
-    def idioma_do_acervo(cls, idioma: str) -> str:
-        # O app manda o locale da interface; sem acervo nem tradução para o idioma, a busca roda em inglês.
-        return {"pt": "pt-BR", "es": "es"}.get(idioma.replace("_", "-").split("-")[0].lower(), "en-US")
 
     @field_validator("frase")
     @classmethod
@@ -62,19 +52,24 @@ class CorpoConsulta(BaseModel):
         return frase
 
 
-def _qualificado() -> bool:
+def _motivo() -> str | None:
+    """Por que o copiloto não mostra cartões agora; None quando mostra. Não há juiz de reserva."""
+    if not qualificacao.qualificado(juiz_pequeno.VERSAO):
+        return f"a versão {juiz_pequeno.VERSAO!r} do juiz não tem limiar no registro"
     try:
-        return (juiz_llm.configurado() and metadados.estado_arquivos() == ESTADO_INICIAL
-                and qualificacao.qualificado(juiz_llm.VERSAO))
+        mudou = metadados.estado_arquivos() != ESTADO_INICIAL
     except OSError:
-        return False
+        mudou = True
+    return "o código do copiloto mudou desde o início do processo" if mudou else None
 
 
 @app.get("/api/saude")
 def saude() -> dict:
+    motivo = _motivo()
     return {
-        "qualificado": _qualificado(),
-        "juiz_llm": {"versao": juiz_llm.VERSAO, "no_ar": juiz_llm.no_ar()},
+        "qualificado": motivo is None,
+        "motivo": motivo,
+        "promovida": qualificacao.promovida(juiz_pequeno.VERSAO),
         "limiares": decisao.limiares(),
         **VERSAO,
     }
@@ -141,7 +136,7 @@ def _preparar_em_ram(owner: str, material_id: str, data: bytes, fields: dict):
             logging.getLogger("uvicorn.error").info(json.dumps({"event": "material_preparation_progress",
                 "materialId": material_id, "phase": fase, "completed": completo, "total": total,
                 "elapsed_ms": round((time.perf_counter() - inicio) * 1000)}))
-    return acervo_profissional.ACERVO.preparar(owner, material_id, data, fields, trava_inferencia, atualizar)
+    return acervo_profissional.ACERVO.preparar(owner, material_id, data, fields, progresso=atualizar)
 
 
 @app.delete("/api/acervo/{account_id}/{material_id}")
@@ -153,8 +148,8 @@ def remover_material(account_id: UUID, material_id: UUID, authorization: str | N
 
 @app.post("/api/consultar-qualificado")
 def consultar_qualificado(corpo: CorpoConsulta, authorization: str | None = Header(default=None)) -> StreamingResponse:
-    if not _qualificado():
-        raise HTTPException(status_code=503, detail="versão do juiz sem promoção registrada")
+    if (motivo := _motivo()) is not None:
+        raise HTTPException(status_code=503, detail=motivo)
     if corpo.accountId is None or corpo.materialIds is None:
         acervo_profissional.falhar("material.unauthorized", 401)
     owner = str(corpo.accountId)
@@ -164,52 +159,36 @@ def consultar_qualificado(corpo: CorpoConsulta, authorization: str | None = Head
         acervo_profissional.falhar("material.not_authorized", 404)
     snapshot = acervo_profissional.ACERVO.snapshot(owner, ids)
     limites = decisao.limiares()
-    vinculo = {"consulta": corpo.model_dump(mode="json", exclude={"cursor"}), "versao": VERSAO,
-              "limiares": limites, "acervo": snapshot.signature()}
-    try:
-        inicio_fonte = continuacao.abrir(corpo.cursor, vinculo) if corpo.cursor is not None else 0
-    except ValueError as erro:
-        snapshot.connection.close()
-        raise HTTPException(status_code=422, detail="continuação inválida para esta consulta") from erro
-    cancelada = threading.Event()
-    resultados = decisao.decidir_progressivamente(snapshot.connection, corpo.frase, corpo.contexto, corpo.falante,
-                                                 corpo.idioma, ids, limites, cancelada.is_set, inicio_fonte,
-                                                 indice=snapshot.index, verificar_proveniencia=snapshot.proveniencia)
 
-    def proximo():
-        with trava_inferencia:
-            if cancelada.is_set():
-                return None
-            if not _qualificado():
-                raise RuntimeError("Os artefatos mudaram durante a consulta")
-            current = acervo_profissional.materiais_autorizados(owner, authorization)
-            if any(id_ not in current for id_ in ids):
-                raise RuntimeError("Autorização do acervo alterada")
-            resultado = next(resultados, None)
-            if resultado is not None and not _qualificado():
-                raise RuntimeError("Os artefatos mudaram durante a consulta")
-            current = acervo_profissional.materiais_autorizados(owner, authorization)
-            if any(id_ not in current for id_ in ids):
-                raise RuntimeError("Autorização do acervo alterada")
-            return resultado
+    def autorizado() -> None:
+        current = acervo_profissional.materiais_autorizados(owner, authorization)
+        if any(id_ not in current for id_ in ids):
+            raise RuntimeError("Autorização do acervo alterada")
+
+    def decidir() -> decisao.Decisao:
+        # Sem trava global: cada modelo protege a própria chamada, e consultas de sessões diferentes avançam juntas
+        # pelas etapas (busca, juiz). Com a trava única, 6 sessões esperavam ~5 s de fila por consulta.
+        if _motivo() is not None:
+            raise RuntimeError("O juiz deixou de estar qualificado")
+        autorizado()
+        resultado = decisao.decidir(snapshot.connection, corpo.frase, corpo.contexto, corpo.falante, ids,
+                                    limites, indice=snapshot.index, verificar_proveniencia=snapshot.proveniencia)
+        if _motivo() is not None:
+            raise RuntimeError("Os artefatos mudaram durante a consulta")
+        autorizado()
+        return resultado
 
     async def transmitir():
         try:
-            if (resultado := await asyncio.to_thread(proximo)) is not None:
-                dados = resultado.para_json()
-                dados.pop("candidatos", None)
-                if not resultado.completo:
-                    dados["cursor"] = continuacao.emitir(resultado.fontes_avaliadas, vinculo)
-                yield json.dumps(dados, ensure_ascii=False) + "\n"
+            dados = (await asyncio.to_thread(decidir)).para_json()
+            dados.pop("candidatos", None)
+            yield json.dumps(dados, ensure_ascii=False) + "\n"
         except (ValueError, RuntimeError, OSError, HTTPException):
-            yield json.dumps({"erro": "insight.indisponivel", "juiz": juiz_llm.VERSAO}) + "\n"
+            yield json.dumps({"erro": "insight.indisponivel", "juiz": juiz_pequeno.VERSAO}) + "\n"
         finally:
-            cancelada.set()
             snapshot.connection.close()
 
     return StreamingResponse(transmitir(), media_type="application/x-ndjson", headers={"Cache-Control": "no-store"})
-
-
 
 
 def _anexar_voto(linha: str) -> None:

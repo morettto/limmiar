@@ -1,4 +1,4 @@
-"""HTTP e trabalho reais; somente autenticação externa e modelo de embedding são simulados."""
+"""HTTP e trabalho reais; somente autenticação externa, modelo de embedding e juiz são simulados."""
 import hashlib
 import io
 import sys
@@ -29,7 +29,8 @@ class PreparoIntegracao(unittest.TestCase):
         self.codificados = []
         self.patches = [patch.object(personal, "ACERVO", self.store),
                         patch.object(personal, "materiais_da_conta", side_effect=lambda owner, *_: self.owned if owner == self.owner else {}),
-                        patch.object(personal.embedder, "codificar_documentos", side_effect=self.embedding)]
+                        patch.object(personal.embedder, "codificar_documentos", side_effect=self.embedding),
+                        patch.object(personal.juiz_pequeno, "generico", side_effect=lambda textos: [0.1] * len(textos))]
         for patch_ in self.patches:
             patch_.start()
         self.servidor = uvicorn.Server(uvicorn.Config(api.app, host="127.0.0.1", port=0,

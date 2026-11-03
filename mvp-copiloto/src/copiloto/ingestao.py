@@ -8,7 +8,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import avaliacao, busca, embedder, parse
+from . import avaliacao, busca, embedder, juiz_pequeno, parse
 from .esquema import DIR_PDFS, gravar_metricas
 
 FRACAO_AVALIACAO = 0.15
@@ -60,7 +60,7 @@ def _progresso(con: sqlite3.Connection, obra_id: str, **campos) -> None:
     con.commit()
 
 
-def processar(con: sqlite3.Connection, obra_id: str, modelo: str = embedder.PADRAO) -> dict:
+def processar(con: sqlite3.Connection, obra_id: str) -> dict:
     obra = con.execute("select * from obra where id = ?", (obra_id,)).fetchone()
     caminho = DIR_PDFS / obra["arquivo"]
     con.execute("update obra set status = 'processando' where id = ?", (obra_id,))
@@ -81,10 +81,11 @@ def processar(con: sqlite3.Connection, obra_id: str, modelo: str = embedder.PADR
         lote = 64
         for inicio in range(0, len(blocos), lote):
             fatia = blocos[inicio : inicio + lote]
-            vetores = embedder.codificar_documentos([b.texto for b in fatia], modelo)
+            vetores = embedder.codificar_documentos([b.texto for b in fatia])
+            genericos = juiz_pequeno.generico([b.texto for b in fatia])
             con.executemany(
-                "insert into trecho (id, obra_id, pagina, paragrafo, texto, idioma, avaliacao, embedding)"
-                " values (?,?,?,?,?,?,?,?)",
+                "insert into trecho (id, obra_id, pagina, paragrafo, texto, idioma, avaliacao, embedding, generico)"
+                " values (?,?,?,?,?,?,?,?,?)",
                 [
                     (
                         str(uuid.uuid4()),
@@ -95,6 +96,7 @@ def processar(con: sqlite3.Connection, obra_id: str, modelo: str = embedder.PADR
                         obra["idioma"],
                         int(marcas[inicio + deslocamento]),
                         vetores[deslocamento].tobytes(),
+                        genericos[deslocamento],
                     )
                     for deslocamento, bloco in enumerate(fatia)
                 ],
@@ -104,13 +106,12 @@ def processar(con: sqlite3.Connection, obra_id: str, modelo: str = embedder.PADR
 
         con.execute(
             "update obra set status = 'pronto', modelo = ?, erro = null where id = ?",
-            (modelo, obra_id),
+            (embedder.PADRAO, obra_id),
         )
         con.commit()
         _progresso(con, obra_id, etapa="a avaliar", paginas_feitas=paginas)
-        busca.INDICE.modelo = modelo
         busca.INDICE.recarregar(con)
-        resultado = avaliar_obra(con, obra_id, modelo)
+        resultado = avaliar_obra(con, obra_id)
         gravar_metricas(con, obra_id, resultado)
         _progresso(con, obra_id, status="pronto", etapa="concluido")
         return resultado
@@ -124,7 +125,7 @@ def processar(con: sqlite3.Connection, obra_id: str, modelo: str = embedder.PADR
         return {"erro": str(erro)}
 
 
-def avaliar_obra(con: sqlite3.Connection, obra_id: str, modelo: str) -> dict:
+def avaliar_obra(con: sqlite3.Connection, obra_id: str) -> dict:
     linhas = con.execute(
         "select id, obra_id, texto, idioma from trecho where obra_id = ? and avaliacao = 1",
         (obra_id,),
@@ -133,11 +134,11 @@ def avaliar_obra(con: sqlite3.Connection, obra_id: str, modelo: str) -> dict:
     consultas = avaliacao.gerar_consultas(trechos, seed=SEED)
     if not consultas:
         return {"consultas": 0, "aviso": "sem frases longas o suficiente"}
-    vetores = embedder.codificar_consultas([c["consulta"] for c in consultas], modelo)
+    vetores = embedder.codificar_consultas([c["consulta"] for c in consultas])
     posicoes: list[int | None] = []
     for vetor, consulta in zip(vetores, consultas):
-        ordenados = [tid for tid, _ in busca.INDICE.buscar(vetor, 10, None, [consulta["consulta"]])]
+        ordenados = [tid for tid, _ in busca.INDICE.buscar(vetor, 10, None)]
         posicoes.append(avaliacao.posicao_do_alvo(ordenados, consulta["trecho_id"]))
     resultado = avaliacao.metricas(posicoes)
-    resultado["modelo"] = modelo
+    resultado["modelo"] = embedder.PADRAO
     return resultado

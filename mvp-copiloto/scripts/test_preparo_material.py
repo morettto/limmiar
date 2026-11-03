@@ -72,12 +72,11 @@ class PreparoMaterial(unittest.TestCase):
         api.preparos.clear()
 
     def test_estado_publica_progresso_real_durante_inferencia(self):
-        def preparar(owner, id_, data, fields, trava, progresso):
+        def preparar(owner, id_, data, fields, progresso):
             progresso("referencias", 8, 24)
             status = api.acervo_pessoal(self.owner, "Bearer ficticio")["materials"][0]
             self.assertFalse(status["ready"])
             self.assertEqual(status["progress"], {"phase": "referencias", "completed": 8, "total": 24})
-            self.assertIs(trava, api.trava_inferencia)
 
         with patch.object(personal, "materiais_da_conta", return_value=self.owned), \
              patch.object(personal, "multipart_em_memoria", AsyncMock(return_value=(b"sintetico", self.fields))), \
@@ -88,10 +87,8 @@ class PreparoMaterial(unittest.TestCase):
             self.assertNotIn((str(self.owner), str(self.id)), api.preparos)
 
     def test_aquece_inferencia_antes_de_publicar_servico_pronto(self):
-        with patch.object(api.embedder, "carregar") as carregar, \
-             patch.object(api.embedder, "codificar_consultas") as codificar, \
-             patch.object(api.traducao, "aquecer") as traduzir:
+        with patch.object(api.embedder, "codificar_consultas") as codificar, \
+             patch.object(api.juiz_pequeno, "principal") as juiz:
             api.arrancar()
-        carregar.assert_called_once()
-        codificar.assert_called_once_with(["Consulta sintética de aquecimento."], lote=1)
-        traduzir.assert_called_once()
+        codificar.assert_called_once()
+        juiz.assert_called_once()

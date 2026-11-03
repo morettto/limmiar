@@ -1,20 +1,21 @@
-# Orquestrador do copiloto (copiloto.api:app): sem acervo de desenvolvimento e sem juiz local.
-# O juiz é o serviço de tools/juiz e cada conta traz o próprio acervo. Construir nesta pasta: docker build -t limmiar-copiloto .
-# Em execução: COPILOTO_API_URL, COPILOTO_APP_ORIGEM, COPILOTO_JUIZ_URL, COPILOTO_JUIZ_CHAVE, COPILOTO_JUIZ_VERSAO.
+# Copiloto (copiloto.api:app): busca e juiz pequeno no mesmo processo, na CPU, em ONNX Runtime.
+# Construir nesta pasta, com modelos/juiz-pequeno e modelos/bge-m3 (scripts/baixar_modelos.py) presentes:
+# docker build -t limmiar-copiloto .
+# Em execução: COPILOTO_API_URL, COPILOTO_APP_ORIGEM e, se preciso, COPILOTO_JUIZ_THREADS e COPILOTO_EMBEDDER_THREADS.
 FROM python:3.12-slim-bookworm
-ENV PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 HF_HOME=/app/hf
+ENV PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
 RUN useradd --system --create-home app && mkdir /app && chown app /app
 WORKDIR /app
-RUN pip install torch --index-url https://download.pytorch.org/whl/cpu
 COPY pyproject.toml ./
 COPY src/copiloto/*.py src/copiloto/
 RUN pip install -e .
-COPY data/limiares-juiz-llm.json data/
+COPY data/juiz-pequeno.json data/risco-cabeca.json data/
 COPY data/juiz-v2/registro.jsonl data/juiz-v2/
+COPY modelos/juiz-pequeno/tokenizer.json modelos/juiz-pequeno/
+COPY modelos/juiz-pequeno/onnx/model_gather.onnx modelos/juiz-pequeno/onnx/
+COPY modelos/bge-m3/tokenizer.json modelos/bge-m3/
+COPY modelos/bge-m3/onnx/sentence_transformers_int8.onnx modelos/bge-m3/onnx/
 USER app
-# Os modelos entram na imagem para o contêiner subir sem rede.
-RUN python -c "from copiloto import embedder, traducao; embedder.carregar(); traducao.aquecer()"
-ENV HF_HUB_OFFLINE=1
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=120s \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/saude', timeout=4)"

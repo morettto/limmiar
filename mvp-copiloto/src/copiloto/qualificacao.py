@@ -1,3 +1,8 @@
+"""Registro das versões do juiz (data/juiz-v2/registro.jsonl): os cortes da decisão e se a versão foi promovida.
+
+Uma versão medida no gabarito serve cartões com o seu limiar; a promoção é a decisão do ciclo.py com as notas do
+profissional, e a saúde da API a informa.
+"""
 from __future__ import annotations
 
 import json
@@ -5,51 +10,35 @@ import math
 
 from .esquema import RAIZ
 
-ALVOS = [
-    ("precisão dos cartões (limite inferior de Wilson)", "precisao_limite_inferior", ">=", 0.88),
-    ("falas com referência pertinente encontrada", "cobertura_geral", ">=", 0.70),
-    ("cartões em falas neutras", ("falso_alarme_por_tipo", "neutro"), "<=", 0.01),
-    ("cartões em falas do terapeuta", ("falso_alarme_por_tipo", "terapeuta"), "<=", 0.0),
-    ("cartões em quase acertos", ("falso_alarme_por_tipo", "quase"), "<=", 0.02),
-    ("falas de risco sinalizadas", "risco_alertado", ">=", 0.95),
-    ("falas ambíguas sinalizadas para clarificar", "ambiguo_alertado", ">=", 0.90),
-    ("cartões por adjudicar", "cartoes_por_adjudicar", "<=", 0),
-    ("recuperação das referências esperadas", "recall_candidatos", ">=", .95),
-    ("tempo até o primeiro cartão (p95 em segundos)", "primeiro_cartao_p95_s", "<=", 3.0),
-]
 
-
-def valor(relatorio: dict, chave):
-    if isinstance(chave, tuple):
-        grupo = relatorio.get(chave[0])
-        return grupo.get(chave[1]) if isinstance(grupo, dict) else None
-    return relatorio.get(chave)
-
-
-def atende_alvos(relatorio: dict) -> bool:
-    for _, chave, sinal, alvo in ALVOS:
-        medido = valor(relatorio, chave)
-        teto = 3.0 if chave == "primeiro_cartao_p95_s" else 1.0
-        if (type(medido) not in (int, float) or not math.isfinite(medido)
-                or medido < 0 or medido > teto or not (medido >= alvo if sinal == ">=" else medido <= alvo)):
-            return False
-    return True
-
-
-def faixas(juiz: str) -> dict | None:
-    """As faixas {forte, possivel} da versão do juiz promovida no registro; None se ela não consta como promovida."""
+def _linha(juiz: str) -> dict | None:
     arquivo = RAIZ / "data" / "juiz-v2" / "registro.jsonl"
     try:
-        linhas = [json.loads(linha) for linha in arquivo.read_text(encoding="utf-8").splitlines() if linha.strip()]
-        for linha in linhas:
-            if linha["versao"] == juiz and linha.get("promovida") is True:
-                forte, possivel = linha["limiares"]["forte"], linha["limiares"]["possivel"]
-                if all(type(v) in (int, float) for v in (forte, possivel)) and 0 < possivel <= forte <= 1:
-                    return {"forte": forte, "possivel": possivel}
+        for linha in arquivo.read_text(encoding="utf-8").splitlines():
+            if linha.strip() and (registro := json.loads(linha))["versao"] == juiz:
+                return registro
     except (OSError, ValueError, KeyError, TypeError):
         pass
     return None
 
 
+CORTES = ("vivencia", "generico", "principal")
+
+
+def limiares(juiz: str) -> dict | None:
+    """Os cortes que a decisão lê (vivencia, generico, principal) registrados para a versão; None se faltar algum ou se
+    não for um número finito, como a margem das cascatas antigas."""
+    try:
+        valores = {chave: _linha(juiz)["limiares"][chave] for chave in CORTES}
+    except (TypeError, KeyError):
+        return None
+    finitos = all(type(v) in (int, float) and math.isfinite(v) for v in valores.values())
+    return valores if finitos else None
+
+
 def qualificado(juiz: str) -> bool:
-    return bool(juiz) and faixas(juiz) is not None
+    return bool(juiz) and limiares(juiz) is not None
+
+
+def promovida(juiz: str) -> bool:
+    return qualificado(juiz) and _linha(juiz).get("promovida") is True
