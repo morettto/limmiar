@@ -129,7 +129,7 @@ recomendação e custo.
   cobertos pelo `.gitignore`; `.agents/`, `.audit/`, `.codex/` — pastas de
   harness de IA de dono ambíguo, não classificadas com confiança;
   `desligar-em-2-horas.ps1` — utilitário pessoal, não é fonte do projeto.
-  PR aberto para `main`: ver #<preencher após abertura>.
+  PR aberto para `main`: https://github.com/morettto/limmiar/pull/24.
 - 2026-11-03 · Repositório · R2 (linha de base dos gates):
 
   | Gate | Resultado | Evidência |
