@@ -37,40 +37,41 @@ Congelado, com hash em `data/juiz-v2/teste-fixo.manifesto.json`. Contém:
 Nada disso entra em treino: nem a obra, nem o par. Mudar o teste fixo exige `--nova-versao` e
 reavaliar o juiz ativo. Rodar: `python teste_fixo.py construir`.
 
-## 4. Retreino e decisão
+## 4. Retreino e decisão (cascata)
 
-```
-python ciclo.py montar treino-ciclo.jsonl [votos.jsonl]       # base + votos (padrão data/votos/votos.jsonl), sem o teste fixo
-python treinar_lora.py MODELO treino-ciclo.jsonl -1 3 adaptador 2  # na VM
-python prever_lora.py MODELO adaptador teste-fixo.jsonl candidato.previsoes.jsonl
-python prever_lora.py MODELO ativo   teste-fixo.jsonl ativo.previsoes.jsonl
-python ciclo.py decidir candidato.previsoes.jsonl ativo.previsoes.jsonl
-```
+O juiz de produção é uma cascata. O aluno (`gte-multilingual-reranker-base` com LoRA, em
+`mvp-copiloto/modelos/juiz-local/aluno-gte-v1`) ordena os candidatos da busca e fica com os 6 primeiros. O professor
+(Gemma 4 E4B base, adaptador desligado) julga esses 6 com o pedido de `copiloto.juiz_llm.pedido_juiz`. O cartão sai
+quando o professor diz sim ao melhor material (nota >= 0,5) e a margem de logit entre ele e o segundo material passa do
+limiar da versão. A regra está em `copiloto/cascata.py`, e o gabarito usa as mesmas funções.
 
-O candidato **só é promovido** quando passa nas duas réguas (o teste fixo e as notas do profissional):
-- **Teste fixo, só regressão** (limiar de operação 0,9): a precisão dos aprovados não cai mais de 0,02 e o AUROC geral
-  não pode ter caído mais de 0,005 (percentil 5 de 1.000 reamostragens); precisa de pelo menos 80 casos difíceis.
-- **Melhora, pelas notas do profissional** (previsões nas avaliações reservadas por obra, `rotulos-5k-suave-teste.jsonl`):
-  a correlação de Spearman com a nota sobe pelo menos 0,10 e a precisão na faixa "sim" (nota >= 0,9) também.
-  Sem notas, vale a regra antiga: precisão +0,05 sem perder mais de 0,10 de cobertura.
+Uma versão nova nasce assim, da raiz do repositório:
 
-O AUROC dos casos difíceis é só informativo. A regra mudou duas vezes depois de ver resultados (2026-10-08): a primeira
-barrou a v1 por um AUROC instável com 9 positivos; a segunda barrou a v2 porque a precisão da v1 já estava em 96% no
-teste fixo (não há folga para +0,05) enquanto as notas do profissional mostravam a diferença real. Cada promoção é
-registrada em `mvp-copiloto/data/juiz-v2/registro.jsonl`.
+1. `tools/atendimento-simulado/treino-juiz/` gera e confere os pares e treina o aluno (o README da pasta tem os passos).
+   O professor rotula com o mesmo pedido que a produção envia, então o rótulo e o julgamento não se separam.
+2. `gold/bakeoff_juiz.py --alunos PASTA` dá as notas do aluno no gabarito pelo carregador de produção (`copiloto.aluno`).
+   `--juizes producao` dá as do professor pelo servidor local de `tools/juiz/local.ps1`.
+3. `gold/cascata.py --aluno ... --professor ... --versao cascata-vN --registrar` fixa o limiar (a menor margem com
+   precisão >= 0,90 nas 10 sessões) e grava a versão no registro como medida, com a estimativa fora da dobra (limiar das
+   sessões 001-005 medido em 006-010 e vice-versa).
+4. `gold/avaliar_copiloto.py RUN` roda o produto ponta a ponta no gabarito e grava o resumo de `gold/pontuar.py`. O
+   limiar não se ajusta nessa rodada.
+5. `gold/rotulagem.py RUN` lista os cartões mostrados para o profissional avaliar, no formato de `rotulos_5k.py`.
+
+A promoção (`"promovida": true`) continua sendo do `ciclo.py decidir`, com as duas réguas: o teste fixo barra regressão
+e as notas do profissional medem a melhora. Sem as notas do profissional a versão fica medida e não é promovida.
 
 ## 5. Liberação por versão
 
-O copiloto atende a versão do juiz que vem em `COPILOTO_JUIZ_VERSAO` (a tag da imagem) só se ela constar em
-`mvp-copiloto/data/juiz-v2/registro.jsonl` com `"promovida": true` (regra do §4) e com `limiares` válidos
-(`forte` e `possivel`). Sem isso a rota de produto responde 503. Não há liberação por conta: quem usa uma versão
-promovida usa a mesma que todos. Cada linha NDJSON da consulta traz o campo `juiz` (essa versão), que o app copia
-para o voto.
+O copiloto atende a versão que vem em `COPILOTO_JUIZ_VERSAO` só se ela constar em
+`mvp-copiloto/data/juiz-v2/registro.jsonl` com `limiares.margem` finita. Sem isso, sem `COPILOTO_JUIZ_URL` ou com o
+servidor fora, a rota de produto responde 503 e `/api/saude` diz o motivo (`motivo`). Não há juiz de reserva. A saúde
+também diz se a versão foi promovida (`juiz_llm.promovida`). Cada linha NDJSON da consulta traz o campo `juiz` (essa
+versão), que o app copia para o voto.
 
-Os cartões usam as faixas do registro da versão ativa: `forte` com probabilidade a partir de `limiares.forte`,
-`possivel` entre `limiares.possivel` e `limiares.forte`, e abaixo de `limiares.possivel` o cartão não sai (a v2: 0,9 e
-0,7). Todos os candidatos (40) são julgados e os fortes vêm primeiro. `data/limiares-juiz-llm.json` guarda só os
-limiares do portão (clínica, risco, ambígua).
+Cada fala gera no máximo um cartão, o melhor trecho do material vencedor, com nível `forte`. A citação literal é a frase
+desse trecho que o aluno mais aproxima da fala. `data/limiares-juiz-llm.json` guarda só os limiares do portão (clínica,
+risco, ambígua).
 
 ## Limites
 
@@ -111,3 +112,56 @@ versão; as do lado "teste" vão para `SAIDA.votos-teste.jsonl` (`alvo_suave` 0 
 candidato e do ativo nesse arquivo com `prever_lora.py` e passe-as como 4º e 5º argumentos de `ciclo.py decidir`: a melhora é medida pelo
 que os profissionais votaram em obras que o modelo não viu. Ainda não há votos reais; o caminho está testado com votos sintéticos.
 Teto honesto: com rótulo humano ruidoso e obras novas a cada profissional, a precisão tende a subir e estabilizar, não chega a 100%.
+
+
+## Auditoria de independência e escala (2026-10-15)
+
+**P1 — a régua histórica não é independente por fonte.** Na cópia local auditada,
+`treino-ciclo2.jsonl` tem 2.232 linhas, 1.904 pares únicos, 946 falas únicas e 50 obras.
+Os 164 cartões humanos aparecem três vezes: repetição aumenta peso, não cobertura.
+O teste fixo de 377 pares compartilha 17 obras e 142 falas com esse treino, embora
+não compartilhe pares exatos. As 101 avaliações humanas reservadas não compartilham
+obras nem pares, mas compartilham quatro falas. Portanto os números históricos acima
+não demonstram generalização independente por obra/família, nem calibração extrema.
+O teste fixo e os artefatos promovidos foram preservados para rastreabilidade.
+
+`mvp-copiloto/scripts/juiz_v2/candidato_cpu.py` gera uma experiência separada: exclui
+as obras, falas normalizadas e passagens normalizadas de ambas as réguas do treino;
+reserva desenvolvimento por obra e exclui também suas falas/passagens do treino.
+Na auditoria local resultaram treino 314 (80 positivos), desenvolvimento 139
+(54 positivos), teste humano 101 (17 positivos). Não se confundem rótulos históricos
+mistos com verdade clínica. Paráfrases e traduções ainda exigem curadoria de família.
+Os manifestos e partições estão em `.local/simulacao-100/candidate-cpu/`.
+
+Comando reproduzível, sem GPU e sem baixar pesos novos:
+
+```powershell
+$env:OMP_NUM_THREADS='2'; $env:MKL_NUM_THREADS='2'
+mvp-copiloto/.venv-treino/Scripts/python.exe mvp-copiloto/scripts/juiz_v2/candidato_cpu.py .local/simulacao-100/candidate-cpu
+```
+
+É uma cabeça logística sobre E5 pequeno congelado, não um retreino do juiz Gemma.
+O relatório mede Brier contra a prevalência constante do treino, AUROC, AP e precisão
+no limiar fixo 0,9. Não ajusta limiar no teste e não promove modelo. O primeiro ensaio
+foi interrompido antes de produzir embeddings para liberar RAM aos testes reais do app.
+A máquina tem GTX 1660 SUPER de 6 GB e 16 GB de RAM; o treino LoRA BF16 existente
+não cabe nessa GPU junto ao juiz de produção. Nenhuma melhoria foi medida neste ensaio.
+
+### Chegar a milhões sem fabricar cobertura
+
+`preparar_corpus.py SAIDA ENTRADA.jsonl ...` processa entradas em fluxo com SQLite,
+sem carregar o corpus inteiro na RAM. Cada linha exige `fala`, `trecho`, `alvo` ou
+`alvo_suave`, `source_family`, `source_uri`, `license`, `label_origin`, `reviewed: true`.
+O responsável pelo corpus deve atribuir a mesma família às obras relacionadas,
+traduções e paráfrases antes da separação. O script separa por família (80/10/10),
+deduplica pares, põe rótulos conflitantes em quarentena e exclui falas/passagens
+idênticas normalizadas que atravessam partições. Registra hashes dos arquivos de
+origem e contagens reais. Isto não detecta sozinho equivalência semântica.
+
+Não há milhões de falas revisadas disponíveis nesta cópia. Os arquivos de vetores
+existentes têm 1.735×1.024, 2.193×1.024 e duas representações de 1.979×2.048;
+não se devem somar representações repetidas como exemplos independentes. Corpus
+público NLI/STS pode ajudar representação, mas seus rótulos não significam pertinência
+clínica. Antes de ampliar: obter fontes licenciadas com proveniência e cobertura
+real, curar famílias e negativos difíceis, revisar amostras por origem e manter um
+novo teste clínico humano intocado. Embeddings não substituem esses rótulos.

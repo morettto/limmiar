@@ -27,7 +27,6 @@ Cada comando, rota e texto de botão abaixo foi conferido contra o código (`too
 | Convite e vínculo do paciente | 3.11 | segundo navegador, passkey com PRF |
 | Check-in do paciente | 3.12 | idem |
 | Partilha e espelho | 3.13 | idem |
-| Pareamento de dispositivos | 3.14 | dois navegadores |
 | Frase de recuperação (uso) | 3.15 | a frase anotada na seção 2 |
 | Trilha de auditoria | 3.16 | nada |
 | Sair e entrar de novo | 2 e 3.17 | nada |
@@ -187,7 +186,7 @@ Endereço: `http://localhost:5173`. Anote tudo no bloco de notas.
 | C11 | Clique em "Entrar" (o botão de cima, ao lado de "Cadastrar"), preencha e-mail e senha e clique em "Acessar conta". | "Verificação em duas etapas" com "Código de verificação". | ☐ ok ☐ falhou |
 | C12 | Digite `000000` e clique em "Verificar". | "Código inválido. Verifique o app autenticador ou use um código de backup." | ☐ ok ☐ falhou |
 | C13 | Digite o código atual do app e clique em "Verificar". | Entra no consultório; o e-mail aparece no topo. | ☐ ok ☐ falhou |
-| C14 | Aperte F5. | Volta para "Bem-vindo ao Limmiar" (a chave dos prontuários vive só na memória da aba), com o link "Desbloquear pelo outro dispositivo" (usado em 3.14). Entre de novo como em C11 a C13. | ☐ ok ☐ falhou |
+| C14 | Aperte F5. | Volta para "Bem-vindo ao Limmiar" (a chave dos prontuários vive só na memória da aba). Entre de novo como em C11 a C13. | ☐ ok ☐ falhou |
 | C15 | Clique em "Sair" e entre usando **um dos 10 códigos de backup** no lugar do código do app. | Entra. | ☐ ok ☐ falhou |
 | C16 | "Sair" e tente entrar com **o mesmo** código de backup. | "Código inválido. Verifique o app autenticador ou use um código de backup." (cada código vale uma vez). Depois entre com o código do app. | ☐ ok ☐ falhou |
 | C17 | "Sair". Em "Entrar", use a senha errada. | "E-mail ou senha inválidos." | ☐ ok ☐ falhou |
@@ -409,22 +408,6 @@ Pré-requisito: I2 feito. Ordem importa: o check-in só é compartilhado se a ca
 | M4 | No principal, menu "Sinais compartilhados pelos pacientes". Tenha uma sessão agendada hoje para o Paciente Um (3.2). | Um grupo cujo título é o **código** da pasta (não o nome), "Check-in compartilhado em 1 de 7 dias", em "Últimos 7 dias" a linha de hoje `5/1 · Ótimo hoje (fictício)` e `· Sessão às HH:MM`; os outros dias "sem check-in". O check-in feito antes de ligar a caixa não aparece. | ☐ ok ☐ falhou |
 | M5 | No paciente, desmarque a caixa e registre outro check-in (`2/4`). | Aparece o texto de "O que muda / O que não muda". No principal, recarregue o menu: continua o `5/1` compartilhado e **não** aparece o `2/4`. | ☐ ok ☐ falhou |
 
-### 3.14 Pareamento de dispositivos **[2 NAV]**
-
-O código vale **2 minutos**: deixe o segundo navegador pronto antes de gerar. O aparelho novo precisa estar com login feito mas sem a chave, o que acontece ao recarregar a página.
-
-| # | Fazer | Esperado | Resultado |
-| --- | --- | --- | --- |
-| D1 | No segundo navegador faça o login do profissional (C11 a C13). Na mesma aba, digite na barra de endereços `http://localhost:5173/devices/pair-new` e Enter. | "Desbloquear este dispositivo": "No dispositivo já desbloqueado, abra Parear novo dispositivo. Escaneie o QR ou cole o código de pareamento.", botão "Escanear código QR" e o campo "Código de pareamento". | ☐ ok ☐ falhou |
-| D2 | No principal, link "Parear novo dispositivo". Em "Senha atual" digite a senha e clique em "Gerar código de pareamento". | "Parear novo dispositivo": o QR e o campo "Código de pareamento" com um texto (começa com `{"s":`). | ☐ ok ☐ falhou |
-| D3 | Copie esse texto (clique dentro, Ctrl+A, Ctrl+C), cole no campo "Código de pareamento" do segundo e clique em "Usar código de pareamento". | Os dois mostram um código curto: no principal "Confirme o novo dispositivo / Compare este código com o exibido no outro dispositivo. Continue somente se forem iguais."; no segundo "Compare o código nos dois dispositivos antes de liberar o acesso." **Os códigos têm de ser iguais.** | ☐ ok ☐ falhou |
-| D4 | No principal, "Os códigos são iguais. Liberar acesso." | "Enviando a chave para o novo dispositivo...", depois "Dispositivo pareado com sucesso." nos dois; o segundo mostra "Prontuários desbloqueados neste dispositivo." | ☐ ok ☐ falhou |
-| D5 | No segundo, "Voltar ao consultório". | Os pacientes aparecem com os nomes legíveis (a mesma chave). | ☐ ok ☐ falhou |
-| D6 | Gere outro código, use no segundo e, no principal, clique em "Cancelar pareamento". | "Pareamento cancelado. Nenhuma chave foi enviada." | ☐ ok ☐ falhou |
-| D7 | Gere um código e espere mais de 2 minutos; cole no segundo. | Segundo: "Este código de pareamento não é mais válido. Gere um novo."; principal: "Este código expirou. Volte para gerar um novo." | ☐ ok ☐ falhou |
-
-Não coberto: "Escanear código QR" com a câmera (precisa de um aparelho apontando a câmera para o QR).
-
 ### 3.15 Frase de recuperação (uso)
 
 | # | Fazer | Esperado | Resultado |
@@ -469,7 +452,7 @@ Não coberto: "Escanear código QR" com a câmera (precisa de um aparelho aponta
 | "Este e-mail já está cadastrado." | Você clicou em "Criar conta" em vez de "Entrar". | Clique antes em "Entrar" (botão de cima). |
 | "E-mail ou senha inválidos." | Um dos dois está errado (a mensagem não diz qual). | Confira no bloco de notas. |
 | "Sua sessão expirou. Entre novamente." | A API foi reiniciada ou o login venceu. | Entre de novo. |
-| Voltou para "Bem-vindo ao Limmiar" depois do F5 | Esperado: a chave dos prontuários só vive na memória da aba. | Entre de novo (ou use o pareamento, 3.14). |
+| Voltou para "Bem-vindo ao Limmiar" depois do F5 | Esperado: a chave dos prontuários só vive na memória da aba. | Entre de novo. |
 | "Chaveiro bloqueado. Desbloqueie para ..." | Há login, mas a chave da aba foi perdida (F5). No paciente, só um link novo numa aba nova resolve. | Profissional: entre de novo. Paciente: I8. |
 | "Sua conta ainda não pode criar prontuários / agendar sessões / assinar notas / registrar consentimento." | A conta de profissional não foi aprovada. | Passos C5 a C7. |
 | "Este prontuário mudou em outro dispositivo. Recarregue e tente de novo." | Duas abas ou dispositivos gravaram ao mesmo tempo. | Recarregue e entre de novo. |
@@ -489,7 +472,6 @@ Não coberto: "Escanear código QR" com a câmera (precisa de um aparelho aponta
 | "Esta chave de acesso não permite desbloquear seus dados cifrados. Escolha outra chave de acesso." | A passkey escolhida não tem a extensão PRF. | Veja a seção 3.11. |
 | "Não foi possível confirmar sua identidade neste dispositivo. Tente novamente." | A cerimônia da passkey falhou ou foi cancelada; ou você abriu por `127.0.0.1` em vez de `localhost`. | Use `http://localhost:5173`. |
 | "Este link de acesso não é mais válido. Solicite um novo." | Link do paciente já usado, expirado (7 dias) ou revogado. | Gere outro (I1 ou I8). |
-| "Este código de pareamento não é mais válido. Gere um novo." | Passaram os 2 minutos, ou o código já foi usado. | Gere outro e cole mais depressa. |
 | "Convite inválido. Solicite um novo link ao profissional." | O link da sessão online perdeu a parte depois do `#`. | Copie o link inteiro do campo. |
 | "Conexão interrompida. Tente reconectar." | A chamada caiu; entre redes diferentes não há TURN. | "Reconectar sessão online"; teste no mesmo PC. |
 | "Você saiu neste dispositivo. Não foi possível encerrar a sessão no servidor." | Você saiu, mas a API estava fora. | "Tentar encerrar no servidor novamente". |
