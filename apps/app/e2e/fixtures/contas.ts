@@ -15,7 +15,7 @@ function toBase64(bytes: Uint8Array): string {
   return Buffer.from(bytes).toString('base64')
 }
 
-/** A distinct, non-zero 32-byte test KEK per persona/device -- never all-zero, same rationale as device-pairing.spec.ts's TEST_KEK, so a bug that zero-fills a buffer cannot silently pass. */
+/** A distinct, non-zero 32-byte test KEK per persona/device -- never all-zero, so a bug that zero-fills a buffer cannot silently pass. */
 export function contaTestKek(seed: number): Uint8Array {
   return Uint8Array.from({ length: 32 }, (_, i) => (i * 7 + seed) % 256)
 }

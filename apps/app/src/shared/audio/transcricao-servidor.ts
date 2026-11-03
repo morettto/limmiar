@@ -7,6 +7,10 @@ export type AvisoTranscricao = 'reconectando' | 'atrasada'
 
 export interface ResultadoTranscricao {
   palavras: PalavraAtribuida[]
+  /** Referência só muda quando uma fala final chega ou uma identificação é corrigida. */
+  palavrasFinais?: PalavraAtribuida[]
+  /** Hipótese substituída em cada parcial; continua visível durante o reconhecimento. */
+  palavrasHipotese?: PalavraAtribuida[]
   finais: number
   estavelAteMs: number
   aviso?: AvisoTranscricao
@@ -26,6 +30,7 @@ export type FalanteDaTrilha = 'profissional' | 'paciente'
 export type Identidade = { modo: 'presencial'; perfil: readonly number[] } | { modo: 'online'; falante: FalanteDaTrilha }
 
 export interface OpcoesTranscricao {
+  reconectar?: boolean
   identidade: Identidade
   aoResultado(resultado: ResultadoTranscricao): void
   falhar(erro: Error): void
@@ -34,6 +39,7 @@ export interface OpcoesTranscricao {
 interface PalavraDoGateway { texto: string; inicio_ms: number; fim_ms: number }
 interface EventoDoGateway {
   type?: string
+  ordem?: unknown
   palavras?: unknown
   texto?: unknown
   frase?: unknown
@@ -43,10 +49,12 @@ interface EventoDoGateway {
 }
 
 const ROTA = '/v1/fala'
-const ATRASO_MS = 2000
+const ATRASO_MS = 300
 // PCM16 a 16 kHz: 32 bytes por ms.
 const ATRASO_BYTES = ATRASO_MS * 32
 const ESPERAS_DE_RECONEXAO_MS = [0, 1000, 2000, 4000, 8000]
+// O gateway guarda 30 s de PCM e recorta até 10 s para reconhecer a voz; arquivos deixam margem para esse recorte.
+const ADIANTAMENTO_ARQUIVO_MS = 10_000
 const ABERTURA_MS = 10_000
 // O servidor pode estar atrasado em relação ao áudio, mas manda eventos enquanto trabalha: silêncio total é falha.
 const SILENCIO_MS = 30_000
@@ -76,12 +84,16 @@ class Transcricao implements SessaoServidor {
   private tentativa = 0
   private atrasada = false
   private servidorAtrasado = false
+  private processadoMs = 0
+  private progressoEm = 0
   private fila: { pcm: Int16Array<ArrayBuffer>; inicio: number }[] = []
   // As finais só crescem (inclusive depois de uma queda); a hipótese em curso é substituída a cada parcial.
   private finais: PalavraAtribuida[] = []
   private hipotese: PalavraAtribuida[] = []
   // Onde cada frase do gateway começou e acabou em `finais`, para corrigir o falante de uma frase curta. Vale por socket.
   private frases = new Map<number, [number, number]>()
+  private ultimaOrdemHipotese = -1
+  private ultimaOrdemFinal = -1
   private conclusao: Conclusao | undefined
   private concluirAoAbrir = false
   private erro: Error | undefined
@@ -113,10 +125,19 @@ class Transcricao implements SessaoServidor {
   }
 
   esvaziada(): Promise<void> {
-    return new Promise((resolver) => {
+    return new Promise((resolver, rejeitar) => {
+      const inicio = Date.now()
       const verificar = () => {
-        if (this.situacao === 'encerrada' || (this.situacao === 'aberta' && this.socket.bufferedAmount <= ATRASO_BYTES)) resolver()
-        else setTimeout(verificar, 25)
+        if (this.situacao === 'encerrada') {
+          if (this.erro) rejeitar(this.erro)
+          else resolver()
+        } else if (this.situacao === 'aberta' && this.socket.bufferedAmount <= ATRASO_BYTES &&
+          this.mapa.enviadoMs - this.processadoMs < ADIANTAMENTO_ARQUIVO_MS) resolver()
+        else if (this.situacao === 'aberta' && Date.now() - Math.max(inicio, this.progressoEm) >= SILENCIO_MS) {
+          const erro = new Error(t`O serviço de transcrição parou de responder.`)
+          this.falhar(erro)
+          rejeitar(erro)
+        } else setTimeout(verificar, 25)
       }
       verificar()
     })
@@ -176,7 +197,11 @@ class Transcricao implements SessaoServidor {
     clearTimeout(this.abertura)
     const reabertura = this.situacao === 'reconectando'
     this.mapa = new MapaDeTempo()
+    this.processadoMs = 0
+    this.progressoEm = Date.now()
     this.frases = new Map()
+    this.ultimaOrdemHipotese = -1
+    this.ultimaOrdemFinal = -1
     this.tentativa = 0
     this.situacao = 'aberta'
     this.fila.forEach(({ pcm, inicio }) => this.mandar(pcm, inicio))
@@ -192,12 +217,16 @@ class Transcricao implements SessaoServidor {
 
   private aplicarProcessado({ processado_ms: processado }: EventoDoGateway): void {
     // O gateway lê o socket sem atraso mesmo quando o modelo não acompanha: o atraso real é o áudio que ele já processou.
-    if (typeof processado === 'number') this.servidorAtrasado = this.mapa.enviadoMs - processado > ATRASO_MS
+    if (typeof processado !== 'number' || !Number.isFinite(processado) || processado < 0 || processado > this.mapa.enviadoMs) return
+    if (processado > this.processadoMs) { this.processadoMs = processado; this.progressoEm = Date.now() }
+    this.servidorAtrasado = this.mapa.enviadoMs - processado > ATRASO_MS
   }
 
   private aplicarParcial(evento: EventoDoGateway): void {
-    const { texto, processado_ms: processado } = evento
-    if (typeof texto !== 'string' || typeof processado !== 'number') return
+    const { texto, ordem, processado_ms: processado } = evento
+    if (typeof texto !== 'string' || typeof processado !== 'number' || !Number.isSafeInteger(ordem) || (ordem as number) < 0 ||
+      (ordem as number) <= Math.max(this.ultimaOrdemHipotese, this.ultimaOrdemFinal)) return
+    this.ultimaOrdemHipotese = ordem as number
     // O parcial é o texto da frase em curso, ainda sem tempos: entra como um trecho só, no instante já processado.
     this.hipotese = texto === '' ? [] : [this.palavra({ texto, inicio_ms: processado, fim_ms: processado }, null)]
     this.aplicarProcessado(evento)
@@ -205,11 +234,13 @@ class Transcricao implements SessaoServidor {
   }
 
   private aplicarFinal(evento: EventoDoGateway): void {
-    const { palavras, frase, falante } = evento
-    if (!palavrasValidas(palavras) || !Number.isInteger(frase) || (falante !== null && typeof falante !== 'string')) return
+    const { palavras, frase, falante, ordem } = evento
+    if (!palavrasValidas(palavras) || !Number.isInteger(frase) || !Number.isSafeInteger(ordem) || (ordem as number) < 0 ||
+      (falante !== null && typeof falante !== 'string')) return
     this.frases.set(frase as number, [this.finais.length, this.finais.length + palavras.length])
-    this.finais.push(...palavras.map((palavra) => this.palavra(palavra, falante)))
-    this.hipotese = []
+    this.finais = [...this.finais, ...palavras.map((palavra) => this.palavra(palavra, falante))]
+    this.ultimaOrdemFinal = Math.max(this.ultimaOrdemFinal, ordem as number)
+    if ((ordem as number) > this.ultimaOrdemHipotese) this.hipotese = []
     this.aplicarProcessado(evento)
     this.emitir()
   }
@@ -217,7 +248,9 @@ class Transcricao implements SessaoServidor {
   private corrigirFalante({ frase, falante }: EventoDoGateway): void {
     const trecho = this.frases.get(frase as number)
     if (!trecho || typeof falante !== 'string') return
-    for (let i = trecho[0]; i < trecho[1]; i++) this.finais[i] = { ...this.finais[i]!, locutor: falante }
+    const corrigidas = this.finais.map((palavra, indice) => indice >= trecho[0] && indice < trecho[1] && palavra.locutor !== falante
+      ? { ...palavra, locutor: falante } : palavra)
+    if (corrigidas.some((palavra, indice) => palavra !== this.finais[indice])) this.finais = corrigidas
     this.emitir()
   }
 
@@ -235,6 +268,10 @@ class Transcricao implements SessaoServidor {
     clearTimeout(this.abertura)
     clearTimeout(this.silencio)
     if (this.situacao === 'abrindo') { this.falhar(new Error(t`Não foi possível conectar ao serviço de transcrição.`)); return }
+    if (this.situacao === 'aberta' && this.opcoes.reconectar === false) {
+      this.falhar(new Error(t`A conexão com a transcrição foi perdida. Carregue o arquivo novamente para transcrever o áudio inteiro.`))
+      return
+    }
     if (this.situacao === 'aberta') {
       // Só as palavras finais sobrevivem à queda; a hipótese em curso morre com o socket.
       this.situacao = 'reconectando'
@@ -291,7 +328,8 @@ class Transcricao implements SessaoServidor {
     // Cada frase final já chega com o falante resolvido: nada mais vai mudar o texto ou o falante antes do fim das finais.
     const estavelAteMs = this.finais.length === 0 ? 0 : this.finais.at(-1)!.fimMs + 1
     const aviso = this.situacao === 'reconectando' ? 'reconectando' : this.atrasada || this.servidorAtrasado ? 'atrasada' : undefined
-    return { palavras, finais: this.finais.length, estavelAteMs, ...(aviso && { aviso }) }
+    return { palavras, palavrasFinais: this.finais, palavrasHipotese: this.hipotese,
+      finais: this.finais.length, estavelAteMs, ...(aviso && { aviso }) }
   }
 }
 

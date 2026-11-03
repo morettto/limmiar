@@ -3,29 +3,31 @@
 `falas-paciente.ts` seleciona palavras antes da fronteira estável de diarização,
 somente de vozes identificadas explicitamente como paciente. Voz desconhecida
 ou profissional interrompe o trecho; as cinco frases anteriores do paciente
-formam o contexto. Pontuação final, troca de voz ou uma pausa de 900 ms depois
-da fronteira estável fecham a frase. O texto ainda incompleto espera esse limite,
-para cada nova palavra não cancelar a análise da frase já concluída.
+formam o contexto. Pontuação final, troca de voz ou uma pausa de 900 ms entre
+palavras fecham a frase, e a última frase final fecha na hora, com ou sem pontuação:
+o servidor só entrega uma frase final depois de fechá-la pelo silêncio. Uma palavra
+além da fronteira estável deixa a frase em curso para a próxima leitura. Cada consulta
+leva `fimMs`, o fim da última palavra, que não vai ao servidor.
 
-`turnos-paciente.ts` faz uma passada final sobre a fala inteira do paciente,
-quando ela termina por voz do profissional ou 2,5 s de silêncio estável, e só
-quando junta duas ou mais frases. O tracejado liga-se às frases da fala; fontes
-já mostradas para uma dessas frases não se repetem no balão da fala inteira.
+`turnos-paciente.ts` faz uma passada sobre a fala inteira do paciente, só depois da
+gravação, quando ela termina por voz do profissional ou 2,5 s de silêncio estável (na
+prática, a fronteira máxima do fim da gravação), e só quando junta duas ou mais frases.
+O tracejado liga-se às frases da fala.
 
-`fila-insights.ts` executa um lote por vez, na ordem das frases pendentes.
-Cada continuação volta ao fim da fila: novas frases e fontes restantes recebem
-sua vez mesmo sob chegada contínua. Um cursor assinado
-retoma a posição, sem julgar novamente as fontes anteriores. Mudanças de texto,
-papel ou contexto invalidam resultados e o cursor. Encerrar o componente cancela
-o trabalho pendente e apaga o progresso em memória.
+`fila-insights.ts` executa uma consulta por vez, sem espera. `atualizar(consultas, relogio)`
+recebe o relógio de conversa (`estavelAteMs`) durante a gravação: vai a frase pendente mais
+nova com até 15 s (`relogio - fimMs`), e as mais velhas ficam guardadas. Sem relógio (gravação
+encerrada), as pendentes seguem na ordem de chegada. Frase nova não cancela a consulta em
+curso; mudanças de texto, papel ou contexto invalidam o resultado e cancelam a consulta
+daquela frase. Encerrar o componente cancela o trabalho pendente.
 
 A fila distingue três falhas (`falha-insight.ts`, `FalhaInsight`) e avisa o chamador com
-`falhar(falha, consulta)`. `fora` (rede, prazo ou HTTP 5xx diferente de 503) devolve a mesma
-consulta ao fim da fila, com o cursor em que parou, e a próxima tentativa espera 1 s, 2 s, 4 s...
-até 30 s; qualquer resposta do serviço zera a espera. Uma fala nova durante a espera não a
-fura. `nao_liberado` (503) e `sem_analise` (resposta inválida, 4xx ou erro no stream) encerram
-só aquela consulta, sem nova tentativa: a primeira é um aviso do serviço inteiro, a segunda
-vale só para a fala.
+`falhar(falha, consulta)`. `fora` (rede, prazo, 401 ou HTTP 5xx diferente de 503) devolve a mesma
+consulta ao fim da fila, e a próxima tentativa espera uma fração aleatória de um teto de 1 s, 2 s,
+4 s... até 30 s; qualquer resposta do serviço zera o teto. Uma fala nova durante a espera não a
+fura, e ao vivo a consulta devolvida envelhece como qualquer outra. `nao_liberado` (503) e
+`sem_analise` (resposta inválida, outro 4xx ou erro no stream) encerram só aquela consulta, sem
+nova tentativa: a primeira é um aviso do serviço inteiro, a segunda vale só para a fala.
 
 `insight.ts` envia somente texto do paciente e contexto ao serviço local. Não
 envia identidade, chave ou áudio. O `idioma` da consulta é o locale ativo do app
@@ -34,15 +36,11 @@ independente de qualidade; indisponibilidade aparece na interface. Todas as
 fontes retornadas são preservadas e seus campos de citação são validados, inclusive
 `probabilidade` (número de 0 a 1) e `nivel` (`"forte"` ou `"possivel"`, decidido pelo
 servidor). A resposta traz sempre `juiz`, a versão do juiz; sem ela a resposta é inválida.
-Uma requisição que passa de 60 s (teto folgado, não medido) é abortada e conta como `fora`.
-503 vira `nao_liberado`; aborto do chamador segue como aborto.
-Cada resposta NDJSON traz um lote e informa conclusão ou continuação. O cursor
-contém somente posição e assinatura, vinculadas à consulta, obras, versão e
-limiares; não contém fala ou contexto. Reiniciar o serviço invalida os cursores.
-O cliente reúne todas as fontes dos lotes e deduplica apenas a mesma passagem.
-Falha na continuação retira o resultado inteiro dessa fala. Assim as fontes
-aparecem durante a sessão e uma frase longa não monopoliza a fila até varrer
-todo o acervo.
+Uma requisição que passa de 30 s (acima do máximo de 23,6 s medido na carga) é abortada e
+conta como `fora`, assim como o 401 do token vencido. 503 vira `nao_liberado`; aborto do
+chamador segue como aborto. A resposta NDJSON tem uma linha só, com `completo: true`: o
+servidor decide numa passada (`mvp-copiloto/src/copiloto/decisao.py`). Outra linha depois
+dela torna a resposta inválida.
 
 `voto-store.ts` guarda, em `localStorage`, os votos "útil / não útil" dos
 cartões como eventos do contrato de `docs/juiz-ciclo-de-treino.md` seção 1. Um

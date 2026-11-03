@@ -7,10 +7,9 @@ export interface RecoveryPhraseSetupPageProps {
   accountId: string
   accessToken: string
   email: string
-  kek: CryptoKey
 }
 
-export function RecoveryPhraseSetupPage({ baseUrl, accountId, accessToken, email, kek }: RecoveryPhraseSetupPageProps) {
+export function RecoveryPhraseSetupPage({ baseUrl, accountId, accessToken, email }: RecoveryPhraseSetupPageProps) {
   const [saved, setSaved] = useState(false)
   return <main className="settings-page">
     <header><h1><Trans>Frase de recuperação</Trans></h1></header>
@@ -19,7 +18,6 @@ export function RecoveryPhraseSetupPage({ baseUrl, accountId, accessToken, email
       accountId={accountId}
       accessToken={accessToken}
       email={email}
-      kek={kek}
       onDone={() => setSaved(true)}
     />}
   </main>

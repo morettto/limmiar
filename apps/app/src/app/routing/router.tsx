@@ -8,8 +8,6 @@ import { E2ePacienteHojeScaffold } from './E2ePacienteHojeScaffold'
 import { MagicLinkCallback } from '../../features/magic-link-auth/MagicLinkCallback'
 import { RecoveryScreen } from '../../features/recovery/RecoveryScreen'
 import { RecoveryPhraseSetupPage } from '../../pages/recovery/RecoveryPhraseSetupPage'
-import { PairPrimaryPage } from '../../pages/device-pairing/PairPrimaryPage'
-import { PairNewPage } from '../../pages/device-pairing/PairNewPage'
 import { CopilotPage } from '../../pages/settings/CopilotPage'
 import { VoicePage } from '../../pages/settings/VoicePage'
 import { AuditPage } from '../../pages/settings/AuditPage'
@@ -29,6 +27,8 @@ import { E2eMicrofoneScaffold } from './E2eMicrofoneScaffold'
 import { E2eVinculoScaffold } from './E2eVinculoScaffold'
 import { E2ePartilhaScaffold } from './E2ePartilhaScaffold'
 import { OnlineSessionPage } from '../../pages/online-session/OnlineSessionPage'
+import { ClinicalVaultGate } from '../../features/clinical-vault/ClinicalVaultGate'
+import { VoiceEnrollmentGate } from '../../features/voice-enrollment/VoiceEnrollmentGate'
 
 function readSearchString(search: Record<string, unknown>, key: string): string {
   const value = search[key]
@@ -45,7 +45,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 const onlineSessionRoute = createRoute({ getParentRoute: () => rootRoute, path: '/session/online',
   component: () => <OnlineSessionPage baseUrl={API_BASE_URL} /> })
 
-const rootRoute = createRootRoute({ component: () => <AppShell><Outlet /></AppShell> })
+const rootRoute = createRootRoute({ component: () => <AppShell><ClinicalVaultGate><VoiceEnrollmentGate><Outlet /></VoiceEnrollmentGate></ClinicalVaultGate></AppShell> })
 
 const acervoRoute = createRoute({ getParentRoute: () => rootRoute, path: '/acervo', component: AcervoRouteComponent })
 function AcervoRouteComponent() {
@@ -56,8 +56,8 @@ function AcervoRouteComponent() {
 
 function IndexRouteComponent() {
   const { sessao, kek, iniciarSessao } = useSession()
-  if (sessao === null || sessao.accessToken === null || (sessao.role === 'Professional' && kek === null)) {
-    return <AuthPage baseUrl={API_BASE_URL} role="Professional" onAuthenticated={iniciarSessao} pairingAvailable={sessao?.role === 'Professional' && sessao.accessToken !== null} />
+  if (sessao === null || sessao.accessToken === null) {
+    return <AuthPage baseUrl={API_BASE_URL} role="Professional" onAuthenticated={iniciarSessao} />
   }
   // S11-01: o role já chega em produção (validado em entities/account/session.ts), redirect real.
   if (sessao.role === 'Patient') {
@@ -142,31 +142,7 @@ const recoverySetupRoute = createRoute({
 function RecoverySetupRouteComponent() {
   const { sessao, kek } = useSession()
   if (sessao === null || sessao.role !== 'Professional' || sessao.email === null || sessao.accessToken === null || kek === null) return <Navigate to="/" />
-  return <RecoveryPhraseSetupPage baseUrl={API_BASE_URL} accountId={sessao.id} accessToken={sessao.accessToken} email={sessao.email} kek={kek} />
-}
-
-const pairPrimaryRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/devices/pair-primary',
-  component: PairPrimaryRouteComponent,
-})
-
-function PairPrimaryRouteComponent() {
-  const { sessao, kek } = useSession()
-  if (sessao?.role !== 'Professional' || !sessao.accessToken || sessao.email === null || kek === null) return <Navigate to="/" />
-  return <PairPrimaryPage baseUrl={API_BASE_URL} accountId={sessao.id} accessToken={sessao.accessToken} email={sessao.email} kek={kek} />
-}
-
-const pairNewRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/devices/pair-new',
-  component: PairNewRouteComponent,
-})
-
-function PairNewRouteComponent() {
-  const { sessao, iniciarSessao } = useSession()
-  if (sessao?.role !== 'Professional' || !sessao.accessToken) return <Navigate to="/" />
-  return <PairNewPage baseUrl={API_BASE_URL} onUnlocked={key => iniciarSessao(sessao, key)} />
+  return <RecoveryPhraseSetupPage baseUrl={API_BASE_URL} accountId={sessao.id} accessToken={sessao.accessToken} email={sessao.email} />
 }
 
 // S10-02 fatia 6: andaime de E2E sem equivalente de producao -- o consentimento chega por query
@@ -464,8 +440,6 @@ const routeTree =
         prontuarioRoute.addChildren([prontuarioIndexRoute, atendimentoRoute]),
         bibliotecaRoute,
         acervoRoute,
-        pairPrimaryRoute,
-        pairNewRoute,
         pacienteLayoutWithChildren,
         ...(E2E_ROUTES_LIGADAS ? [authScreenE2ERoute, e2eMicrofoneRoute, e2eVinculoRoute, e2ePartilhaRoute] : []),
       ])

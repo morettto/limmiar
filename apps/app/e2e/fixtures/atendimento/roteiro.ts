@@ -55,7 +55,17 @@ export interface Atendimento {
   duracaoS: number
 }
 
+export interface Turno { quem: Enunciado['quem']; texto: string; tipo?: TipoFala; ouvido?: string }
+
 export function montarAtendimento(): Atendimento {
+  return montarAtendimentoDe(FALAS_PACIENTE.flatMap((fala, indice) => [
+    { quem: 'profissional' as const, texto: FALAS_PROFISSIONAL[indice]! },
+    { quem: 'paciente' as const, texto: fala.texto, tipo: fala.tipo, ouvido: fala.ouvido },
+  ]))
+}
+
+/** O mesmo áudio de duas vozes sintéticas, com cadastro de voz e tom de sincronismo, para qualquer diálogo. */
+export function montarAtendimentoDe(turnos: readonly Turno[]): Atendimento {
   const partes: Float32Array[] = [falar(VOZ_PROFISSIONAL, CADASTRO_S), silencio(1.5)]
   let relogio = CADASTRO_S + 1.5
   const marcadorInicioS = relogio
@@ -68,10 +78,7 @@ export function montarAtendimento(): Atendimento {
     enunciados.push({ quem, texto, ouvido, tipo, inicioS: relogio, fimS: relogio + duracao })
     relogio += duracao + PAUSA_S
   }
-  FALAS_PACIENTE.forEach((fala, indice) => {
-    dizer('profissional', FALAS_PROFISSIONAL[indice]!)
-    dizer('paciente', fala.texto, fala.tipo, fala.ouvido)
-  })
+  for (const turno of turnos) dizer(turno.quem, turno.texto, turno.tipo, turno.ouvido)
   partes.push(silencio(CAUDA_S))
   return { audio: concatenar(partes), enunciados, marcadorInicioS, duracaoS: relogio + CAUDA_S }
 }

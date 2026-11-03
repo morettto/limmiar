@@ -78,17 +78,15 @@ ticket S08-06, `Nota` também é dona do seu `estado` (`EstadoNota`, `ESTADO_PEN
   alcance). Sem mudança de comportamento nem de cobertura -- só a keyword `export`.
   **Este ficheiro é a referência única para esta justificação** -- `ORDEM_SECOES` e
   `ESTADO_PENDENTE`/`ESTADO_ASSINADA` (abaixo) nascem as duas neste `.ts` puro, fora do
-  alcance de `lingui/no-unlocalized-strings`. Os READMEs de `features/nota-editor` e
-  `features/nota-fila` linkam para aqui em vez de repetirem o parágrafo.
+  alcance de `lingui/no-unlocalized-strings`. O README de `features/nota-editor` linka para
+  aqui em vez de repetir o parágrafo.
 - Tipos: `SecaoSoap`, `FraseNota`, `Nota` (`src/nota.ts`), `EstadoNota`
   (`(typeof ESTADOS_NOTA)[number]`); constantes `ESTADO_PENDENTE`, `ESTADO_ASSINADA` e o
   array `ESTADOS_NOTA` (`[ESTADO_PENDENTE, ESTADO_ASSINADA] as const`) -- as constantes vêm do S08-06,
   `ESTADOS_NOTA`/`EstadoNota` derivado dele do S08-16 (justificação do idioma no comentário
   acima de `ESTADOS_NOTA` em `nota.ts`). **`ESTADOS_NOTA` serve só para derivar `EstadoNota`,
-  não é ordem de apresentação** -- desde o S08-31, a ordem em que as abas de
-  `features/nota-fila` renderizam vive em `ORDEM_ABAS`, local a essa feature, não aqui (ver
-  `features/nota-fila/README.md`, "Decisões desta fatia"). Reordenar este array não muda
-  nenhuma UI; é seguro só quanto a isso.
+  não é ordem de apresentação**. Reordenar este array não muda nenhuma UI; é seguro só
+  quanto a isso.
   `Afirmacao`/`Ancora` são importados de `@limmiar/copilot`, não redeclarados.
 - `notaAssinaturaAad(noteId: string, revisao: number): Uint8Array<ArrayBuffer>`
   (`nota-crypto.ts`, fatia 5) -- `"limmiar/note-signature/v1|{noteId}|{revisao}"` em UTF-8.
@@ -167,8 +165,8 @@ ticket S08-06, `Nota` também é dona do seu `estado` (`EstadoNota`, `ESTADO_PEN
   coleções paralelas, com o mesmo `id` a servir de chave implícita entre elas e nada a
   garantir que concordassem -- ver a origem completa do defeito em
   `[[S08-06 Fundir ItemFila em Nota e eliminar as listas paralelas]]`. `estado` passou a
-  campo de `Nota`; `ItemFila` deixou de existir. `FilaAssinatura`/`agruparPorPaciente`
-  (`features/nota-fila`, `features/nota-biblioteca`) importam `EstadoNota`/
+  campo de `Nota`; `ItemFila` deixou de existir. `agruparPorPaciente`
+  (`features/nota-biblioteca`) importa `EstadoNota`/
   `ESTADO_PENDENTE`/`ESTADO_ASSINADA` daqui, em vez de os redeclararem.
 - **`rascunhoParaNota` agora devolve `estado: ESTADO_PENDENTE`.** Um rascunho recém-criado
   nasce sempre pendente -- a única mudança de comportamento desta fatia neste ficheiro

@@ -26,8 +26,10 @@ class SocketFalso {
 const PERFIL = [0.25, -0.5, 0.75]
 const PRESENCIAL: Identidade = { modo: 'presencial', perfil: PERFIL }
 const palavra = (texto: string, inicio_ms: number, fim_ms: number) => ({ texto, inicio_ms, fim_ms })
-const final = (frase: number, falante: string | null, palavras: object[], processado_ms = 0) => ({ type: 'final', frase, falante, palavras, processado_ms })
-const parcial = (texto: string, processado_ms = 0) => ({ type: 'parcial', texto, processado_ms })
+let proximaOrdem = 0
+const final = (frase: number, falante: string | null, palavras: object[], processado_ms = 0, ordem = proximaOrdem++) =>
+  ({ type: 'final', ordem, frase, falante, palavras, processado_ms })
+const parcial = (texto: string, processado_ms = 0, ordem = proximaOrdem++) => ({ type: 'parcial', ordem, texto, processado_ms })
 
 let resultados: ResultadoTranscricao[]
 let falhas: Error[]
@@ -46,6 +48,7 @@ async function abrir(identidade: Identidade = PRESENCIAL): Promise<SessaoServido
 
 beforeEach(() => {
   SocketFalso.todos = []
+  proximaOrdem = 0
   resultados = []
   falhas = []
   vi.useFakeTimers()
@@ -111,16 +114,17 @@ describe('transcrição', () => {
   it('mostra a hipótese enquanto a pessoa fala, sem falante, e a substitui a cada parcial', async () => {
     await abrir()
     socket().receber(parcial(''))
-    expect(ultimo()).toEqual({ palavras: [], finais: 0, estavelAteMs: 0 })
+    expect(ultimo()).toEqual({ palavras: [], palavrasFinais: [], palavrasHipotese: [], finais: 0, estavelAteMs: 0 })
     socket().receber(parcial('Bom dia,', 1040))
-    expect(ultimo()).toEqual({ palavras: [{ texto: 'Bom dia,', inicioMs: 1040, fimMs: 1040, locutor: null }], finais: 0, estavelAteMs: 0 })
+    expect(ultimo()).toEqual({ palavras: [{ texto: 'Bom dia,', inicioMs: 1040, fimMs: 1040, locutor: null }],
+      palavrasFinais: [], palavrasHipotese: [{ texto: 'Bom dia,', inicioMs: 1040, fimMs: 1040, locutor: null }], finais: 0, estavelAteMs: 0 })
     socket().receber(parcial('Bom', 1100))
     expect(ultimo().palavras.map((item) => item.texto)).toEqual(['Bom'])
   })
 
   it('frase final sem instante processado não mexe no aviso de atraso', async () => {
     await abrir()
-    socket().receber({ type: 'final', frase: 0, falante: 'profissional', palavras: [palavra('Oi', 100, 300)] })
+    socket().receber({ type: 'final', ordem: 0, frase: 0, falante: 'profissional', palavras: [palavra('Oi', 100, 300)] })
     expect(ultimo()).toMatchObject({ finais: 1 })
     expect(ultimo().aviso).toBeUndefined()
   })
@@ -138,6 +142,8 @@ describe('transcrição', () => {
     socket().receber(final(0, 'profissional', [palavra('Bom', 640, 720), palavra('dia', 880, 1040)]))
     expect(ultimo()).toEqual({
       palavras: [{ texto: 'Bom', inicioMs: 640, fimMs: 720, locutor: 'profissional' }, { texto: 'dia', inicioMs: 880, fimMs: 1040, locutor: 'profissional' }],
+      palavrasFinais: [{ texto: 'Bom', inicioMs: 640, fimMs: 720, locutor: 'profissional' }, { texto: 'dia', inicioMs: 880, fimMs: 1040, locutor: 'profissional' }],
+      palavrasHipotese: [],
       finais: 2,
       estavelAteMs: 1041,
     })
@@ -146,6 +152,17 @@ describe('transcrição', () => {
     expect(ultimo().palavras.map((item) => [item.texto, item.locutor])).toEqual([['Bom', 'profissional'], ['dia', 'profissional'], ['Oi', 'paciente']])
     expect(ultimo().finais).toBe(3)
     expect(ultimo().estavelAteMs).toBe(1701)
+  })
+
+  it('um final atrasado acrescenta palavras sem apagar a hipótese mais nova', async () => {
+    await abrir()
+    socket().receber(parcial('Estou aqui', 1600, 10))
+    socket().receber(final(0, 'paciente', [palavra('Antes', 100, 400)], 900, 9))
+    expect(ultimo().palavras.map((item) => item.texto)).toEqual(['Antes', 'Estou aqui'])
+    socket().receber(parcial('velha', 800, 8))
+    expect(ultimo().palavras.map((item) => item.texto)).toEqual(['Antes', 'Estou aqui'])
+    socket().receber(final(1, 'paciente', [palavra('Agora', 1800, 2200)], 2300, 11))
+    expect(ultimo().palavras.map((item) => item.texto)).toEqual(['Antes', 'Agora'])
   })
 
   it('frase sem nenhuma vizinha fica sem falante até o gateway corrigi-la', async () => {
@@ -200,7 +217,7 @@ describe('transcrição', () => {
     sessao.enviar(voz(10))
     expect(socket().quadros()).toEqual([])
     await expect(sessao.concluir()).rejects.toThrow('indisponível')
-    await expect(sessao.esvaziada()).resolves.toBeUndefined()
+    await expect(sessao.esvaziada()).rejects.toThrow('indisponível')
   })
 
   it('um erro sem detalhe também é falha', async () => {
@@ -211,32 +228,32 @@ describe('transcrição', () => {
 })
 
 describe('atraso', () => {
-  it('avisa quando mais de 2 s de áudio esperam no socket e some quando o buffer esvazia', async () => {
+  it('avisa quando mais de 300 ms de áudio esperam no socket e some quando o buffer esvazia', async () => {
     const sessao = await abrir()
     sessao.enviar(voz(10))
     expect(resultados).toEqual([])
-    socket().bufferedAmount = 64_001
+    socket().bufferedAmount = 9_601
     sessao.enviar(voz(10))
     sessao.enviar(voz(10))
     expect(resultados.map((r) => r.aviso)).toEqual(['atrasada'])
-    socket().bufferedAmount = 64_000
+    socket().bufferedAmount = 9_600
     sessao.enviar(voz(10))
     expect(resultados.map((r) => r.aviso)).toEqual(['atrasada', undefined])
     expect('aviso' in ultimo()).toBe(false)
   })
 
-  it('avisa também quando o gateway processou mais de 2 s a menos que o enviado, mesmo com o socket vazio', async () => {
+  it('sinaliza o limite de 300 ms de atraso do gateway mesmo com o socket vazio', async () => {
     const sessao = await abrir()
-    sessao.enviar(voz(48_000))
-    socket().receber(parcial('', 900))
+    sessao.enviar(voz(12_800))
+    socket().receber(parcial('', 500))
+    expect('aviso' in ultimo()).toBe(false)
+    socket().receber(parcial('', 499))
     expect(ultimo().aviso).toBe('atrasada')
-    socket().receber(parcial('', 990))
-    expect(ultimo().aviso).toBe('atrasada')
-    socket().receber(parcial('', 2100))
+    socket().receber(parcial('', 500))
     expect('aviso' in ultimo()).toBe(false)
     socket().receber({ type: 'parcial', palavras: [] })
     expect('aviso' in ultimo()).toBe(false)
-    socket().receber(final(0, 'paciente', [palavra('a', 0, 1)], 500))
+    socket().receber(final(0, 'paciente', [palavra('a', 0, 1)], 499))
     expect(ultimo().aviso).toBe('atrasada')
   })
 
@@ -307,7 +324,8 @@ describe('encerramento', () => {
     socket().receber(parcial('Oi tudo', 700))
     socket().receber(final(0, 'profissional', [palavra('Oi', 100, 400)]))
     socket().receber({ type: 'concluida' })
-    await expect(concluida).resolves.toEqual({ palavras: [{ texto: 'Oi', inicioMs: 100, fimMs: 400, locutor: 'profissional' }], finais: 1, estavelAteMs: 401 })
+    await expect(concluida).resolves.toEqual({ palavras: [{ texto: 'Oi', inicioMs: 100, fimMs: 400, locutor: 'profissional' }],
+      palavrasFinais: [{ texto: 'Oi', inicioMs: 100, fimMs: 400, locutor: 'profissional' }], palavrasHipotese: [], finais: 1, estavelAteMs: 401 })
     expect(socket().fechado).toBe(true)
     await expect(sessao.concluir()).resolves.toMatchObject({ finais: 1 })
   })
@@ -362,6 +380,8 @@ describe('queda e reconexão', () => {
     socket().cair()
     expect(ultimo()).toEqual({
       palavras: [{ texto: 'Bom', inicioMs: 100, fimMs: 300, locutor: 'profissional' }, { texto: 'dia', inicioMs: 400, fimMs: 600, locutor: 'profissional' }],
+      palavrasFinais: [{ texto: 'Bom', inicioMs: 100, fimMs: 300, locutor: 'profissional' }, { texto: 'dia', inicioMs: 400, fimMs: 600, locutor: 'profissional' }],
+      palavrasHipotese: [],
       finais: 2,
       estavelAteMs: 601,
       aviso: 'reconectando',
@@ -480,4 +500,83 @@ describe('queda e reconexão', () => {
     await vi.advanceTimersByTimeAsync(60_000)
     expect(SocketFalso.todos).toHaveLength(1)
   })
+})
+
+
+it('o envio de arquivo espera o processamento mesmo com o socket vazio, sem depender do relógio do áudio', async () => {
+  const sessao = await abrir()
+  sessao.enviar(voz(160_000))
+  let livre = false
+  const espera = sessao.esvaziada().then(() => { livre = true })
+  await vi.advanceTimersByTimeAsync(100)
+  expect(livre).toBe(false)
+  socket().receber(parcial('em andamento', 500))
+  await vi.advanceTimersByTimeAsync(25)
+  await espera
+  expect(livre).toBe(true)
+  sessao.descartar()
+})
+
+
+it('não trava arquivo curto ou silêncio sem quadros enviados', async () => {
+  const sessao = await abrir()
+  for (let i = 0; i < 125; i++) sessao.enviar(new Float32Array(1280))
+  await expect(sessao.esvaziada()).resolves.toBeUndefined()
+  sessao.enviar(voz(1280))
+  await expect(sessao.esvaziada()).resolves.toBeUndefined()
+  sessao.descartar()
+})
+
+it('interrompe envio de arquivo sem progresso e libera a espera quando cancelado', async () => {
+  const sessao = await abrir()
+  sessao.enviar(voz(160_000))
+  const rejeitada = expect(sessao.esvaziada()).rejects.toThrow('parou de responder')
+  await vi.advanceTimersByTimeAsync(29_000)
+  socket().receber(parcial('', 0))
+  await vi.advanceTimersByTimeAsync(1000)
+  await rejeitada
+  expect(socket().fechado).toBe(true)
+  const outra = await abrir()
+  outra.enviar(voz(160_000))
+  const espera = outra.esvaziada()
+  outra.descartar()
+  await vi.advanceTimersByTimeAsync(25)
+  await espera
+})
+
+it('o limite do arquivo recomeça no relógio do socket reconectado', async () => {
+  const sessao = await abrir()
+  sessao.enviar(voz(160_000))
+  const espera = sessao.esvaziada()
+  socket().cair()
+  await vi.advanceTimersByTimeAsync(0)
+  socket(1).abrir()
+  socket(1).receber({ type: 'pronta' })
+  await vi.advanceTimersByTimeAsync(25)
+  await espera
+  sessao.enviar(voz(160_000))
+  let livre = false
+  const nova = sessao.esvaziada().then(() => { livre = true })
+  await vi.advanceTimersByTimeAsync(25)
+  expect(livre).toBe(false)
+  socket(1).receber(parcial('', 500))
+  await vi.advanceTimersByTimeAsync(25)
+  await nova
+  sessao.descartar()
+})
+
+
+it('arquivo interrompido exige novo envio em vez de reconectar e devolver uma transcrição incompleta', async () => {
+  const abertura = abrirTranscricao({ reconectar: false, identidade: PRESENCIAL, aoResultado: () => {}, falhar: erro => falhas.push(erro) })
+  socket().abrir(); socket().receber({ type: 'pronta' })
+  const sessao = await abertura
+  sessao.enviar(voz(160_000))
+  const esperando = expect(sessao.esvaziada()).rejects.toThrow('Carregue o arquivo novamente')
+  socket().cair()
+  await vi.advanceTimersByTimeAsync(25)
+  await esperando
+  await expect(sessao.concluir()).rejects.toThrow('áudio inteiro')
+  expect(falhas).toHaveLength(1)
+  await vi.advanceTimersByTimeAsync(10_000)
+  expect(SocketFalso.todos).toHaveLength(1)
 })

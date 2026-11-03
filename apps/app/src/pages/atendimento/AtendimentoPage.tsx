@@ -53,6 +53,8 @@ function Sessao({ baseUrl, accountId, accessToken, kek, patientId, atendimentoId
   const [finalizando, setFinalizando] = useState(false)
   const [preparando, setPreparando] = useState(false)
   const [encerrada, setEncerrada] = useState(atendimento.encerradoEm !== undefined)
+  const [conclusaoPendente, setConclusaoPendente] = useState(atendimento.encerradoEm !== undefined)
+  const [tentativaConclusao, setTentativaConclusao] = useState(0)
   const [avisoEncerramento, setAvisoEncerramento] = useState<Texto | null>(null)
   const pararCaptura = useRef<() => Promise<void>>(null)
   const salvarNota = useRef<() => Promise<void>>(null)
@@ -66,6 +68,16 @@ function Sessao({ baseUrl, accountId, accessToken, kek, patientId, atendimentoId
   const paciente = useMemo(() => ({ id: patientId, nome: prontuario.nome, dek: prontuario.dek,
     consentimentos: prontuario.consentimentos, transcricoes: prontuario.transcricoes }), [patientId, prontuario])
   const data = i18n.date(atendimento.iniciadoEm, FORMATO_DATA_ATENDIMENTO)
+
+  useEffect(() => {
+    if (!conclusaoPendente) return
+    let ativa = true
+    setFinalizando(true)
+    void encerrarAtendimento(baseUrl, accountId, accessToken, patientId, atendimentoId, prontuario.dek)
+      .then(() => { if (ativa) { setConclusaoPendente(false); setFinalizando(false) } })
+      .catch(erro => { if (ativa) { setAvisoEncerramento(erro instanceof Error ? erro.message : msg`Não foi possível encerrar a sessão. Tente novamente.`); setFinalizando(false) } })
+    return () => { ativa = false }
+  }, [conclusaoPendente, tentativaConclusao, baseUrl, accountId, accessToken, patientId, atendimentoId, prontuario.dek])
 
   // Stryker disable next-line ArrayDeclaration: equivalent, a callback with no dependencies keeps one identity either way.
   const receberPendencias = useCallback((emCurso: boolean) => { setPendente(emCurso); if (emCurso) setPropostaReferencia(null) }, [])
@@ -123,6 +135,7 @@ function Sessao({ baseUrl, accountId, accessToken, kek, patientId, atendimentoId
       <div className="my-4 flex flex-wrap gap-3">
         {!encerrada && <button type="button" className="button-primary" disabled={finalizando || preparando || (tipoSessao === 'online' && pendente)} onClick={() => void encerrar()}><Trans>Encerrar sessão</Trans></button>}
         {encerrada && <p role="status"><Trans>Sessão encerrada</Trans></p>}
+        {encerrada && conclusaoPendente && <button type="button" disabled={finalizando} onClick={() => { setAvisoEncerramento(null); setTentativaConclusao(valor => valor + 1) }}><Trans>Concluir encerramento</Trans></button>}
       </div>
       {avisoEncerramento !== null && <p role="status">{traduzir(i18n, avisoEncerramento)}</p>}
     </header>

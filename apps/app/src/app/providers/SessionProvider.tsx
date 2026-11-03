@@ -7,6 +7,7 @@ import { purgarConta } from './purgar-conta'
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [sessao, setSessao] = useState<Account | null>(() => sessaoDaConta.ler())
+  const sessaoAtual = useRef(sessao)
   const [kek, setKek] = useState<CryptoKey | null>(null)
   const [falhaSaida, setFalhaSaida] = useState(false)
   const [revogando, setRevogando] = useState(false)
@@ -42,18 +43,26 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         void revogar(sessao.refreshToken!)
       }
       setSessao(account)
+      sessaoAtual.current = account
       setKek(key ?? null)
     }
     const terminarSessao = () => {
       sessaoDaConta.terminar()
       setSessao(null)
+      sessaoAtual.current = null
       setKek(null)
       if (sessao !== null) {
         void purgarConta(sessao.id)
         void revogar(sessao.refreshToken!)
       }
     }
-    return { sessao, kek, iniciarSessao, terminarSessao }
+    const bloquearProntuarios = () => { setKek(null) }
+    const desbloquearProntuarios = (accountId: string, key: CryptoKey) => {
+      if (sessaoAtual.current?.id !== accountId || !sessaoAtual.current.accessToken) return
+      if (key.extractable) throw new Error('The clinical KEK must be non-extractable')
+      setKek(key)
+    }
+    return { sessao, kek, iniciarSessao, terminarSessao, bloquearProntuarios, desbloquearProntuarios }
   }, [sessao, kek, revogar])
 
   useEffect(() => {
@@ -72,6 +81,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         const { accessToken, refreshToken, accessTokenExpiresAt } = result
         const renewed = { ...sessao!, accessToken, refreshToken, accessTokenExpiresAt }
         sessaoDaConta.registar(renewed)
+        sessaoAtual.current = renewed
         setSessao(renewed)
       } catch {
         if (!cancelled) timer = setTimeout(() => void refresh(), 15000)

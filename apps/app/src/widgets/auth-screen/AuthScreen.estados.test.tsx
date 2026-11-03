@@ -7,7 +7,6 @@ import * as accountApi from '../../entities/account/api'
 import type { Account } from '../../entities/account'
 import { AuthScreen } from './AuthScreen'
 
-const kekDerivada = vi.hoisted(() => ({ chave: { extractable: false } as unknown as CryptoKey }))
 vi.mock('../../entities/account/api', async () => ({
   ...await vi.importActual<typeof import('../../entities/account/api')>('../../entities/account/api'),
   register: vi.fn(), login: vi.fn(), continueWithGoogle: vi.fn(),
@@ -15,10 +14,6 @@ vi.mock('../../entities/account/api', async () => ({
 vi.mock('../../entities/account/password-verifier', () => ({
   deriveEmailSalt: vi.fn(async () => new Uint8Array(16).fill(1)),
   deriveEmailPasswordVerifier: vi.fn(async () => new Uint8Array(32).fill(2)),
-}))
-vi.mock('../../entities/account/account-keys', () => ({
-  deriveAccountKek: vi.fn(async () => kekDerivada.chave),
-  createRecoveryEnvelope: vi.fn(), openRecoveryEnvelope: vi.fn(),
 }))
 vi.mock('../../features/magic-link-auth/MagicLinkCallback', () => ({
   MagicLinkCallback: ({ token }: { token: string }) => <p data-token={token}>Confirmação</p>,
@@ -92,7 +87,7 @@ describe('AuthScreen: estados e textos', () => {
     expect(screen.queryByRole('status')).toBeNull()
     await act(async () => envio.resolve({ ok: true, account: conta() }))
     expect((await screen.findByRole('status')).textContent).toBe('Conta criada. Você está cadastrado como profissional.')
-    expect(onAuthenticated).toHaveBeenCalledExactlyOnceWith(conta(), kekDerivada.chave)
+    expect(onAuthenticated).toHaveBeenCalledExactlyOnceWith(conta())
     expect(screen.getByLabelText('Senha')).toHaveProperty('value', '')
   })
 

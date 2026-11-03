@@ -1,5 +1,5 @@
-// Duplo mínimo da File System Access API (OPFS), partilhado pelos testes de índice,
-// reprodutor e indice-store: só a superfície que os três usam. Nasceu na terceira duplicação
+// Duplo mínimo da File System Access API (OPFS), partilhado pelos testes que tocam OPFS:
+// só a superfície que eles usam. Nasceu na terceira duplicação
 // do duplo local (S08-02).
 
 // Bytes só ficam visíveis em `handle.bytes` depois de `close()`, como na API real, e
@@ -93,11 +93,6 @@ export class FakeDirectoryHandle {
     }
     throw new DOMException(`entrada inexistente: ${name}`, 'NotFoundError')
   }
-}
-
-/** Atalho para quem só precisa do tipo (não vai inspecionar `.files` depois). */
-export function fakeDir(): FileSystemDirectoryHandle {
-  return new FakeDirectoryHandle() as unknown as FileSystemDirectoryHandle
 }
 
 /** jsdom não implementa `navigator.storage` -- semeia `getDirectory()` com uma raiz fake para o

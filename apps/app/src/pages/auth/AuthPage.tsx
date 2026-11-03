@@ -6,10 +6,9 @@ export interface AuthPageProps {
   // '' means unset -- AuthScreen falls back to its own default.
   role: string
   onAuthenticated?: (account: Account, kek?: CryptoKey) => void
-  pairingAvailable?: boolean
 }
 
-export function AuthPage({ baseUrl, role, onAuthenticated, pairingAvailable = false }: AuthPageProps) {
+export function AuthPage({ baseUrl, role, onAuthenticated }: AuthPageProps) {
   const initialRole: AccountRole | undefined = role === 'Professional' || role === 'Patient' ? role : undefined
 
   return (
@@ -25,7 +24,6 @@ export function AuthPage({ baseUrl, role, onAuthenticated, pairingAvailable = fa
       onAuthenticated={onAuthenticated}
       />
       <p className="auth-secondary"><a href="/recover"><Trans>Esqueci minha senha</Trans></a></p>
-      {pairingAvailable && <p className="auth-secondary"><a href="/devices/pair-new"><Trans>Desbloquear pelo outro dispositivo</Trans></a></p>}
     </main>
   )
 }

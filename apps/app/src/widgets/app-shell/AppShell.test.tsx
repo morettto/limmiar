@@ -12,10 +12,10 @@ import { useBloquearNavegacao } from './bloqueio'
 const PROFISSIONAL: Account = { id: 'conta-1', email: 'doutora@example.com', role: 'Professional', twoFactorRequirement: 'NotApplicable',
   twoFactorTicket: null, accessToken: 'access', refreshToken: 'refresh', accessTokenExpiresAt: '2099-01-01T00:00:00Z' }
 const KEK = {} as CryptoKey
-const CAMINHOS = ['/', '/pacientes', '/pacientes/p1', '/biblioteca', '/acervo', '/espelho', '/settings/copilot', '/settings/voice', '/settings/audit', '/settings/recovery', '/devices/pair-primary']
+const CAMINHOS = ['/', '/pacientes', '/pacientes/p1', '/biblioteca', '/acervo', '/espelho', '/settings/copilot', '/settings/voice', '/settings/audit', '/settings/recovery']
 const PRINCIPAIS = [['Consultório', '/'], ['Pacientes', '/pacientes'], ['Biblioteca de notas', '/biblioteca'], ['Acervo pessoal', '/acervo'], ['Sinais compartilhados pelos pacientes', '/espelho']]
 const CONFIGURACOES = [['Votos do copiloto de IA', '/settings/copilot'], ['Identificação da sua voz', '/settings/voice'], ['Trilha de auditoria', '/settings/audit'],
-  ['Frase de recuperação', '/settings/recovery'], ['Parear novo dispositivo', '/devices/pair-primary']]
+  ['Frase de recuperação', '/settings/recovery']]
 
 function Travador({ ativo = true }: { ativo?: boolean }) {
   useBloquearNavegacao(ativo)
@@ -30,7 +30,7 @@ function montar({ sessao = PROFISSIONAL as Account | null, kek = KEK as CryptoKe
   const raiz = createRootRoute({ component: () => <AppShell><Outlet /></AppShell> })
   const rotas = CAMINHOS.map(path => createRoute({ getParentRoute: () => raiz, path, component: () => conteudo }))
   const router = createRouter({ routeTree: raiz.addChildren(rotas), history: createMemoryHistory({ initialEntries: [caminho] }) })
-  render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao, kek, iniciarSessao: vi.fn(), terminarSessao }}>
+  render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao, kek, iniciarSessao: vi.fn(), terminarSessao, bloquearProntuarios: vi.fn(), desbloquearProntuarios: vi.fn() }}>
     <RouterProvider router={router} />
   </SessionContext.Provider></I18nProvider>)
   return { router, terminarSessao }

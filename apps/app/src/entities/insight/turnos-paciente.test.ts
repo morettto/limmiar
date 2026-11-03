@@ -13,7 +13,7 @@ describe('fala inteira do paciente', () => {
     ]
     const falas = selecionarFalasPaciente(palavras, papeis, 2500)
     expect(selecionarTurnosPaciente(palavras, papeis, 2500, falas)).toEqual([{
-      id: 'turno:0:p', frase: 'Tenho medo quando vejo um homem no passeio. Desde o assalto.', contexto: [], ancoras: ['0:p', '1100:p'],
+      id: 'turno:0:p', frase: 'Tenho medo quando vejo um homem no passeio. Desde o assalto.', contexto: [], fimMs: 1600, ancoras: ['0:p', '1100:p'],
     }])
   })
   it('espera o silêncio estável e ignora fala de uma frase só', () => {
@@ -48,8 +48,8 @@ describe('fala inteira do paciente', () => {
 
   it('o turno de até 2000 caracteres vale e o de 2001 não', () => {
     const falasDe = (tamanhoA: number, tamanhoB: number) => [
-      { id: '0:p', frase: 'a'.repeat(tamanhoA), contexto: [] },
-      { id: '600:p', frase: 'b'.repeat(tamanhoB), contexto: [] },
+      { id: '0:p', frase: 'a'.repeat(tamanhoA), contexto: [], fimMs: 0 },
+      { id: '600:p', frase: 'b'.repeat(tamanhoB), contexto: [], fimMs: 0 },
     ]
     const palavras = [falaCom('a', 'p', 0, 500), falaCom('b', 'p', 600, 1000), falaCom('Entendo.', 't', 1100, 1200)]
     expect(selecionarTurnosPaciente(palavras, papeis, 9000, falasDe(1000, 999))).toHaveLength(1)

@@ -38,7 +38,7 @@ test('sem obras autorizadas orienta o profissional e não consulta o juiz', asyn
     const { type } = JSON.parse(mensagem)
     if (type === 'iniciar') ws.send(JSON.stringify({ type: 'pronta' }))
     if (type === 'concluir') {
-      ws.send(JSON.stringify({ type: 'final', frase: 0, falante: 'paciente', palavras: [{ texto: frase, inicio_ms: 100, fim_ms: 2500 }], processado_ms: 2800 }))
+      ws.send(JSON.stringify({ type: 'final', ordem: 0, frase: 0, falante: 'paciente', palavras: [{ texto: frase, inicio_ms: 100, fim_ms: 2500 }], processado_ms: 2800 }))
       ws.send(JSON.stringify({ type: 'concluida' }))
     }
   }))
@@ -94,7 +94,7 @@ test('abertura conserva PCM, distingue vozes e silêncio; encerramento exige rev
         ['pessoa_4', textoVisita, 90000, 91000],
         [null, 'Trecho ainda sem voz identificada.', 92000, 93000],
       ] as const
-      finais.forEach(([falante, texto, inicio_ms, fim_ms], frase) => ws.send(JSON.stringify({ type: 'final', frase, falante,
+      finais.forEach(([falante, texto, inicio_ms, fim_ms], frase) => ws.send(JSON.stringify({ type: 'final', ordem: frase, frase, falante,
         palavras: [{ texto, inicio_ms, fim_ms }], processado_ms: 94000 })))
     })
   })

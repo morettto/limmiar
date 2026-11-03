@@ -33,7 +33,7 @@ describe('session-context', () => {
   })
 
   it('useSession inside a SessionContext.Provider returns the provided value', () => {
-    const value: ContextoSessao = {kek: null,  sessao: ACCOUNT, iniciarSessao: vi.fn(), terminarSessao: vi.fn() }
+    const value: ContextoSessao = {kek: null,  sessao: ACCOUNT, iniciarSessao: vi.fn(), terminarSessao: vi.fn(), bloquearProntuarios: vi.fn(), desbloquearProntuarios: vi.fn() }
 
     render(
       <SessionContext.Provider value={value}>

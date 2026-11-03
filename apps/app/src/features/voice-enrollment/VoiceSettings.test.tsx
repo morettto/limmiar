@@ -70,6 +70,9 @@ describe('configuração da voz na conta', () => {
     await montar()
     expect(screen.getByText('Não foi possível abrir seu perfil de voz. Tente novamente.')).toBeTruthy()
     expect(screen.queryByText('Você ainda não tem um perfil de voz.')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar novamente' }))
+    await screen.findByText('Você ainda não tem um perfil de voz.')
+    expect(obterCadastroVoz).toHaveBeenCalledTimes(2)
   })
   it.each(['microfone', 'api'])('informa falha de cadastro %s e permite tentar novamente', async (etapa) => {
     if (etapa === 'microfone') vi.mocked(capturarPerfil).mockRejectedValueOnce(new Error('permissão negada'))

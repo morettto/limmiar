@@ -37,12 +37,6 @@ vi.mock('../../features/recovery/RecoveryScreen', () => ({
 vi.mock('../../features/recovery/RecoveryPhraseSetup', () => ({
   RecoveryPhraseSetup: vi.fn(() => <div data-testid="recovery-phrase-setup" />),
 }))
-vi.mock('../../features/device-pairing-primary/PairPrimaryDevice', () => ({
-  PairPrimaryDevice: vi.fn(() => <div data-testid="pair-primary-device" />),
-}))
-vi.mock('../../features/device-pairing-new/PairNewDevice', () => ({
-  PairNewDevice: vi.fn(() => <div data-testid="pair-new-device" />),
-}))
 vi.mock('../../pages/settings/CopilotPage', () => ({ CopilotPage: vi.fn(() => <div data-testid="copilot-page" />) }))
 vi.mock('../../pages/home/HomePage', () => ({
   HomePage: vi.fn(() => <div data-testid="home-page" />),
@@ -65,6 +59,8 @@ vi.mock('../../pages/biblioteca/BibliotecaAccountPage', () => ({
 }))
 vi.mock('../../pages/acervo/AcervoPage', () => ({ AcervoPage: vi.fn(() => <div data-testid="acervo-page" />) }))
 vi.mock('../../features/voice-enrollment/VoiceSettings', () => ({ VoiceSettings: vi.fn(() => <div data-testid="voice-settings" />) }))
+// O cadastro de voz obrigatório é regra de produto: as rotas profissionais partem de um perfil válido.
+vi.mock('../../features/voice-enrollment/perfil-de-voz', () => ({ temPerfilDeVoz: vi.fn(async () => true) }))
 vi.mock('../../pages/settings/AuditPage', () => ({ AuditPage: vi.fn(() => <div data-testid="audit-page" />) }))
 vi.mock('../../features/partilha/EspelhoP6', () => ({ EspelhoP6: vi.fn(() => <div data-testid="espelho-p6" />) }))
 vi.mock('../../features/partilha/PartilhaCheckIns', () => ({ PartilhaCheckIns: vi.fn(() => <div data-testid="partilha-check-ins" />) }))
@@ -181,20 +177,43 @@ describe('router', () => {
     const { HomePage } = await import('../../pages/home/HomePage')
     expect(vi.mocked(HomePage).mock.lastCall![0].chaveiro).toEqual({ kek, accountId: ACCOUNT.id, accessToken: ACCOUNT.accessToken })
   })
+  it('profissional sem perfil de voz válido fica na configuração obrigatória, sem montar o consultório', async () => {
+    vi.stubEnv('VITE_API_BASE_URL', 'http://build.example')
+    const router = await loadRouterAt('/pacientes')
+    const { SessionContext } = await import('../../entities/account/session-context')
+    const { temPerfilDeVoz } = await import('../../features/voice-enrollment/perfil-de-voz')
+    vi.mocked(temPerfilDeVoz).mockResolvedValueOnce(false)
+    const kek = await webcrypto.importKek(new Uint8Array(32).fill(8))
+    render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao: ACCOUNT, kek, iniciarSessao: vi.fn(), terminarSessao: vi.fn(), bloquearProntuarios: vi.fn(), desbloquearProntuarios: vi.fn() }}>
+      <RouterProvider router={router} /></SessionContext.Provider></I18nProvider>)
+    await screen.findByRole('heading', { name: 'Vamos reconhecer a sua voz' })
+    expect(screen.queryByTestId('pacientes-page')).toBeNull()
+    expect(vi.mocked(temPerfilDeVoz)).toHaveBeenCalledWith('http://build.example', ACCOUNT.id, ACCOUNT.accessToken, kek, expect.any(AbortSignal))
+  })
+  it('profissional com perfil de voz válido passa direto ao consultório', async () => {
+    const router = await loadRouterAt('/pacientes')
+    const { SessionContext } = await import('../../entities/account/session-context')
+    const kek = await webcrypto.importKek(new Uint8Array(32).fill(8))
+    render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao: ACCOUNT, kek, iniciarSessao: vi.fn(), terminarSessao: vi.fn(), bloquearProntuarios: vi.fn(), desbloquearProntuarios: vi.fn() }}>
+      <RouterProvider router={router} /></SessionContext.Provider></I18nProvider>)
+    await screen.findByTestId('pacientes-page')
+    expect(screen.queryByRole('heading', { name: 'Vamos reconhecer a sua voz' })).toBeNull()
+  })
   it.each(['sem sessão', 'paciente', 'sem token', 'chave bloqueada'])('/acervo exige sessão profissional desbloqueada: %s', async condicao => {
     const router = await loadRouterAt('/acervo')
     const { SessionContext } = await import('../../entities/account/session-context')
     const sessao = condicao === 'sem sessão' ? null : { ...ACCOUNT, role: condicao === 'paciente' ? 'Patient' as const : 'Professional' as const, accessToken: condicao === 'sem token' ? null : ACCOUNT.accessToken }
     const kek = condicao === 'chave bloqueada' ? null : await webcrypto.importKek(new Uint8Array(32).fill(8))
-    render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao, kek, iniciarSessao: vi.fn(), terminarSessao: vi.fn() }}><RouterProvider router={router} /></SessionContext.Provider></I18nProvider>)
-    await vi.waitFor(() => expect(router.state.location.pathname).toBe(condicao === 'paciente' ? '/hoje' : '/'))
+    render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao, kek, iniciarSessao: vi.fn(), terminarSessao: vi.fn(), bloquearProntuarios: vi.fn(), desbloquearProntuarios: vi.fn() }}><RouterProvider router={router} /></SessionContext.Provider></I18nProvider>)
+    if (condicao === 'chave bloqueada') await screen.findByRole('heading', { name: 'Desbloqueie seu consultório' })
+    else await vi.waitFor(() => expect(router.state.location.pathname).toBe(condicao === 'paciente' ? '/hoje' : '/'))
     expect(screen.queryByTestId('acervo-page')).toBeNull()
   })
   it('/acervo recebe as credenciais e a chave desbloqueada sem URL com identidade do paciente', async () => {
     const router = await loadRouterAt('/acervo')
     const { SessionContext } = await import('../../entities/account/session-context')
     const kek = await webcrypto.importKek(new Uint8Array(32).fill(8))
-    render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao: ACCOUNT, kek, iniciarSessao: vi.fn(), terminarSessao: vi.fn() }}><RouterProvider router={router} /></SessionContext.Provider></I18nProvider>)
+    render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao: ACCOUNT, kek, iniciarSessao: vi.fn(), terminarSessao: vi.fn(), bloquearProntuarios: vi.fn(), desbloquearProntuarios: vi.fn() }}><RouterProvider router={router} /></SessionContext.Provider></I18nProvider>)
     await screen.findByTestId('acervo-page')
     const { AcervoPage } = await import('../../pages/acervo/AcervoPage')
     expect(vi.mocked(AcervoPage).mock.lastCall![0]).toMatchObject({ accountId: ACCOUNT.id, accessToken: ACCOUNT.accessToken, kek })
@@ -216,7 +235,7 @@ describe('router', () => {
     const router = await loadRouterAt(caminho)
     const { SessionContext } = await import('../../entities/account/session-context')
     const kek = await webcrypto.importKek(new Uint8Array(32).fill(8))
-    render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao: ACCOUNT, kek, iniciarSessao: vi.fn(), terminarSessao: vi.fn() }}><RouterProvider router={router} /></SessionContext.Provider></I18nProvider>)
+    render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao: ACCOUNT, kek, iniciarSessao: vi.fn(), terminarSessao: vi.fn(), bloquearProntuarios: vi.fn(), desbloquearProntuarios: vi.fn() }}><RouterProvider router={router} /></SessionContext.Provider></I18nProvider>)
     const principal = await screen.findByRole('navigation', { name: 'Navegação principal' })
     expect(within(principal).getAllByRole('link', { current: 'page' }).map(link => link.textContent)).toEqual([ativo])
   })
@@ -225,16 +244,19 @@ describe('router', () => {
     const router = await loadRouterAt('/settings/copilot')
     const { SessionContext } = await import('../../entities/account/session-context')
     const sessao = condicao === 'sem sessão' ? null : PATIENT_ACCOUNT
-    render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao, kek: null, iniciarSessao: vi.fn(), terminarSessao: vi.fn() }}>
+    render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao, kek: null, iniciarSessao: vi.fn(), terminarSessao: vi.fn(), bloquearProntuarios: vi.fn(), desbloquearProntuarios: vi.fn() }}>
       <RouterProvider router={router} /></SessionContext.Provider></I18nProvider>)
-    await vi.waitFor(() => expect(router.state.location.pathname).toBe(condicao === 'paciente' ? '/hoje' : '/'))
+    if (condicao === 'chave bloqueada') await screen.findByRole('heading', { name: 'Desbloqueie seu consultório' })
+    else await vi.waitFor(() => expect(router.state.location.pathname).toBe(condicao === 'paciente' ? '/hoje' : '/'))
     expect(screen.queryByTestId('copilot-page')).toBeNull()
   })
 
   it('/settings/copilot recebe a conta da sessão profissional', async () => {
-    seedStoredAccount(ACCOUNT)
     const router = await loadRouterAt('/settings/copilot')
-    await renderRouter(router)
+    const { SessionContext } = await import('../../entities/account/session-context')
+    const kek = await webcrypto.importKek(new Uint8Array(32).fill(7))
+    render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao: ACCOUNT, kek, iniciarSessao: vi.fn(), terminarSessao: vi.fn(), bloquearProntuarios: vi.fn(), desbloquearProntuarios: vi.fn() }}>
+      <RouterProvider router={router} /></SessionContext.Provider></I18nProvider>)
     await screen.findByTestId('copilot-page')
     const { CopilotPage } = await import('../../pages/settings/CopilotPage')
     expect(vi.mocked(CopilotPage).mock.lastCall![0]).toEqual({ accountId: ACCOUNT.id })
@@ -247,9 +269,10 @@ describe('router', () => {
       role: condicao === 'paciente' ? 'Patient' as const : 'Professional' as const,
       accessToken: condicao === 'sem token' ? null : ACCOUNT.accessToken }
     const kek = condicao === 'chave bloqueada' ? null : await webcrypto.importKek(new Uint8Array(32).fill(8))
-    render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao, kek, iniciarSessao: vi.fn(), terminarSessao: vi.fn() }}>
+    render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao, kek, iniciarSessao: vi.fn(), terminarSessao: vi.fn(), bloquearProntuarios: vi.fn(), desbloquearProntuarios: vi.fn() }}>
       <RouterProvider router={router} /></SessionContext.Provider></I18nProvider>)
-    await vi.waitFor(() => expect(router.state.location.pathname).toBe(condicao === 'paciente' ? '/hoje' : '/'))
+    if (condicao === 'chave bloqueada') await screen.findByRole('heading', { name: 'Desbloqueie seu consultório' })
+    else await vi.waitFor(() => expect(router.state.location.pathname).toBe(condicao === 'paciente' ? '/hoje' : '/'))
     expect(screen.queryByTestId('prontuario-page')).toBeNull()
   })
 
@@ -260,9 +283,10 @@ describe('router', () => {
       role: condicao === 'paciente' ? 'Patient' as const : 'Professional' as const,
       accessToken: condicao === 'sem token' ? null : ACCOUNT.accessToken }
     const kek = condicao === 'chave bloqueada' ? null : await webcrypto.importKek(new Uint8Array(32).fill(8))
-    render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao, kek, iniciarSessao: vi.fn(), terminarSessao: vi.fn() }}>
+    render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao, kek, iniciarSessao: vi.fn(), terminarSessao: vi.fn(), bloquearProntuarios: vi.fn(), desbloquearProntuarios: vi.fn() }}>
       <RouterProvider router={router} /></SessionContext.Provider></I18nProvider>)
-    await vi.waitFor(() => expect(router.state.location.pathname).toBe(condicao === 'paciente' ? '/hoje' : '/'))
+    if (condicao === 'chave bloqueada') await screen.findByRole('heading', { name: 'Desbloqueie seu consultório' })
+    else await vi.waitFor(() => expect(router.state.location.pathname).toBe(condicao === 'paciente' ? '/hoje' : '/'))
     expect(screen.queryByTestId('pacientes-page')).toBeNull()
   })
 
@@ -272,7 +296,7 @@ describe('router', () => {
     const router = await loadRouterAt('/pacientes')
     const { SessionContext } = await import('../../entities/account/session-context')
     const kek = await webcrypto.importKek(new Uint8Array(32).fill(8))
-    render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao: ACCOUNT, kek, iniciarSessao: vi.fn(), terminarSessao: vi.fn() }}>
+    render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao: ACCOUNT, kek, iniciarSessao: vi.fn(), terminarSessao: vi.fn(), bloquearProntuarios: vi.fn(), desbloquearProntuarios: vi.fn() }}>
       <RouterProvider router={router} /></SessionContext.Provider></I18nProvider>)
     await screen.findByTestId('pacientes-page')
     const { PacientesPage } = await import('../../pages/pacientes/PacientesPage')
@@ -308,7 +332,7 @@ describe('router', () => {
     const router = await loadRouterAt(`/pacientes/paciente-1/sessoes/atendimento-3${pedida === undefined ? '' : `?aba=${pedida}`}`)
     const { SessionContext } = await import('../../entities/account/session-context')
     const kek = await webcrypto.importKek(new Uint8Array(32).fill(8))
-    render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao: ACCOUNT, kek, iniciarSessao: vi.fn(), terminarSessao: vi.fn() }}>
+    render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao: ACCOUNT, kek, iniciarSessao: vi.fn(), terminarSessao: vi.fn(), bloquearProntuarios: vi.fn(), desbloquearProntuarios: vi.fn() }}>
       <RouterProvider router={router} /></SessionContext.Provider></I18nProvider>)
     await screen.findByTestId('atendimento-page')
     expect(screen.getByTestId('prontuario-provider')).toBeTruthy()
@@ -324,9 +348,10 @@ describe('router', () => {
       role: condicao === 'paciente' ? 'Patient' as const : 'Professional' as const,
       accessToken: condicao === 'sem token' ? null : ACCOUNT.accessToken }
     const kek = condicao === 'chave bloqueada' ? null : await webcrypto.importKek(new Uint8Array(32).fill(8))
-    render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao, kek, iniciarSessao: vi.fn(), terminarSessao: vi.fn() }}>
+    render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao, kek, iniciarSessao: vi.fn(), terminarSessao: vi.fn(), bloquearProntuarios: vi.fn(), desbloquearProntuarios: vi.fn() }}>
       <RouterProvider router={router} /></SessionContext.Provider></I18nProvider>)
-    await vi.waitFor(() => expect(router.state.location.pathname).toBe(condicao === 'paciente' ? '/hoje' : '/'))
+    if (condicao === 'chave bloqueada') await screen.findByRole('heading', { name: 'Desbloqueie seu consultório' })
+    else await vi.waitFor(() => expect(router.state.location.pathname).toBe(condicao === 'paciente' ? '/hoje' : '/'))
     expect(screen.queryByTestId('atendimento-page')).toBeNull()
     expect(screen.queryByTestId('prontuario-provider')).toBeNull()
   })
@@ -338,9 +363,10 @@ describe('router', () => {
       role: condicao === 'paciente' ? 'Patient' as const : 'Professional' as const,
       accessToken: condicao === 'sem token' ? null : ACCOUNT.accessToken }
     const kek = condicao === 'chave bloqueada' ? null : await webcrypto.importKek(new Uint8Array(32).fill(8))
-    render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao, kek, iniciarSessao: vi.fn(), terminarSessao: vi.fn() }}>
+    render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao, kek, iniciarSessao: vi.fn(), terminarSessao: vi.fn(), bloquearProntuarios: vi.fn(), desbloquearProntuarios: vi.fn() }}>
       <RouterProvider router={router} /></SessionContext.Provider></I18nProvider>)
-    await vi.waitFor(() => expect(router.state.location.pathname).toBe(condicao === 'paciente' ? '/hoje' : '/'))
+    if (condicao === 'chave bloqueada') await screen.findByRole('heading', { name: 'Desbloqueie seu consultório' })
+    else await vi.waitFor(() => expect(router.state.location.pathname).toBe(condicao === 'paciente' ? '/hoje' : '/'))
     expect(screen.queryByTestId('biblioteca-page')).toBeNull()
   })
   it('/biblioteca recebe chave e token reais da conta profissional', async () => {
@@ -348,7 +374,7 @@ describe('router', () => {
     const router = await loadRouterAt('/biblioteca')
     const { SessionContext } = await import('../../entities/account/session-context')
     const kek = await webcrypto.importKek(new Uint8Array(32).fill(8))
-    render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao: ACCOUNT, kek, iniciarSessao: vi.fn(), terminarSessao: vi.fn() }}>
+    render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao: ACCOUNT, kek, iniciarSessao: vi.fn(), terminarSessao: vi.fn(), bloquearProntuarios: vi.fn(), desbloquearProntuarios: vi.fn() }}>
       <RouterProvider router={router} /></SessionContext.Provider></I18nProvider>)
     await screen.findByTestId('biblioteca-page')
     const { BibliotecaAccountPage } = await import('../../pages/biblioteca/BibliotecaAccountPage')
@@ -362,9 +388,10 @@ describe('router', () => {
       role: condicao === 'paciente' ? 'Patient' as const : 'Professional' as const,
       accessToken: condicao === 'sem token' ? null : ACCOUNT.accessToken }
     const kek = condicao === 'chave bloqueada' ? null : await webcrypto.importKek(new Uint8Array(32).fill(8))
-    render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao, kek, iniciarSessao: vi.fn(), terminarSessao: vi.fn() }}>
+    render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao, kek, iniciarSessao: vi.fn(), terminarSessao: vi.fn(), bloquearProntuarios: vi.fn(), desbloquearProntuarios: vi.fn() }}>
       <RouterProvider router={router} /></SessionContext.Provider></I18nProvider>)
-    await vi.waitFor(() => expect(router.state.location.pathname).toBe(condicao === 'paciente' ? '/hoje' : '/'))
+    if (condicao === 'chave bloqueada') await screen.findByRole('heading', { name: 'Desbloqueie seu consultório' })
+    else await vi.waitFor(() => expect(router.state.location.pathname).toBe(condicao === 'paciente' ? '/hoje' : '/'))
     expect(screen.queryByTestId('voice-settings')).toBeNull()
   })
   it('/settings/voice recebe chave e token da conta e volta ao consultório pela barra', async () => {
@@ -372,7 +399,7 @@ describe('router', () => {
     const router = await loadRouterAt('/settings/voice')
     const { SessionContext } = await import('../../entities/account/session-context')
     const kek = await webcrypto.importKek(new Uint8Array(32).fill(8))
-    render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao: ACCOUNT, kek, iniciarSessao: vi.fn(), terminarSessao: vi.fn() }}>
+    render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao: ACCOUNT, kek, iniciarSessao: vi.fn(), terminarSessao: vi.fn(), bloquearProntuarios: vi.fn(), desbloquearProntuarios: vi.fn() }}>
       <RouterProvider router={router} /></SessionContext.Provider></I18nProvider>)
     await screen.findByTestId('voice-settings')
     const { VoiceSettings } = await import('../../features/voice-enrollment/VoiceSettings')
@@ -385,7 +412,7 @@ describe('router', () => {
     const router = await loadRouterAt('/settings/audit')
     const { SessionContext } = await import('../../entities/account/session-context')
     const sessao = condicao === 'sem sessão' ? null : { ...ACCOUNT, accessToken: null }
-    render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao, kek: null, iniciarSessao: vi.fn(), terminarSessao: vi.fn() }}>
+    render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao, kek: null, iniciarSessao: vi.fn(), terminarSessao: vi.fn(), bloquearProntuarios: vi.fn(), desbloquearProntuarios: vi.fn() }}>
       <RouterProvider router={router} /></SessionContext.Provider></I18nProvider>)
     await vi.waitFor(() => expect(router.state.location.pathname).toBe('/'))
     expect(screen.queryByTestId('audit-page')).toBeNull()
@@ -394,7 +421,7 @@ describe('router', () => {
     vi.stubEnv('VITE_API_BASE_URL', 'http://build.example')
     const router = await loadRouterAt('/settings/audit')
     const { SessionContext } = await import('../../entities/account/session-context')
-    render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao: ACCOUNT, kek: null, iniciarSessao: vi.fn(), terminarSessao: vi.fn() }}>
+    render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao: ACCOUNT, kek: await webcrypto.importKek(new Uint8Array(32).fill(7)), iniciarSessao: vi.fn(), terminarSessao: vi.fn(), bloquearProntuarios: vi.fn(), desbloquearProntuarios: vi.fn() }}>
       <RouterProvider router={router} /></SessionContext.Provider></I18nProvider>)
     await screen.findByTestId('audit-page')
     const { AuditPage } = await import('../../pages/settings/AuditPage')
@@ -408,9 +435,10 @@ describe('router', () => {
       role: condicao === 'paciente' ? 'Patient' as const : 'Professional' as const,
       accessToken: condicao === 'sem token' ? null : ACCOUNT.accessToken }
     const kek = condicao === 'chave bloqueada' ? null : await webcrypto.importKek(new Uint8Array(32).fill(8))
-    render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao, kek, iniciarSessao: vi.fn(), terminarSessao: vi.fn() }}>
+    render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao, kek, iniciarSessao: vi.fn(), terminarSessao: vi.fn(), bloquearProntuarios: vi.fn(), desbloquearProntuarios: vi.fn() }}>
       <RouterProvider router={router} /></SessionContext.Provider></I18nProvider>)
-    await vi.waitFor(() => expect(router.state.location.pathname).toBe(condicao === 'paciente' ? '/hoje' : '/'))
+    if (condicao === 'chave bloqueada') await screen.findByRole('heading', { name: 'Desbloqueie seu consultório' })
+    else await vi.waitFor(() => expect(router.state.location.pathname).toBe(condicao === 'paciente' ? '/hoje' : '/'))
     expect(screen.queryByTestId('espelho-p6')).toBeNull()
   })
   it('/espelho recebe chave e token da conta profissional', async () => {
@@ -418,7 +446,7 @@ describe('router', () => {
     const router = await loadRouterAt('/espelho')
     const { SessionContext } = await import('../../entities/account/session-context')
     const kek = await webcrypto.importKek(new Uint8Array(32).fill(8))
-    render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao: ACCOUNT, kek, iniciarSessao: vi.fn(), terminarSessao: vi.fn() }}>
+    render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao: ACCOUNT, kek, iniciarSessao: vi.fn(), terminarSessao: vi.fn(), bloquearProntuarios: vi.fn(), desbloquearProntuarios: vi.fn() }}>
       <RouterProvider router={router} /></SessionContext.Provider></I18nProvider>)
     await screen.findByTestId('espelho-p6')
     const { EspelhoP6 } = await import('../../features/partilha/EspelhoP6')
@@ -430,7 +458,7 @@ describe('router', () => {
     const router = await loadRouterAt('/hoje')
     const { SessionContext } = await import('../../entities/account/session-context')
     const kek = await webcrypto.importKek(new Uint8Array(32).fill(8))
-    render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao: PATIENT_ACCOUNT, kek, iniciarSessao: vi.fn(), terminarSessao: vi.fn() }}>
+    render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao: PATIENT_ACCOUNT, kek, iniciarSessao: vi.fn(), terminarSessao: vi.fn(), bloquearProntuarios: vi.fn(), desbloquearProntuarios: vi.fn() }}>
       <RouterProvider router={router} /></SessionContext.Provider></I18nProvider>)
     await screen.findByTestId('partilha-check-ins')
     const { PartilhaCheckIns } = await import('../../features/partilha/PartilhaCheckIns')
@@ -569,7 +597,7 @@ describe('router', () => {
     expect(vi.mocked(RecoveryScreen).mock.calls[0]![0].baseUrl).toBe('http://build.example')
   })
 
-  it('recuperação adota a chave restaurada e abre o consultório', async () => {
+  it('recuperação de login não recebe chave clínica', async () => {
     const router = await loadRouterAt('/recover')
     await renderRouter(router)
     await screen.findByTestId('recovery-screen')
@@ -578,18 +606,18 @@ describe('router', () => {
     const props = vi.mocked(RecoveryScreen).mock.calls[0]![0]
     expect(window.sessionStorage.getItem('limmiar:account')).toBeNull()
 
-    const kek = await webcrypto.importKek(new Uint8Array(32).fill(7))
-    act(() => { props.onRecovered?.(ACCOUNT, kek) })
+    act(() => { props.onRecovered?.(ACCOUNT) })
 
     expect(JSON.parse(window.sessionStorage.getItem('limmiar:account')!)).toEqual(JSON.parse(contaPersistidaJson(ACCOUNT)))
-    await screen.findByTestId('home-page')
+    await screen.findByRole('heading', { name: 'Desbloqueie seu consultório' })
+    expect(screen.queryByTestId('home-page')).toBeNull()
   })
 
   it('configuração de recuperação recebe a conta e a chave da sessão atual', async () => {
     const router = await loadRouterAt('/settings/recovery')
     const { SessionContext } = await import('../../entities/account/session-context')
     const kek = await webcrypto.importKek(new Uint8Array(32).fill(7))
-    render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao: ACCOUNT, kek, iniciarSessao: vi.fn(), terminarSessao: vi.fn() }}><RouterProvider router={router} /></SessionContext.Provider></I18nProvider>)
+    render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao: ACCOUNT, kek, iniciarSessao: vi.fn(), terminarSessao: vi.fn(), bloquearProntuarios: vi.fn(), desbloquearProntuarios: vi.fn() }}><RouterProvider router={router} /></SessionContext.Provider></I18nProvider>)
     await screen.findByTestId('recovery-phrase-setup')
 
     const { RecoveryPhraseSetup } = await import('../../features/recovery/RecoveryPhraseSetup')
@@ -598,7 +626,7 @@ describe('router', () => {
     expect(props.accountId).toBe(ACCOUNT.id)
     expect(props.accessToken).toBe(ACCOUNT.accessToken)
     expect(props.email).toBe(ACCOUNT.email)
-    expect(props.kek).toBe(kek)
+    expect(props).not.toHaveProperty('kek')
     act(() => props.onDone())
     expect((await screen.findByRole('status')).textContent).toBe('Frase de recuperação salva.')
   })
@@ -610,69 +638,13 @@ describe('router', () => {
       role: condicao === 'paciente' ? 'Patient' as const : 'Professional' as const,
       accessToken: condicao === 'sem token' ? null : ACCOUNT.accessToken }
     const kek = condicao === 'chave bloqueada' ? null : await webcrypto.importKek(new Uint8Array(32).fill(8))
-    render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao, kek, iniciarSessao: vi.fn(), terminarSessao: vi.fn() }}><RouterProvider router={router} /></SessionContext.Provider></I18nProvider>)
-    await vi.waitFor(() => expect(router.state.location.pathname).toBe(condicao === 'paciente' ? '/hoje' : '/'))
+    render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao, kek, iniciarSessao: vi.fn(), terminarSessao: vi.fn(), bloquearProntuarios: vi.fn(), desbloquearProntuarios: vi.fn() }}><RouterProvider router={router} /></SessionContext.Provider></I18nProvider>)
+    if (condicao === 'chave bloqueada') await screen.findByRole('heading', { name: 'Desbloqueie seu consultório' })
+    else await vi.waitFor(() => expect(router.state.location.pathname).toBe(condicao === 'paciente' ? '/hoje' : '/'))
     expect(screen.queryByTestId('recovery-phrase-setup')).toBeNull()
   })
 
-  it('pareamento de origem usa a sessão e ignora chaves e servidor da URL', async () => {
-    const router = await loadRouterAt('/devices/pair-primary?baseUrl=https://outro.invalid&accountId=outra&accessToken=falso&kek=falso')
-    const { SessionContext } = await import('../../entities/account/session-context')
-    const { deriveAccountKek } = await import('../../entities/account/account-keys')
-    const key = await deriveAccountKek('senha-pareamento', ACCOUNT.email!)
-    render(<I18nProvider i18n={i18n}><SessionContext.Provider value={{ sessao: ACCOUNT, kek: key, iniciarSessao: vi.fn(), terminarSessao: vi.fn() }}><RouterProvider router={router} /></SessionContext.Provider></I18nProvider>)
-    fireEvent.change(await screen.findByLabelText('Senha atual'), { target: { value: 'senha-pareamento' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Gerar código de pareamento' }))
-    const { PairPrimaryDevice } = await import('../../features/device-pairing-primary/PairPrimaryDevice')
-    await screen.findByTestId('pair-primary-device')
-    const props = vi.mocked(PairPrimaryDevice).mock.lastCall![0]
-    expect(props.accountId).toBe(ACCOUNT.id)
-    expect(props.accessToken).toBe(ACCOUNT.accessToken)
-    expect(props.baseUrl).not.toBe('https://outro.invalid')
-    const raw = await props.getKekForTransfer()
-    expect(raw).toHaveLength(32)
-    raw.fill(0)
-  }, 15000)
 
-  it('dispositivo novo adota somente uma chave não extraível na sessão autenticada', async () => {
-    seedStoredAccount(ACCOUNT)
-    const router = await loadRouterAt('/devices/pair-new?baseUrl=https://outro.invalid')
-    await renderRouter(router)
-    fireEvent.change(await screen.findByLabelText('Código de pareamento'), { target: { value: 'codigo-do-outro-dispositivo' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Usar código de pareamento' }))
-    await screen.findByTestId('pair-new-device')
-    const { PairNewDevice } = await import('../../features/device-pairing-new/PairNewDevice')
-    const props = vi.mocked(PairNewDevice).mock.lastCall![0]
-    expect(props.baseUrl).not.toBe('https://outro.invalid')
-    await expect(props.decode!()).resolves.toBe('codigo-do-outro-dispositivo')
-    await act(async () => { await props.onKekAdopted(new Uint8Array(32).fill(7)) })
-    await screen.findByText('Prontuários desbloqueados neste dispositivo.')
-    fireEvent.click(within(screen.getByRole('navigation', { name: 'Navegação principal' })).getByRole('link', { name: 'Consultório' }))
-    await screen.findByTestId('home-page')
-    const { HomePage } = await import('../../pages/home/HomePage')
-    expect(vi.mocked(HomePage).mock.lastCall![0].chaveiro.kek.extractable).toBe(false)
-    expect(window.sessionStorage.getItem('limmiar:account')).not.toContain('kek')
-  })
-
-  it('a câmera só é aberta após escolher escanear no dispositivo novo', async () => {
-    seedStoredAccount(ACCOUNT)
-    const router = await loadRouterAt('/devices/pair-new')
-    await renderRouter(router)
-    expect(screen.queryByTestId('pair-new-device')).toBeNull()
-    fireEvent.click(await screen.findByRole('button', { name: 'Escanear código QR' }))
-    await screen.findByTestId('pair-new-device')
-    const { PairNewDevice } = await import('../../features/device-pairing-new/PairNewDevice')
-    expect(vi.mocked(PairNewDevice).mock.lastCall![0].decode).toBeUndefined()
-  })
-
-  it.each(['/devices/pair-primary', '/devices/pair-new'])('pareamento sem autenticação volta ao acesso (%s)', async path => {
-    const router = await loadRouterAt(path)
-    await renderRouter(router)
-    await screen.findByTestId('auth-screen')
-    expect(router.state.location.pathname).toBe('/')
-    expect(screen.queryByTestId('pair-primary-device')).toBeNull()
-    expect(screen.queryByTestId('pair-new-device')).toBeNull()
-  })
 
   it('resolves /e2e/microfone (E2E-only): forwards a valid consentimento to abrirMicrofone and shows an alert on refusal', async () => {
     const { abrirMicrofone } = await import('../../entities/consentimento/microfone')

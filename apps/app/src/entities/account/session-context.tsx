@@ -6,6 +6,8 @@ export interface ContextoSessao {
   kek: CryptoKey | null
   iniciarSessao(account: Account, kek?: CryptoKey): void
   terminarSessao(): void
+  bloquearProntuarios(): void
+  desbloquearProntuarios(accountId: string, kek: CryptoKey): void
 }
 
 export const SessionContext = createContext<ContextoSessao | null>(null)

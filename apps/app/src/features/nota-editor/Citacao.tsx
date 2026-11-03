@@ -3,8 +3,7 @@ import type { Ancora } from '@limmiar/copilot'
 
 export interface CitacaoProps {
   ancora: Ancora
-  /** Vem do reprodutor real (fatia 3, `features/nota-audio/reprodutor.ts`), passado pelo
-   *  chamador (hoje `NotaPage`). */
+  /** Passado pelo chamador; sem ele a citação não toca nada. */
   aoTocar?: (ancora: Ancora) => void
 }
 

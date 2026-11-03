@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { componentAxeBuilder } from '../src/test-support/axe'
+import { criarChavePessoalNaInterface } from './fixtures/profissional-interface'
 import { computeTotpCode } from './fixtures/totp'
 
 // S18-02: entra pelo caminho do profissional (registo + TOTP em `/`), não magic-link -- evita
@@ -31,6 +32,7 @@ test('a professional logs in, then logs out via the "Sair" button, and the sessi
   await page.getByLabel('Código de 6 dígitos do aplicativo autenticador').fill(computeTotpCode(secret, Math.floor(Date.now() / 1000)))
   await page.getByRole('button', { name: 'Confirmar' }).click()
   await page.getByRole('button', { name: 'Guardei meus códigos' }).click()
+  await criarChavePessoalNaInterface(page)
 
   await expect(page.locator('#app-shell')).toBeVisible()
   await expect(page.getByTestId('conta-sessao')).toHaveText(email)

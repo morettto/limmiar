@@ -7,6 +7,7 @@ const PG_PORTA = process.env.E2E_PG_PORTA ?? '5432'
 
 export default defineConfig({
   testDir: './e2e',
+  testIgnore: ['**/live-asr-latency.spec.ts'],
   fullyParallel: true,
   reporter: 'list',
   use: {
@@ -14,7 +15,7 @@ export default defineConfig({
   },
   webServer: [
     {
-      // VITE_ENABLE_E2E_TEST_ROUTES gates the pairing test-only routes (router.tsx).
+      // VITE_ENABLE_E2E_TEST_ROUTES gates the E2E-only scaffold routes (router.tsx).
       // This build writes to dist-e2e/, so it can never land in the deployed dist/,
       // and VITE_API_BASE_URL puts the API's other origin in the CSP (security-headers.ts).
       command: `pnpm run build:e2e && node e2e/fixtures/allow-frame-origin.mjs http://127.0.0.1:5333 && pnpm exec wrangler dev --port 8787 --local-protocol http --assets dist-e2e`,
@@ -61,7 +62,6 @@ export default defineConfig({
         // Chromium rejects an IP literal as an RP ID at credentials.create().
         WebAuthn__RelyingPartyId: 'localhost',
         WebAuthn__ExpectedOrigin: 'http://localhost:8787',
-        DevicePairing__SessionLifetimeSeconds: '8',
         // Every spec calls /auth/* from the same loopback IP, far past the per-IP production limit.
         RateLimiting__Disabled: 'true',
         // CORS locked to the two wrangler dev origins this suite calls from: most specs

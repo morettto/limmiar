@@ -46,34 +46,29 @@ describe('fsd-no-cross-slice', () => {
       .map((v) => ({ rule: { name: v.rule.name }, from: v.from, to: v.to }))
       .sort((a, b) => a.from.localeCompare(b.from))
 
-    // Exact list, each entry naming its rule: proves the two narrow rules fire on their own,
-    // not just the general one, that intra-slice/lower-layer/both accepted pairs never sneak
+    // Exact list, each entry naming its rule: proves the narrow rule fires on its own,
+    // not just the general one, that intra-slice/lower-layer/the accepted pair never sneak
     // into this array, and that a file loose at a layer root (no slice folder) also violates.
     expect(sorted).toEqual([
       {
-        rule: { name: 'fsd-no-cross-slice-device-pairing-new' },
-        from: 'src/features/device-pairing-new/PairNewDevice.ts',
-        to: 'src/features/nota-fila/navegacao-teclado.ts',
-      },
-      {
         rule: { name: 'fsd-no-cross-slice' },
-        from: 'src/features/nota-audio/reprodutor.ts',
-        to: 'src/features/live-session/audio-crypto.ts',
+        from: 'src/features/nota-biblioteca/outro-importador.ts',
+        to: 'src/features/totp-challenge/TotpChallenge.ts',
       },
       {
         rule: { name: 'fsd-no-cross-slice' },
         from: 'src/features/nota-editor/EditorSoap.ts',
-        to: 'src/features/nota-fila/navegacao-teclado.ts',
+        to: 'src/features/nota-biblioteca/navegacao-teclado.ts',
       },
       {
         rule: { name: 'fsd-no-cross-slice' },
-        from: 'src/features/nota-fila/outro-importador.ts',
-        to: 'src/features/totp-challenge/TotpChallenge.ts',
+        from: 'src/features/prontuario/reprodutor.ts',
+        to: 'src/features/live-session/audio-crypto.ts',
       },
       {
         rule: { name: 'fsd-no-cross-slice-recovery' },
         from: 'src/features/recovery/RecoveryScreen.ts',
-        to: 'src/features/nota-fila/navegacao-teclado.ts',
+        to: 'src/features/nota-biblioteca/navegacao-teclado.ts',
       },
       {
         rule: { name: 'fsd-no-loose-layer-files' },

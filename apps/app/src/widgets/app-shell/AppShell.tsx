@@ -21,7 +21,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
 function BarraDoConsultorio({ email, bloqueada }: { email: string | null; bloqueada: boolean }) {
   const { t } = useLingui()
-  const { terminarSessao } = useSession()
+  const { terminarSessao, bloquearProntuarios } = useSession()
   const [menuAberto, setMenuAberto] = useState(false)
   const [contaAberta, setContaAberta] = useState(false)
   const menuRef = useRef<HTMLButtonElement>(null)
@@ -71,8 +71,8 @@ function BarraDoConsultorio({ email, bloqueada }: { email: string | null; bloque
           <li><Link to="/settings/voice" {...link}><Trans>Identificação da sua voz</Trans></Link></li>
           <li><Link to="/settings/audit" {...link}><Trans>Trilha de auditoria</Trans></Link></li>
           <li><Link to="/settings/recovery" {...link}><Trans>Frase de recuperação</Trans></Link></li>
-          <li><Link to="/devices/pair-primary" {...link}><Trans>Parear novo dispositivo</Trans></Link></li>
         </ul>}
+        <button type="button" disabled={bloqueada} onClick={bloquearProntuarios}><Trans>Bloquear prontuários</Trans></button>
         <button type="button" disabled={bloqueada} onClick={terminarSessao}><Trans>Sair</Trans></button>
       </nav>
     </div>

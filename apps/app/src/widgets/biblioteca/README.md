@@ -5,8 +5,8 @@
 Render puro da Tela de biblioteca de notas (spec S08, ticket S08-02, fatia 4 de 5): campo
 de busca + notas agrupadas por paciente. Não decide o estado da busca -- `resultado`
 (`ResultadoBusca`, `features/nota-biblioteca/indice.ts`) já vem calculado do chamador
-(`pages/biblioteca/BibliotecaPage.tsx`); este widget só sabe renderizar os três estados,
-igual em espírito a `widgets/soap-editor/FilaEEditor.tsx` (compõe, não decide).
+(`pages/biblioteca/BibliotecaPage.tsx`); este widget só sabe renderizar os três estados
+(compõe, não decide).
 
 ## Fluxo principal
 

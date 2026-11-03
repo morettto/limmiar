@@ -40,7 +40,6 @@ export default defineConfig({
     proxy: {
         '^/auth/(register|login|google|refresh|logout|recover|magic-link/(verify|webauthn))': 'http://127.0.0.1:5259',
         '/accounts': 'http://127.0.0.1:5259',
-        '/devices/pairing-sessions': 'http://127.0.0.1:5259',
         '/online-sessions': { target: 'http://127.0.0.1:5259', ws: true },
       '/health': 'http://127.0.0.1:5259',
       '/copiloto': { target: 'http://127.0.0.1:8000', rewrite: (path) => path.replace(/^\/copiloto/, '') },

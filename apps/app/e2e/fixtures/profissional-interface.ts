@@ -1,9 +1,21 @@
 import { expect, type APIRequestContext, type Locator, type Page } from '@playwright/test'
 import { computeTotpCode } from './totp'
+import { prepararVozSintetica } from './perfil-de-voz-sintetico'
 
 export const SENHA_PROFISSIONAL_TESTE = 'Pareamento-profissional-2026!'
 const STAFF = process.env.LIMMIAR_E2E_STAFF_API_KEY ?? 'e2e-unused-staff-key'
-export interface ProfissionalTeste { email: string; secret: string }
+export interface ProfissionalTeste { email: string; secret: string; chavePessoal: string; codigosRecuperacao: string[] }
+
+export async function criarChavePessoalNaInterface(page: Page): Promise<{ chavePessoal: string; codigosRecuperacao: string[] }> {
+  await page.getByRole('button', { name: 'Gerar minha chave pessoal', exact: true }).click()
+  const chave = await page.locator('.vault-secret').textContent()
+  const codigosRecuperacao = await page.locator('.vault-codes code').allTextContents()
+  await prepararVozSintetica(page, chave!)
+  await page.getByLabel('Últimos 6 caracteres da chave pessoal', { exact: true }).fill(chave!.slice(-6))
+  await page.getByRole('checkbox').check()
+  await page.getByRole('button', { name: 'Concluir e abrir consultório', exact: true }).click()
+  return { chavePessoal: chave!, codigosRecuperacao }
+}
 
 export async function registrarProfissionalNaInterface(page: Page, request: APIRequestContext): Promise<ProfissionalTeste> {
   const email = `profissional-${crypto.randomUUID()}@example.com`
@@ -19,6 +31,7 @@ export async function registrarProfissionalNaInterface(page: Page, request: APIR
   await page.getByLabel('Código de 6 dígitos do aplicativo autenticador', { exact: true }).fill(computeTotpCode(secret, Math.floor(Date.now() / 1000)))
   await page.getByRole('button', { name: 'Confirmar', exact: true }).click()
   await page.getByRole('button', { name: 'Guardei meus códigos', exact: true }).click()
+  const cofre = await criarChavePessoalNaInterface(page)
   await page.getByLabel('Referência do documento', { exact: true }).fill('Documento fictício de teste da interface')
   await page.getByRole('button', { name: 'Enviar para revisão', exact: true }).click()
   await expect(page.getByText('Documento recebido. Sua conta aguarda a aprovação da equipe.', { exact: true })).toBeVisible()
@@ -28,7 +41,7 @@ export async function registrarProfissionalNaInterface(page: Page, request: APIR
   expect(decision.ok()).toBe(true)
   await page.getByRole('button', { name: 'Atualizar verificação', exact: true }).click()
   await expect(page.getByRole('region', { name: 'Painel do consultório', exact: true })).toBeVisible()
-  return { email, secret }
+  return { email, secret, ...cofre }
 }
 
 export async function entrarProfissionalNaInterface(page: Page, account: ProfissionalTeste): Promise<void> {
@@ -39,6 +52,8 @@ export async function entrarProfissionalNaInterface(page: Page, account: Profiss
   await page.getByRole('button', { name: 'Acessar conta', exact: true }).click()
   await page.getByLabel('Código de verificação', { exact: true }).fill(computeTotpCode(account.secret, Math.floor(Date.now() / 1000)))
   await page.getByRole('button', { name: 'Verificar', exact: true }).click()
+  await page.getByLabel('Chave pessoal', { exact: true }).fill(account.chavePessoal)
+  await page.getByRole('button', { name: 'Desbloquear prontuários', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Sair', exact: true })).toBeVisible()
 }
 

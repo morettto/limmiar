@@ -54,7 +54,7 @@ ficheiro; a única dependência cruzada é `@limmiar/crypto` (`webcrypto`,
 - `openSummariesInWorker(kek, items, signal?): Promise<SummaryResult[]>`
   (`worker-client.ts`) — consumido por
   `widgets/painel-profissional/PainelProfissional.tsx` (default de
-  `openSummaries`, seam de teste) e `widgets/patient-wallet`.
+  `openSummaries`, seam de teste).
 
 ## Decisões desta fatia
 

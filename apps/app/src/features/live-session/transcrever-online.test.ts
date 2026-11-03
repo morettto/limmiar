@@ -18,6 +18,19 @@ beforeEach(() => {
 })
 afterEach(() => { vi.restoreAllMocks(); vi.clearAllMocks() })
 describe('transcrição das origens online', () => {
+  it('abre as duas trilhas sem esperar a primeira conexão terminar', async () => {
+    type SessaoPronta = Awaited<ReturnType<typeof transcreverAoVivo>>
+    const resolvers: ((sessao: SessaoPronta) => void)[] = []
+    transcrever.mockImplementation(() => new Promise(resolve => resolvers.push(resolve)))
+
+    const abertura = transcreverOnline(local, remoto, new AbortController().signal, atualizar, falhar, 0)
+    await vi.waitFor(() => expect(resolvers).toHaveLength(2))
+    resolvers.forEach(resolve => resolve({ encerrar, pausar }))
+
+    await (await abertura).encerrar()
+    expect(encerrar).toHaveBeenCalledTimes(2)
+  })
+
   it('conserva mute nas trilhas originais, separa papéis e não espera fala do profissional para liberar o paciente', async () => {
     const abort = new AbortController()
     const sessao = await transcreverOnline(local, remoto, abort.signal, atualizar, falhar, 2000)
@@ -25,7 +38,11 @@ describe('transcrição das origens online', () => {
     expect(transcrever.mock.calls.map(call => call[4].trilhas)).toEqual(['emprestadas', 'emprestadas'])
     expect([emprestada(0).falante, emprestada(1).falante]).toEqual(['profissional', 'paciente'])
     transcrever.mock.calls[1]![2](resultado)
-    expect(atualizar.mock.lastCall?.[0]).toEqual({ palavras: [{ ...resultado.palavras[0], locutor: 'online-paciente', inicioMs: 2000, fimMs: 2500 }], finais: 1, estavelAteMs: 2501 })
+    expect(atualizar.mock.lastCall?.[0]).toEqual({
+      palavras: [{ ...resultado.palavras[0], locutor: 'online-paciente', inicioMs: 2000, fimMs: 2500 }],
+      palavrasFinais: [{ ...resultado.palavras[0], locutor: 'online-paciente', inicioMs: 2000, fimMs: 2500 }],
+      palavrasHipotese: [], finais: 1, estavelAteMs: 2501,
+    })
     transcrever.mock.calls[0]![2]({ ...resultado, palavras: [{ ...resultado.palavras[0]!, inicioMs: 100, fimMs: 100 }] })
     expect(atualizar.mock.lastCall?.[0].palavras.map((palavra: { locutor: string }) => palavra.locutor)).toEqual(['online-paciente', 'online-profissional'])
     sessao.pausar(true); expect(pausar).toHaveBeenCalledTimes(2)

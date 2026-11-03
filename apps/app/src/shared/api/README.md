@@ -14,7 +14,7 @@ Cliente HTTP puro para `apps/api`: uma função por endpoint (`register`, `login
 ## Pontos de entrada
 
 - `putJson`, `getJson`, `deleteRequest`, `readProblem`, tipo `ProblemResult` -- wrappers de fetch/erro reusáveis por outros módulos. `postJson` não é exportada: só `register`/`login`/`continueWithGoogle`/etc. (POST) a chamam, todos definidos neste mesmo arquivo.
-- Uma função por endpoint: `getHealthDb`, `register`, `login`, `continueWithGoogle`, `beginTotpEnrollment`, `confirmTotpEnrollment`, `verifyTotpChallenge`, `createPairingSession`, `claimPairingSession`, `getPairingClaimStatus`, `submitPairingPayload`, `fetchPairingPayload`, `requestMagicLink`, `verifyMagicLink`, `recoverAccess`, `createPatient`, `appendPatientEntry`, `getPatientRecord`, `listPatients`, `registerRecoveryPhrase`, `completeWebAuthnCeremony`.
+- Uma função por endpoint: `getHealthDb`, `register`, `login`, `continueWithGoogle`, `beginTotpEnrollment`, `confirmTotpEnrollment`, `verifyTotpChallenge`, `requestMagicLink`, `verifyMagicLink`, `recoverAccess`, `createPatient`, `appendPatientEntry`, `getPatientRecord`, `listPatients`, `registerRecoveryPhrase`, `completeWebAuthnCeremony`.
 - `client.pact.test.ts` -- contrato Pact consumer/provider com `apps/api` sobre `getHealthDb`/`login`/`register` (grava/lê `pacts/limmiar-app-limmiar-api.json`, verificado do lado .NET separadamente).
 
 ## Decisões relevantes

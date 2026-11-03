@@ -31,7 +31,7 @@ export function securityHeaders(env: BuildEnv) {
     'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
     'Referrer-Policy': 'no-referrer',
     'Permissions-Policy': 'microphone=(self), camera=(self), geolocation=()',
-    // img-src data: is the pairing QR (PairingQr.tsx); media-src blob: is the recorded session audio.
+    // img-src data: is the TOTP QR (TotpSetup.tsx); media-src blob: is the recorded session audio.
     'Content-Security-Policy': [
       "default-src 'self'",
       "script-src 'self' 'wasm-unsafe-eval'",

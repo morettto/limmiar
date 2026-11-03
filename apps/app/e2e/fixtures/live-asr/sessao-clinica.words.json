@@ -1,0 +1,671 @@
+{
+    "schemaVersion":  2,
+    "audio":  {
+                  "file":  "sessao-clinica.pcm",
+                  "sha256":  "4deec8b5dd76e86251d5ba71e9ea670c67e7c53e3f38bdbc86a149cf412c1596",
+                  "encoding":  "pcm_s16le",
+                  "sampleRate":  16000,
+                  "channels":  1,
+                  "framesPerChannel":  1008096
+              },
+    "alignment":  {
+                      "method":  "synthesizer_word_boundaries",
+                      "engine":  "System.Speech 4.0.0.0 SpeakProgress + PhonemeReached",
+                      "voices":  {
+                                     "profissional":  "Microsoft Daniel",
+                                     "paciente":  "Microsoft Maria"
+                                 },
+                      "generatedAt":  "2026-10-20T00:28:16Z",
+                      "script":  "roteiro.json"
+                  },
+    "words":  [
+                  {
+                      "text":  "Boa",
+                      "speaker":  "profissional",
+                      "startSample":  1557,
+                      "endSampleExclusive":  6400
+                  },
+                  {
+                      "text":  "tarde",
+                      "speaker":  "profissional",
+                      "startSample":  6400,
+                      "endSampleExclusive":  16151
+                  },
+                  {
+                      "text":  "Como",
+                      "speaker":  "profissional",
+                      "startSample":  31376,
+                      "endSampleExclusive":  36168
+                  },
+                  {
+                      "text":  "você",
+                      "speaker":  "profissional",
+                      "startSample":  36176,
+                      "endSampleExclusive":  41379
+                  },
+                  {
+                      "text":  "passou",
+                      "speaker":  "profissional",
+                      "startSample":  41393,
+                      "endSampleExclusive":  48964
+                  },
+                  {
+                      "text":  "a",
+                      "speaker":  "profissional",
+                      "startSample":  48976,
+                      "endSampleExclusive":  50128
+                  },
+                  {
+                      "text":  "semana",
+                      "speaker":  "profissional",
+                      "startSample":  50132,
+                      "endSampleExclusive":  58832
+                  },
+                  {
+                      "text":  "desde",
+                      "speaker":  "profissional",
+                      "startSample":  58857,
+                      "endSampleExclusive":  66887
+                  },
+                  {
+                      "text":  "o",
+                      "speaker":  "profissional",
+                      "startSample":  66901,
+                      "endSampleExclusive":  68117
+                  },
+                  {
+                      "text":  "nosso",
+                      "speaker":  "profissional",
+                      "startSample":  68117,
+                      "endSampleExclusive":  73935
+                  },
+                  {
+                      "text":  "último",
+                      "speaker":  "profissional",
+                      "startSample":  73936,
+                      "endSampleExclusive":  81777
+                  },
+                  {
+                      "text":  "encontro",
+                      "speaker":  "profissional",
+                      "startSample":  81788,
+                      "endSampleExclusive":  92645
+                  },
+                  {
+                      "text":  "Foi",
+                      "speaker":  "paciente",
+                      "startSample":  107857,
+                      "endSampleExclusive":  112144
+                  },
+                  {
+                      "text":  "uma",
+                      "speaker":  "paciente",
+                      "startSample":  112144,
+                      "endSampleExclusive":  116191
+                  },
+                  {
+                      "text":  "semana",
+                      "speaker":  "paciente",
+                      "startSample":  116191,
+                      "endSampleExclusive":  125574
+                  },
+                  {
+                      "text":  "difícil",
+                      "speaker":  "paciente",
+                      "startSample":  125584,
+                      "endSampleExclusive":  139016
+                  },
+                  {
+                      "text":  "Dormi",
+                      "speaker":  "paciente",
+                      "startSample":  154101,
+                      "endSampleExclusive":  160595
+                  },
+                  {
+                      "text":  "pouco",
+                      "speaker":  "paciente",
+                      "startSample":  160601,
+                      "endSampleExclusive":  170341
+                  },
+                  {
+                      "text":  "e",
+                      "speaker":  "paciente",
+                      "startSample":  170344,
+                      "endSampleExclusive":  172472
+                  },
+                  {
+                      "text":  "acordei",
+                      "speaker":  "paciente",
+                      "startSample":  172485,
+                      "endSampleExclusive":  181696
+                  },
+                  {
+                      "text":  "cansada",
+                      "speaker":  "paciente",
+                      "startSample":  181705,
+                      "endSampleExclusive":  193408
+                  },
+                  {
+                      "text":  "quase",
+                      "speaker":  "paciente",
+                      "startSample":  193431,
+                      "endSampleExclusive":  201275
+                  },
+                  {
+                      "text":  "todos",
+                      "speaker":  "paciente",
+                      "startSample":  201277,
+                      "endSampleExclusive":  209585
+                  },
+                  {
+                      "text":  "os",
+                      "speaker":  "paciente",
+                      "startSample":  209597,
+                      "endSampleExclusive":  212017
+                  },
+                  {
+                      "text":  "dias",
+                      "speaker":  "paciente",
+                      "startSample":  212019,
+                      "endSampleExclusive":  221728
+                  },
+                  {
+                      "text":  "Entendo",
+                      "speaker":  "profissional",
+                      "startSample":  236907,
+                      "endSampleExclusive":  247502
+                  },
+                  {
+                      "text":  "O",
+                      "speaker":  "profissional",
+                      "startSample":  262551,
+                      "endSampleExclusive":  263751
+                  },
+                  {
+                      "text":  "que",
+                      "speaker":  "profissional",
+                      "startSample":  263760,
+                      "endSampleExclusive":  266149
+                  },
+                  {
+                      "text":  "você",
+                      "speaker":  "profissional",
+                      "startSample":  266160,
+                      "endSampleExclusive":  271795
+                  },
+                  {
+                      "text":  "acha",
+                      "speaker":  "profissional",
+                      "startSample":  271796,
+                      "endSampleExclusive":  277653
+                  },
+                  {
+                      "text":  "que",
+                      "speaker":  "profissional",
+                      "startSample":  277680,
+                      "endSampleExclusive":  280360
+                  },
+                  {
+                      "text":  "atrapalhou",
+                      "speaker":  "profissional",
+                      "startSample":  280366,
+                      "endSampleExclusive":  291328
+                  },
+                  {
+                      "text":  "o",
+                      "speaker":  "profissional",
+                      "startSample":  291331,
+                      "endSampleExclusive":  292307
+                  },
+                  {
+                      "text":  "seu",
+                      "speaker":  "profissional",
+                      "startSample":  292307,
+                      "endSampleExclusive":  296290
+                  },
+                  {
+                      "text":  "sono",
+                      "speaker":  "profissional",
+                      "startSample":  296299,
+                      "endSampleExclusive":  305040
+                  },
+                  {
+                      "text":  "Fiquei",
+                      "speaker":  "paciente",
+                      "startSample":  320192,
+                      "endSampleExclusive":  327824
+                  },
+                  {
+                      "text":  "pensando",
+                      "speaker":  "paciente",
+                      "startSample":  327828,
+                      "endSampleExclusive":  337929
+                  },
+                  {
+                      "text":  "no",
+                      "speaker":  "paciente",
+                      "startSample":  337938,
+                      "endSampleExclusive":  340500
+                  },
+                  {
+                      "text":  "trabalho",
+                      "speaker":  "paciente",
+                      "startSample":  340512,
+                      "endSampleExclusive":  352820
+                  },
+                  {
+                      "text":  "Minha",
+                      "speaker":  "paciente",
+                      "startSample":  367895,
+                      "endSampleExclusive":  372669
+                  },
+                  {
+                      "text":  "chefe",
+                      "speaker":  "paciente",
+                      "startSample":  372688,
+                      "endSampleExclusive":  381102
+                  },
+                  {
+                      "text":  "pediu",
+                      "speaker":  "paciente",
+                      "startSample":  381104,
+                      "endSampleExclusive":  387608
+                  },
+                  {
+                      "text":  "um",
+                      "speaker":  "paciente",
+                      "startSample":  387608,
+                      "endSampleExclusive":  390192
+                  },
+                  {
+                      "text":  "relatório",
+                      "speaker":  "paciente",
+                      "startSample":  390213,
+                      "endSampleExclusive":  402867
+                  },
+                  {
+                      "text":  "urgente",
+                      "speaker":  "paciente",
+                      "startSample":  402874,
+                      "endSampleExclusive":  415504
+                  },
+                  {
+                      "text":  "e",
+                      "speaker":  "paciente",
+                      "startSample":  419024,
+                      "endSampleExclusive":  421232
+                  },
+                  {
+                      "text":  "eu",
+                      "speaker":  "paciente",
+                      "startSample":  421235,
+                      "endSampleExclusive":  423707
+                  },
+                  {
+                      "text":  "fiquei",
+                      "speaker":  "paciente",
+                      "startSample":  423712,
+                      "endSampleExclusive":  431152
+                  },
+                  {
+                      "text":  "com",
+                      "speaker":  "paciente",
+                      "startSample":  431164,
+                      "endSampleExclusive":  434918
+                  },
+                  {
+                      "text":  "medo",
+                      "speaker":  "paciente",
+                      "startSample":  434926,
+                      "endSampleExclusive":  440635
+                  },
+                  {
+                      "text":  "de",
+                      "speaker":  "paciente",
+                      "startSample":  440636,
+                      "endSampleExclusive":  443376
+                  },
+                  {
+                      "text":  "errar",
+                      "speaker":  "paciente",
+                      "startSample":  443380,
+                      "endSampleExclusive":  452138
+                  },
+                  {
+                      "text":  "Esse",
+                      "speaker":  "profissional",
+                      "startSample":  467296,
+                      "endSampleExclusive":  471776
+                  },
+                  {
+                      "text":  "medo",
+                      "speaker":  "profissional",
+                      "startSample":  471776,
+                      "endSampleExclusive":  477846
+                  },
+                  {
+                      "text":  "de",
+                      "speaker":  "profissional",
+                      "startSample":  477856,
+                      "endSampleExclusive":  480411
+                  },
+                  {
+                      "text":  "errar",
+                      "speaker":  "profissional",
+                      "startSample":  480416,
+                      "endSampleExclusive":  485077
+                  },
+                  {
+                      "text":  "aparece",
+                      "speaker":  "profissional",
+                      "startSample":  485086,
+                      "endSampleExclusive":  495313
+                  },
+                  {
+                      "text":  "em",
+                      "speaker":  "profissional",
+                      "startSample":  495317,
+                      "endSampleExclusive":  497410
+                  },
+                  {
+                      "text":  "outras",
+                      "speaker":  "profissional",
+                      "startSample":  497439,
+                      "endSampleExclusive":  504679
+                  },
+                  {
+                      "text":  "situações",
+                      "speaker":  "profissional",
+                      "startSample":  504683,
+                      "endSampleExclusive":  517607
+                  },
+                  {
+                      "text":  "também",
+                      "speaker":  "profissional",
+                      "startSample":  517610,
+                      "endSampleExclusive":  525989
+                  },
+                  {
+                      "text":  "Aparece",
+                      "speaker":  "paciente",
+                      "startSample":  541280,
+                      "endSampleExclusive":  554236
+                  },
+                  {
+                      "text":  "sim",
+                      "speaker":  "paciente",
+                      "startSample":  557790,
+                      "endSampleExclusive":  565586
+                  },
+                  {
+                      "text":  "Quando",
+                      "speaker":  "paciente",
+                      "startSample":  580761,
+                      "endSampleExclusive":  587188
+                  },
+                  {
+                      "text":  "preciso",
+                      "speaker":  "paciente",
+                      "startSample":  587200,
+                      "endSampleExclusive":  597903
+                  },
+                  {
+                      "text":  "falar",
+                      "speaker":  "paciente",
+                      "startSample":  597910,
+                      "endSampleExclusive":  605216
+                  },
+                  {
+                      "text":  "em",
+                      "speaker":  "paciente",
+                      "startSample":  605222,
+                      "endSampleExclusive":  607462
+                  },
+                  {
+                      "text":  "público",
+                      "speaker":  "paciente",
+                      "startSample":  607476,
+                      "endSampleExclusive":  618395
+                  },
+                  {
+                      "text":  "sinto",
+                      "speaker":  "paciente",
+                      "startSample":  621920,
+                      "endSampleExclusive":  630381
+                  },
+                  {
+                      "text":  "o",
+                      "speaker":  "paciente",
+                      "startSample":  630385,
+                      "endSampleExclusive":  631505
+                  },
+                  {
+                      "text":  "coração",
+                      "speaker":  "paciente",
+                      "startSample":  631520,
+                      "endSampleExclusive":  641112
+                  },
+                  {
+                      "text":  "acelerado",
+                      "speaker":  "paciente",
+                      "startSample":  641120,
+                      "endSampleExclusive":  655520
+                  },
+                  {
+                      "text":  "e",
+                      "speaker":  "paciente",
+                      "startSample":  655520,
+                      "endSampleExclusive":  657776
+                  },
+                  {
+                      "text":  "as",
+                      "speaker":  "paciente",
+                      "startSample":  657776,
+                      "endSampleExclusive":  660624
+                  },
+                  {
+                      "text":  "mãos",
+                      "speaker":  "paciente",
+                      "startSample":  660626,
+                      "endSampleExclusive":  666878
+                  },
+                  {
+                      "text":  "frias",
+                      "speaker":  "paciente",
+                      "startSample":  666880,
+                      "endSampleExclusive":  678556
+                  },
+                  {
+                      "text":  "Você",
+                      "speaker":  "profissional",
+                      "startSample":  693596,
+                      "endSampleExclusive":  698788
+                  },
+                  {
+                      "text":  "conseguiu",
+                      "speaker":  "profissional",
+                      "startSample":  698793,
+                      "endSampleExclusive":  708610
+                  },
+                  {
+                      "text":  "usar",
+                      "speaker":  "profissional",
+                      "startSample":  708619,
+                      "endSampleExclusive":  714011
+                  },
+                  {
+                      "text":  "a",
+                      "speaker":  "profissional",
+                      "startSample":  714016,
+                      "endSampleExclusive":  715072
+                  },
+                  {
+                      "text":  "respiração",
+                      "speaker":  "profissional",
+                      "startSample":  715083,
+                      "endSampleExclusive":  728992
+                  },
+                  {
+                      "text":  "que",
+                      "speaker":  "profissional",
+                      "startSample":  729010,
+                      "endSampleExclusive":  731552
+                  },
+                  {
+                      "text":  "treinamos",
+                      "speaker":  "profissional",
+                      "startSample":  731557,
+                      "endSampleExclusive":  742854
+                  },
+                  {
+                      "text":  "na",
+                      "speaker":  "profissional",
+                      "startSample":  742863,
+                      "endSampleExclusive":  745630
+                  },
+                  {
+                      "text":  "última",
+                      "speaker":  "profissional",
+                      "startSample":  745630,
+                      "endSampleExclusive":  753424
+                  },
+                  {
+                      "text":  "sessão",
+                      "speaker":  "profissional",
+                      "startSample":  753426,
+                      "endSampleExclusive":  763431
+                  },
+                  {
+                      "text":  "Consegui",
+                      "speaker":  "paciente",
+                      "startSample":  778617,
+                      "endSampleExclusive":  788489
+                  },
+                  {
+                      "text":  "algumas",
+                      "speaker":  "paciente",
+                      "startSample":  788495,
+                      "endSampleExclusive":  798574
+                  },
+                  {
+                      "text":  "vezes",
+                      "speaker":  "paciente",
+                      "startSample":  798588,
+                      "endSampleExclusive":  809536
+                  },
+                  {
+                      "text":  "Ajudou",
+                      "speaker":  "paciente",
+                      "startSample":  824615,
+                      "endSampleExclusive":  832287
+                  },
+                  {
+                      "text":  "um",
+                      "speaker":  "paciente",
+                      "startSample":  832302,
+                      "endSampleExclusive":  834988
+                  },
+                  {
+                      "text":  "pouco",
+                      "speaker":  "paciente",
+                      "startSample":  834998,
+                      "endSampleExclusive":  845393
+                  },
+                  {
+                      "text":  "mas",
+                      "speaker":  "paciente",
+                      "startSample":  848931,
+                      "endSampleExclusive":  853601
+                  },
+                  {
+                      "text":  "a",
+                      "speaker":  "paciente",
+                      "startSample":  853616,
+                      "endSampleExclusive":  854832
+                  },
+                  {
+                      "text":  "ansiedade",
+                      "speaker":  "paciente",
+                      "startSample":  854860,
+                      "endSampleExclusive":  867617
+                  },
+                  {
+                      "text":  "voltou",
+                      "speaker":  "paciente",
+                      "startSample":  867631,
+                      "endSampleExclusive":  875424
+                  },
+                  {
+                      "text":  "à",
+                      "speaker":  "paciente",
+                      "startSample":  875429,
+                      "endSampleExclusive":  876933
+                  },
+                  {
+                      "text":  "noite",
+                      "speaker":  "paciente",
+                      "startSample":  876940,
+                      "endSampleExclusive":  886094
+                  },
+                  {
+                      "text":  "Ótimo",
+                      "speaker":  "profissional",
+                      "startSample":  901312,
+                      "endSampleExclusive":  910578
+                  },
+                  {
+                      "text":  "Na",
+                      "speaker":  "profissional",
+                      "startSample":  925788,
+                      "endSampleExclusive":  928288
+                  },
+                  {
+                      "text":  "próxima",
+                      "speaker":  "profissional",
+                      "startSample":  928306,
+                      "endSampleExclusive":  938475
+                  },
+                  {
+                      "text":  "semana",
+                      "speaker":  "profissional",
+                      "startSample":  938495,
+                      "endSampleExclusive":  949081
+                  },
+                  {
+                      "text":  "conversamos",
+                      "speaker":  "profissional",
+                      "startSample":  952668,
+                      "endSampleExclusive":  967088
+                  },
+                  {
+                      "text":  "sobre",
+                      "speaker":  "profissional",
+                      "startSample":  967103,
+                      "endSampleExclusive":  972848
+                  },
+                  {
+                      "text":  "o",
+                      "speaker":  "profissional",
+                      "startSample":  972854,
+                      "endSampleExclusive":  973910
+                  },
+                  {
+                      "text":  "que",
+                      "speaker":  "profissional",
+                      "startSample":  973918,
+                      "endSampleExclusive":  976217
+                  },
+                  {
+                      "text":  "você",
+                      "speaker":  "profissional",
+                      "startSample":  976223,
+                      "endSampleExclusive":  981558
+                  },
+                  {
+                      "text":  "observou",
+                      "speaker":  "profissional",
+                      "startSample":  981568,
+                      "endSampleExclusive":  994524
+                  }
+              ]
+}

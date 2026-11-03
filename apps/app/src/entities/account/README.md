@@ -97,25 +97,19 @@ compilação, não só em prosa.
   `terminar()` precisam deles; o storage real (`window.sessionStorage`) já implementa os três,
   só a interface injetada é que ficou maior para o teste poder dopar os quatro ramos de `ler()`.
 
-## Chave clínica e recuperação
+## Login e chave pessoal separados
 
-`account-keys.ts` implementa a hierarquia S01: senha → Argon2id → KEK não extraível
-→ DEK por paciente. A derivação da KEK usa domínio e salt diferentes do verificador
-enviado ao servidor. `SessionProvider` mantém a KEK apenas em memória.
+O login autentica a conta e não produz a KEK clínica. O profissional cria uma chave
+pessoal aleatória e três códigos de recuperação no primeiro acesso, exibidos uma
+única vez. `entities/clinical-vault` protege a mestra em envelopes independentes;
+`SessionProvider` mantém somente o `CryptoKey` não extraível em memória.
 
-A frase BIP39 deriva outra KEK, também separada do verificador de recuperação.
-O envelope de recuperação contém uma DEK selada (60 bytes) e a KEK clínica cifrada
-sob essa DEK (60 bytes). O AAD liga cada parte à conta, finalidade e versão.
-Senha e frase nunca saem do cliente; buffers de material de chave são zerados.
+`/recover` e `/settings/recovery` recuperam apenas autenticação e segundo fator.
+A frase de recuperação do login não abre os prontuários. Não há mais derivação de
+KEK pela senha nem envelope clínico na recuperação de conta.
 
-A configuração confirma a senha contra a KEK da sessão antes de gerar a frase.
-Só registra verificador e envelope juntos depois da confirmação “Guardei minha
-frase”; uma tentativa abortada preserva a recuperação anterior. Uma repetição de
-gravação conserva a mesma frase e cifra. O restauro abre a mesma KEK sem a senha
-antiga e só a entrega à sessão depois de completar o segundo fator.
-
-Rotas de produto: `/recover` e `/settings/recovery`. Nenhum token, senha ou chave
-é recebido pela URL. Uma conta sem envelope não é tratada como restauro completo.
+A criação, o desbloqueio, a substituição por código, os limites de revogação e a
+validação estão em `docs/chave-pessoal-prontuarios.md`. Nenhum segredo vem da URL.
 
 [[S18-02 Sair da conta por um ponto único de purga|S18-02]] fechou o botão "Sair" e a purga por
 conta (`app/providers/purgar-conta.ts`, `PURGAS`/`purgarConta`) -- fora desta slice, ver

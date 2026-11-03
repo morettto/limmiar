@@ -9,8 +9,25 @@ const TAXA = 16000
 const MARGEM_PALAVRA_S = 0.15
 const ATRASO_FINAL_MS = 400
 
+// O mesmo corte de frase de selecionarFalasPaciente: cada frase do paciente é uma consulta ao copiloto.
+const FIM_DE_FRASE = /[.!?…]["'”’)\]]*$/
+
 interface Palavra { texto: string; inicio_ms: number; fim_ms: number }
 interface Enunciado { quem: 'profissional' | 'paciente'; texto: string; ouvido: string; inicioS: number; fimS: number }
+export interface FimDeFrase { frase: string; fimEm: number }
+
+function frasesDe(palavras: Palavra[]): { frase: string; fimMs: number }[] {
+  const frases: { frase: string; fimMs: number }[] = []
+  let atual: string[] = []
+  palavras.forEach((palavra, indice) => {
+    atual.push(palavra.texto)
+    if (FIM_DE_FRASE.test(palavra.texto) || indice === palavras.length - 1) {
+      frases.push({ frase: atual.join(' '), fimMs: palavra.fim_ms })
+      atual = []
+    }
+  })
+  return frases
+}
 
 function fracaoDoMarcador(bloco: Int16Array): number {
   const omega = 2 * Math.PI * 1000 / TAXA
@@ -44,17 +61,21 @@ class ServidorFalso {
   private deslocamentoS: number | null = null
   private frases: Palavra[][] = []
   private fins: [string, number][] = []
+  private frasesDoPaciente: { frase: string; fimMs: number }[] = []
   private finalizadas = new Set<number>()
+  private proximaOrdem = 0
   private readonly ws: WebSocketRoute
   private readonly marcadorInicioS: number
   private readonly enunciados: Enunciado[]
   private readonly reveladas: Record<string, number>
+  private readonly terminadas: FimDeFrase[]
 
-  constructor(ws: WebSocketRoute, marcadorInicioS: number, enunciados: Enunciado[], reveladas: Record<string, number>) {
+  constructor(ws: WebSocketRoute, marcadorInicioS: number, enunciados: Enunciado[], reveladas: Record<string, number>, terminadas: FimDeFrase[]) {
     this.ws = ws
     this.marcadorInicioS = marcadorInicioS
     this.enunciados = enunciados
     this.reveladas = reveladas
+    this.terminadas = terminadas
     ws.onMessage((mensagem) => {
       if (typeof mensagem === 'string') this.comando(JSON.parse(mensagem) as { type: string })
       else this.receber(new Int16Array(mensagem.buffer.slice(mensagem.byteOffset, mensagem.byteOffset + mensagem.length)))
@@ -66,9 +87,13 @@ class ServidorFalso {
       this.deslocamentoS = this.marcadorInicioS - this.recebidas / TAXA
       this.frases = this.enunciados.map((enunciado) => palavrasDe(enunciado, this.deslocamentoS!))
       this.fins = this.enunciados.map((enunciado) => [enunciado.texto, enunciado.fimS - MARGEM_PALAVRA_S - this.deslocamentoS!])
+      this.frasesDoPaciente = this.frases.flatMap((palavras, indice) => this.enunciados[indice]!.quem === 'paciente' ? frasesDe(palavras) : [])
     }
     this.recebidas += pcm.length
     for (const [texto, fimS] of this.fins) if (fimS <= this.recebidas / TAXA && !(texto in this.reveladas)) this.reveladas[texto] = Date.now()
+    while (this.frasesDoPaciente[0] && this.frasesDoPaciente[0].fimMs <= this.recebidas / 16) {
+      this.terminadas.push({ frase: this.frasesDoPaciente.shift()!.frase, fimEm: Date.now() })
+    }
     this.estado(false)
   }
 
@@ -90,16 +115,18 @@ class ServidorFalso {
       if (ouvidas.length === 0) return
       if (ouvidas.length === palavras.length && (concluido || palavras.at(-1)!.fim_ms <= agoraMs - ATRASO_FINAL_MS)) {
         this.finalizadas.add(indice)
-        this.ws.send(JSON.stringify({ type: 'final', frase: indice, falante: this.enunciados[indice]!.quem, palavras, processado_ms: agoraMs }))
+        this.ws.send(JSON.stringify({ type: 'final', ordem: this.proximaOrdem++, frase: indice, falante: this.enunciados[indice]!.quem, palavras, processado_ms: agoraMs }))
       } else hipotese.push(...ouvidas)
     })
-    if (hipotese.length > 0 || !concluido) this.ws.send(JSON.stringify({ type: 'parcial', texto: hipotese.map((palavra) => palavra.texto).join(' '), processado_ms: agoraMs }))
+    if (hipotese.length > 0 || !concluido) this.ws.send(JSON.stringify({ type: 'parcial', ordem: this.proximaOrdem++, texto: hipotese.map((palavra) => palavra.texto).join(' '), processado_ms: agoraMs }))
   }
 }
 
 export interface AsrSimulado {
   /** Texto dito -> instante (Date.now) em que o fake terminou de receber o áudio da última palavra dele. */
   reveladas(): Promise<Record<string, number>>
+  /** Cada frase do paciente, na ordem, com o instante (Date.now) em que o fake terminou de receber o áudio da última palavra dela. */
+  frases(): Promise<FimDeFrase[]>
   /** Quantas conexões de transcrição o app abriu. */
   sessoes(): Promise<number>
 }
@@ -107,10 +134,11 @@ export interface AsrSimulado {
 export async function simularAsr(page: Page, atendimento: Atendimento): Promise<AsrSimulado> {
   const enunciados: Enunciado[] = atendimento.enunciados.map(({ quem, texto, ouvido, inicioS, fimS }) => ({ quem, texto, ouvido, inicioS, fimS }))
   const reveladas: Record<string, number> = {}
+  const terminadas: FimDeFrase[] = []
   let sessoes = 0
   await page.routeWebSocket(/\/speech\/v1\/fala$/, (ws) => {
     sessoes++
-    new ServidorFalso(ws, atendimento.marcadorInicioS, enunciados, reveladas)
+    new ServidorFalso(ws, atendimento.marcadorInicioS, enunciados, reveladas, terminadas)
   })
-  return { reveladas: async () => reveladas, sessoes: async () => sessoes }
+  return { reveladas: async () => reveladas, frases: async () => terminadas, sessoes: async () => sessoes }
 }

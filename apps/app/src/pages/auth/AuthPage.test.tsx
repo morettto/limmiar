@@ -24,11 +24,6 @@ describe('AuthPage', () => {
     expect(screen.queryByRole('link', { name: 'Desbloquear pelo outro dispositivo' })).toBeNull()
   })
 
-  it('oferece o desbloqueio pelo outro dispositivo quando o pareamento está disponível', () => {
-    pagina({ pairingAvailable: true })
-    expect(screen.getByRole('link', { name: 'Desbloquear pelo outro dispositivo' }).getAttribute('href')).toBe('/devices/pair-new')
-  })
-
   it.each([
     ['Professional', 'Professional'],
     ['Patient', 'Patient'],

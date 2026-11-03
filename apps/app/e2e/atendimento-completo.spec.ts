@@ -11,7 +11,7 @@ import { modeloDeVozInstalado, servirModeloDeVoz } from './fixtures/modelo-de-vo
 import { pdfSintetico } from './fixtures/atendimento/pdf-sintetico'
 import { Relatorio } from './fixtures/atendimento/relatorio'
 import { FALAS_PACIENTE, indiceDaPalavra, montarAtendimento } from './fixtures/atendimento/roteiro'
-import { abrirAbaDaSessao, abrirCarteira, abrirConfiguracao, entrarProfissionalNaInterface, SENHA_PROFISSIONAL_TESTE, voltarAoInicio, type ProfissionalTeste } from './fixtures/profissional-interface'
+import { abrirAbaDaSessao, abrirCarteira, abrirConfiguracao, entrarProfissionalNaInterface, criarChavePessoalNaInterface, SENHA_PROFISSIONAL_TESTE, voltarAoInicio, type ProfissionalTeste } from './fixtures/profissional-interface'
 import { computeTotpCode } from './fixtures/totp'
 
 // Plano de fechamento da V1, tarefa 18: o roteiro do §5 de ponta a ponta no stack local. O que a rede
@@ -118,15 +118,15 @@ test('atendimento completo: do cadastro à nota assinada, com microfone falso e 
       await expect(page.getByRole('heading', { name: 'Guarde seus códigos de backup' })).toBeVisible()
       relatorio.medida('Códigos de backup do TOTP exibidos', String(await page.getByRole('listitem').count()))
       await page.getByRole('button', { name: 'Guardei meus códigos', exact: true }).click()
+      const cofre = await criarChavePessoalNaInterface(page)
       await expect(page.locator('#app-shell')).toBeVisible()
-      conta = { email, secret: segredo }
+      conta = { email, secret: segredo, ...cofre }
     })
 
     await relatorio.passo('1b. Anotar a frase de recuperação', 'real', async () => {
       await abrirConfiguracao(page, 'Frase de recuperação')
-      await page.getByLabel('Senha atual', { exact: true }).fill(SENHA_PROFISSIONAL_TESTE)
       await page.getByRole('button', { name: 'Gerar frase de recuperação', exact: true }).click()
-      await expect(page.getByRole('heading', { name: 'Guarde sua frase de recuperação' })).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'Recuperação do login' })).toBeVisible()
       relatorio.medida('Palavras da frase de recuperação exibidas', String(await page.getByRole('listitem').count()))
       await page.getByRole('button', { name: 'Guardei minha frase', exact: true }).click()
       await expect(page.getByRole('status').filter({ hasText: 'Frase de recuperação salva.' })).toBeVisible()

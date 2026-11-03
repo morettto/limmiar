@@ -10,7 +10,7 @@ const PAGINAS = { '/': 'Consultório', '/pacientes': 'Seus pacientes', '/bibliot
   '/espelho': 'Sinais compartilhados pelos pacientes', '/settings/audit': 'Trilha de auditoria' }
 const PROFISSIONAL: Account = { id: 'conta-ct', email: 'maria.fernanda@consultorio-exemplo.com.br', role: 'Professional', twoFactorRequirement: 'NotApplicable',
   twoFactorTicket: null, accessToken: 'token', refreshToken: 'refresh', accessTokenExpiresAt: '2099-01-01T00:00:00Z' }
-const SESSAO = { sessao: PROFISSIONAL, kek: {} as CryptoKey, iniciarSessao: () => {}, terminarSessao: () => {} }
+const SESSAO = { sessao: PROFISSIONAL, kek: {} as CryptoKey, iniciarSessao: () => {}, terminarSessao: () => {}, bloquearProntuarios: () => {}, desbloquearProntuarios: () => {} }
 
 function Pagina({ titulo, bloqueada }: { titulo: string; bloqueada: boolean }) {
   useBloquearNavegacao(bloqueada)
