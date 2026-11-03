@@ -1,8 +1,8 @@
-# Sobe o juiz local (llama-server: Gemma 4 E4B Q4_K_M + LoRA) e imprime as variáveis do `pnpm dev`.
-# Uso, da raiz do repositório: .\tools\juiz\local.ps1 [-Ngl 99] [-Versao v2]. Passo a passo e conversão do LoRA: tools/juiz/README.md.
+# Sobe o juiz local (llama-server: Gemma 4 E4B Q4_K_M) e imprime as variáveis do `pnpm dev`.
+# Uso, da raiz do repositório: .\tools\juiz\local.ps1 [-Ngl 99] [-Versao cascata-v2]. Passo a passo: tools/juiz/README.md.
 param(
     [string]$Bin = "$PSScriptRoot\..\..\.local\llamacpp\bin12",
-    [string]$Versao = 'v2',
+    [string]$Versao = 'cascata-v2',
     [int]$Ngl = 99,
     [int]$Porta = 8100
 )
@@ -11,7 +11,7 @@ $ErrorActionPreference = 'Stop'
 $gguf = Join-Path $PSScriptRoot '..\..\mvp-copiloto\modelos\gguf'
 $servidor = Join-Path $Bin 'llama-server.exe'
 $base = Join-Path $gguf 'gemma-4-E4B-it-Q4_K_M.gguf'
-$lora = Join-Path $gguf "juiz-$Versao-lora-f16.gguf"
+$lora = Join-Path $gguf 'juiz-v2-lora-f16.gguf'
 foreach ($arquivo in $servidor, $base, $lora) {
     if (-not (Test-Path $arquivo)) { throw "Falta $arquivo (tools/juiz/README.md, 'Servir na GPU local')." }
 }
@@ -24,11 +24,13 @@ if ($env:COPILOTO_JUIZ_CHAVE) { $chave = $env:COPILOTO_JUIZ_CHAVE } else {
 }
 
 # A chave vai por variável de ambiente (LLAMA_API_KEY) para não aparecer na linha de comando do processo.
-# O adaptador carrega desligado (escala 0); cada pedido do juiz liga o id 0 pelo campo "lora".
+# O adaptador da v2 carrega desligado, e todo pedido do copiloto o mantém em escala 0: juiz, portão e reescrita usam a base.
 $env:LLAMA_API_KEY = $chave
 $log = Join-Path $PSScriptRoot '..\..\.local\juiz-local.log'
 New-Item -ItemType Directory -Force (Split-Path $log) | Out-Null
+# --cache-ram: the prompt cache defaults to 8 GiB of host RAM and only grows, which starves a 16 GB machine.
 $argumentos = @('-m', "`"$base`"", '--lora', "`"$lora`"", '--lora-init-without-apply', '-ngl', $Ngl, '-c', 3072, '-fa', 'on',
+    '--cache-ram', 1024,
     '-np', 1, '--host', '127.0.0.1', '--port', $Porta, '--alias', 'juiz')
 $processo = Start-Process $servidor -ArgumentList $argumentos -WindowStyle Hidden -PassThru -RedirectStandardError $log -RedirectStandardOutput "$log.out"
 Remove-Item Env:LLAMA_API_KEY
@@ -44,7 +46,5 @@ if ($i -eq 120) { Stop-Process -Id $processo.Id; throw "O llama-server não fico
 "`$env:COPILOTO_JUIZ_URL            = 'http://127.0.0.1:$Porta'"
 "`$env:COPILOTO_JUIZ_CHAVE          = '$chave'"
 "`$env:COPILOTO_JUIZ_VERSAO         = '$Versao'"
-"`$env:COPILOTO_JUIZ_MODELO         = 'juiz'"
 "`$env:COPILOTO_BASE_MODELO         = 'juiz'"
-"`$env:COPILOTO_REESCRITA_MODELO    = 'juiz'"
 "Encerrar: Stop-Process -Id $($processo.Id)"

@@ -35,10 +35,11 @@ function flatten(value, prefix = '') {
   for (const [key, item] of Object.entries(value)) {
     const path = prefix ? `${prefix}__${key}` : key
     if (item !== null && typeof item === 'object') flatten(item, path)
-    else env[path] = String(item)
+    else env[path] ??= String(item)
   }
 }
 flatten(settings)
+env.Copiloto__BaseUrl ??= 'http://127.0.0.1:8000'
 const docker = (args) => execFileSync('docker', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
 try {
   docker(['info', '--format', '{{.ServerVersion}}'])
@@ -94,8 +95,7 @@ process.on('SIGINT', () => stop())
 process.on('SIGTERM', () => stop())
 start(copilotPython, ['-m', 'uvicorn', 'copiloto.api:app', '--app-dir', 'src', '--host', '127.0.0.1', '--port', '8000'], {
   cwd: resolve(root, 'mvp-copiloto'),
-  env: { ...env, COPILOTO_EMBEDDER_DISPOSITIVO: env.COPILOTO_EMBEDDER_DISPOSITIVO ?? 'cpu',
-    COPILOTO_JUIZ_DISPOSITIVO: process.env.COPILOTO_JUIZ_DISPOSITIVO ?? 'cpu' },
+  env: { ...env, COPILOTO_JUIZ_DISPOSITIVO: process.env.COPILOTO_JUIZ_DISPOSITIVO ?? 'cpu' },
 })
 // Gateway de fala (apps/gateway-fala): o /speech do Vite chega aqui; ele fala com o container do NeMo-Speech.
 start(process.execPath, ['apps/gateway-fala/src/main.ts'], {
