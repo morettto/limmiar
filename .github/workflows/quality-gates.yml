@@ -240,14 +240,6 @@ jobs:
       - name: oxlint (all workspaces)
         run: pnpm -r --if-present lint
 
-  # The .NET side owns the problem `code` strings; apps/app used to re-type them by
-  # hand into shared/api/problem-messages.ts, and drifted to 13 of 24 — every
-  # device-pairing failure rendered the generic message. shared/api/problem-codes.ts
-  # is generated from apps/api/src/Api/**/*ProblemCodes.cs and keys the registry, so
-  # a missing entry is a tsc error; this job is the other half, catching a code added
-  # to the API whose generated file was never regenerated and committed. Same
-  # regenerate-then-git-status-check shape as i18n-extract-check below and
-  # pact-consumer further down, for the same reason: the generator has no --check flag.
   problem-codes-check:
     name: "Contract: problem codes (API → app drift detection)"
     runs-on: ubuntu-latest
