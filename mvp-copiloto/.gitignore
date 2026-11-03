@@ -1,14 +1,12 @@
 .venv/
-data/pdfs/*.pdf
-data/*.db
+.venv-treino/
 __pycache__/
 *.pyc
-resultados/*.log
 modelos/
-resultados/cache/
-ferramentas/
-data/votos/
 
-# Pesos dos adaptadores: o registro.jsonl guarda o sha256 de cada versão; o arquivo vai para a imagem do juiz, não para o Git.
-data/juiz-v2/**/*.safetensors
-.venv-treino/
+# Dados de treino, rotulagem e avaliação do juiz, pesos de adaptadores e bibliografia:
+# artefatos de experimento, não código-fonte. O registro.jsonl guarda o sha256 de cada
+# versão de adaptador e fica no Git; o restante vai para a imagem do juiz.
+data/
+!data/juiz-v2/registro.jsonl
+!data/limiares-juiz-llm.json
