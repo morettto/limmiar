@@ -15,13 +15,13 @@ public static class AccountsComposition
         // -- MissingConfigurationTests pins this exact order (AbacatePay:WebhookSecret, checked
         // in Program.Composition.cs's AddBilling, stays last of all).
         services.AddWebAuthn(configuration);
-        services.AddMagicLink(configuration);
+        services.AddMagicLink();
         services.AddCredentials();
-        services.AddDevicePairing(configuration);
         services.AddProfessionalVerification(configuration);
         services.AddVoiceEnrollment();
         services.AddTwoFactor(configuration);
         services.AddSingleton(sp => new AccountKeyPairService(sp.GetRequiredService<NpgsqlDataSource>()));
+        services.AddSingleton<ClinicalVaultStore>();
 
         services.ConfigureHttpJsonOptions(options =>
         {
@@ -34,10 +34,10 @@ public static class AccountsComposition
         app.MapCredentials();
         app.MapTwoFactor();
         app.MapMagicLink();
-        app.MapDevicePairing();
         app.MapProfessionalVerification();
         app.MapRecovery();
         app.MapVoiceEnrollment();
         app.MapAccountKeyPairEndpoints();
+        app.MapClinicalVault();
     }
 }

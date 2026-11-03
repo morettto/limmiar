@@ -38,13 +38,6 @@ public static class AccountsProblemCodes
     // URL's account exists, so this alone never leaks account existence (RFC 9110 §15.5.4).
     public const string AuthForbidden = "auth.forbidden";
 
-    // Same code for expired/claimed/wrong-account, so a stolen QR code can't be told apart from a live one.
-    public const string DevicePairingSessionNotFound = "auth.device_pairing_session_not_found";
-
-    public const string DevicePairingPayloadNotReady = "auth.device_pairing_payload_not_ready";
-
-    public const string DevicePairingPayloadNotDelivered = "auth.device_pairing_payload_not_delivered";
-
     // Same code for never-issued, expired, and already-used, so a caller can't probe which one applies.
     public const string AuthMagicLinkInvalid = "auth.magic_link_invalid";
 
@@ -58,4 +51,7 @@ public static class AccountsProblemCodes
     public const string KeyPairNotFound = "key_pair.not_found";
 
     public const string KeyPairPublicKeyConflict = "key_pair.public_key_conflict";
+    public const string ClinicalVaultNotFound = "clinical_vault.not_found";
+    public const string ClinicalVaultConflict = "clinical_vault.conflict";
+    public const string ClinicalVaultRecoveryFailed = "clinical_vault.recovery_failed";
 }

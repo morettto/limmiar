@@ -20,7 +20,7 @@ public static class HealthEndpoints
         app.MapGet("/health/db", HandleGetHealthDbAsync)
             .WithName("GetHealthDb")
             .WithSummary("Database readiness probe")
-            .WithDescription("Opens a connection to Postgres and runs SELECT 1. Returns 503 with a problem details body when the database is unreachable.")
+            .WithDescription("Checks Postgres connectivity and access to the application schema. Returns 503 when the database or schema is unavailable.")
             .Produces(StatusCodes.Status200OK)
             .Produces<LimmiarProblemDetails>(StatusCodes.Status503ServiceUnavailable, "application/problem+json");
     }
@@ -37,7 +37,7 @@ public static class HealthEndpoints
 
             await using var connection = await dataSource.OpenConnectionAsync(linkedCts.Token);
             await using var command = connection.CreateCommand();
-            command.CommandText = "SELECT 1";
+            command.CommandText = "SELECT 1 FROM health_check_probe LIMIT 0";
             await command.ExecuteScalarAsync(linkedCts.Token);
 
             result = TypedResults.Ok();

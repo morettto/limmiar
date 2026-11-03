@@ -18,15 +18,8 @@ CREATE TABLE IF NOT EXISTS scheduled_sessions (
     CONSTRAINT duration_positive CHECK (duration_minutes BETWEEN 1 AND 1440)
 );
 
--- Partial unique index, live rows only (cancelled_at IS NULL): this is what makes "two
--- concurrent transactions for the exact same slot produce exactly one winner" a DB-enforced
--- guarantee rather than an application race. It only catches an EXACT starts_at match --
--- ponytail: a 60-minute session at 10:00 and another at 10:30 do NOT collide under this index
--- even though they overlap; the acceptance criterion for this ticket is literally "mesmo
--- horário" (exact same instant), not partial overlap. Upgrade path if/when partial overlap
--- becomes a written requirement: replace this index with
--- `EXCLUDE USING gist (tenant_id WITH =, tsrange(starts_at, starts_at + make_interval(mins => duration_minutes)) WITH &&) WHERE (cancelled_at IS NULL)`,
--- which needs the btree_gist extension -- neither EXCLUDE/gist nor btree_gist are introduced here.
+-- Partial unique index, live rows only (cancelled_at IS NULL), enforcing exact start-time
+-- equality rather than interval overlap.
 CREATE UNIQUE INDEX IF NOT EXISTS scheduled_sessions_live_slot_uq
     ON scheduled_sessions (tenant_id, starts_at) WHERE cancelled_at IS NULL;
 
@@ -49,10 +42,3 @@ GRANT SELECT, INSERT ON scheduled_sessions TO app_role;
 GRANT UPDATE (starts_at, duration_minutes, cancelled_at) ON scheduled_sessions TO app_role;
 REVOKE DELETE ON scheduled_sessions FROM app_role;
 
--- ponytail: recording_active has no writer nor GRANT in this ticket. Only
--- ScheduledSessionStore's Move/CancelAsync read it (under SELECT ... FOR UPDATE) to reject
--- moving/cancelling a session mid-recording. The future S05/S06 migration that introduces the
--- endpoint which starts/stops a recording must also add `GRANT UPDATE (recording_active) ON
--- scheduled_sessions TO app_role` at that point -- least-privilege means no grant until there
--- is a writer, not just no writer. That endpoint's UPDATE then queues behind the same
--- row-level lock, so no second table or second lock needs inventing when it lands.

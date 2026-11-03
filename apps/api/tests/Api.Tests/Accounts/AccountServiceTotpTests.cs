@@ -342,7 +342,7 @@ public sealed class AccountServiceTotpTests
         var store = new FakeAccountStore(account);
         var service = CreateService(store, comparerAlwaysMatches: true);
 
-        var result = await service.LoginAsync(account.Email, SomeVerifier, CancellationToken.None);
+        var result = await service.LoginAsync(account.Email!, SomeVerifier, CancellationToken.None);
 
         Assert.True(result.TryGetValue(out var success));
         Assert.Equal(TwoFactorRequirement.ChallengeRequired, success.TwoFactorRequirement);
@@ -356,7 +356,7 @@ public sealed class AccountServiceTotpTests
         var ticketIssuer = new TwoFactorTicketIssuer();
         var service = CreateService(store, comparerAlwaysMatches: true, ticketIssuer: ticketIssuer);
 
-        var result = await service.LoginAsync(account.Email, SomeVerifier, CancellationToken.None);
+        var result = await service.LoginAsync(account.Email!, SomeVerifier, CancellationToken.None);
 
         Assert.True(result.TryGetValue(out var success));
         Assert.NotNull(success.TwoFactorTicket);
@@ -370,7 +370,7 @@ public sealed class AccountServiceTotpTests
         var store = new FakeAccountStore(account);
         var service = CreateService(store, comparerAlwaysMatches: true);
 
-        var result = await service.LoginAsync(account.Email, SomeVerifier, CancellationToken.None);
+        var result = await service.LoginAsync(account.Email!, SomeVerifier, CancellationToken.None);
 
         Assert.False(result.TryGetValue(out _));
     }
@@ -382,7 +382,7 @@ public sealed class AccountServiceTotpTests
         var store = new FakeAccountStore(account);
         var service = CreateService(store, comparerAlwaysMatches: true);
 
-        var result = await service.LoginAsync(account.Email, SomeVerifier, CancellationToken.None);
+        var result = await service.LoginAsync(account.Email!, SomeVerifier, CancellationToken.None);
 
         Assert.False(result.TryGetValue(out _));
     }
@@ -486,7 +486,7 @@ public sealed class AccountServiceTotpTests
         var store = new FakeAccountStore(account);
         var service = CreateService(store, comparerAlwaysMatches: true);
 
-        var result = await service.LoginAsync(account.Email, SomeVerifier, CancellationToken.None);
+        var result = await service.LoginAsync(account.Email!, SomeVerifier, CancellationToken.None);
 
         Assert.False(result.TryGetValue(out _));
     }
@@ -498,7 +498,7 @@ public sealed class AccountServiceTotpTests
         var store = new FakeAccountStore(account);
         var service = CreateService(store, comparerAlwaysMatches: true);
 
-        var result = await service.LoginAsync(account.Email, SomeVerifier, CancellationToken.None);
+        var result = await service.LoginAsync(account.Email!, SomeVerifier, CancellationToken.None);
 
         Assert.True(result.TryGetValue(out var success));
         Assert.Null(success.Session);

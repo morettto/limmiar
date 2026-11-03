@@ -4,7 +4,7 @@ namespace Api.Accounts;
 
 public static class MagicLinkComposition
 {
-    public static void AddMagicLink(this IServiceCollection services, IConfiguration configuration)
+    public static void AddMagicLink(this IServiceCollection services)
     {
         services.AddSingleton<IMagicLinkIssuer, MagicLinkIssuer>();
         services.AddSingleton<IAnonymousPatientAccessStore>(sp => new PostgresAnonymousPatientAccessStore(sp.GetRequiredService<NpgsqlDataSource>()));

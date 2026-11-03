@@ -86,11 +86,6 @@ public static class AuditChain
             expectedPreviousHash = entry.EntryHash;
         }
 
-        // ponytail: linear scan of the chain per anchor. Anchors are captured one per
-        // CaptureAnchorAsync call and read back for a single tenant, so this is a handful of
-        // passes over a list already held in memory. Ceiling: if a tenant ever carries enough
-        // anchors for O(anchors x chain) to show up, index the chain by Sequence into a
-        // Dictionary once before the loop.
         foreach (var anchor in anchors)
         {
             var anchored = chain.FirstOrDefault(entry => entry.Sequence == anchor.AnchoredSequence);

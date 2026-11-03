@@ -6,17 +6,16 @@ namespace Api.Tests.Accounts;
 public sealed class AccountServiceRecoveryTests
 {
     private static readonly byte[] SomeVerifier = CreateVerifier(0x01);
-    private static readonly byte[] SomeEnvelope = Enumerable.Repeat((byte)0x07, 120).ToArray();
 
     [Fact]
-    public async Task RecoverAccess_WithoutClinicalKeyEnvelope_DoesNotPretendToRestoreAccess()
+    public async Task RecoverAccess_RecoversAuthenticationWithoutClinicalKeyMaterial()
     {
         var account = new Account(Guid.NewGuid(), "old@example.com", AccountRole.Professional, SomeVerifier, null,
             RecoveryVerifier: CreateVerifier(0x02));
         var handler = CreateRecoverAccessHandler(new FakeAccountStore(account), new StubPasswordVerifierComparer(alwaysMatches: true));
-        var result = await handler.Handle(new RecoverAccessCommand(account.Email, CreateVerifier(0x02)), CancellationToken.None);
-        Assert.False(result.Succeeded);
-        Assert.Null(result.Account);
+        var result = await handler.Handle(new RecoverAccessCommand(account.Email!, CreateVerifier(0x02)), CancellationToken.None);
+        Assert.True(result.Succeeded);
+        Assert.Equal(account.Id, result.Account!.Id);
         Assert.Null(result.Session);
     }
 
@@ -51,7 +50,7 @@ public sealed class AccountServiceRecoveryTests
     {
         var account = new Account(
             Guid.NewGuid(), "known@example.com", AccountRole.Professional, SomeVerifier, null,
-            RecoveryVerifier: CreateVerifier(0x02), RecoveryEnvelope: SomeEnvelope);
+            RecoveryVerifier: CreateVerifier(0x02));
         var store = new FakeAccountStore(account);
         var handler = CreateRecoverAccessHandler(store, new StubPasswordVerifierComparer(alwaysMatches: false));
 
@@ -79,7 +78,7 @@ public sealed class AccountServiceRecoveryTests
     {
         var account = new Account(
             Guid.NewGuid(), "patient@example.com", AccountRole.Patient, SomeVerifier, null,
-            RecoveryVerifier: CreateVerifier(0x02), RecoveryEnvelope: SomeEnvelope);
+            RecoveryVerifier: CreateVerifier(0x02));
         var store = new FakeAccountStore(account);
         var handler = CreateRecoverAccessHandler(store, new StubPasswordVerifierComparer(alwaysMatches: true));
 
@@ -96,7 +95,7 @@ public sealed class AccountServiceRecoveryTests
     {
         var account = new Account(
             Guid.NewGuid(), "pro@example.com", AccountRole.Professional, SomeVerifier, null,
-            RecoveryVerifier: CreateVerifier(0x02), RecoveryEnvelope: SomeEnvelope);
+            RecoveryVerifier: CreateVerifier(0x02));
         var store = new FakeAccountStore(account);
         var handler = CreateRecoverAccessHandler(store, new StubPasswordVerifierComparer(alwaysMatches: true));
 
@@ -114,7 +113,7 @@ public sealed class AccountServiceRecoveryTests
         var store = new FakeAccountStore();
         var handler = new RegisterRecoveryVerifierHandler(store);
 
-        var result = await handler.Handle(new RegisterRecoveryVerifierCommand(Guid.NewGuid(), SomeVerifier, SomeEnvelope), CancellationToken.None);
+        var result = await handler.Handle(new RegisterRecoveryVerifierCommand(Guid.NewGuid(), SomeVerifier), CancellationToken.None);
 
         Assert.False(result.Succeeded);
         Assert.Equal(RegisterRecoveryVerifierFailureReason.AccountNotFound, result.FailureReason);
@@ -127,7 +126,7 @@ public sealed class AccountServiceRecoveryTests
         var store = new FakeAccountStore(account);
         var handler = new RegisterRecoveryVerifierHandler(store);
 
-        var result = await handler.Handle(new RegisterRecoveryVerifierCommand(account.Id, SomeVerifier, SomeEnvelope), CancellationToken.None);
+        var result = await handler.Handle(new RegisterRecoveryVerifierCommand(account.Id, SomeVerifier), CancellationToken.None);
 
         Assert.False(result.Succeeded);
         Assert.Equal(RegisterRecoveryVerifierFailureReason.NotAProfessionalAccount, result.FailureReason);
@@ -140,14 +139,13 @@ public sealed class AccountServiceRecoveryTests
         var store = new FakeAccountStore(account);
         var handler = new RegisterRecoveryVerifierHandler(store);
 
-        var result = await handler.Handle(new RegisterRecoveryVerifierCommand(account.Id, SomeVerifier, SomeEnvelope), CancellationToken.None);
+        var result = await handler.Handle(new RegisterRecoveryVerifierCommand(account.Id, SomeVerifier), CancellationToken.None);
 
         Assert.True(result.Succeeded);
         Assert.Equal(SHA256.HashData(SomeVerifier), result.Account!.RecoveryVerifier);
 
         var stored = await store.FindByIdAsync(account.Id, CancellationToken.None);
         Assert.Equal(SHA256.HashData(SomeVerifier), stored!.RecoveryVerifier);
-        Assert.Equal(SomeEnvelope, stored.RecoveryEnvelope);
     }
 
     // Same discipline as RegisterHandler: a store dump must never contain the recovery
@@ -159,7 +157,7 @@ public sealed class AccountServiceRecoveryTests
         var store = new FakeAccountStore(account);
         var handler = new RegisterRecoveryVerifierHandler(store);
 
-        var result = await handler.Handle(new RegisterRecoveryVerifierCommand(account.Id, SomeVerifier, SomeEnvelope), CancellationToken.None);
+        var result = await handler.Handle(new RegisterRecoveryVerifierCommand(account.Id, SomeVerifier), CancellationToken.None);
 
         Assert.NotEqual(SomeVerifier, result.Account!.RecoveryVerifier);
         Assert.Equal(SHA256.HashData(SomeVerifier), result.Account.RecoveryVerifier);
@@ -174,8 +172,8 @@ public sealed class AccountServiceRecoveryTests
         var firstVerifier = CreateVerifier(0x02);
         var secondVerifier = CreateVerifier(0x03);
 
-        await handler.Handle(new RegisterRecoveryVerifierCommand(account.Id, firstVerifier, SomeEnvelope), CancellationToken.None);
-        var result = await handler.Handle(new RegisterRecoveryVerifierCommand(account.Id, secondVerifier, SomeEnvelope), CancellationToken.None);
+        await handler.Handle(new RegisterRecoveryVerifierCommand(account.Id, firstVerifier), CancellationToken.None);
+        var result = await handler.Handle(new RegisterRecoveryVerifierCommand(account.Id, secondVerifier), CancellationToken.None);
 
         Assert.True(result.Succeeded);
         Assert.Equal(SHA256.HashData(secondVerifier), result.Account!.RecoveryVerifier);

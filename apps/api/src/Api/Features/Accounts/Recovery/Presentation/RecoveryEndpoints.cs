@@ -20,8 +20,8 @@ public static class RecoveryEndpoints
 
         app.MapPost("/accounts/{accountId:guid}/recovery-phrase", HandleRegisterRecoveryVerifierAsync)
             .WithName("PostAccountRecoveryPhrase")
-            .WithSummary("Register or rotate recovery credentials and an encrypted clinical-key envelope")
-            .WithDescription("Accepts a client-derived verifier and an opaque encrypted key envelope, never the phrase or plaintext clinical key. Requires an Authorization: Bearer access token for this exact professional account. Replaces both recovery fields together.")
+            .WithSummary("Register or rotate account authentication recovery credentials")
+            .WithDescription("Recovers authentication only. Clinical-vault keys are independent and never included. Requires an Authorization: Bearer access token for this exact professional account.")
             .Produces<RegisterRecoveryVerifierResponse>(StatusCodes.Status200OK)
             .Produces<LimmiarProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")
             .Produces<LimmiarProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")
@@ -45,8 +45,7 @@ public static class RecoveryEndpoints
         var account = result.Account!;
         return TypedResults.Ok(new RecoverAccessResponse(
             account.Id, account.Email, account.Role, result.TwoFactorRequirement, result.TwoFactorTicket,
-            result.Session?.AccessToken, result.Session?.RefreshToken, result.Session?.AccessTokenExpiresAt,
-            account.RecoveryEnvelope!));
+            result.Session?.AccessToken, result.Session?.RefreshToken, result.Session?.AccessTokenExpiresAt));
     }
 
     private static async Task<Results<Ok<RegisterRecoveryVerifierResponse>, JsonHttpResult<LimmiarProblemDetails>>> HandleRegisterRecoveryVerifierAsync(
@@ -60,12 +59,7 @@ public static class RecoveryEndpoints
             return ValidationProblem("recoveryVerifier");
         }
 
-        if (request.RecoveryEnvelope is not { Length: 120 })
-        {
-            return ValidationProblem("recoveryEnvelope");
-        }
-
-        var result = await sender.Send(new RegisterRecoveryVerifierCommand(accountId, request.RecoveryVerifier, request.RecoveryEnvelope), cancellationToken);
+        var result = await sender.Send(new RegisterRecoveryVerifierCommand(accountId, request.RecoveryVerifier), cancellationToken);
         if (!result.Succeeded)
         {
             return result.FailureReason switch
@@ -110,9 +104,8 @@ public sealed record RecoverAccessResponse(
     string? TwoFactorTicket,
     string? AccessToken,
     string? RefreshToken,
-    DateTimeOffset? AccessTokenExpiresAt,
-    byte[] RecoveryEnvelope);
+    DateTimeOffset? AccessTokenExpiresAt);
 
-public sealed record RegisterRecoveryVerifierRequest(byte[] RecoveryVerifier, byte[] RecoveryEnvelope);
+public sealed record RegisterRecoveryVerifierRequest(byte[] RecoveryVerifier);
 
 public sealed record RegisterRecoveryVerifierResponse(Guid AccountId);

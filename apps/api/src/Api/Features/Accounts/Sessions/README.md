@@ -41,7 +41,7 @@ lado (`Api.Accounts.Credentials`, `Api.Accounts.MagicLink`, etc.).
   (`TwoFactorEndpoints`, gate é o ticket de dois fatores) e
   `POST /accounts/{accountId}/professional-verification/decision`
   (`ProfessionalVerificationEndpoints`, gate é o `X-Staff-Api-Key`). Todas as outras rotas com
-  `{accountId}` -- hoje Scheduling, Notes, Consent, Patients, DevicePairing, VoiceEnrollment,
+  `{accountId}` -- hoje Scheduling, Notes, Consent, Patients, VoiceEnrollment,
   Recovery, ProfessionalVerification/submit -- estão protegidas sem precisar de dizer nada na
   rota; uma rota nova com `{accountId}` nasce protegida. O nome do parâmetro compara-se sem
   distinguir maiúsculas, como o routing faz, por isso `{AccountId}` também fica protegida.

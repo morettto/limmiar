@@ -173,12 +173,11 @@ public sealed class AnonymousPatientAccessStoreTests(PostgresContainerFixture fi
         var patient = Patient();
         Assert.True(await _access.RegisterAsync(first, patient, CancellationToken.None));
         var (_, next) = await InviteAsync();
-        await _accounts.MutateAsync(patient.Id, _ => patient with { RecoveryVerifier = new byte[32], RecoveryEnvelope = new byte[120], WebAuthnSignCount = 1 }, CancellationToken.None);
+        await _accounts.MutateAsync(patient.Id, _ => patient with { RecoveryVerifier = new byte[32], WebAuthnSignCount = 1 }, CancellationToken.None);
         Assert.False(await _access.AssertAsync(next, patient with { WebAuthnSignCount = 2 }, 0, CancellationToken.None));
         Assert.True(await _access.AssertAsync(next, patient with { WebAuthnSignCount = 2 }, 1, CancellationToken.None));
         var stored = (await _accounts.FindByIdAsync(patient.Id, CancellationToken.None))!;
         Assert.Equal(2u, stored.WebAuthnSignCount);
-        Assert.Equal(new byte[120], stored.RecoveryEnvelope);
         Assert.Equal(new byte[32], stored.RecoveryVerifier);
     }
 

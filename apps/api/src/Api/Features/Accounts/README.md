@@ -5,7 +5,7 @@
 Dono da conta (`Account`): registo, login, Google, magic link, recuperação por frase BIP39,
 TOTP, WebAuthn, envelope de voz, verificação profissional e o par de chaves X25519
 (`KeyPair/AccountKeyPairService`). Cada sub-slice (`Credentials`, `Recovery`, `TwoFactor`,
-`WebAuthn`, `MagicLink`, `DevicePairing`, `ProfessionalVerification`, `VoiceEnrollment`,
+`WebAuthn`, `MagicLink`, `ProfessionalVerification`, `VoiceEnrollment`,
 `Sessions`) mora numa pasta própria atrás da mesma porta `IAccountStore`; ver o README de cada
 uma para o seu contrato. `PatientLinks` e `apps/api/README.md` documentam quem mais depende
 desta conta.
@@ -62,3 +62,7 @@ desta conta.
 - `Program.Composition.cs` regista `NpgsqlDataSource` via delegate de fábrica
   (`AddSingleton(_ => ...)`), não uma instância pronta -- só assim o container liberta as ligações
   ao fim de cada `WebApplicationFactory` de teste. Ver `apps/api/README.md` (Platform/Data).
+
+## Cofre clínico independente
+
+`ClinicalVault` persiste envelopes opacos e hashes de verificadores em `clinical_vaults`, com RLS por conta. Criação é única; recuperar requer sessão da conta, código válido e revisão atual, com troca atômica de todos os envelopes. GET nunca devolve verificadores. Senha e recuperação de login não produzem material clínico. Ver `docs/chave-pessoal-prontuarios.md` para protocolo, testes e reset local.
