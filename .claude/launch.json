@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "mvp-copiloto",
+      "runtimeExecutable": "mvp-copiloto/.venv/Scripts/python.exe",
+      "runtimeArgs": ["-m", "uvicorn", "copiloto.api:app", "--app-dir", "mvp-copiloto/src", "--port", "8000"],
+      "port": 8000
+    }
+  ]
+}
