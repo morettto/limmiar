@@ -114,9 +114,8 @@ describe('criarAbridorUpstream', () => {
     const { url, ouvido } = await subir(criado)
     const aoFechar = vi.fn()
     const upstream = await criarAbridorUpstream({ url, endpointingMs: 600, aberturaMs: ABERTURA })('pt', () => {}, aoFechar)
-    ouvido.ws!.close()
-    await vi.waitFor(() => expect(aoFechar).toHaveBeenCalledTimes(1))
-    expect(aoFechar.mock.calls[0]![0]).toBeInstanceOf(Error)
+    ouvido.ws!.close(1008)
+    await vi.waitFor(() => expect(aoFechar).toHaveBeenCalledWith(new Error('A conexão com o serviço de transcrição foi encerrada (código 1008).')))
 
     const outra = await subir(criado)
     const aoFecharOutra = vi.fn()
@@ -132,8 +131,40 @@ describe('criarAbridorUpstream', () => {
     const { url, ouvido } = await subir(criado)
     const aoFechar = vi.fn()
     await criarAbridorUpstream({ url, endpointingMs: 600, aberturaMs: ABERTURA })('pt', () => {}, aoFechar)
-    ouvido.ws!.send(JSON.stringify({ type: 'error', error: { message: 'x' } }))
-    await vi.waitFor(() => expect(aoFechar).toHaveBeenCalledTimes(1))
+    ouvido.ws!.send(JSON.stringify({ type: 'error', error: { code: 'buffer_commit_failed', message: 'conteúdo sensível que não deve ir ao log' } }))
+    await vi.waitFor(() => expect(aoFechar).toHaveBeenCalledWith(new Error('NeMo-Speech: buffer_commit_failed')))
+  })
+
+  it('preserva o erro recebido antes de a sessão estar pronta', async () => {
+    const { url, ouvido } = await subir(() => {})
+    const abrindo = criarAbridorUpstream({ url, endpointingMs: 600, aberturaMs: ABERTURA })('pt', () => {}, () => {})
+    await vi.waitFor(() => expect(ouvido.ws).toBeDefined())
+    ouvido.ws!.send(JSON.stringify({ type: 'error', error: { code: 'invalid_session', message: 'conteúdo sensível que não deve ir ao log' } }))
+    await expect(abrindo).rejects.toThrow('NeMo-Speech: invalid_session')
+  })
+
+  it('usa uma mensagem segura quando o servidor não envia detalhes de erro', async () => {
+    const { url, ouvido } = await subir(criado)
+    const aoFechar = vi.fn()
+    await criarAbridorUpstream({ url, endpointingMs: 600, aberturaMs: ABERTURA })('pt', () => {}, aoFechar)
+    ouvido.ws!.send(JSON.stringify({ type: 'error', error: {} }))
+    await vi.waitFor(() => expect(aoFechar).toHaveBeenCalledWith(new Error('NeMo-Speech: erro')))
+  })
+
+  it('usa a categoria do servidor quando o erro não tem código', async () => {
+    const { url, ouvido } = await subir(criado)
+    const aoFechar = vi.fn()
+    await criarAbridorUpstream({ url, endpointingMs: 600, aberturaMs: ABERTURA })('pt', () => {}, aoFechar)
+    ouvido.ws!.send(JSON.stringify({ type: 'error', error: { type: 'server_error', message: 'conteúdo sensível que não deve ir ao log' } }))
+    await vi.waitFor(() => expect(aoFechar).toHaveBeenCalledWith(new Error('NeMo-Speech: server_error')))
+  })
+
+  it('trata erro malformado durante a abertura como falha de conexão', async () => {
+    const { url, ouvido } = await subir(() => {})
+    const abrindo = criarAbridorUpstream({ url, endpointingMs: 600, aberturaMs: ABERTURA })('pt', () => {}, () => {})
+    await vi.waitFor(() => expect(ouvido.ws).toBeDefined())
+    ouvido.ws!.send(JSON.stringify({ type: 'error', error: 'indisponível' }))
+    await expect(abrindo).rejects.toThrow('NeMo-Speech: erro')
   })
 
   it('falha ao abrir se o servidor fecha antes do session.created, demora demais ou não existe', async () => {

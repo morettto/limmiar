@@ -21,7 +21,7 @@ export interface ParametrosSessao {
 }
 
 export const PARAMETROS_PADRAO: ParametrosSessao = {
-  bufferMs: 30_000, rotacaoMs: 180_000, rotacaoForcadaMs: 300_000, fraseMinimaMs: 1500, vozMaximaMs: 10_000,
+  bufferMs: 30_000, rotacaoMs: 120_000, rotacaoForcadaMs: 145_000, fraseMinimaMs: 1500, vozMaximaMs: 10_000,
   margemDepoisMs: 200, repeticaoMs: 500,
 }
 
@@ -38,6 +38,8 @@ export interface Dependencias {
   parametros?: ParametrosSessao
   registrar?(evento: string): void
 }
+
+type MensagemEnfileirada = { ordem: number; mensagem: Exclude<MensagemUpstream, { tipo: 'parcial' }> }
 
 const NORMAL = 1000
 const FALHA = 1011
@@ -57,7 +59,7 @@ export class Sessao {
   private amostrasNoUpstream = 0
   private proximaFrase = 0
   private fila: Int16Array[] = []
-  private mensagens: MensagemUpstream[] = []
+  private mensagens: MensagemEnfileirada[] = []
   private drenando = false
   private rotacionando = false
   private rotacao: Promise<void> | undefined
@@ -66,6 +68,12 @@ export class Sessao {
   private confirmacao: (() => void) | undefined
   private chaveParcial = ''
   private processadoEnviadoMs = 0
+  private proximaOrdem = 0
+  private ordemParcialEnviado = -1
+  // Palavras das finais já recebidas e ainda não mandadas: o parcial as leva à frente da frase em curso, senão o app, que
+  // troca a hipótese inteira a cada parcial, perderia a frase da tela enquanto ela espera a verificação.
+  private palavrasEmEspera: string[] = []
+  private parcialUpstream = { texto: '', processadoMs: 0 }
 
   constructor(inicio: Inicio, canal: Canal, deps: Dependencias) {
     this.inicio = inicio
@@ -111,6 +119,7 @@ export class Sessao {
     this.pendentes = []
     this.fila = []
     this.mensagens = []
+    this.palavrasEmEspera = []
   }
 
   private abrirUpstream(): Promise<Upstream> {
@@ -131,44 +140,48 @@ export class Sessao {
 
   private receber(mensagem: MensagemUpstream): void {
     if (this.encerrada) return
-    this.mensagens.push(mensagem)
+    const ordem = this.proximaOrdem++
+    if (mensagem.tipo === 'parcial') {
+      this.parcialUpstream = { texto: mensagem.texto, processadoMs: Math.round(this.deslocamentoMs + mensagem.processadoS * 1000) }
+      this.enviarParcial(this.parcialUpstream.processadoMs, ordem)
+      if (mensagem.texto === '' || this.amostrasNoUpstream / AMOSTRAS_POR_MS >= this.parametros.rotacaoForcadaMs) this.talvezRotacionar()
+      return
+    }
+    if (mensagem.tipo === 'final') {
+      this.parcialUpstream = { texto: '', processadoMs: Math.round(this.deslocamentoMs + mensagem.processadoS * 1000) }
+      this.palavrasEmEspera.push(...mensagem.palavras.map((palavra) => palavra.texto))
+      if (mensagem.palavras.length === 0) this.chaveParcial = ''
+    }
+    this.mensagens.push({ mensagem, ordem })
     if (!this.drenando) void this.drenar()
   }
 
-  // Um por vez, na ordem: o parcial seguinte espera a frase anterior ser verificada, senão a tela perderia o texto por um instante.
+  // Finais e confirmações, uma por vez e na ordem: a frase seguinte espera a anterior ser verificada. Os parciais não esperam.
   private async drenar(): Promise<void> {
     this.drenando = true
     try {
-      for (let mensagem = this.mensagens.shift(); mensagem && !this.encerrada; mensagem = this.mensagens.shift()) {
-        // Cada parcial traz a frase em curso inteira: com outra mensagem na fila, ele já está velho.
-        if (mensagem.tipo === 'parcial' && this.mensagens.length > 0) continue
-        await this.tratar(mensagem)
+      for (let envelope = this.mensagens.shift(); envelope && !this.encerrada; envelope = this.mensagens.shift()) {
+        await this.tratar(envelope)
       }
     } catch (erro) { this.falhar(erro) } finally { this.drenando = false }
   }
 
-  private async tratar(mensagem: MensagemUpstream): Promise<void> {
+  private async tratar({ mensagem, ordem }: MensagemEnfileirada): Promise<void> {
     if (mensagem.tipo === 'confirmado') {
       this.confirmacao?.()
       return
     }
     const processadoMs = Math.round(this.deslocamentoMs + mensagem.processadoS * 1000)
-    if (mensagem.tipo === 'final') {
-      // Frase final sem palavras (o NeMo-Speech fecha a sessão assim) só limpa o parcial.
-      if (mensagem.palavras.length > 0) await this.finalizar(mensagem.palavras, processadoMs)
-      this.chaveParcial = ''
-      this.talvezRotacionar()
-      return
-    }
-    this.enviarParcial(mensagem.texto, processadoMs)
-    if (mensagem.texto === '' || this.amostrasNoUpstream / AMOSTRAS_POR_MS >= this.parametros.rotacaoForcadaMs) this.talvezRotacionar()
+    if (mensagem.palavras.length > 0) await this.finalizar(mensagem.palavras, processadoMs, ordem)
+    this.talvezRotacionar()
   }
 
-  private async finalizar(novas: PalavraUpstream[], processadoMs: number): Promise<void> {
+  private async finalizar(novas: PalavraUpstream[], processadoMs: number, ordem: number): Promise<void> {
     const palavras = novas.map((palavra) => this.palavra(palavra))
     if (this.inicio.modo === 'online') {
-      this.canal.enviar({ type: 'final', frase: this.proximaFrase++, falante: this.inicio.falante,
+      this.canal.enviar({ type: 'final', ordem, frase: this.proximaFrase++, falante: this.inicio.falante,
         palavras, processado_ms: processadoMs })
+      this.aposFinal(palavras.length, processadoMs, ordem)
     } else {
       for (let posicao = 0; posicao < palavras.length;) {
         const primeira = palavras[posicao]!
@@ -195,23 +208,45 @@ export class Sessao {
           while (falante !== null && ate < lote.length &&
             falanteNoInstante(trechos, (lote[ate]!.inicio_ms + lote[ate]!.fim_ms) / 2) === falante) ate++
           const frase = this.proximaFrase++
-          this.canal.enviar({ type: 'final', frase, falante, palavras: lote.slice(i, ate), processado_ms: processadoMs })
+          this.canal.enviar({ type: 'final', ordem, frase, falante, palavras: lote.slice(i, ate), processado_ms: processadoMs })
           if (falante === null) this.pendentes.push({ frase, instanteMs })
           i = ate
         }
+        this.aposFinal(lote.length, processadoMs, ordem)
         posicao = fim
       }
     }
-    this.processadoEnviadoMs = processadoMs
   }
 
-  private enviarParcial(texto: string, processadoMs: number): void {
-    const chave = texto
-    if (chave === this.chaveParcial && processadoMs - this.processadoEnviadoMs < this.parametros.repeticaoMs) return
+  // O app só limpa a hipótese com uma final mais nova que ela. Se o último parcial é mais novo, ele ainda mostra estas
+  // palavras e a correção tem de sair, mesmo com o navegador ocupado, senão a frase aparece duas vezes.
+  private aposFinal(emitidas: number, processadoMs: number, ordem: number): void {
+    this.palavrasEmEspera.splice(0, emitidas)
+    this.processadoEnviadoMs = Math.max(this.processadoEnviadoMs, processadoMs)
+    if (this.ordemParcialEnviado > ordem) {
+      this.mandarParcial(Math.max(this.processadoEnviadoMs, this.parcialUpstream.processadoMs), this.proximaOrdem++)
+      return
+    }
+    this.chaveParcial = ''
+    if (this.textoParcial() !== '') this.enviarParcial(this.processadoEnviadoMs, this.proximaOrdem++)
+  }
+
+  private textoParcial(): string {
+    return [...this.palavrasEmEspera, this.parcialUpstream.texto].filter(Boolean).join(' ')
+  }
+
+  private enviarParcial(processadoMs: number, ordem: number): void {
+    if (this.textoParcial() === this.chaveParcial && processadoMs - this.processadoEnviadoMs < this.parametros.repeticaoMs) return
     if (this.canal.ocupado()) return
-    this.chaveParcial = chave
+    this.mandarParcial(processadoMs, ordem)
+  }
+
+  private mandarParcial(processadoMs: number, ordem: number): void {
+    const texto = this.textoParcial()
+    this.chaveParcial = texto
     this.processadoEnviadoMs = processadoMs
-    this.canal.enviar({ type: 'parcial', texto, processado_ms: processadoMs })
+    this.ordemParcialEnviado = ordem
+    this.canal.enviar({ type: 'parcial', ordem, texto, processado_ms: processadoMs })
   }
 
   private talvezRotacionar(): void {

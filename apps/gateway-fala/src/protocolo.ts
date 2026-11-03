@@ -14,8 +14,8 @@ export interface Palavra {
 // com falante confirmado ou incerto; `falante` corrige palavra incerta pelo próprio contexto acústico.
 export type Saida =
   | { type: 'pronta' }
-  | { type: 'parcial'; texto: string; processado_ms: number }
-  | { type: 'final'; frase: number; falante: Falante | null; palavras: Palavra[]; processado_ms: number }
+  | { type: 'parcial'; ordem: number; texto: string; processado_ms: number }
+  | { type: 'final'; ordem: number; frase: number; falante: Falante | null; palavras: Palavra[]; processado_ms: number }
   | { type: 'falante'; frase: number; falante: Falante }
   | { type: 'concluida' }
   | { type: 'erro'; mensagem: string }
