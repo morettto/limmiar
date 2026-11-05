@@ -1,5 +1,6 @@
 name: Quality gates
 
+# No path filters: every PR and push to main runs app E2E, including app changes.
 on:
   pull_request:
     branches: [main]
@@ -46,13 +47,86 @@ jobs:
       - name: Prepare verified browser voice model and runtime
         run: node tools/voice-identity/setup.mjs
       - run: pnpm --filter app exec playwright install --with-deps chromium
-      - run: pnpm --filter app test:e2e
-      - name: Upload browser diagnostics on failure
-        if: failure()
+      - name: Run app E2E
+        id: app-e2e
+        continue-on-error: true
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: test-results/e2e-report.json
+        run: pnpm --filter app test:e2e --reporter=list,json
+      - name: Require screenshots for passing E2E cases
+        if: always() && steps.app-e2e.outcome != 'skipped'
+        env:
+          APP_E2E_OUTCOME: ${{ steps.app-e2e.outcome }}
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs')
+          const path = require('node:path')
+
+          const resultsDir = path.resolve('apps/app/test-results')
+          const reportPath = path.join(resultsDir, 'e2e-report.json')
+          const outcome = process.env.APP_E2E_OUTCOME
+          let report
+
+          try {
+            report = JSON.parse(fs.readFileSync(reportPath, 'utf8'))
+          } catch (error) {
+            fs.mkdirSync(resultsDir, { recursive: true })
+            fs.writeFileSync(path.join(resultsDir, 'e2e-report-validation.txt'), `Unable to read Playwright JSON report (${outcome}): ${String(error)}\n`)
+            console.error('::error::App E2E did not produce a readable JSON report; screenshot coverage cannot be verified.')
+            process.exit(1)
+          }
+
+          let passingCases = 0
+          const missingScreenshots = []
+
+          function verifySuite(suite) {
+            for (const spec of suite.specs ?? []) {
+              for (const test of spec.tests ?? []) {
+                if (!['expected', 'flaky'].includes(test.status)) continue
+                passingCases += 1
+                const result = test.results?.at(-1)
+                const hasPng = (result?.attachments ?? []).some((attachment) => {
+                  if (attachment.contentType !== 'image/png' || typeof attachment.path !== 'string') return false
+                  const candidates = [path.resolve(attachment.path), path.resolve('apps/app', attachment.path)]
+                  return candidates.some((candidate) => {
+                    const relative = path.relative(resultsDir, candidate)
+                    const isInResults = relative !== '' && relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative)
+                    return isInResults && fs.existsSync(candidate) && fs.statSync(candidate).isFile() && fs.statSync(candidate).size > 0
+                  })
+                })
+                if (!hasPng) missingScreenshots.push(`${test.projectName}: ${spec.file}: ${spec.title}`)
+              }
+            }
+            for (const child of suite.suites ?? []) verifySuite(child)
+          }
+
+          for (const suite of report.suites ?? []) verifySuite(suite)
+
+          if (passingCases === 0 && outcome === 'success') {
+            console.error('::error::App E2E reported success but produced no passing test cases to validate.')
+            process.exit(1)
+          }
+
+          if (missingScreenshots.length > 0) {
+            const examples = missingScreenshots.slice(0, 10).map((label) => label.replace(/[\r\n%]/g, '?'))
+            console.error(`::error::${missingScreenshots.length} passing E2E test case(s) have no PNG screenshot attachment in apps/app/test-results.`)
+            console.error(`Missing screenshots: ${examples.join(' | ')}`)
+            process.exit(1)
+          }
+
+          console.log(`Validated screenshots for ${passingCases} passing E2E test case(s).`)
+          NODE
+      - name: Upload browser diagnostics
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: app-e2e-report
           path: apps/app/test-results
+          if-no-files-found: warn
+      - name: Preserve E2E failure status
+        if: steps.app-e2e.outcome == 'failure'
+        run: exit 1
   # Runs on every push to main AND every PR (not gated to pull_request) —
   # coverage must hold on main too, not just be checked before merge.
   coverage:
