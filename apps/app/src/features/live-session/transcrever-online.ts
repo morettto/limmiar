@@ -10,30 +10,50 @@ export async function transcreverOnline(local: MediaStream, remoto: MediaStream,
   const fontes = [local, remoto]
   const ids = Object.keys(PAPEIS_ONLINE)
   const resultados: TranscricaoAoVivo[] = [{ palavras: [], finais: 0, estavelAteMs: 0 }, { palavras: [], finais: 0, estavelAteMs: 0 }]
+  let referenciasFinais: [PalavraAtribuida[] | undefined, PalavraAtribuida[] | undefined] = [undefined, undefined]
+  let deslocamentosFinais: [number, number] = [Number.NaN, Number.NaN]
+  let palavrasFinais: PalavraAtribuida[] = []
   const deslocamentos = [inicioMs, inicioMs]
+  const finaisSemReferencia = [{ palavras: [] as PalavraAtribuida[] }, { palavras: [] as PalavraAtribuida[] }]
   const capturadas = new Set<number>()
   const abort = new AbortController()
-  const sessoes: SessaoTranscricao[] = []
   const cancelar = () => abort.abort()
   signal.addEventListener('abort', cancelar)
   let encerramento: Promise<void> | undefined
   function publicar() {
     const paciente = resultados[1]!
     const ultimaFinal = paciente.palavras[paciente.finais - 1]
-    const palavras: PalavraAtribuida[] = resultados.flatMap((resultado, indice) => resultado.palavras.map(palavra => ({
+    const novasReferencias = resultados.map((resultado, indice) => {
+      if (resultado.palavrasFinais) return resultado.palavrasFinais
+      const cache = finaisSemReferencia[indice]!
+      if (cache.palavras.length !== resultado.finais || cache.palavras.some((palavra, i) => palavra !== resultado.palavras[i])) {
+        cache.palavras = resultado.palavras.slice(0, resultado.finais)
+      }
+      return cache.palavras
+    }) as typeof referenciasFinais
+    if (novasReferencias.some((referencia, indice) => referencia !== referenciasFinais[indice] || deslocamentos[indice] !== deslocamentosFinais[indice])) {
+      referenciasFinais = novasReferencias
+      deslocamentosFinais = [deslocamentos[0]!, deslocamentos[1]!]
+      palavrasFinais = resultados.flatMap((_, indice) => (referenciasFinais[indice] ?? []).map(palavra => ({
+        ...palavra, locutor: ids[indice]!, inicioMs: palavra.inicioMs + deslocamentos[indice]!, fimMs: palavra.fimMs + deslocamentos[indice]!,
+      }))).sort((a, b) => a.inicioMs - b.inicioMs || a.fimMs - b.fimMs)
+    }
+    const palavrasHipotese: PalavraAtribuida[] = resultados.flatMap((resultado, indice) =>
+      (resultado.palavrasHipotese ?? resultado.palavras.slice(resultado.finais)).map(palavra => ({
       ...palavra, locutor: ids[indice]!, inicioMs: palavra.inicioMs + deslocamentos[indice]!, fimMs: palavra.fimMs + deslocamentos[indice]!,
-    }))).sort((a, b) => a.inicioMs - b.inicioMs || a.fimMs - b.fimMs)
+      }))).sort((a, b) => a.inicioMs - b.inicioMs || a.fimMs - b.fimMs)
+    const palavras = [...palavrasFinais, ...palavrasHipotese].sort((a, b) => a.inicioMs - b.inicioMs || a.fimMs - b.fimMs)
     // Das duas trilhas, vale o aviso mais grave: "reconectando" vem depois de "atrasada" na ordem alfabética.
     const aviso = resultados.flatMap(resultado => resultado.aviso ?? []).sort().at(-1)
     // O papel vem da trilha autenticada; aguardar diarização atrasaria frases já finalizadas.
-    atualizar({ palavras, finais: resultados.reduce((total, resultado) => total + resultado.finais, 0),
+    atualizar({ palavras, palavrasFinais, palavrasHipotese, finais: resultados.reduce((total, resultado) => total + resultado.finais, 0),
       estavelAteMs: deslocamentos[1]! + (ultimaFinal ? ultimaFinal.fimMs + 1 : 0), ...(aviso && { aviso }) })
   }
   try {
     if (signal.aborted) cancelar()
     // A trilha original conserva o mute do WebRTC; a captura não é dona dela.
-    for (let indice = 0; indice < fontes.length; indice++) {
-      sessoes.push(await transcreverAoVivo(fontes[indice]!, abort.signal, resultado => {
+    const sessoes = await Promise.all(fontes.map((fonte, indice) => transcreverAoVivo(
+      fonte, abort.signal, resultado => {
         resultados[indice] = resultado; publicar()
       }, erro => { if (!abort.signal.aborted) { falhar(erro); abort.abort() } }, {
         trilhas: 'emprestadas',
@@ -43,8 +63,8 @@ export async function transcreverOnline(local: MediaStream, remoto: MediaStream,
           capturadas.add(indice)
           deslocamentos[indice] = inicioMs + Math.max(0, Math.round(performance.now() - inicio - pcm.length / 16))
         },
-      }))
-    }
+      },
+    )))
     return {
       pausar(pausada) { sessoes.forEach(sessao => sessao.pausar(pausada)) },
       encerrar() {

@@ -1,5 +1,14 @@
 # Cadastro de voz
 
+`VoiceEnrollmentGate` exige cadastro após o desbloqueio do cofre profissional,
+antes de montar qualquer página do consultório. O perfil existente precisa abrir
+com a chave atual; sem ele, a configuração guiada não oferece pular. Salvar com
+confirmação da API libera o destino original; remover o perfil bloqueia novamente.
+O gate não guarda marcadores no navegador nem altera o fluxo dos pacientes.
+A verificação (`perfil-de-voz`) mostra só um carregamento neutro; a configuração
+aparece apenas quando a API confirma que não há perfil. Falha de leitura mantém o
+bloqueio com erro e nova tentativa, sem oferecer cadastro sobre um perfil talvez válido.
+
 `VoiceSettings` é a configuração profissional em `/settings/voice`. A rota exige
 conta profissional, token e KEK desbloqueada. Permite cadastrar, substituir e
 remover o perfil; respostas depois da saída são ignoradas.

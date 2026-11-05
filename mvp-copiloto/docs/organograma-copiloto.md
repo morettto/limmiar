@@ -13,14 +13,16 @@ flowchart TD
     P --> W[Estado isolado por sessionId]
     W --> G{Locutor é paciente?}
     G -- não --> N1[Silêncio]
-    G -- sim --> T[Triagem local]
-    T --> Q{Clínico, risco ou ambíguo?}
+    G -- sim --> RI[Alerta de risco: cabeça sobre o BGE-M3]
+    RI --> T[Portão: juiz pequeno, vivência]
+    T --> Q{Paciente fala de si?}
     Q -- não --> N2[Silêncio]
     Q -- sim --> V[Embedding BGE-M3]
-    V --> R[Busca vetorial + BM25 + RRF]
+    V --> R[Busca vetorial, 24 candidatos]
     R --> X[Filtro selectedWorkIds]
-    X --> J[Juiz gte-r2 em lote]
-    J --> K[Escolha por limiar]
+    X --> AL[Saem os genéricos, nota da preparação]
+    AL --> J[Juiz pequeno: nota principal]
+    J --> K[Maior nota ≥ corte]
     K --> H[Proveniência no PDF]
     H --> Y{Página, parágrafo e texto conferem?}
     Y -- não --> N3[Silêncio com motivo]
@@ -38,6 +40,8 @@ flowchart LR
     X --> C[Chunker de parágrafo]
     C --> DB[(SQLite/PostgreSQL)]
     C --> E[BGE-M3]
+    C --> GE[Juiz pequeno: nota generico]
+    GE --> DB
     E --> M[Matriz vetorial]
     C --> B[BM25]
     B --> I[Índice versionado]

@@ -23,7 +23,6 @@ public sealed class RegisterRecoveryVerifierHandler(IAccountStore store) : IRequ
         var updated = await store.MutateAsync(account.Id, current => current with
         {
             RecoveryVerifier = verifier,
-            RecoveryEnvelope = request.RecoveryEnvelope,
         }, cancellationToken);
         return updated is null ? RegisterRecoveryVerifierResult.Failure(RegisterRecoveryVerifierFailureReason.AccountNotFound)
             : RegisterRecoveryVerifierResult.Success(updated);

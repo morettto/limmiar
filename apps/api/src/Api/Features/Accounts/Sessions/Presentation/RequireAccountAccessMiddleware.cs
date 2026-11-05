@@ -4,13 +4,7 @@ using static Api.Accounts.AccountsProblemResults;
 
 namespace Api.Accounts;
 
-/// <summary>
-/// Opt-out marker for an <c>{accountId}</c> route that is intentionally not gated by
-/// <see cref="RequireAccountAccessMiddleware"/> because it authorizes a different way. Every
-/// other <c>{accountId}</c> route is protected with no per-route call needed -- closed by
-/// default. Attach via <see cref="AccountAccessEndpointConventions.AllowWithoutAccountToken"/>
-/// and say why at the call site.
-/// </summary>
+/// <summary>Marks an account-scoped route that uses another authorization mechanism.</summary>
 public sealed class AllowWithoutAccountTokenMetadata
 {
     public static readonly AllowWithoutAccountTokenMetadata Instance = new();
@@ -20,25 +14,12 @@ public sealed class AllowWithoutAccountTokenMetadata
     }
 }
 
-/// <summary>
-/// The one place that decides whether a route is covered by <see cref="RequireAccountAccessMiddleware"/>:
-/// its <see cref="RoutePattern"/> declares <c>accountId</c> and it was not opted out. Both the
-/// middleware (runtime 401/403) and <see cref="DeclareAccountAccessOpenApiResponses"/> (OpenAPI
-/// docs) call this same check, so the two can never drift apart.
-/// </summary>
 public static class AccountAccessEndpointConventions
 {
-    /// <summary>Opts an <c>{accountId}</c> route out of <see cref="RequireAccountAccessMiddleware"/> -- only for a route that authorizes some other way (name that gate in a comment at the call site).</summary>
+    /// <summary>Opts an account-scoped route out when it has another authorization mechanism.</summary>
     public static RouteHandlerBuilder AllowWithoutAccountToken(this RouteHandlerBuilder builder) =>
         builder.WithMetadata(AllowWithoutAccountTokenMetadata.Instance);
 
-    /// <summary>
-    /// Registered once, on the app's root route group (Program.Composition.cs), so every
-    /// <c>{accountId}</c> route declares the 401/403 OpenAPI responses with nothing to remember
-    /// per route. Runs via <see cref="IEndpointConventionBuilder.Finally"/> so it sees the final
-    /// metadata list -- including a route's own <see cref="AllowWithoutAccountToken"/> -- rather
-    /// than racing it.
-    /// </summary>
     public static RouteGroupBuilder DeclareAccountAccessOpenApiResponses(this RouteGroupBuilder builder)
     {
         // RouteGroupBuilder implements IEndpointConventionBuilder explicitly, so Finally is only
@@ -71,16 +52,6 @@ public static class AccountAccessEndpointConventions
         metadata.Any(m => m is AllowWithoutAccountTokenMetadata);
 }
 
-/// <summary>
-/// Registered once in the request pipeline, right after routing has selected an endpoint and
-/// before that endpoint runs -- so strictly before Minimal API's own parameter binding (route
-/// values, query, body). An <see cref="Microsoft.AspNetCore.Http.IEndpointFilter"/> cannot give
-/// this guarantee: it only runs once binding has already succeeded, so a structurally malformed
-/// body (e.g. invalid JSON) would reach the framework's own bad-request handling before any
-/// filter ever saw the request. Protects every routed endpoint whose pattern declares
-/// <c>{accountId}</c>, unless it opted out (see <see cref="AllowWithoutAccountTokenMetadata"/>) --
-/// closed by default, so a new route can't ship unprotected by omission.
-/// </summary>
 public sealed class RequireAccountAccessMiddleware(RequestDelegate next, ISessionTokenIssuer sessionTokenIssuer)
 {
     private const string BearerPrefix = "Bearer ";

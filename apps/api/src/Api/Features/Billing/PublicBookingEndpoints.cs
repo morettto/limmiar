@@ -20,7 +20,7 @@ public static class PublicBookingEndpoints
         app.MapPost("/p/{token}/reserve", HandleReserveAsync)
             .WithName("PostPublicReserve")
             .WithSummary("Reservar por link público")
-            .WithDescription("Deliberately unauthenticated: quem apresenta o token opaco de 256 bits tem a capacidade (molde DevicePairingEndpoints claim). Link desconhecido dá o mesmo 404 de link revogado.")
+            .WithDescription("Deliberately unauthenticated: quem apresenta o token opaco de 256 bits tem a capacidade. Link desconhecido dá o mesmo 404 de link revogado.")
             .Produces<PublicReserveResponse>(StatusCodes.Status201Created)
             .Produces<PublicReserveResponse>(StatusCodes.Status200OK)
             .Produces<PublicReserveResponse>(StatusCodes.Status202Accepted)

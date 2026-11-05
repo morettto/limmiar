@@ -7,7 +7,7 @@ describe('linhas da transcrição', () => {
   it('preserva profissional, paciente, desconhecido e hipótese sem alterar o texto', () => {
     const palavras = [palavra('Como está?', 0, 'p'), palavra('Tenho', 200, 's'), palavra('medo.', 400, 's'),
       palavra('Quando', 600, 's'), palavra('chego', 800, 's'), palavra('Olá', 1000, null)]
-    const linhas = montarLinhasTranscricao(palavras, { p: 'voce', s: 'paciente' }, [{ id: '200:s', frase: 'Tenho medo.', contexto: [] }])
+    const linhas = montarLinhasTranscricao(palavras, { p: 'voce', s: 'paciente' }, [{ id: '200:s', frase: 'Tenho medo.', contexto: [], fimMs: 0 }])
     expect(linhas.map((linha) => [linha.texto, linha.papel, linha.consultaId])).toEqual([
       ['Como está?', 'voce', null], ['Tenho medo.', 'paciente', '200:s'], ['Quando chego', 'paciente', null], ['Olá', null, null],
     ])
@@ -15,7 +15,7 @@ describe('linhas da transcrição', () => {
     expect(linhas[1]).toMatchObject({ inicioMs: 200, fimMs: 500 })
   })
   it('não herda vínculo de consulta com texto ou papel anterior', () => {
-    const consultas = [{ id: '0:s', frase: 'Tenho medo.', contexto: [] }]
+    const consultas = [{ id: '0:s', frase: 'Tenho medo.', contexto: [], fimMs: 0 }]
     expect(montarLinhasTranscricao([palavra('Não', 0, 's'), palavra('tenho', 200, 's'), palavra('medo.', 400, 's')], { s: 'paciente' }, consultas)[0])
       .toMatchObject({ texto: 'Não tenho medo.', consultaId: null })
     expect(montarLinhasTranscricao([palavra('Tenho medo.', 0, 's')], { s: 'voce' }, consultas)[0]!.consultaId).toBeNull()
@@ -23,7 +23,7 @@ describe('linhas da transcrição', () => {
   it('separa a próxima consulta, uma pausa, pontuação e papel não identificado', () => {
     const palavras = [palavra('Medo', 0, 's'), palavra('Tristeza', 200, 's'), palavra('Voltei…', 1300, 's'),
       palavra('Hoje', 1500, 's'), palavra('Outra', 1700, 'x')]
-    const linhas = montarLinhasTranscricao(palavras, { s: 'paciente' }, [{ id: '200:s', frase: 'Tristeza', contexto: [] }])
+    const linhas = montarLinhasTranscricao(palavras, { s: 'paciente' }, [{ id: '200:s', frase: 'Tristeza', contexto: [], fimMs: 0 }])
     expect(linhas.map((l) => l.texto)).toEqual(['Medo', 'Tristeza', 'Voltei…', 'Hoje', 'Outra'])
     expect(linhas[4]!.papel).toBeNull()
     expect(montarLinhasTranscricao([], {}, [])).toEqual([])
@@ -33,7 +33,7 @@ describe('linhas da transcrição', () => {
     const linhas = montarLinhasTranscricao(palavras, {}, [], 3)
     expect(linhas.map((l) => [l.texto, l.locutor, l.parcial])).toEqual([['Bom dia doutora', 's', false], ['tenho', 's', true]])
     expect(montarLinhasTranscricao(palavras, {}, [])[0]).toMatchObject({ texto: 'Bom dia doutora tenho', parcial: false })
-    const consulta = [{ id: '0:s', frase: 'Bom dia doutora tenho', contexto: [] }]
+    const consulta = [{ id: '0:s', frase: 'Bom dia doutora tenho', contexto: [], fimMs: 0 }]
     expect(montarLinhasTranscricao(palavras, { s: 'paciente' }, consulta, 3)[0]).toMatchObject({ texto: 'Bom dia doutora', consultaId: null })
   })
   it('junta as palavras de hipótese entre si, sem misturar com as finais', () => {
@@ -44,7 +44,7 @@ describe('linhas da transcrição', () => {
   })
 
   it('só junta ao vínculo de consulta palavras do mesmo falante', () => {
-    const consultas = [{ id: '0:s', frase: 'Tenho medo agora.', contexto: [] }]
+    const consultas = [{ id: '0:s', frase: 'Tenho medo agora.', contexto: [], fimMs: 0 }]
     const linhas = montarLinhasTranscricao([palavra('Tenho', 0, 's'), palavra('medo', 200, 's'), palavra('agora.', 400, 'x')], { s: 'paciente', x: 'paciente' }, consultas)
     expect(linhas.map((l) => [l.texto, l.consultaId])).toEqual([['Tenho medo', null], ['agora.', null]])
   })

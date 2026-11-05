@@ -61,8 +61,7 @@ export function BibliotecaPage({ notas, nomesPacientes, chaveIndice, store }: Bi
 
     setErro(null)
     // Sem `.catch`, uma OPFS negada ou uma chave/AAD errada vira rejeição não tratada e a
-    // página encalha em "Preparando a busca..." sem sinal nenhum -- mesmo padrão de
-    // `PatientWallet.tsx` (`load(kek).catch(...)`), mesmo `role="alert"`.
+    // página encalha em "Preparando a busca..." sem sinal nenhum.
     preparar(chaveIndice, accountId).catch(() => {
       if (!cancelado) {
         setErro(msg`Não foi possível preparar a busca. Tente novamente.`)

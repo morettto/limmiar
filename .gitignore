@@ -20,6 +20,18 @@ obj/
 TestResults/
 *.user
 
+# Python (tools/*, scripts chamados fora do venv do mvp-copiloto)
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Grafo de código (`graphify update .`): graph.json e manifest.json são versionados
+# (merge driver em .gitattributes, hook pós-commit atualiza); o resto é cache/estado
+# local ou snapshot histórico regenerável.
+graphify-out/*
+!graphify-out/graph.json
+!graphify-out/manifest.json
+
 # Artefacto de diff da cadeia de review (efémero, 1.3.0)
 
 # Modelo e worker do TitaNet (identidade de voz), gerados por tools/voice-identity/setup.mjs.

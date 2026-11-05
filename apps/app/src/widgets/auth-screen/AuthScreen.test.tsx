@@ -63,7 +63,7 @@ describe('AuthScreen', () => {
     window.sessionStorage.clear()
   })
 
-  it('entra com senha, entrega a KEK em memória e permite voltar ao cadastro', async () => {
+  it('entra com senha sem receber chave clínica e permite voltar ao cadastro', async () => {
     const account = { id: 'login-account', email: 'user@example.com', role: 'Professional' as const,
       twoFactorRequirement: 'NotApplicable' as const, twoFactorTicket: null,
       accessToken: 'access', refreshToken: 'refresh', accessTokenExpiresAt: '2099-01-01T00:00:00Z' }
@@ -81,7 +81,7 @@ describe('AuthScreen', () => {
     await waitFor(() => expect(onAuthenticated).toHaveBeenCalledOnce(), { timeout: 12000 })
     expect(vi.mocked(accountApi.login).mock.calls[0]?.[1]).toMatchObject({ email: account.email })
     expect(vi.mocked(accountApi.login).mock.calls[0]?.[1]).not.toHaveProperty('password')
-    expect(onAuthenticated.mock.calls[0]?.[1]).toMatchObject({ extractable: false })
+    expect(onAuthenticated.mock.calls[0]).toHaveLength(1)
     expect((screen.getByLabelText('Senha') as HTMLInputElement).value).toBe('')
   }, 15000)
 
@@ -377,7 +377,7 @@ describe('AuthScreen', () => {
       role: 'Professional',
       twoFactorRequirement: 'ChallengeRequired',
       twoFactorTicket: null,
-    }, expect.objectContaining({ extractable: false }))
+    })
     expect((await screen.findByRole('status')).textContent).toBe(
       'Conta criada. Você está cadastrado como profissional.',
     )

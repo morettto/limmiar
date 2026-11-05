@@ -75,14 +75,24 @@ export function criarAbridorUpstream(config: ConfigUpstream): AbrirUpstream {
         pronto(upstream)
         return
       }
-      if (evento.type === 'error') { socket.terminate(); return }
+      if (evento.type === 'error') {
+        const detalhe = typeof evento.error === 'object' && evento.error !== null ? evento.error as Record<string, unknown> : {}
+        const categoria = typeof detalhe.code === 'string' ? detalhe.code : typeof detalhe.type === 'string' ? detalhe.type : 'erro'
+        const erro = new Error(`NeMo-Speech: ${categoria}`)
+        clearTimeout(abertura)
+        fechadoAqui = true
+        socket.terminate()
+        if (!aberto) falhou(erro)
+        else aoFechar(erro)
+        return
+      }
       const mensagem = traduzir(evento)
       if (mensagem) aoMensagem(mensagem)
     })
     socket.on('error', () => {})
-    socket.on('close', () => {
+    socket.on('close', (codigo) => {
       clearTimeout(abertura)
-      const erro = new Error('A conexão com o serviço de transcrição foi encerrada.')
+      const erro = new Error(`A conexão com o serviço de transcrição foi encerrada (código ${codigo}).`)
       if (!aberto) falhou(erro)
       else if (!fechadoAqui) aoFechar(erro)
     })

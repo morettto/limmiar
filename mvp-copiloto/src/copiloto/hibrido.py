@@ -1,14 +1,9 @@
 from __future__ import annotations
 
 import re
-import threading
 
 import numpy as np
 
-_TRAVA = threading.Lock()
-_RERANKERS: dict[str, object] = {}
-
-RERANKER_PADRAO = "BAAI/bge-reranker-v2-m3"
 K_RRF = 60
 
 
@@ -39,21 +34,3 @@ def fundir_rrf(*ordens: list[int], k: int, constante: int = K_RRF) -> list[int]:
         for posicao, indice in enumerate(ordem):
             pontos[indice] = pontos.get(indice, 0.0) + 1.0 / (constante + posicao + 1)
     return [i for i, _ in sorted(pontos.items(), key=lambda par: -par[1])[:k]]
-
-
-def carregar_reranker(nome: str = RERANKER_PADRAO):
-    with _TRAVA:
-        if nome not in _RERANKERS:
-            from sentence_transformers import CrossEncoder
-
-            _RERANKERS[nome] = CrossEncoder(nome, max_length=512)
-        return _RERANKERS[nome]
-
-
-def reordenar(consulta: str, textos: list[str], indices: list[int], k: int, nome: str = RERANKER_PADRAO) -> list[int]:
-    if not indices:
-        return []
-    modelo = carregar_reranker(nome)
-    scores = modelo.predict([(consulta, textos[i]) for i in indices], show_progress_bar=False)
-    ordem = np.argsort(-np.asarray(scores))
-    return [indices[int(p)] for p in ordem[:k]]

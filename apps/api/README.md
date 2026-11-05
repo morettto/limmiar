@@ -70,7 +70,7 @@ tentar arrancar o container, não passam silenciosamente. Os testes puramente un
 - Minimal API, um ficheiro por área dentro de `src/Api/Features/<Módulo>` (ex.
   `Scheduling/SchedulingEndpoints.cs`, `Notes/NoteEndpoints.cs`, `Patients/PatientEndpoints.cs`)
   ou de `src/Api/Features/Accounts/<Fatia>/Presentation` (ex.
-  `DevicePairing/Presentation/DevicePairingEndpoints.cs`). Toda rota `{accountId}` nasce
+  `MagicLink/Presentation/MagicLinkEndpoints.cs`). Toda rota `{accountId}` nasce
   protegida por `RequireAccountAccessMiddleware`
   (`Accounts/Sessions/Presentation/RequireAccountAccessMiddleware.cs`, ver
   `Accounts.Sessions/README.md`) sem nenhuma chamada por rota -- fechado por omissão: o

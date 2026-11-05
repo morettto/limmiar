@@ -14,13 +14,13 @@ async function decodificar(audio: Blob): Promise<Float32Array> {
   return (await renderizador.startRendering()).getChannelData(0)
 }
 
-// Gravação inteira: o mesmo gateway da sessão ao vivo, com o PCM empurrado sem esperar o relógio, no ritmo em que o socket escoa.
+// Gravação inteira: o mesmo gateway da sessão ao vivo, com o PCM empurrado sem esperar o relógio, no ritmo em que o servidor processa.
 // A impressão de voz do profissional é apagada ao fim, com ou sem sucesso.
 export async function transcreverLocal(audio: Blob, signal: AbortSignal, perfil: number[]): Promise<PalavraAtribuida[]> {
   try {
     const pcm = await decodificar(audio)
     signal.throwIfAborted()
-    const sessao = await abrirTranscricao({ identidade: { modo: 'presencial', perfil }, aoResultado: () => {}, falhar: () => {} })
+    const sessao = await abrirTranscricao({ reconectar: false, identidade: { modo: 'presencial', perfil }, aoResultado: () => {}, falhar: () => {} })
     const descartar = () => sessao.descartar()
     signal.addEventListener('abort', descartar)
     try {

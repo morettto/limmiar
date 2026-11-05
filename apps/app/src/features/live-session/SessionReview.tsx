@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import type { CryptoKey } from '@limmiar/crypto'
 import { montarTranscricaoCanonica, type PalavraAtribuida, type RotuloLocutor } from '@limmiar/diarization'
@@ -15,8 +15,9 @@ import { papelDoFalante, transcreverAoVivo, type SessaoTranscricao, type Transcr
 import { LiveInsights } from './LiveInsights'
 import { abrirPerfilDeVoz } from './perfil-de-voz'
 import { PAPEIS_ONLINE, transcreverOnline } from './transcrever-online'
+import { setMaterialUsage } from '../../entities/material/api'
+import { acquireMaterialCapture, pendingMaterialCaptures, recoverMaterialCaptures, type MaterialCapture } from '../../entities/material/material-capture'
 import { prepareAuthorizedMaterials, type SessionMaterial } from '../../entities/material/authorized-materials'
-import type { BibliografiaInsight } from '../../entities/insight/insight'
 import type { PropostaReferencia } from '../../entities/nota/referencia'
 
 const FECHAR_PAGINA = 'beforeunload'
@@ -54,6 +55,8 @@ export interface SessionReviewProps {
 export function SessionReview({ baseUrl, accessToken, accountId, kek, paciente, atendimentoId, transcricao, onPendingChange, online, prepararEncerramento, onSaved, onPropostaReferencia, encerrada = false, bloqueada = false, onPreparingChange }: SessionReviewProps) {
   const { i18n, t } = useLingui()
   const [palavras, setPalavras] = useState<PalavraAtribuida[]>(() => transcricao?.palavras ?? [])
+  const [palavrasFinais, setPalavrasFinais] = useState<PalavraAtribuida[]>(() => transcricao?.palavras ?? [])
+  const [palavrasHipotese, setPalavrasHipotese] = useState<PalavraAtribuida[]>([])
   const [papeis, setPapeis] = useState<Record<string, RotuloLocutor | null>>(() => transcricao?.papeis ?? {})
   // Stryker disable next-line ConditionalExpression: equivalent, every flow that shows words resets the flag first.
   const [revisada, setRevisada] = useState(transcricao !== undefined)
@@ -72,16 +75,26 @@ export function SessionReview({ baseUrl, accessToken, accountId, kek, paciente, 
   const [revisao, setRevisao] = useState(transcricao?.revisao ?? -1)
   const [alterada, setAlterada] = useState(false)
   const votosLocais = useMemo(() => ({ accountId, kek }), [accountId, kek])
-  const [bibliografia, setBibliografia] = useState<BibliografiaInsight | null>(null)
+  const acessoAtual = useRef({ baseUrl, accountId, accessToken })
+  acessoAtual.current = { baseUrl, accountId, accessToken }
+  const [materiaisAutorizados, setMateriaisAutorizados] = useState<string[] | null>(null)
   const [materiaisPendentes, setMateriaisPendentes] = useState(0)
   const [materiais, setMateriais] = useState<SessionMaterial[]>([])
   const [selecionados, setSelecionados] = useState<string[]>(transcricao?.materialIds ?? [])
+  const materialSelection = useRef({ selecionados, materiais })
+  materialSelection.current = { selecionados, materiais }
   const tentativa = useRef<Transcricao | null>(null)
   const recorder = useRef<MediaRecorder | null>(null)
   const sessaoAoVivo = useRef<SessaoTranscricao | null>(null)
   const sessaoOnline = useRef<SessaoTranscricao | null>(null)
   const filaOnline = useRef(Promise.resolve())
+  const fimPresencial = useRef(Promise.resolve())
+  const inicioPresencial = useRef<Promise<SessaoTranscricao> | null>(null)
+  const capturasEncerradas = useRef(new Map<string, MaterialCapture>())
+  const [liberacaoPendente, setLiberacaoPendente] = useState(false)
+  const [retomadaPendente, setRetomadaPendente] = useState(() => pendingMaterialCaptures(accountId, atendimentoId).length > 0)
   const palavrasOnline = useRef<PalavraAtribuida[]>([])
+  const finaisPresenciaisFonte = useRef<PalavraAtribuida[] | undefined>(undefined)
   const inicioOnline = useRef<number | null>(null)
   const controller = useRef<AbortController | null>(null)
   const corrigidos = useRef<Record<string, RotuloLocutor | null>>({})
@@ -93,14 +106,15 @@ export function SessionReview({ baseUrl, accessToken, accountId, kek, paciente, 
   consentimentos.current = paciente.consentimentos
   const autorizada = paciente.consentimentos.gravacao === 'concedido'
   const analiseAutorizada = paciente.consentimentos.analiseIa === 'concedido'
+  const temTranscricao = transcricao !== undefined
   const locutores = Object.keys(papeis)
   const papelDe = new Map<string | null, RotuloLocutor | null>(Object.entries(papeis))
   const identificada = palavras.every((palavra) => palavra.texto.trim() !== '' && papelDe.get(palavra.locutor) != null)
   const haPendencias = gravando || ocupado || alterada
   const jaGravada = revisao >= 0
-  const bibliografiaSelecionada = useMemo(() => bibliografia === null ? undefined : {
-    ...bibliografia, materialIds: selecionados.filter(id => bibliografia.materialIds.includes(id)),
-  }, [bibliografia, selecionados])
+  const bibliografiaSelecionada = useMemo(() => materiaisAutorizados === null ? undefined : {
+    accountId, accessToken, materialIds: selecionados.filter(id => materiaisAutorizados.includes(id)),
+  }, [materiaisAutorizados, selecionados, accountId, accessToken])
 
   useEffect(() => {
     if (online || !autorizada || !analiseAutorizada || jaGravada || encerrada) return
@@ -114,20 +128,22 @@ export function SessionReview({ baseUrl, accessToken, accountId, kek, paciente, 
   useEffect(() => {
     let ativa = true
     let espera: ReturnType<typeof setTimeout> | undefined
-    setBibliografia(null); setMateriaisPendentes(0)
+    setMateriaisAutorizados(null); setMateriaisPendentes(0)
     function carregar(primeira: boolean) {
-      void prepareAuthorizedMaterials({ baseUrl, accountId, accessToken }, kek).then(result => {
+      const acesso = acessoAtual.current
+      void prepareAuthorizedMaterials(acesso, kek).then(result => {
         if (ativa) {
-          setBibliografia({ accountId, accessToken, materialIds: result.materialIds }); setMateriaisPendentes(result.pending)
-          setMateriais(result.materials)
-          if (primeira && !transcricao) setSelecionados(result.materialIds)
+          setMateriaisAutorizados(result.materialIds); setMateriaisPendentes(result.pending)
+          setMateriais(result.materials.filter(item => item.ready))
+          if (temTranscricao) setSelecionados(ids => ids.filter(id => result.materialIds.includes(id)))
+          if (primeira && !temTranscricao) setSelecionados(result.materialIds)
           if (result.pending > 0) espera = setTimeout(() => carregar(false), 1500)
         }
       }).catch(() => { if (ativa) setMateriaisPendentes(1) })
     }
     if (analiseAutorizada) carregar(true)
     return () => { ativa = false; clearTimeout(espera) }
-  }, [baseUrl, accountId, accessToken, kek, analiseAutorizada, transcricao])
+  }, [baseUrl, accountId, kek, analiseAutorizada, temTranscricao])
 
   useEffect(() => { onPendingChange(haPendencias) }, [haPendencias, onPendingChange])
   useEffect(() => { onPreparingChange?.(ocupado) }, [ocupado, onPreparingChange])
@@ -154,7 +170,8 @@ export function SessionReview({ baseUrl, accessToken, accountId, kek, paciente, 
     if ((!autorizada || !analiseAutorizada) && recorder.current?.state !== 'inactive') recorder.current?.stop()
     if (!analiseAutorizada) {
       palavrasOnline.current = []; inicioOnline.current = null
-      setPalavras([]); setPapeis({}); setAlterada(false)
+      finaisPresenciaisFonte.current = undefined
+      setPalavras([]); setPalavrasFinais([]); setPalavrasHipotese([]); setPapeis({}); setAlterada(false)
     }
   }, [autorizada, analiseAutorizada])
   useEffect(() => () => { if (audioUrl) URL.revokeObjectURL(audioUrl) }, [audioUrl])
@@ -162,13 +179,12 @@ export function SessionReview({ baseUrl, accessToken, accountId, kek, paciente, 
   useEffect(() => {
     prepararEncerramento?.(async () => {
       const gravador = recorder.current
-      const presencial = sessaoAoVivo.current
       if (gravador && gravador.state !== 'inactive') {
         await new Promise<void>(resolve => {
           gravador.addEventListener('stop', () => resolve(), { once: true })
           gravador.stop()
         })
-        await presencial?.encerrar()
+        await fimPresencial.current
       }
       await filaOnline.current
       await sessaoOnline.current?.encerrar()
@@ -176,35 +192,93 @@ export function SessionReview({ baseUrl, accessToken, accountId, kek, paciente, 
     })
   }, [prepararEncerramento])
 
+  const liberarCaptura = useCallback(async (captura: MaterialCapture | undefined) => {
+    if (!captura) return
+    capturasEncerradas.current.set(captura.captureId, captura)
+    try {
+      await captura.release(acessoAtual.current)
+      capturasEncerradas.current.delete(captura.captureId)
+      setLiberacaoPendente(capturasEncerradas.current.size > 0)
+    } catch (erro) {
+      setLiberacaoPendente(true)
+      setErroCaptura(erro instanceof Error ? erro.message : msg`Não foi possível concluir. Tente novamente.`)
+    }
+  }, [])
+
+  const adquirirCaptura = useCallback(async () => {
+    const ids = materialSelection.current.selecionados
+    if (ids.some(id => !materialSelection.current.materiais.some(item => item.materialId === id && item.ready))) throw new Error(i18n._(msg`Aguarde o preparo dos materiais selecionados.`))
+    try { return await acquireMaterialCapture(acessoAtual.current, atendimentoId, ids) }
+    catch (erro) { setRetomadaPendente(true); throw erro }
+  }, [atendimentoId, i18n])
+
+  const reservarMateriais = useCallback(async (ids = materialSelection.current.selecionados) => {
+    if (ids.some(id => !materialSelection.current.materiais.some(item => item.materialId === id && item.ready))) throw new Error(i18n._(msg`Aguarde o preparo dos materiais selecionados.`))
+    if (ids.length === 0) return
+    const result = await setMaterialUsage(acessoAtual.current, atendimentoId, ids)
+    if (!result.ok) throw new Error(translateProblemCode(result.code, result.params, i18n))
+  }, [atendimentoId, i18n])
+
+  async function selecionarMateriais(ids: string[]) {
+    setOcupado(true)
+    try {
+      if (palavras.length > 0) await reservarMateriais(ids)
+      if (!montado.current) return
+      setSelecionados(ids)
+      setAlterada(palavras.length > 0)
+      tentativa.current = null
+    } catch (erro) { setMensagem(erro instanceof Error ? erro.message : msg`Não foi possível concluir. Tente novamente.`) }
+    finally { setOcupado(false) }
+  }
+
+  const bibliografiaPronta = materiaisAutorizados !== null
   const localOnline = online?.local
   const remotoOnline = online?.remoto
   const onlineAtiva = online?.ativa
   useEffect(() => {
-    if (!localOnline || !remotoOnline || !onlineAtiva || !autorizada || !analiseAutorizada || jaGravada) return
+    if (!bibliografiaPronta || !localOnline || !remotoOnline || !onlineAtiva || !autorizada || !analiseAutorizada || jaGravada) return
     let cancelada = false
     let sessao: SessaoTranscricao | null = null
+    let captura: MaterialCapture | undefined
     const abort = new AbortController()
     filaOnline.current = filaOnline.current.then(async () => {
       if (cancelada) return
       controller.current = abort
       inicioOnline.current ??= performance.now()
       const anteriores = palavrasOnline.current
+      let fonteFinalAnterior: PalavraAtribuida[] | undefined
+      let finaisCombinados = anteriores
       const inicioMs = Math.round(performance.now() - inicioOnline.current)
       setOcupado(true); setErroCaptura(null); setAviso(undefined); setRevisada(false)
       try {
+        captura = await adquirirCaptura()
+        if (cancelada || abort.signal.aborted) { await liberarCaptura(captura); captura = undefined; return }
         sessao = await transcreverOnline(localOnline, remotoOnline, abort.signal, transcricao => {
           if (abort.signal.aborted) return
           const novas = [...anteriores, ...transcricao.palavras].sort((a, b) => a.inicioMs - b.inicioMs || a.fimMs - b.fimMs)
           palavrasOnline.current = novas
-          setPalavras(novas); setPapeis({ ...PAPEIS_ONLINE }); setAlterada(novas.length > 0)
-          setEstavelAteMs(transcricao.estavelAteMs); setAviso(transcricao.aviso); setRevisada(false); tentativa.current = null
+          const fonteFinal = transcricao.palavrasFinais ?? transcricao.palavras.slice(0, transcricao.finais)
+          if (fonteFinal !== fonteFinalAnterior) {
+            fonteFinalAnterior = fonteFinal
+            finaisCombinados = [...anteriores, ...fonteFinal].sort((a, b) => a.inicioMs - b.inicioMs || a.fimMs - b.fimMs)
+            setPalavrasFinais(finaisCombinados)
+          }
+          const hipotese = transcricao.palavrasHipotese ?? transcricao.palavras.slice(transcricao.finais)
+          setPalavras(novas); setPalavrasHipotese(hipotese)
+          setPapeis(PAPEIS_ONLINE); setAlterada(novas.length > 0)
+          setEstavelAteMs(transcricao.estavelAteMs); setFinais(transcricao.finais); setAviso(transcricao.aviso); setRevisada(false); tentativa.current = null
         }, erro => { if (!abort.signal.aborted) setErroCaptura(erro.message) }, inicioMs)
-        sessaoOnline.current = sessao
+        const aberta = sessao
+        sessaoOnline.current = { ...aberta, async encerrar() {
+          try { await aberta.encerrar() }
+          finally { abort.abort(); await liberarCaptura(captura) }
+        } }
         if (!cancelada) {
           setGravando(true)
           setMensagem(msg`Transcrição online ao vivo. Cada trilha identifica quem está falando.`)
         }
       } catch {
+        if (!sessao) { abort.abort(); await liberarCaptura(captura); captura = undefined }
         if (!cancelada) setErroCaptura(msg`Não foi possível transcrever a chamada. O áudio não foi salvo.`)
       } finally { setOcupado(false) }
     })
@@ -215,12 +289,14 @@ export function SessionReview({ baseUrl, accessToken, accountId, kek, paciente, 
         try { await sessao?.encerrar() }
         catch { setErroCaptura(msg`A transcrição foi interrompida. Revise o texto recuperado.`) }
         finally {
+          abort.abort()
+          await liberarCaptura(captura); captura = undefined
           sessaoOnline.current = null
           setGravando(false); setEstavelAteMs(Number.MAX_SAFE_INTEGER)
         }
       })
     }
-  }, [localOnline, remotoOnline, onlineAtiva, autorizada, analiseAutorizada, jaGravada])
+  }, [localOnline, remotoOnline, onlineAtiva, autorizada, analiseAutorizada, jaGravada, bibliografiaPronta, adquirirCaptura, liberarCaptura])
 
   async function analisar(audio: Blob) {
     if (consentimentos.current.gravacao !== 'concedido') return
@@ -235,17 +311,25 @@ export function SessionReview({ baseUrl, accessToken, accountId, kek, paciente, 
     setOcupado(true)
     setMensagem(msg`Preparando o áudio para o Nemotron...`)
     setPalavras([])
+    setPalavrasFinais([])
+    setPalavrasHipotese([])
     setPapeis({})
     setRevisada(false)
     setAlterada(false)
     setEstavelAteMs(0)
     tentativa.current = null
+    let captura: MaterialCapture | undefined
     try {
-      const perfil = await abrirPerfilDeVoz(baseUrl, accountId, accessToken, kek, abort.signal)
+      captura = await adquirirCaptura()
+      abort.signal.throwIfAborted()
+      const acesso = acessoAtual.current
+      const perfil = await abrirPerfilDeVoz(acesso.baseUrl, acesso.accountId, acesso.accessToken, kek, abort.signal)
       if (perfil === null) { setMensagem(msg`Cadastre sua voz antes de transcrever: é preciso saber quem está falando.`); return }
       const resultado = await transcreverLocal(audio, abort.signal, perfil)
       if (!abort.signal.aborted) {
         setPalavras(resultado)
+        setPalavrasFinais(resultado)
+        setPalavrasHipotese([])
         setPapeis(Object.fromEntries(resultado.flatMap((palavra) => palavra.locutor === null ? [] : [[palavra.locutor, papelDoFalante(palavra.locutor)]])))
         setAlterada(resultado.length > 0)
         setEstavelAteMs(Number.MAX_SAFE_INTEGER)
@@ -254,14 +338,18 @@ export function SessionReview({ baseUrl, accessToken, accountId, kek, paciente, 
     } catch (erro) {
       if (!abort.signal.aborted) setMensagem(erro instanceof Error ? erro.message : msg`Não foi possível processar o áudio.`)
     } finally {
+      await liberarCaptura(captura)
       if (controller.current === abort) setOcupado(false)
     }
   }
 
   async function iniciarGravacao() {
+    if (analiseAutorizada && materiaisAutorizados === null) return
     setOcupado(true)
     setErroCaptura(null)
     setAviso(undefined)
+    let captura: MaterialCapture | undefined
+    let capturaTransferida = false
     const resultado = await abrirMicrofone(paciente.consentimentos.gravacao)
     if (!resultado.ok) { setOcupado(false); setMensagem(msg`Autorize a gravação e permita o microfone.`); return }
     try {
@@ -274,12 +362,16 @@ export function SessionReview({ baseUrl, accessToken, accountId, kek, paciente, 
       controller.current?.abort()
       controller.current = abort
       corrigidos.current = {}
+      finaisPresenciaisFonte.current = undefined
       tentativa.current = null
       setPalavras([])
+      setPalavrasFinais([])
+      setPalavrasHipotese([])
       setPapeis({})
       setEstavelAteMs(0)
       setPausada(false)
       sessaoAoVivo.current = null
+      inicioPresencial.current = null
       const partes: Blob[] = []
       let tamanho = 0
       gravador.addEventListener('dataavailable', (evento) => {
@@ -296,28 +388,31 @@ export function SessionReview({ baseUrl, accessToken, accountId, kek, paciente, 
         const audio = new Blob(partes, { type: gravador.mimeType })
         partes.length = 0
         recorder.current = null
-        if (abort.signal.aborted) {
-          resultado.microfone.stream.getTracks().forEach(track => track.stop())
-          return
-        }
-        const sessao = sessaoAoVivo.current
+        const iniciada = inicioPresencial.current
         sessaoAoVivo.current = null
-        if (sessao) {
+        fimPresencial.current = (async () => {
           setOcupado(true)
-          void sessao.encerrar().then(() => {
-            if (abort.signal.aborted) return
-            setAudioUrl(URL.createObjectURL(audio))
-            setEstavelAteMs(Number.MAX_SAFE_INTEGER)
-            setMensagem(msg`Transcrição concluída. Confirme os papéis das vozes.`)
-          }).catch(() => {}).finally(() => {
-            resultado.microfone.stream.getTracks().forEach((track) => track.stop())
+          try {
+            const sessao = await iniciada
+            if (sessao) {
+              await sessao.encerrar()
+              if (!abort.signal.aborted) {
+                setAudioUrl(URL.createObjectURL(audio))
+                setEstavelAteMs(Number.MAX_SAFE_INTEGER)
+                setMensagem(msg`Transcrição concluída. Confirme os papéis das vozes.`)
+              }
+            } else if (!abort.signal.aborted) await analisar(audio)
+          } finally {
+            abort.abort()
+            resultado.microfone.stream.getTracks().forEach(track => track.stop())
+            await liberarCaptura(captura)
             setOcupado(false)
-          })
-        } else {
-          resultado.microfone.stream.getTracks().forEach((track) => track.stop())
-          void analisar(audio)
-        }
+          }
+        })()
+        void fimPresencial.current.catch(() => setErroCaptura(msg`A transcrição foi interrompida. Revise o texto recuperado.`))
       }, { once: true })
+      captura = await adquirirCaptura()
+      abort.signal.throwIfAborted()
       if (consentimentos.current.analiseIa === 'concedido') {
         const preparado = await perfilPronto.current!
         const perfil = preparado.perfil?.slice() ?? null
@@ -331,11 +426,25 @@ export function SessionReview({ baseUrl, accessToken, accountId, kek, paciente, 
         }
         recorder.current = gravador
         gravador.start(5000)
-        sessaoAoVivo.current = await transcreverAoVivo(resultado.microfone.stream, abort.signal, (transcricao) => {
+        capturaTransferida = true
+        inicioPresencial.current = transcreverAoVivo(resultado.microfone.stream, abort.signal, (transcricao) => {
           if (abort.signal.aborted) return
           setPalavras(transcricao.palavras)
-          setPapeis(Object.fromEntries(transcricao.palavras.flatMap((palavra) => palavra.locutor === null ? [] : [[palavra.locutor,
-            palavra.locutor in corrigidos.current ? corrigidos.current[palavra.locutor] : papelDoFalante(palavra.locutor)]])))
+          const fonteFinal = transcricao.palavrasFinais ?? transcricao.palavras.slice(0, transcricao.finais)
+          if (fonteFinal !== finaisPresenciaisFonte.current) {
+            finaisPresenciaisFonte.current = fonteFinal
+            setPalavrasFinais(fonteFinal)
+            setPapeis(Object.fromEntries(fonteFinal.flatMap((palavra) => palavra.locutor === null ? [] : [[palavra.locutor,
+              palavra.locutor in corrigidos.current ? corrigidos.current[palavra.locutor] : papelDoFalante(palavra.locutor)]])))
+          }
+          const hipotese = transcricao.palavrasHipotese ?? transcricao.palavras.slice(transcricao.finais)
+          setPalavrasHipotese(hipotese)
+          const papeisHipotese = Object.fromEntries(hipotese.flatMap((palavra) => palavra.locutor === null ? [] : [[palavra.locutor,
+            palavra.locutor in corrigidos.current ? corrigidos.current[palavra.locutor] : papelDoFalante(palavra.locutor)]]))
+          setPapeis((atuais) => {
+            const novos = Object.entries(papeisHipotese).filter(([locutor, papel]) => atuais[locutor] !== papel)
+            return novos.length === 0 ? atuais : { ...atuais, ...Object.fromEntries(novos) }
+          })
           setEstavelAteMs(transcricao.estavelAteMs)
           setFinais(transcricao.finais)
           setAviso(transcricao.aviso)
@@ -347,18 +456,24 @@ export function SessionReview({ baseUrl, accessToken, accountId, kek, paciente, 
           if (gravador.state !== 'inactive') gravador.stop()
         // eslint-disable-next-line lingui/no-unlocalized-strings -- Transport option value, not visible copy.
         }, { trilhas: 'proprias', perfil })
+        sessaoAoVivo.current = await inicioPresencial.current
       }
       if (abort.signal.aborted) return
       recorder.current = gravador
       if (gravador.state === 'inactive') gravador.start(5000)
+      capturaTransferida = true
       setGravando(true)
       setMensagem(msg`Transcrição ao vivo. Seu perfil de voz identifica quem está falando.`)
     } catch {
       controller.current?.abort()
       if (recorder.current && recorder.current.state !== 'inactive') recorder.current.stop()
       resultado.microfone.stream.getTracks().forEach((track) => track.stop())
+      await liberarCaptura(captura)
       setMensagem(msg`Não foi possível iniciar a gravação.`)
-    } finally { setOcupado(false) }
+    } finally {
+      if (!capturaTransferida) await liberarCaptura(captura)
+      setOcupado(false)
+    }
   }
 
   function tocar(inicioMs: number) {
@@ -367,7 +482,10 @@ export function SessionReview({ baseUrl, accessToken, accountId, kek, paciente, 
   }
 
   function corrigir(indice: number, alteracao: Partial<PalavraAtribuida>) {
-    setPalavras((atual) => atual.map((palavra, i) => i === indice ? { ...palavra, ...alteracao } : palavra))
+    const corrigidasAgora = palavras.map((palavra, i) => i === indice ? { ...palavra, ...alteracao } : palavra)
+    setPalavras(corrigidasAgora)
+    setPalavrasFinais(corrigidasAgora)
+    setPalavrasHipotese([])
     setRevisada(false)
     setAlterada(true)
     tentativa.current = null
@@ -377,6 +495,8 @@ export function SessionReview({ baseUrl, accessToken, accountId, kek, paciente, 
     setAudioUrl(null)
     setRevisao(transcricao.revisao)
     setPalavras(transcricao.palavras)
+    setPalavrasFinais(transcricao.palavras)
+    setPalavrasHipotese([])
     setEstavelAteMs(Number.MAX_SAFE_INTEGER)
     setPapeis(transcricao.papeis)
     setSelecionados(transcricao.materialIds ?? [])
@@ -390,7 +510,8 @@ export function SessionReview({ baseUrl, accessToken, accountId, kek, paciente, 
     setOcupado(true)
     setMensagem(null)
     try {
-      const registro = await getPatientRecord(baseUrl, accountId, accessToken, paciente.id)
+      const acesso = acessoAtual.current
+      const registro = await getPatientRecord(acesso.baseUrl, acesso.accountId, acesso.accessToken, paciente.id)
       if (!registro.ok) throw new Error(translateProblemCode(registro.code, registro.params, i18n))
       const bytes = await openEntries(paciente.dek, registro.entries, paciente.id)
       const transcricoes = bytes.flatMap((entrada) => {
@@ -411,7 +532,8 @@ export function SessionReview({ baseUrl, accessToken, accountId, kek, paciente, 
         if ((ultima?.revisao ?? -1) !== revisao) { setMensagem(msg`Outra revisão foi salva. Reabra a transcrição antes de corrigir.`); return }
         const sequence = registro.entries.length + 1
         const ciphertext = await sealEntry(paciente.dek, paciente.id, sequence, transcricaoParaEntrada(nova))
-        const resultado = await appendPatientEntry(baseUrl, accountId, accessToken, paciente.id, { sequence, ciphertext })
+        const acessoAtualizado = acessoAtual.current
+        const resultado = await appendPatientEntry(acessoAtualizado.baseUrl, acessoAtualizado.accountId, acessoAtualizado.accessToken, paciente.id, { sequence, ciphertext })
         if (!resultado.ok) throw new Error(translateProblemCode(resultado.code, resultado.params, i18n))
       }
       if (montado.current) {
@@ -430,7 +552,7 @@ export function SessionReview({ baseUrl, accessToken, accountId, kek, paciente, 
   function descartar() {
     const anterior = historico.at(-1)
     if (anterior) abrir(anterior)
-    else { setPalavras([]); setPapeis({}); setAudioUrl(null); setAlterada(false); tentativa.current = null }
+    else { setPalavras([]); setPalavrasFinais([]); setPalavrasHipotese([]); setPapeis({}); setAudioUrl(null); setAlterada(false); tentativa.current = null }
   }
 
   return <section className="workspace-card" aria-label={t`Gravação e transcrição`}>
@@ -438,16 +560,24 @@ export function SessionReview({ baseUrl, accessToken, accountId, kek, paciente, 
     <p>{online ? <Trans>Na sessão online, as trilhas identificam profissional e paciente. Confira o texto antes de salvar.</Trans>
       : <Trans>Seu perfil de voz identifica o profissional. Confira as falas incertas antes de usar a transcrição.</Trans>}</p>
     {!autorizada && <p role="status"><Trans>O consentimento de gravação é necessário.</Trans></p>}
+    {retomadaPendente && <button type="button" className="button-secondary" onClick={() => {
+      void recoverMaterialCaptures(acessoAtual.current, atendimentoId).then(ativas => {
+        setRetomadaPendente(ativas > 0)
+        if (ativas > 0) setErroCaptura(msg`Encerre a captura na aba de origem. Se ela já foi interrompida, recarregue essa aba e tente novamente.`)
+      }).catch(erro => setErroCaptura(erro instanceof Error ? erro.message : msg`Não foi possível concluir. Tente novamente.`))
+    }}><Trans>Recuperar capturas interrompidas</Trans></button>}
+    {liberacaoPendente && <button type="button" className="button-secondary" onClick={() => { void Promise.all([...capturasEncerradas.current.values()].map(liberarCaptura)) }}><Trans>Tentar liberar captura encerrada</Trans></button>}
     {!online && <div className="my-3 flex flex-wrap gap-3">
-      <button type="button" className="button-primary" disabled={bloqueada || ocupado || (!gravando && (!autorizada || alterada || jaGravada || encerrada))} onClick={() => gravando ? recorder.current!.stop() : void iniciarGravacao()}>
+      <button type="button" className="button-primary" disabled={bloqueada || ocupado || (!gravando && (!autorizada || alterada || jaGravada || encerrada || (analiseAutorizada && !bibliografiaPronta)))} onClick={() => gravando ? recorder.current!.stop() : void iniciarGravacao()}>
         {gravando ? <Trans>Encerrar gravação</Trans> : <Trans>Iniciar gravação</Trans>}
       </button>
       {gravando && sessaoAoVivo.current && <button type="button" onClick={() => {
         sessaoAoVivo.current!.pausar(!pausada)
         setPausada(!pausada)
       }}>{pausada ? <Trans>Retomar sessão</Trans> : <Trans>Pausar sessão</Trans>}</button>}
-      <label><Trans>Ou carregar áudio</Trans><input type="file" accept="audio/*" disabled={!autorizada || ocupado || gravando || alterada || jaGravada || encerrada || bloqueada}
+      <label><Trans>Ou carregar áudio</Trans><input type="file" accept="audio/*" disabled={!autorizada || ocupado || gravando || alterada || jaGravada || encerrada || bloqueada || (analiseAutorizada && !bibliografiaPronta)}
         onChange={(e) => {
+          if (analiseAutorizada && !bibliografiaPronta) return
           const arquivo = e.target.files![0]
           if (!arquivo) return
           if (arquivo.size === 0 || !arquivo.type.startsWith('audio/')) { setMensagem(msg`Escolha um arquivo de áudio válido.`); return }
@@ -462,16 +592,14 @@ export function SessionReview({ baseUrl, accessToken, accountId, kek, paciente, 
     {erroCaptura !== null && <p role="alert">{traduzir(i18n, erroCaptura)}</p>}
     {gravando && aviso === 'reconectando' && <p role="status"><Trans>A conexão com a transcrição caiu. Reconectando: o que for dito agora será transcrito assim que ela voltar.</Trans></p>}
     {gravando && aviso === 'atrasada' && <p role="status"><Trans>A transcrição está atrasada em relação à fala. O áudio continua sendo enviado.</Trans></p>}
-    {analiseAutorizada && bibliografia === null && materiaisPendentes === 0 && <p role="status"><Trans>Preparando seu acervo autorizado para o copiloto local...</Trans></p>}
+    {analiseAutorizada && materiaisAutorizados === null && materiaisPendentes === 0 && <p role="status"><Trans>Preparando seu acervo autorizado para o copiloto local...</Trans></p>}
     {materiaisPendentes > 0 && <p role="status"><Trans>Há materiais autorizados que não estão prontos nesta máquina. Verifique seu acervo pessoal.</Trans></p>}
     {analiseAutorizada && materiais.length > 0 && <fieldset disabled={ocupado || gravando || bloqueada || encerrada}>
       <legend><Trans>Obras desta sessão</Trans></legend>
       <p><Trans>Escolha as referências que o copiloto poderá consultar neste atendimento.</Trans></p>
       {materiais.map(material => <label key={material.materialId}><input type="checkbox" disabled={!material.ready}
         checked={selecionados.includes(material.materialId)} onChange={evento => {
-          setSelecionados(atual => evento.target.checked ? [...atual, material.materialId] : atual.filter(id => id !== material.materialId))
-          setAlterada(palavras.length > 0)
-          tentativa.current = null
+          void selecionarMateriais(evento.target.checked ? [...selecionados, material.materialId] : selecionados.filter(id => id !== material.materialId))
         }} />{material.title}{!material.ready && <span><Trans> · Em preparação</Trans></span>}</label>)}
     </fieldset>}
     {gravando && <p role="status">{pausada ? <Trans>Microfone pausado.</Trans> : <Trans>O áudio permanece somente em memória durante a sessão.</Trans>}</p>}
@@ -501,7 +629,7 @@ export function SessionReview({ baseUrl, accessToken, accountId, kek, paciente, 
         {audioUrl && <button type="button" disabled={!palavras.some((palavra) => palavra.locutor === locutor)} onClick={() => tocar(palavras.find((palavra) => palavra.locutor === locutor)!.inicioMs)}><Trans>Ouvir esta voz</Trans></button>}
       </div>})}
     </fieldset>}
-    <LiveInsights palavras={palavras} papeis={papeis} estavelAteMs={estavelAteMs} finais={gravando ? finais : undefined} autorizada={analiseAutorizada && bibliografia !== null} bibliografia={bibliografiaSelecionada} temObrasAutorizadas={materiais.length > 0} votos={votosLocais} trilhasSeparadas={online !== undefined} onOuvir={audioUrl ? tocar : undefined}
+    <LiveInsights palavras={palavras} palavrasFinais={palavrasFinais} palavrasHipotese={palavrasHipotese} papeis={papeis} estavelAteMs={estavelAteMs} finais={gravando ? finais : undefined} autorizada={analiseAutorizada && materiaisAutorizados !== null} bibliografia={bibliografiaSelecionada} temObrasAutorizadas={materiais.length > 0} votos={votosLocais} trilhasSeparadas={online !== undefined} onOuvir={audioUrl ? tocar : undefined}
       onSelectFonte={onPropostaReferencia && jaGravada && !haPendencias && !online?.ativa ? (consulta, fonte, inicioMs, fimMs) => onPropostaReferencia({
         patientId: paciente.id, inicioMs, fimMs, referencia: { trechoId: fonte.trecho_id, titulo: fonte.titulo, autor: fonte.autor,
           pagina: fonte.pagina, paragrafo: fonte.paragrafo, citacaoLiteral: fonte.citacao_literal,

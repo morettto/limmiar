@@ -3,7 +3,8 @@ import type { ConsultaInsight } from './insight'
 
 const SILENCIO_FIM_TURNO_MS = 2500
 
-// Passada final sobre a fala inteira do paciente: pega o sentido que só existe juntando frases.
+// Passada sobre a fala inteira do paciente, só depois da gravação: pega o sentido que só existe juntando frases.
+// O silêncio de 2,5 s só se cumpre com a gravação concluída (`estavelAteMs` máximo): até lá a última fala espera.
 export function selecionarTurnosPaciente(palavras: readonly PalavraAtribuida[], papeis: Readonly<Record<string, RotuloLocutor | null>>,
   estavelAteMs: number, falas: readonly ConsultaInsight[]): ConsultaInsight[] {
   const porId = new Map(falas.map((fala) => [fala.id, fala]))
@@ -13,7 +14,7 @@ export function selecionarTurnosPaciente(palavras: readonly PalavraAtribuida[], 
   const concluir = () => {
     const frase = atuais.map((fala) => fala.frase).join(' ')
     if (atuais.length >= 2 && frase.length <= 2000) {
-      turnos.push({ id: `turno:${atuais[0]!.id}`, frase, contexto: atuais[0]!.contexto, ancoras: atuais.map((fala) => fala.id) })
+      turnos.push({ id: `turno:${atuais[0]!.id}`, frase, contexto: atuais[0]!.contexto, fimMs: atuais.at(-1)!.fimMs, ancoras: atuais.map((fala) => fala.id) })
     }
     atuais = []
   }

@@ -1,4 +1,4 @@
-import { encodeBase64, decodeBase64 } from '../../shared/lib/base64'
+import { encodeBase64 } from '../../shared/lib/base64'
 import { request, type ProblemResult } from '../../shared/api/client'
 import type { Account, AccountRole, SessionTokens } from './account'
 
@@ -164,7 +164,7 @@ export async function verifyMagicLink(baseUrl: string, params: { token: string; 
 export async function recoverAccess(
   baseUrl: string,
   params: { email: string; recoveryVerifier: Uint8Array },
-): Promise<({ ok: true; account: Account; recoveryEnvelope: Uint8Array<ArrayBuffer> } | ProblemResult)> {
+): Promise<({ ok: true; account: Account } | ProblemResult)> {
   const result = await request(baseUrl, 'POST', '/auth/recover', {
     email: params.email,
     recoveryVerifier: encodeBase64(params.recoveryVerifier),
@@ -173,8 +173,8 @@ export async function recoverAccess(
     return result
   }
 
-  const { recoveryEnvelope, ...account } = (await result.response.json()) as Account & { recoveryEnvelope: string }
-  return { ok: true, account, recoveryEnvelope: decodeBase64(recoveryEnvelope) }
+  const account = (await result.response.json()) as Account
+  return { ok: true, account }
 }
 
 export type RegisterRecoveryPhraseResult = { ok: true } | ProblemResult
@@ -184,13 +184,12 @@ export async function registerRecoveryPhrase(
   accountId: string,
   accessToken: string,
   recoveryVerifier: Uint8Array,
-  recoveryEnvelope: Uint8Array,
 ): Promise<RegisterRecoveryPhraseResult> {
   const result = await request(
     baseUrl,
     'POST',
     `/accounts/${accountId}/recovery-phrase`,
-    { recoveryVerifier: encodeBase64(recoveryVerifier), recoveryEnvelope: encodeBase64(recoveryEnvelope) },
+    { recoveryVerifier: encodeBase64(recoveryVerifier) },
     accessToken,
   )
   if (!result.ok) {

@@ -37,13 +37,13 @@ class IntegridadeArtefatos(unittest.TestCase):
             criar_esquema(con)
             con.execute("insert into obra (id,titulo,autor,idioma,arquivo,arquivo_hash) values (?,?,?,?,?,?)",
                         ("o1", "Título", "Autor", "pt-BR", "fonte.pdf", "hash"))
-            con.execute("insert into trecho (id,obra_id,pagina,paragrafo,texto,idioma,embedding) values (?,?,?,?,?,?,?)",
-                        ("t1", "o1", 1, 1, "Texto original", "pt-BR", b"embedding"))
+            con.execute("insert into trecho (id,obra_id,pagina,paragrafo,texto,idioma,embedding,generico) values (?,?,?,?,?,?,?,?)",
+                        ("t1", "o1", 1, 1, "Texto original", "pt-BR", b"embedding", 0.1))
             con.commit()
             hashes = [metadados.hash_indice()]
             self.assertEqual(hashes[0], metadados.hash_indice())
             for sql in ("update obra set titulo='Outra obra'", "update trecho set texto='Outro texto'",
-                        "update trecho set embedding=x'010203'", "delete from trecho"):
+                        "update trecho set embedding=x'010203'", "update trecho set generico=0.9", "delete from trecho"):
                 con.execute(sql)
                 con.commit()
                 hashes.append(metadados.hash_indice())
@@ -65,7 +65,7 @@ class IntegridadeArtefatos(unittest.TestCase):
             self.assertEqual(set(metadados.estado_arquivos()), {str(codigo)})
 
     def test_versao_do_produto_e_a_do_juiz_mais_contrato_e_codigo(self):
-        with patch.object(metadados, "hashes", return_value={"arquivo": "hash"}),              patch.object(metadados.juiz_llm, "VERSAO", "v7"):
+        with patch.object(metadados, "hashes", return_value={"arquivo": "hash"}),              patch.object(metadados.juiz_pequeno, "VERSAO", "v7"):
             versao = metadados.versao()
         self.assertEqual(versao["contrato"], "fontes-progressivas-frase-v4")
         self.assertEqual(versao["juiz"], "v7")
@@ -79,7 +79,7 @@ class IntegridadeArtefatos(unittest.TestCase):
         self.assertEqual(versao["indice_sha256"], "hash-indice")
         self.assertEqual(versao["pdf_hashes"], {"arquivo": "hash"})
         self.assertEqual(versao["model_hashes"], {"arquivo": "hash"})
-        self.assertEqual(versao["juiz"], metadados.juiz_llm.VERSAO)
+        self.assertEqual(versao["juiz"], metadados.juiz_pequeno.VERSAO)
 
     def test_hashes_ignoram_diretorios(self):
         hashes = metadados.hashes([self.pesos, self.pdfs])

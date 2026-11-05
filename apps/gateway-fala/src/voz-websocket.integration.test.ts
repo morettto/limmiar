@@ -66,7 +66,10 @@ describe.skipIf(!existsSync(modelo) || !existsSync(modeloSegmentacao))('voz pelo
       await vi.waitFor(() => expect(ambiente.up.fechado).toBe(true))
       espera.resolver(); await terminou.promessa
       await new Promise<void>(resolve => setImmediate(resolve))
-      expect(ambiente.mensagens).toEqual([{ type: 'pronta' }])
+      expect(ambiente.mensagens).toEqual([
+        { type: 'pronta' },
+        { type: 'parcial', ordem: 1, texto: 'Privado sintético', processado_ms: 2000 },
+      ])
       expect(ambiente.registrar.mock.calls.flat().join('')).not.toContain('Privado')
     } finally { espera.resolver(); await ambiente.fechar() }
   }, 60_000)

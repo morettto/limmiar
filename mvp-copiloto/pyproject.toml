@@ -7,14 +7,20 @@ dependencies = [
     "uvicorn[standard]>=0.32",
     "python-multipart>=0.0.12",
     "pypdf>=5.1",
-    "sentence-transformers>=3.3",
     "numpy>=1.26",
+    "onnxruntime>=1.30",
+    "tokenizers>=0.23.1,<0.24",
+    "huggingface_hub>=1.0",
     "httpx>=0.28",
-    "rank_bm25>=0.2.2",
-    "ctranslate2>=4.5",
-    "sentencepiece>=0.2",
-    "sacremoses>=0.1",
     "fonttools>=4.50",
+]
+
+[project.optional-dependencies]
+# Fora do serviço: copiloto.aluno, copiloto.traducao e as ferramentas de treino e de pesquisa em tools/atendimento-simulado.
+pesquisa = [
+    "sentence-transformers>=3.3",
+    "peft>=0.21",
+    "sentencepiece>=0.2",
 ]
 
 [build-system]

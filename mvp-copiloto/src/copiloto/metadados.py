@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import hashlib
-import os
 import json
 import sqlite3
 from contextlib import closing
 from pathlib import Path
 
-from . import juiz_llm, treinado
+from . import embedder, juiz_pequeno
 from .esquema import CAMINHO_BD, DIR_PDFS, RAIZ
 
 
@@ -15,7 +14,7 @@ FONTES = Path(__file__).parent
 
 
 def arquivos_modelo() -> list[Path]:
-    return [*treinado.pasta(treinado.NOME_JUIZ).glob("*"), treinado.arquivo_triagem()]
+    return juiz_pequeno.arquivos()
 
 
 def estado_arquivos() -> dict:
@@ -45,7 +44,8 @@ def hashes(arquivos) -> dict[str, str]:
     for arquivo in sorted(arquivos):
         if arquivo.is_file():
             with arquivo.open("rb") as stream:
-                saida[arquivo.relative_to(RAIZ).as_posix()] = hashlib.file_digest(stream, "sha256").hexdigest()
+                nome = arquivo.relative_to(RAIZ) if arquivo.is_relative_to(RAIZ) else arquivo
+                saida[nome.as_posix()] = hashlib.file_digest(stream, "sha256").hexdigest()
     return saida
 
 
@@ -53,9 +53,8 @@ def versao() -> dict:
     return {
         "contrato": "fontes-progressivas-frase-v4",
         "source_hashes": hashes(FONTES.glob("*.py")),
-        "juiz": juiz_llm.VERSAO,
-        "dispositivo_embedder": os.environ.get("COPILOTO_EMBEDDER_DISPOSITIVO", "cpu"),
-        "dtype_embedder": "float16" if os.environ.get("COPILOTO_EMBEDDER_DISPOSITIVO", "cpu").startswith("cuda") else "float32",
+        "juiz": juiz_pequeno.VERSAO,
+        "embedder": embedder.PADRAO,
     }
 
 
@@ -65,6 +64,4 @@ def versao_pesquisa() -> dict:
         "model_hashes": hashes(arquivos_modelo()),
         "pdf_hashes": hashes(DIR_PDFS.glob("*.pdf")),
         "indice_sha256": hash_indice(),
-        "dispositivo_juiz": os.environ.get("COPILOTO_JUIZ_DISPOSITIVO", "cuda"),
-        "dtype_juiz": os.environ.get("COPILOTO_JUIZ_DTYPE", "float32"),
     }

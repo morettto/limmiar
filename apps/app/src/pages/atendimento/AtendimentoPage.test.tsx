@@ -108,6 +108,17 @@ describe('AtendimentoPage', () => {
     expect(screen.queryByLabelText('Tipo de sessão')).toBeNull()
   })
 
+  it('retoma a conclusão após recarregar uma sessão encerrada e permite repetir se falhar', async () => {
+    vi.mocked(encerrarAtendimento).mockRejectedValueOnce(new Error('Falha ao concluir'))
+    montar(prontuario({ atendimentos: [{ ...atendimento, encerradoEm: '2026-10-05T15:00:00Z' }] }))
+    await screen.findByText('Falha ao concluir')
+    fireEvent.click(screen.getByRole('button', { name: 'Concluir encerramento' }))
+    await act(async () => {})
+    expect(encerrarAtendimento).toHaveBeenCalledTimes(2)
+    expect(screen.queryByRole('button', { name: 'Concluir encerramento' })).toBeNull()
+    expect(finalizacao.salvar).not.toHaveBeenCalled()
+  })
+
   it('sem a sessão na pasta do paciente avisa e leva de volta à pasta', () => {
     montar(prontuario(), { atendimentoId: 'inexistente' })
     expect(screen.getByRole('alert').textContent).toBe('Não encontramos esta sessão na pasta do paciente.')

@@ -1,5 +1,10 @@
 *
 !pyproject.toml
 !src/copiloto/*.py
-!data/limiares-juiz-llm.json
+!data/juiz-pequeno.json
+!data/risco-cabeca.json
 !data/juiz-v2/registro.jsonl
+!modelos/juiz-pequeno/tokenizer.json
+!modelos/juiz-pequeno/onnx/model_gather.onnx
+!modelos/bge-m3/tokenizer.json
+!modelos/bge-m3/onnx/sentence_transformers_int8.onnx

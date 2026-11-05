@@ -11,7 +11,7 @@ const bytes = new TextEncoder().encode('Fonte bibliográfica privada')
 beforeEach(async () => {
   kek = await webcrypto.importKek(new Uint8Array(32).fill(4))
   sealed = await sealMaterial(kek, access.accountId, 'id', { title: 'Obra', authors: 'Autora', reference: '', filename: 'obra.txt', type: 'txt', size: bytes.length, sha256: await materialHash(bytes) }, bytes)
-  vi.spyOn(api, 'listMaterials').mockResolvedValue({ ok: true, materials: [{ ...sealed, authorized: true, createdAt: 'date' }] })
+  vi.spyOn(api, 'listMaterials').mockResolvedValue({ ok: true, materials: [{ ...sealed, authorized: true, inUse: false, createdAt: 'date' }] })
   vi.spyOn(api, 'getMaterialContent').mockResolvedValue({ ok: true, ciphertext: sealed.contentCiphertext })
   vi.spyOn(local, 'listPreparedMaterials').mockResolvedValue([])
   vi.spyOn(local, 'prepareLocalMaterial').mockResolvedValue()
@@ -24,7 +24,7 @@ it('lista somente obras autorizadas e prontas sem baixar nem preparar arquivos n
   expect(local.prepareLocalMaterial).not.toHaveBeenCalled()
 })
 it('não libera obra não autorizada mesmo se preparada', async () => {
-  vi.mocked(api.listMaterials).mockResolvedValue({ ok: true, materials: [{ ...sealed, authorized: false, createdAt: '' }] })
+  vi.mocked(api.listMaterials).mockResolvedValue({ ok: true, materials: [{ ...sealed, authorized: false, inUse: false, createdAt: '' }] })
   expect(await prepareAuthorizedMaterials(access, kek)).toEqual({ materialIds: [], pending: 0, materials: [] })
 })
 it('obra ausente, em preparação, de outro id ou hash não pode ser selecionada', async () => {
@@ -33,7 +33,7 @@ it('obra ausente, em preparação, de outro id ou hash não pode ser selecionada
     [{ materialId: 'other', ready: true as const, sha256: hash, paragraphs: 1, preparedAt: '' }],
     [{ materialId: 'id', ready: true as const, sha256: 'wrong', paragraphs: 1, preparedAt: '' }]]) {
     vi.mocked(local.listPreparedMaterials).mockResolvedValue(prepared)
-    expect(await prepareAuthorizedMaterials(access, kek)).toEqual({ materialIds: [], pending: 1, materials: [{ materialId: 'id', title: 'Obra', ready: false }] })
+    expect(await prepareAuthorizedMaterials(access, kek)).toEqual({ materialIds: [], pending: 1, materials: [] })
   }
 })
 it('falhas de carteira, estado ou decifração não viram acervo vazio', async () => {
@@ -41,6 +41,7 @@ it('falhas de carteira, estado ou decifração não viram acervo vazio', async (
   await expect(prepareAuthorizedMaterials(access, kek)).rejects.toThrow('unavailable')
   vi.mocked(local.listPreparedMaterials).mockRejectedValueOnce(new Error('offline'))
   await expect(prepareAuthorizedMaterials(access, kek)).rejects.toThrow('offline')
-  vi.mocked(api.listMaterials).mockResolvedValueOnce({ ok: true, materials: [{ ...sealed, wrappedDek: new Uint8Array(3), authorized: true, createdAt: '' }] })
+  vi.mocked(api.listMaterials).mockResolvedValueOnce({ ok: true, materials: [{ ...sealed, wrappedDek: new Uint8Array(3), authorized: true, inUse: false, createdAt: '' }] })
+  vi.mocked(local.listPreparedMaterials).mockResolvedValueOnce([{ materialId: 'id', ready: true, sha256: await materialHash(bytes), paragraphs: 1, preparedAt: '' }])
   await expect(prepareAuthorizedMaterials(access, kek)).rejects.toThrow()
 })

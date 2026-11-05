@@ -8,7 +8,8 @@ navegador ──WebSocket /speech/v1/fala──▶ gateway de fala (apps/gateway
 ```
 
 O gateway escolhe o processo menos ocupado, manda ao app só o que é novo (parcial com a cauda ainda sem tempo, cada frase
-final com o falante resolvido) e reinicia a sessão upstream numa pausa a cada ~3 min, mantendo o relógio. A decisão e o que
+final com o falante resolvido) e reinicia a sessão upstream após 120 s em uma pausa ou aos 145 s mesmo com fala, mantendo o
+relógio. Isso deixa margem às conexões que fecharam após 154–159 s de áudio processado neste hardware. A decisão e o que
 ela muda na privacidade: `docs/adr/ADR-0012-transcricao-no-servidor.md`. Áudio e impressão de voz vivem só em memória.
 
 `pnpm dev` garante os containers (`tools/nemotron/garantir.mjs`) e sobe o gateway com a lista deles (`NEMOTRON_URLS`).

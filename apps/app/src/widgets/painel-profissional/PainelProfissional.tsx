@@ -112,7 +112,7 @@ export function PainelProfissional({ baseUrl, chaveiro, notas, versao, onStart, 
       setEstado({ status: 'pronto', pacientes, sessoes })
     }
 
-    // Sem `.catch()` aqui (ao contrário de `PatientWallet`): `carregar` em si não rejeita --
+    // Sem `.catch()` aqui: `carregar` em si não rejeita --
     // as duas fontes já absorvem a própria falha acima -- um `.catch` só ficaria morto.
     void carregar()
 

@@ -52,17 +52,17 @@ public sealed class RecoveryEndpointsTests : IAsyncLifetime
     [InlineData(0)]
     [InlineData(119)]
     [InlineData(121)]
-    public async Task PostRecoveryPhrase_RequiresCompleteEncryptedKeyEnvelope(int? length)
+    public async Task PostRecoveryPhrase_RequiresRecoveryVerifier(int? length)
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
         var id = await RegisterProfessionalAsync(client, "recovery-envelope@example.com");
         var response = await client.PostAsJsonAsync($"/accounts/{id}/recovery-phrase",
-            new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier, length is null ? null! : new byte[length.Value]),
+            new RegisterRecoveryVerifierRequest(length is null ? null! : new byte[length.Value]),
             AccountsJsonContext.Default.RegisterRecoveryVerifierRequest);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        Assert.Equal("recoveryEnvelope", doc.RootElement.GetProperty("params").GetProperty("field").GetString());
+        Assert.Equal("recoveryVerifier", doc.RootElement.GetProperty("params").GetProperty("field").GetString());
         var recover = await client.PostAsJsonAsync("/auth/recover", new RecoverAccessRequest("recovery-envelope@example.com", SomeRecoveryVerifier),
             AccountsJsonContext.Default.RecoverAccessRequest);
         Assert.Equal(HttpStatusCode.Unauthorized, recover.StatusCode);
@@ -77,7 +77,7 @@ public sealed class RecoveryEndpointsTests : IAsyncLifetime
 
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/recovery-phrase",
-            new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier, SomeEnvelope),
+            new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier),
             AccountsJsonContext.Default.RegisterRecoveryVerifierRequest);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -96,7 +96,7 @@ public sealed class RecoveryEndpointsTests : IAsyncLifetime
 
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/recovery-phrase",
-            new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier, SomeEnvelope),
+            new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier),
             AccountsJsonContext.Default.RegisterRecoveryVerifierRequest);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
@@ -115,7 +115,7 @@ public sealed class RecoveryEndpointsTests : IAsyncLifetime
 
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/recovery-phrase",
-            new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier, SomeEnvelope),
+            new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier),
             AccountsJsonContext.Default.RegisterRecoveryVerifierRequest);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
@@ -136,7 +136,7 @@ public sealed class RecoveryEndpointsTests : IAsyncLifetime
 
         var response = await client.PostAsJsonAsync(
             $"/accounts/{victimAccountId}/recovery-phrase",
-            new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier, SomeEnvelope),
+            new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier),
             AccountsJsonContext.Default.RegisterRecoveryVerifierRequest);
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
@@ -154,7 +154,7 @@ public sealed class RecoveryEndpointsTests : IAsyncLifetime
 
         var response = await client.PostAsJsonAsync(
             $"/accounts/{accountId}/recovery-phrase",
-            new RegisterRecoveryVerifierRequest(new byte[] { 1, 2, 3 }, SomeEnvelope),
+            new RegisterRecoveryVerifierRequest(new byte[] { 1, 2, 3 }),
             AccountsJsonContext.Default.RegisterRecoveryVerifierRequest);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -176,7 +176,7 @@ public sealed class RecoveryEndpointsTests : IAsyncLifetime
 
         var response = await client.PostAsJsonAsync(
             $"/accounts/{registered.Id}/recovery-phrase",
-            new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier, SomeEnvelope),
+            new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier),
             AccountsJsonContext.Default.RegisterRecoveryVerifierRequest);
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
@@ -196,7 +196,7 @@ public sealed class RecoveryEndpointsTests : IAsyncLifetime
 
         var response = await client.PostAsJsonAsync(
             $"/accounts/{unknownAccountId}/recovery-phrase",
-            new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier, SomeEnvelope),
+            new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier),
             AccountsJsonContext.Default.RegisterRecoveryVerifierRequest);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -235,7 +235,7 @@ public sealed class RecoveryEndpointsTests : IAsyncLifetime
         var accountId = await RegisterProfessionalAsync(client, "recover-ok@example.com");
         await client.PostAsJsonAsync(
             $"/accounts/{accountId}/recovery-phrase",
-            new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier, SomeEnvelope),
+            new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier),
             AccountsJsonContext.Default.RegisterRecoveryVerifierRequest);
 
         var response = await client.PostAsJsonAsync(
@@ -247,7 +247,6 @@ public sealed class RecoveryEndpointsTests : IAsyncLifetime
         var body = await response.Content.ReadFromJsonAsync(AccountsJsonContext.Default.RecoverAccessResponse);
         Assert.NotNull(body);
         Assert.Equal("recover-ok@example.com", body!.Email);
-        Assert.Equal(SomeEnvelope, body.RecoveryEnvelope);
         Assert.Equal(AccountRole.Professional, body.Role);
         // 2FA is mandatory on every login for a Professional (ADR-S02-03/S02-04); recovery re-authenticates but still owes a fresh TOTP challenge before a session is issued.
         Assert.Equal(TwoFactorRequirement.ChallengeRequired, body.TwoFactorRequirement);
@@ -266,7 +265,7 @@ public sealed class RecoveryEndpointsTests : IAsyncLifetime
         // seed here mirrors that invariant so the real ConstantTimePasswordVerifierComparer
         // matches the raw verifier the request below submits.
         var account = new Account(
-            Guid.NewGuid(), email, AccountRole.Patient, SHA256.HashData(SomeVerifier), null, RecoveryVerifier: SHA256.HashData(recoveryVerifier), RecoveryEnvelope: SomeEnvelope);
+            Guid.NewGuid(), email, AccountRole.Patient, SHA256.HashData(SomeVerifier), null, RecoveryVerifier: SHA256.HashData(recoveryVerifier));
         using var factory = CreateFactory().WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services => services.AddSingleton<IAccountStore>(new SeededAccountStore(account))));
         using var client = factory.CreateClient();
@@ -294,7 +293,7 @@ public sealed class RecoveryEndpointsTests : IAsyncLifetime
         var accountId = await RegisterProfessionalAsync(client, "recover-wrong@example.com");
         await client.PostAsJsonAsync(
             $"/accounts/{accountId}/recovery-phrase",
-            new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier, SomeEnvelope),
+            new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier),
             AccountsJsonContext.Default.RegisterRecoveryVerifierRequest);
 
         var response = await client.PostAsJsonAsync(
@@ -316,7 +315,7 @@ public sealed class RecoveryEndpointsTests : IAsyncLifetime
         var accountId = await RegisterProfessionalAsync(client, "recover-compare@example.com");
         await client.PostAsJsonAsync(
             $"/accounts/{accountId}/recovery-phrase",
-            new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier, SomeEnvelope),
+            new RegisterRecoveryVerifierRequest(SomeRecoveryVerifier),
             AccountsJsonContext.Default.RegisterRecoveryVerifierRequest);
 
         var wrongVerifierResponse = await client.PostAsJsonAsync(

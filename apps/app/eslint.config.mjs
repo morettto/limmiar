@@ -2,6 +2,7 @@
 import tseslint from 'typescript-eslint'
 import pluginLingui from 'eslint-plugin-lingui'
 import noImplicitLocaleFormatting from './eslint-rules/no-implicit-locale-formatting.js'
+import noZeroTickPolling from './eslint-rules/no-zero-tick-polling.js'
 
 // Scoped, single-purpose ESLint config — the general-purpose linter here is oxlint (package.json
 // "lint"). This exists only for the two i18n gates oxlint has no rule for, the same way
@@ -15,8 +16,6 @@ export default tseslint.config(
       // E2eMicrofoneScaffold.tsx: andaime de e2e atras de VITE_ENABLE_E2E_TEST_ROUTES, a copy
       // dele nunca chega a um utilizador -- traduzi-la so encheria os catalogos de fixture.
       'src/app/routing/E2eMicrofoneScaffold.tsx',
-      '**/*.test.{ts,tsx}',
-      '**/*.spec.{ts,tsx}',
       'src/test-support/**',
       'dist/**',
       'coverage/**',
@@ -28,6 +27,7 @@ export default tseslint.config(
     // a parse error on type annotations without it) + the locale-formatting
     // check, which can appear in plain .ts logic too, not just components.
     files: ['src/**/*.{ts,tsx}'],
+    ignores: ['**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}'],
     extends: [tseslint.configs.recommended],
     plugins: {
       local: { rules: { 'no-implicit-locale-formatting': noImplicitLocaleFormatting } },
@@ -41,8 +41,22 @@ export default tseslint.config(
     },
   },
   {
+    files: ['src/**/*.{test,spec}.{ts,tsx}'],
+    languageOptions: {
+      parser: tseslint.parser,
+      parserOptions: { ecmaFeatures: { jsx: true } },
+    },
+    plugins: {
+      local: { rules: { 'no-zero-tick-polling': noZeroTickPolling } },
+    },
+    rules: {
+      'local/no-zero-tick-polling': 'error',
+    },
+  },
+  {
     // JSX-visible-text check only applies where JSX exists.
     files: ['src/**/*.tsx'],
+    ignores: ['**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}'],
     extends: [pluginLingui.configs['flat/recommended']],
     rules: {
       'lingui/no-unlocalized-strings': [

@@ -1,6 +1,5 @@
 export type { Account, AccountRole, TwoFactorRequirement, SessionTokens } from './account'
 export { deriveEmailPasswordVerifier, deriveEmailSalt } from './password-verifier'
-export { deriveAccountKek, createRecoveryEnvelope, openRecoveryEnvelope } from './account-keys'
 export { deriveRecoveryVerifier } from './recovery-verifier'
 export {
   register,

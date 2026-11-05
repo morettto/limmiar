@@ -21,13 +21,6 @@ namespace Api.Accounts;
 [JsonSerializable(typeof(ConfirmTotpEnrollmentRequest))]
 [JsonSerializable(typeof(ConfirmTotpEnrollmentResponse))]
 [JsonSerializable(typeof(TotpChallengeRequest))]
-[JsonSerializable(typeof(CreatePairingSessionRequest))]
-[JsonSerializable(typeof(CreatePairingSessionResponse))]
-[JsonSerializable(typeof(ClaimPairingSessionRequest))]
-[JsonSerializable(typeof(ClaimPairingSessionResponse))]
-[JsonSerializable(typeof(PairingClaimStatusResponse))]
-[JsonSerializable(typeof(SubmitPairingPayloadRequest))]
-[JsonSerializable(typeof(PairingSessionPayloadResponse))]
 [JsonSerializable(typeof(VerifyMagicLinkRequest))]
 [JsonSerializable(typeof(VerifyMagicLinkResponse))]
 [JsonSerializable(typeof(CompleteMagicLinkWebAuthnRequest))]
@@ -40,6 +33,10 @@ namespace Api.Accounts;
 [JsonSerializable(typeof(VoiceEnrollmentResponse))]
 [JsonSerializable(typeof(AccountKeyPairRequest))]
 [JsonSerializable(typeof(AccountKeyPairResponse))]
+[JsonSerializable(typeof(VaultDocument))]
+[JsonSerializable(typeof(VaultWrite))]
+[JsonSerializable(typeof(RecoverVaultRequest))]
+[JsonSerializable(typeof(VaultRecoverySlotStored[]))]
 public partial class AccountsJsonContext : JsonSerializerContext
 {
 }

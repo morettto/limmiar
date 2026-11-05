@@ -20,7 +20,6 @@ public sealed class RateLimitingTests
     {
         { "/auth/login", 30 },
         { "/auth/magic-link/verify", 30 },
-        { "/devices/pairing-sessions/abc/claim", 10 },
         { "/webhooks/abacatepay", 120 },
     };
 

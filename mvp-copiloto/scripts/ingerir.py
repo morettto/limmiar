@@ -18,16 +18,15 @@ from copiloto.esquema import DIR_PDFS, conectar, criar_esquema  # noqa: E402
 MANIFESTO = DIR_PDFS / "manifesto.json"
 
 
-def main(modelo: str = embedder.PADRAO) -> None:
+def main() -> None:
     if not MANIFESTO.exists():
         print("manifesto nao existe; corra scripts/baixar_pdfs.py primeiro")
         return
     itens = json.loads(MANIFESTO.read_text(encoding="utf-8"))
     con = conectar()
     criar_esquema(con)
-    busca.INDICE.modelo = modelo
 
-    print(f"modelo: {modelo}")
+    print(f"modelo: {embedder.PADRAO}")
     print(f"obras no manifesto: {len(itens)}\n")
 
     for item in itens:
@@ -42,7 +41,7 @@ def main(modelo: str = embedder.PADRAO) -> None:
             print(f"  = ja no acervo: {item['arquivo']}")
             continue
         inicio = time.perf_counter()
-        resultado = ingestao.processar(con, obra_id, modelo)
+        resultado = ingestao.processar(con, obra_id)
         duracao = time.perf_counter() - inicio
         if "erro" in resultado:
             print(f"  x {item['arquivo']}: {resultado['erro']}")
@@ -61,4 +60,4 @@ def main(modelo: str = embedder.PADRAO) -> None:
 
 
 if __name__ == "__main__":
-    main(sys.argv[1] if len(sys.argv) > 1 else embedder.PADRAO)
+    main()

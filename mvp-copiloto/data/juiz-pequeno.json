@@ -1,0 +1,8 @@
+{
+  "versao": "juiz-pequeno-v1",
+  "perguntas": {
+    "vivencia": "O paciente fala de algo que ele mesmo sente, pensa, lembra, faz ou quer.",
+    "risco": "O que o paciente diz pede avaliação de risco agora: pensamento de suicídio ou de não querer viver, autolesão, intenção de ferir alguém, ou perigo atual de violência.",
+    "generico": "Este parágrafo só define ou lista: definição de transtorno, critérios, lista de sintomas, tabela, itens de escala, prevalência ou introdução geral."
+  }
+}

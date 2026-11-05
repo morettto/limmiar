@@ -26,7 +26,7 @@ public sealed class AccountMutationRaceTests
         var latest = initial with { VoiceEnrollment = new(new byte[60], new byte[796]) };
         var store = new ChangingStore(initial, removedAccount ? null : latest);
         var result = await new RegisterRecoveryVerifierHandler(store).Handle(
-            new(initial.Id, new byte[32], new byte[120]), CancellationToken.None);
+            new(initial.Id, new byte[32]), CancellationToken.None);
         Assert.Equal(!removedAccount, result.Succeeded);
         if (removedAccount) Assert.Equal(RegisterRecoveryVerifierFailureReason.AccountNotFound, result.FailureReason);
         else Assert.Equal(latest.VoiceEnrollment, result.Account!.VoiceEnrollment);
@@ -57,13 +57,12 @@ public sealed class AccountMutationRaceTests
     public async Task ConfirmTotp_PreservesRecoveryWrittenSinceInitialRead()
     {
         var initial = Professional() with { TotpSecret = "pending-secret" };
-        var latest = initial with { RecoveryEnvelope = new byte[120], RecoveryVerifier = new byte[32] };
+        var latest = initial with { RecoveryVerifier = new byte[32] };
         var store = new ChangingStore(initial, latest);
         var result = await new ConfirmTotpEnrollmentHandler(store, new ValidTotp(), new SessionTokenIssuer())
             .Handle(new(initial.Id, "123456"), CancellationToken.None);
         Assert.True(result.Succeeded);
-        Assert.Equal(latest.RecoveryEnvelope, result.Account!.RecoveryEnvelope);
-        Assert.Equal(latest.RecoveryVerifier, result.Account.RecoveryVerifier);
+        Assert.Equal(latest.RecoveryVerifier, result.Account!.RecoveryVerifier);
         Assert.NotNull(result.Account.TotpEnabledAt);
     }
 
@@ -130,7 +129,7 @@ public sealed class AccountMutationRaceTests
     public async Task SubmitCredential_RefusesToOverwriteConcurrentVerification(ProfessionalCredentialType type, bool removedAccount)
     {
         var initial = Professional() with { VerificationStatus = AccountVerificationStatus.Pending };
-        var latest = initial with { VerificationStatus = AccountVerificationStatus.Active, RecoveryEnvelope = new byte[120] };
+        var latest = initial with { VerificationStatus = AccountVerificationStatus.Active };
         var store = new ChangingStore(initial, removedAccount ? null : latest);
         var result = await new SubmitProfessionalCredentialHandler(store, new VerifiedCouncil())
             .Handle(new(initial.Id, type, "06/123456", "SP", "document-reference"), CancellationToken.None);

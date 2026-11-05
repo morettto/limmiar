@@ -21,3 +21,9 @@
 
 - Keep branches synced with `origin/main`. Merge `origin/main` before commits and merge requests. Resolve conflicts and re-run the affected checks.
 - `tools/branch-sync-guard.mjs` (PreToolUse hook, `.claude/settings.json`) enforces this: a `git commit`, `git push` or new branch on a branch behind `origin/main` is refused until the merge happens. The merge itself is never blocked.
+
+## Rule enforcement
+
+| Rule | Enforcement |
+| --- | --- |
+| Tests must wait for observable async state instead of polling by advancing fake time by zero. | `apps/app/eslint-rules/no-zero-tick-polling.js`, covered by its `RuleTester` and real-config test; `pnpm --filter app test:eslint-rules` and `pnpm --filter app lint:i18n` run locally and in CI. |

@@ -9,8 +9,7 @@ export interface EditorSoapProps {
   /** Controlado pelo widget-pai -- este componente não guarda estado próprio da nota. */
   nota: Nota
   onChange: (nota: Nota) => void
-  /** Vem do reprodutor real (fatia 3, `features/nota-audio/reprodutor.ts`), repassado sem
-   *  alteração até `Citacao`. */
+  /** Repassado sem alteração até `Citacao`. */
   aoTocar?: (ancora: Ancora) => void
   /** Assinar de facto (fatia 4) fica por conta do chamador; aqui só se garante o atalho. */
   aoAssinar: (nota: Nota) => void

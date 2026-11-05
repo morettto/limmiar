@@ -38,7 +38,7 @@ beforeAll(async () => dynamicActivate('pt-BR'))
 beforeEach(async () => {
   kek = await webcrypto.importKek(new Uint8Array(32).fill(8))
   material = await sealMaterial(kek, access.accountId, 'material', { title: 'Livro privado', authors: 'Autora fictícia', reference: 'Edição 2026', filename: 'obra.txt', type: 'txt', size: bytes.length, sha256: await materialHash(bytes) }, bytes)
-  items = [{ ...material, authorized: false, createdAt: 'date' }]
+  items = [{ ...material, authorized: false, inUse: false, createdAt: 'date' }]
   vi.spyOn(api, 'listMaterials').mockImplementation(async () => ({ ok: true, materials: items }))
   vi.spyOn(api, 'uploadMaterial').mockResolvedValue({ ok: true })
   vi.spyOn(api, 'authorizeMaterial').mockResolvedValue({ ok: true })
@@ -56,23 +56,24 @@ afterEach(() => { cleanup(); vi.restoreAllMocks() })
 it('reabre uma preparação falha com ação de repetir, sem afirmar que a obra está pronta', async () => {
   vi.mocked(local.listPreparedMaterials).mockResolvedValue([{ materialId: 'material', ready: false, sha256: '', stage: 'falhou' }])
   mount(); await loaded()
-  expect(screen.getByText('Não foi possível preparar este arquivo. Tente novamente.')).toBeTruthy()
-  expect(screen.getByRole('button', { name: 'Preparar arquivo' })).toBeTruthy()
+  expect(screen.getByText('Não foi possível preparar este arquivo.')).toBeTruthy()
+  expect(screen.queryByRole('button', { name: 'Preparar arquivo' })).toBeNull()
   expect(screen.queryByText('Pronto para selecionar na sessão')).toBeNull()
 })
 
 it('acompanha preparo sem bloquear a estante e apresenta pronto ou falha pelo estado do serviço', async () => {
   const outro = await seal('outro'), falho = await seal('falho')
-  items.push({ ...outro, authorized: false, createdAt: '' }, { ...falho, authorized: false, createdAt: '' })
+  items[0]!.createdAt = '2026-10-01T00:00:00Z'
+  items.push({ ...outro, authorized: false, inUse: false, createdAt: '2026-10-02T00:00:00Z' }, { ...falho, authorized: false, inUse: false, createdAt: '2026-10-03T00:00:00Z' })
   vi.mocked(local.listPreparedMaterials).mockResolvedValueOnce([]).mockResolvedValue([
     { materialId: 'material', ready: true, sha256: await materialHash(bytes), paragraphs: 1, preparedAt: '' },
     { materialId: 'outro', ready: false, sha256: '', stage: 'organizando' },
     { materialId: 'falho', ready: false, sha256: '', stage: 'falhou' },
   ])
   mount(); await loaded()
-  fireEvent.click(screen.getAllByRole('button', { name: 'Preparar arquivo' })[0]!)
+  await waitFor(() => expect(local.prepareLocalMaterial).toHaveBeenCalled(), { timeout: 2500 })
   await waitFor(() => expect(screen.getByText('Pronto para selecionar na sessão')).toBeTruthy(), { timeout: 2500 })
-  expect(screen.getByText('Não foi possível preparar este arquivo. Tente novamente.')).toBeTruthy()
+  expect(screen.getByText('Não foi possível preparar este arquivo.')).toBeTruthy()
   expect(screen.getByText('Organizando o conteúdo e preparando suas referências...')).toBeTruthy()
   expect(screen.getAllByRole('checkbox')[0]).toHaveProperty('disabled', false)
 })
@@ -89,7 +90,7 @@ it('mostra páginas e referências realmente processadas, atualizando percentual
   vi.mocked(local.listPreparedMaterials).mockResolvedValue([{ ...estado, progress: { phase: 'referencias', completed: 8, total: 24 } }])
   await waitFor(() => expect(screen.getByText('Preparando referências: 8 de 24')).toBeTruthy(), { timeout: 2500 })
   expect(screen.getByText('33%')).toBeTruthy()
-  expect(screen.getByRole('checkbox', { name: 'Autorizar nas minhas consultas' })).toHaveProperty('disabled', false)
+  expect(screen.getByRole('checkbox', { name: 'Autorizar nas minhas consultas' })).toHaveProperty('disabled', true)
   expect(screen.queryByText('Pronto para selecionar na sessão')).toBeNull()
 })
 
@@ -97,7 +98,7 @@ it.each(['resolve', 'rejeita'])('ignora resposta de acompanhamento (%s) depois d
   const consulta = deferred<local.PreparedMaterial[]>()
   vi.mocked(local.listPreparedMaterials).mockResolvedValueOnce([]).mockReturnValueOnce(consulta.promise)
   const view = mount(); await loaded()
-  fireEvent.click(screen.getByRole('button', { name: 'Preparar arquivo' }))
+  await waitFor(() => expect(local.prepareLocalMaterial).toHaveBeenCalled(), { timeout: 2500 })
   await waitFor(() => expect(local.listPreparedMaterials).toHaveBeenCalledTimes(2), { timeout: 2500 })
   view.unmount()
   await act(async () => { if (modo === 'resolve') consulta.resolve([]); else consulta.reject(new Error('tarde')) })
@@ -107,15 +108,15 @@ it.each(['resolve', 'rejeita'])('ignora resposta de acompanhamento (%s) depois d
 it('informa falha de acompanhamento e falha ao abrir o arquivo para preparo', async () => {
   vi.mocked(local.listPreparedMaterials).mockResolvedValueOnce([]).mockRejectedValue(new Error('fora'))
   mount(); await loaded()
-  fireEvent.click(screen.getByRole('button', { name: 'Preparar arquivo' }))
+  await waitFor(() => expect(local.prepareLocalMaterial).toHaveBeenCalled(), { timeout: 2500 })
   await screen.findByText('Organizando o conteúdo e preparando suas referências...')
   await waitFor(() => expect(screen.getByText('Não foi possível acompanhar o preparo. Tente novamente.')).toBeTruthy(), { timeout: 2500 })
   cleanup()
   vi.mocked(local.listPreparedMaterials).mockResolvedValue([])
   vi.mocked(api.getMaterialContent).mockRejectedValueOnce(new Error('arquivo indisponível'))
   mount(); await loaded()
-  fireEvent.click(screen.getByRole('button', { name: 'Preparar arquivo' }))
-  await screen.findByText('Não foi possível preparar este arquivo. Tente novamente.')
+  await waitFor(() => expect(local.prepareLocalMaterial).toHaveBeenCalled(), { timeout: 2500 })
+  await screen.findByText('Não foi possível preparar este arquivo.', {}, { timeout: 2500 })
 })
 
 it('abre só metadados cifrados, busca local e oferece ações com autorização retirada por padrão', async () => {
@@ -151,8 +152,8 @@ it('cifra bytes e bibliografia antes do upload e informa armazenamento sem afirm
   expect(opened.metadata.sha256).toBe(await materialHash(bytes))
   expect(Array.from(await openMaterialContent(opened.dek, access.accountId, sealed.materialId, sealed.contentCiphertext))).toEqual(Array.from(bytes))
   expect(new TextDecoder().decode(sealed.contentCiphertext)).not.toContain('Referência')
-  expect(local.prepareLocalMaterial).toHaveBeenCalledWith(access, sealed.materialId, expect.objectContaining({ title: 'Obra nova' }), expect.anything())
-  expect(Array.from(vi.mocked(local.prepareLocalMaterial).mock.lastCall![3])).toEqual(Array.from(bytes))
+  expect(local.prepareLocalMaterial).not.toHaveBeenCalled()
+  expect(api.getMaterialContent).not.toHaveBeenCalled()
   for (const label of FIELDS) {
     expect(screen.getByLabelText(label)).toHaveProperty('value', '')
     expect(screen.getByLabelText(label)).toHaveProperty('disabled', true)
@@ -259,17 +260,19 @@ it('autorizar e revogar são rápidos e não baixam nem preparam o arquivo', asy
   await screen.findByText('Autorização retirada. Este material não participa das suas consultas.')
   expect(local.removeLocalMaterial).not.toHaveBeenCalled()
 })
-it('preparo falho é visível, libera a estante e permite repetir em segundo plano', async () => {
+it('preparo falho é visível e só permite excluir, sem autorizar, recuperar ou repetir', async () => {
   vi.mocked(local.prepareLocalMaterial).mockRejectedValueOnce(new Error('material.prepare'))
   mount(); await loaded()
-  fireEvent.click(screen.getByRole('button', { name: 'Preparar arquivo' }))
-  await screen.findByText('Não foi possível preparar este arquivo. Tente novamente.')
-  expect(screen.getByRole('button', { name: 'Recuperar arquivo' })).toHaveProperty('disabled', false)
-  fireEvent.click(screen.getByRole('button', { name: 'Preparar arquivo' }))
-  await screen.findByText('Organizando o conteúdo e preparando suas referências...')
-  expect(local.prepareLocalMaterial).toHaveBeenCalledTimes(2)
+  await screen.findByText('Não foi possível preparar este arquivo.', {}, { timeout: 2500 })
+  expect(screen.getByRole('checkbox')).toHaveProperty('disabled', true)
+  expect(screen.queryByRole('button', { name: 'Recuperar arquivo' })).toBeNull()
+  expect(screen.queryByRole('button', { name: 'Preparar arquivo' })).toBeNull()
+  expect(screen.getByRole('button', { name: 'Excluir material' })).toHaveProperty('disabled', false)
+  expect(local.prepareLocalMaterial).toHaveBeenCalledTimes(1)
 })
+
 it('recusa autorização e leitura falhas, recupera arquivo e libera a URL de memória', async () => {
+  vi.mocked(local.listPreparedMaterials).mockResolvedValue([{ materialId: 'material', ready: true, sha256: await materialHash(bytes), paragraphs: 1, preparedAt: '' }])
   mount(); await loaded()
   vi.mocked(api.authorizeMaterial).mockResolvedValueOnce({ ok: false, code: 'materials.not_found', params: {} })
   fireEvent.click(screen.getByRole('checkbox', { name: 'Autorizar nas minhas consultas' }))
@@ -303,7 +306,7 @@ it('exclusão tem confirmação e cancelamento; erro mantém o item, sucesso rem
 })
 it('autoriza um item sem alterar a autorização ou disponibilidade dos outros materiais', async () => {
   const second = await sealMaterial(kek, access.accountId, 'second', { title: 'Outro livro', authors: 'Outro autor', reference: '', filename: 'outra.txt', type: 'txt', size: bytes.length, sha256: await materialHash(bytes) }, bytes)
-  items.push({ ...second, authorized: false, createdAt: '' })
+  items.push({ ...second, authorized: false, inUse: false, createdAt: '' })
   mount(); await loaded()
   fireEvent.click(screen.getAllByRole('checkbox', { name: 'Autorizar nas minhas consultas' })[0]!)
   await screen.findByText('Material disponível para selecionar nas suas sessões.')
@@ -336,10 +339,10 @@ it('erro ao carregar pode ser repetido e respostas tardias após sair são ignor
   const failed = mount(); failed.unmount(); await act(async () => {})
 })
 it('estado do motor indisponível não impede recuperar a estante cifrada ou baixar PDF', async () => {
+  vi.mocked(local.listPreparedMaterials).mockResolvedValue([{ materialId: 'material', ready: true, sha256: await materialHash(bytes), paragraphs: 1, preparedAt: '' }])
   material = await sealMaterial(kek, access.accountId, 'material', { title: 'PDF privado', authors: '', reference: '', filename: 'obra.pdf', type: 'pdf', size: bytes.length, sha256: await materialHash(bytes) }, bytes)
-  items = [{ ...material, authorized: true, createdAt: '' }]
+  items = [{ ...material, authorized: true, inUse: false, createdAt: '' }]
   vi.mocked(api.getMaterialContent).mockResolvedValue({ ok: true, ciphertext: material.contentCiphertext })
-  vi.mocked(local.listPreparedMaterials).mockRejectedValue(new Error('offline'))
   mount(); await screen.findByText('PDF privado')
   expect(screen.queryByRole('alert')).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: 'Recuperar arquivo' }))
@@ -413,7 +416,7 @@ it.each([
   mount()
   if (estado.ready) {
     expect(await screen.findByText('Arquivo guardado · aguardando preparação')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Preparar arquivo' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Preparar arquivo' })).toBeNull()
   } else {
     expect(await screen.findByText('Organizando o conteúdo e preparando suas referências...')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Preparar arquivo' })).toBeNull()
@@ -429,10 +432,10 @@ it('uma resposta tardia de outra sessão não substitui o acervo atual nem apaga
   view.rerender(page('token-novo'))
   await waitFor(() => expect(api.listMaterials).toHaveBeenCalledTimes(2))
 
-  await act(async () => atual.resolve({ ok: true, materials: [{ ...(await seal('nova')), authorized: false, createdAt: '' }] }))
+  await act(async () => atual.resolve({ ok: true, materials: [{ ...(await seal('nova')), authorized: false, inUse: false, createdAt: '' }] }))
   expect(await screen.findByText('Obra nova')).toBeTruthy()
 
-  await act(async () => antiga.resolve({ ok: true, materials: [{ ...(await seal('velha')), authorized: false, createdAt: '' }] }))
+  await act(async () => antiga.resolve({ ok: true, materials: [{ ...(await seal('velha')), authorized: false, inUse: false, createdAt: '' }] }))
   await act(async () => { await new Promise((resolve) => setTimeout(resolve, 30)) })
   expect(screen.queryByText('Obra velha')).toBeNull()
   expect(screen.getByText('Obra nova')).toBeTruthy()
@@ -469,7 +472,7 @@ it('uma falha tardia de outra sessão não aparece sobre o acervo atual', async 
 it('mostra o tipo em maiúsculas, o tamanho em MB com uma casa e só as linhas que existem', async () => {
   const completa = await seal('completa', { type: 'pdf', size: 1294467, authors: 'Fulana', reference: 'Segunda edição' })
   const simples = await seal('simples', { authors: '', reference: '', size: 3145728 })
-  items = [{ ...completa, authorized: false, createdAt: '' }, { ...simples, authorized: false, createdAt: '' }]
+  items = [{ ...completa, authorized: false, inUse: false, createdAt: '' }, { ...simples, authorized: false, inUse: false, createdAt: '' }]
   mount(); await screen.findByText('Obra completa')
   const [linhaCompleta, linhaSimples] = screen.getAllByRole('listitem')
   expect(Array.from(linhaCompleta!.querySelectorAll('p')).map((p) => p.textContent)).toEqual(['PDF · 1,2 MB', 'Fulana', 'Segunda edição', 'Arquivo guardado · aguardando preparação', 'Guardado · uso não autorizado'])
@@ -478,7 +481,7 @@ it('mostra o tipo em maiúsculas, o tamanho em MB com uma casa e só as linhas q
 
 it('retirar a autorização de um item preparado só tira o dele do estado preparado', async () => {
   const outro = await seal('outro')
-  items = [{ ...items[0]!, authorized: true }, { ...outro, authorized: true, createdAt: '' }]
+  items = [{ ...items[0]!, authorized: true }, { ...outro, authorized: true, inUse: false, createdAt: '' }]
   const sha256 = await materialHash(bytes)
   vi.mocked(local.listPreparedMaterials).mockResolvedValue([
     { materialId: 'material', ready: true, sha256, paragraphs: 1, preparedAt: '' },
@@ -499,10 +502,10 @@ it('preparo mostra indicador sem bloquear autorização ou ações da estante', 
   const preparo = deferred<void>()
   vi.mocked(local.prepareLocalMaterial).mockReturnValueOnce(preparo.promise)
   mount(); await loaded()
-  fireEvent.click(screen.getByRole('button', { name: 'Preparar arquivo' }))
+  await waitFor(() => expect(local.prepareLocalMaterial).toHaveBeenCalled(), { timeout: 2500 })
   await screen.findByText('Organizando o conteúdo e preparando suas referências...')
   expect(document.querySelector('.preparation-spinner')).not.toBeNull()
-  expect(screen.getByRole('checkbox', { name: 'Autorizar nas minhas consultas' })).toHaveProperty('disabled', false)
+  expect(screen.getByRole('checkbox', { name: 'Autorizar nas minhas consultas' })).toHaveProperty('disabled', true)
   expect(region('Materiais do acervo').getAttribute('aria-busy')).toBe('false')
   await act(async () => preparo.resolve())
   expect(screen.queryByText('Pronto para selecionar na sessão')).toBeNull()
@@ -510,7 +513,8 @@ it('preparo mostra indicador sem bloquear autorização ou ações da estante', 
 
 it.each([['txt', 'text/plain;charset=utf-8'], ['pdf', 'application/pdf']] as const)('recupera o arquivo %s com o tipo e o conteúdo originais e o nome guardado', async (tipo, mime) => {
   const guardado = await seal('guardado', { type: tipo, filename: `guardado.${tipo}` })
-  items = [{ ...guardado, authorized: true, createdAt: '' }]
+  items = [{ ...guardado, authorized: true, inUse: false, createdAt: '' }]
+  vi.mocked(local.listPreparedMaterials).mockResolvedValue([{ materialId: 'guardado', ready: true, sha256: await materialHash(bytes), paragraphs: 1, preparedAt: '' }])
   vi.mocked(api.getMaterialContent).mockResolvedValue({ ok: true, ciphertext: guardado.contentCiphertext })
   let nome = ''
   vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) { nome = `${this.download}|${this.href}` })
@@ -525,7 +529,7 @@ it.each([['txt', 'text/plain;charset=utf-8'], ['pdf', 'application/pdf']] as con
 
 it('excluir tira da lista só o material escolhido', async () => {
   const outro = await seal('outro')
-  items = [items[0]!, { ...outro, authorized: false, createdAt: '' }]
+  items = [items[0]!, { ...outro, authorized: false, inUse: false, createdAt: '' }]
   mount(); await screen.findByText('Obra outro')
   fireEvent.click(screen.getAllByRole('button', { name: 'Excluir material' })[0]!)
   fireEvent.click(screen.getByRole('button', { name: 'Confirmar exclusão' }))
@@ -533,4 +537,103 @@ it('excluir tira da lista só o material escolhido', async () => {
   expect(screen.queryByText('Livro privado')).toBeNull()
   expect(screen.getByText('Obra outro')).toBeTruthy()
   expect(screen.getAllByRole('button', { name: 'Excluir material' })).toHaveLength(1)
+})
+
+
+it.each(['material.prepare', 'material.busy'])('preserva rejeição local %s; capacidade retenta automaticamente e erro definitivo só permite excluir', async code => {
+  vi.mocked(local.prepareLocalMaterial).mockRejectedValueOnce(new Error(code))
+  mount(); await loaded()
+  const message = code === 'material.busy'
+    ? 'O serviço está preparando outros arquivos. Este arquivo está guardado, mas ainda não entrou na fila. O preparo será tentado novamente automaticamente.'
+    : 'Não foi possível preparar este arquivo.'
+  await screen.findByText(message, {}, { timeout: 2500 })
+  expect(screen.queryByRole('button', { name: 'Preparar arquivo' })).toBeNull()
+  expect(screen.queryByRole('button', { name: 'Recuperar arquivo' })).toBeNull()
+  expect(screen.getByRole('checkbox')).toHaveProperty('disabled', true)
+  if (code === 'material.busy') {
+    await waitFor(() => expect(local.prepareLocalMaterial).toHaveBeenCalledTimes(2), { timeout: 3500 })
+    expect(screen.queryByText(message)).toBeNull()
+  } else {
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 1100)) })
+    expect(screen.getByText(message)).toBeTruthy()
+    expect(local.prepareLocalMaterial).toHaveBeenCalledTimes(1)
+  }
+})
+
+
+it('desabilita exclusão em uso e mantém conflito visível sem remover a obra', async () => {
+  items[0]!.inUse = true
+  const view = mount(); await loaded()
+  expect(screen.getByRole('button', { name: 'Excluir material' })).toHaveProperty('disabled', true)
+  view.unmount()
+  items[0]!.inUse = false
+  mount(); await loaded()
+  vi.mocked(api.deleteMaterial).mockResolvedValueOnce({ ok: false, code: 'materials.in_use', params: {} })
+  fireEvent.click(screen.getByRole('button', { name: 'Excluir material' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Confirmar exclusão' }))
+  await screen.findByText('Este material está em uso em um atendimento. Encerre o atendimento antes de excluir.')
+  expect(screen.getByText('Livro privado')).toBeTruthy()
+  expect(local.removeLocalMaterial).not.toHaveBeenCalled()
+  expect(screen.getByRole('button', { name: 'Confirmar exclusão' })).toHaveProperty('disabled', true)
+})
+
+it('prepara um arquivo por vez e só baixa o próximo quando o anterior está pronto', async () => {
+  const segundo = await seal('segundo')
+  items.push({ ...segundo, authorized: false, inUse: false, createdAt: '' })
+  vi.mocked(api.getMaterialContent).mockImplementation(async (_access, id) => ({ ok: true, ciphertext: id === 'material' ? material.contentCiphertext : segundo.contentCiphertext }))
+  vi.mocked(local.prepareLocalMaterial).mockImplementation(async (_access, id, metadata) => {
+    vi.mocked(local.listPreparedMaterials).mockResolvedValue([{ materialId: id, ready: false, sha256: metadata.sha256, stage: 'organizando' }])
+  })
+  mount(); await loaded()
+  await waitFor(() => expect(local.prepareLocalMaterial).toHaveBeenCalledTimes(1), { timeout: 2500 })
+  await waitFor(() => expect(local.listPreparedMaterials).toHaveBeenCalledTimes(2), { timeout: 2500 })
+  expect(api.getMaterialContent).toHaveBeenCalledTimes(1)
+  vi.mocked(local.listPreparedMaterials).mockResolvedValue([{ materialId: 'material', ready: true, sha256: await materialHash(bytes), paragraphs: 1, preparedAt: '' }])
+  await waitFor(() => expect(local.prepareLocalMaterial).toHaveBeenCalledTimes(2), { timeout: 3500 })
+  expect(api.getMaterialContent).toHaveBeenCalledTimes(2)
+})
+
+it('não envia bytes decifrados se sair durante a recuperação do arquivo', async () => {
+  const download = deferred<Awaited<ReturnType<typeof api.getMaterialContent>>>()
+  vi.mocked(api.getMaterialContent).mockReturnValueOnce(download.promise)
+  const view = mount(); await loaded()
+  await waitFor(() => expect(api.getMaterialContent).toHaveBeenCalledOnce(), { timeout: 2500 })
+  view.unmount()
+  await act(async () => download.resolve({ ok: true, ciphertext: material.contentCiphertext }))
+  expect(local.prepareLocalMaterial).not.toHaveBeenCalled()
+})
+
+
+it('pagina dez obras, busca em todas as páginas, volta ao início e ajusta após excluir', async () => {
+  items = await Promise.all(Array.from({ length: 11 }, async (_, index) => ({ ...await seal(`obra-${index}`, { title: `Livro ${index}` }), authorized: false, inUse: false, createdAt: '' })))
+  mount(); await loaded()
+  const nav = screen.getByRole('navigation', { name: 'Paginação do acervo' })
+  expect(screen.getAllByRole('listitem')).toHaveLength(10)
+  expect(within(nav).getByText('Página 1 de 2')).toBeTruthy()
+  expect(within(nav).getByRole('button', { name: 'Página anterior' })).toHaveProperty('disabled', true)
+  fireEvent.click(within(nav).getByRole('button', { name: 'Próxima página' }))
+  expect(screen.getAllByRole('listitem')).toHaveLength(1)
+  expect(screen.getByText('Livro 10')).toBeTruthy()
+  fireEvent.change(screen.getByLabelText('Buscar no acervo'), { target: { value: 'Livro 2' } })
+  expect(screen.getByText('Livro 2')).toBeTruthy()
+  expect(within(nav).getByText('Página 1 de 1')).toBeTruthy()
+  fireEvent.change(screen.getByLabelText('Buscar no acervo'), { target: { value: '' } })
+  expect(within(nav).getByText('Página 1 de 2')).toBeTruthy()
+  fireEvent.click(within(nav).getByRole('button', { name: 'Próxima página' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Excluir material' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Confirmar exclusão' }))
+  await screen.findByText('Material excluído do seu acervo.')
+  expect(screen.getAllByRole('listitem')).toHaveLength(10)
+  expect(within(nav).getByText('Página 1 de 1')).toBeTruthy()
+  expect(within(nav).getByRole('button', { name: 'Próxima página' })).toHaveProperty('disabled', true)
+})
+
+it.each([false, true])('prioriza obras autorizadas e depois as mais antigas: autorização %s', async authorized => {
+  const antiga = await seal('antiga')
+  items = [{ ...material, authorized: false, inUse: false, createdAt: authorized ? '2026-10-13T12:00:00Z' : '2026-10-15T12:00:00Z' }, { ...antiga, authorized, inUse: false, createdAt: '2026-10-14T12:00:00Z' }]
+  vi.mocked(api.getMaterialContent).mockResolvedValue({ ok: true, ciphertext: antiga.contentCiphertext })
+  mount(); await loaded()
+  await waitFor(() => expect(local.prepareLocalMaterial).toHaveBeenCalledOnce(), { timeout: 2500 })
+  expect(api.getMaterialContent).toHaveBeenCalledWith(access, 'antiga')
+  expect(vi.mocked(local.prepareLocalMaterial).mock.calls[0]![1]).toBe('antiga')
 })

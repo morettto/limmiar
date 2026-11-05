@@ -62,7 +62,6 @@ public static class RateLimitingComposition
         {
             null => null,
             _ when pattern.StartsWith("/auth/", StringComparison.Ordinal) => new($"auth:{ip}", 30),
-            "/devices/pairing-sessions/{sessionId}/claim" => new($"claim:{ip}", 10),
             _ when pattern.StartsWith("/webhooks/", StringComparison.Ordinal) => new($"webhook:{ip}", 120),
             // Parsed, not used as text: the same GUID in another casing must land in the same bucket.
             "/accounts/{accountId:guid}/totp/challenge" => new($"totp:{AccountId(context)}", 5),

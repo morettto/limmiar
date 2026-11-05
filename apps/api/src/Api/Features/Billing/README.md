@@ -268,7 +268,7 @@ Ficheiros novos: `PublicBooking.cs` (tipos, políticas, serviço), `PublicBookin
 
 ### Fluxo principal
 
-- `POST /p/{token}/reserve` (público, molde `DevicePairingEndpoints` claim): valida nome,
+- `POST /p/{token}/reserve` (público): valida nome,
   contacto e data futura (400) → `ResolveTenantAsync(hash)` (nulo/expirado → 404) →
   reclama o efeito (`externalId` determinístico link+slot, UNIQUE: repetição → 200 com o
   guardado) → `CreateCheckoutAsync` (falha → 202 `PaymentPending`, sem sessão parcial) →

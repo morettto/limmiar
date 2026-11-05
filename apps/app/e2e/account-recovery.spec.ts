@@ -1,11 +1,11 @@
 import { test, expect } from '@playwright/test'
-import { abrirAbaDaSessao, abrirCarteira, abrirConfiguracao, iniciarSessaoAgora } from './fixtures/profissional-interface'
+import { abrirAbaDaSessao, abrirCarteira, abrirConfiguracao, iniciarSessaoAgora, criarChavePessoalNaInterface } from './fixtures/profissional-interface'
 import { computeTotpCode } from './fixtures/totp'
 
 test.describe('Recuperação BIP39 em rotas de produto', () => {
   test.use({ locale: 'pt-BR' })
 
-  test('restaura a chave e a sessão em navegador limpo sem a senha antiga', async ({ page, browser, request }) => {
+  test('recupera o login sem liberar prontuários até informar a chave pessoal', async ({ page, browser, request }) => {
     test.setTimeout(60_000)
     const email = `recovery-${crypto.randomUUID()}@example.com`
     const password = 'Recuperacao-teste-2026!'
@@ -20,6 +20,7 @@ test.describe('Recuperação BIP39 em rotas de produto', () => {
     await page.getByLabel('Código de 6 dígitos do aplicativo autenticador', { exact: true }).fill(computeTotpCode(secret, Math.floor(Date.now() / 1000)))
     await page.getByRole('button', { name: 'Confirmar', exact: true }).click()
     await page.getByRole('button', { name: 'Guardei meus códigos', exact: true }).click()
+    const { chavePessoal } = await criarChavePessoalNaInterface(page)
     await expect(page.getByRole('heading', { name: 'Consultório', exact: true })).toBeVisible()
     await page.getByLabel('Referência do documento', { exact: true }).fill('Documento fictício de teste E2E')
     await page.getByRole('button', { name: 'Enviar para revisão', exact: true }).click()
@@ -43,9 +44,8 @@ test.describe('Recuperação BIP39 em rotas de produto', () => {
     await page.getByRole('button', { name: 'Assinar nota', exact: true }).click()
     await expect(page.getByRole('region', { name: 'Nota da sessão', exact: true }).getByRole('status')).toHaveText('Nota assinada e salva no prontuário.')
     await abrirConfiguracao(page, 'Frase de recuperação')
-    await page.getByLabel('Senha atual', { exact: true }).fill(password)
     await page.getByRole('button', { name: 'Gerar frase de recuperação', exact: true }).click()
-    await expect(page.getByRole('heading', { name: 'Guarde sua frase de recuperação', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Recuperação do login', exact: true })).toBeVisible()
     const items = await page.locator('ol li').allTextContents()
     expect(items).toHaveLength(24)
     const mnemonic = items.map(item => item.replace(/^\d+\.\s*/, '')).join(' ')
@@ -61,6 +61,10 @@ test.describe('Recuperação BIP39 em rotas de produto', () => {
       await expect(recovered.getByRole('button', { name: 'Verificar', exact: true })).toBeVisible()
       await recovered.getByLabel('Código de verificação', { exact: true }).fill(computeTotpCode(secret, Math.floor(Date.now() / 1000)))
       await recovered.getByRole('button', { name: 'Verificar', exact: true }).click()
+      await expect(recovered.getByRole('heading', { name: 'Desbloqueie seu consultório' })).toBeVisible()
+      await expect(recovered.getByText(patientName, { exact: true })).toHaveCount(0)
+      await recovered.getByLabel('Chave pessoal', { exact: true }).fill(chavePessoal)
+      await recovered.getByRole('button', { name: 'Desbloquear prontuários', exact: true }).click()
       await expect(recovered.getByRole('heading', { name: 'Consultório', exact: true })).toBeVisible()
       await expect(recovered.getByTestId('conta-sessao')).toHaveText(email)
       await expect(recovered.getByRole('button', { name: 'Sair', exact: true })).toBeVisible()

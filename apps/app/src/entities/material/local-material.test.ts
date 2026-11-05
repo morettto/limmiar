@@ -39,3 +39,9 @@ it('recusa preparo falho, retorno adulterado, estado indisponível e remoção f
   fetcher.mockResolvedValueOnce(new Response(null, { status: 503 }))
   await expect(removeLocalMaterial(access, 'id')).rejects.toThrow('remove')
 })
+
+
+it('distingue falta de capacidade de um preparo aceito pelo serviço', async () => {
+  fetcher.mockResolvedValueOnce(Response.json({ code: 'material.busy' }, { status: 429 }))
+  await expect(prepareLocalMaterial(access, 'id', metadata, new Uint8Array([1]))).rejects.toThrow('material.busy')
+})

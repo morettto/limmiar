@@ -32,7 +32,7 @@ test('aprovação explícita mantém fonte e revisão na nota cifrada e assinada
       const tipo = typeof mensagem === 'string' ? (JSON.parse(mensagem) as { type: string }).type : null
       if (tipo === 'iniciar') ws.send(JSON.stringify({ type: 'pronta' }))
       if (tipo !== 'concluir') return
-      ws.send(JSON.stringify({ type: 'final', frase: 0, falante: 'paciente', palavras: [{ texto: phrase, inicio_ms: 100, fim_ms: 2500 }], processado_ms: 2800 }))
+      ws.send(JSON.stringify({ type: 'final', ordem: 0, frase: 0, falante: 'paciente', palavras: [{ texto: phrase, inicio_ms: 100, fim_ms: 2500 }], processado_ms: 2800 }))
       ws.send(JSON.stringify({ type: 'concluida' }))
     })
   })

@@ -1,0 +1,14 @@
+{
+  "vozes": { "profissional": "Microsoft Daniel", "paciente": "Microsoft Maria" },
+  "falas": [
+    { "quem": "profissional", "texto": "Boa tarde. Como você passou a semana desde o nosso último encontro?" },
+    { "quem": "paciente", "texto": "Foi uma semana difícil. Dormi pouco e acordei cansada quase todos os dias." },
+    { "quem": "profissional", "texto": "Entendo. O que você acha que atrapalhou o seu sono?" },
+    { "quem": "paciente", "texto": "Fiquei pensando no trabalho. Minha chefe pediu um relatório urgente, e eu fiquei com medo de errar." },
+    { "quem": "profissional", "texto": "Esse medo de errar aparece em outras situações também?" },
+    { "quem": "paciente", "texto": "Aparece, sim. Quando preciso falar em público, sinto o coração acelerado e as mãos frias." },
+    { "quem": "profissional", "texto": "Você conseguiu usar a respiração que treinamos na última sessão?" },
+    { "quem": "paciente", "texto": "Consegui algumas vezes. Ajudou um pouco, mas a ansiedade voltou à noite." },
+    { "quem": "profissional", "texto": "Ótimo. Na próxima semana, conversamos sobre o que você observou." }
+  ]
+}

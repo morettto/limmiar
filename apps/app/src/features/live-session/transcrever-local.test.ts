@@ -32,7 +32,7 @@ describe('transcreverLocal', () => {
   it('manda a gravação inteira ao serviço, em quadros de 80 ms, esperando o socket escoar, e devolve as palavras com falante', async () => {
     const resultado = await transcreverLocal(audio, new AbortController().signal, perfil)
     expect(resultado).toEqual(palavras)
-    expect(abrirTranscricao).toHaveBeenCalledWith(expect.objectContaining({ identidade: { modo: 'presencial', perfil } }))
+    expect(abrirTranscricao).toHaveBeenCalledWith(expect.objectContaining({ reconectar: false, identidade: { modo: 'presencial', perfil } }))
     expect(perfil).toEqual([0, 0])
     expect(sessao.enviar.mock.calls.map(([trecho]) => (trecho as Float32Array).length)).toEqual([...Array<number>(31).fill(1280), 320])
     expect(sessao.esvaziada).toHaveBeenCalledTimes(32)
@@ -103,4 +103,14 @@ describe('transcreverLocal', () => {
     await transcreverLocal(audio, controller.signal, perfil)
     expect(remover).toHaveBeenCalledWith('abort', expect.any(Function))
   })
+})
+
+
+it('para de mandar PCM e limpa perfil quando a espera de processamento falha', async () => {
+  sessao.esvaziada.mockRejectedValueOnce(new Error('processamento parado'))
+  await expect(transcreverLocal(audio, new AbortController().signal, perfil)).rejects.toThrow('processamento parado')
+  expect(sessao.enviar).toHaveBeenCalledOnce()
+  expect(sessao.concluir).not.toHaveBeenCalled()
+  expect(sessao.descartar).toHaveBeenCalledOnce()
+  expect(perfil).toEqual([0, 0])
 })

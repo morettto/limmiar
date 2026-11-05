@@ -41,7 +41,8 @@ create table if not exists trecho (
     texto         text not null,
     idioma        text not null,
     avaliacao     integer not null default 0,
-    embedding     blob
+    embedding     blob,
+    generico      real not null
 );
 
 create index if not exists idx_trecho_obra on trecho(obra_id);
@@ -79,6 +80,7 @@ class Citacao:
     texto: str
     score: float
     proveniencia: str
+    generico: float
 
     def para_json(self) -> dict:
         return asdict(self)

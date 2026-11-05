@@ -34,7 +34,7 @@ function sessaoValue(accountId: string | null): ContextoSessao {
   return {kek: null,
     sessao: accountId === null ? null : sessaoParaConta(accountId),
     iniciarSessao: vi.fn(),
-    terminarSessao: vi.fn(),
+    terminarSessao: vi.fn(), bloquearProntuarios: vi.fn(), desbloquearProntuarios: vi.fn(),
   }
 }
 

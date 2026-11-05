@@ -3,11 +3,12 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import { I18nProvider } from '@lingui/react'
 import type { ComponentProps, ReactNode } from 'react'
 import { FalhaServicoInsight } from '../../entities/insight/falha-insight'
-import { consultarInsight, enviarVoto, type ResultadoInsight } from '../../entities/insight/insight'
+import { consultarInsight, enviarVoto, type ConsultaInsight, type ResultadoInsight } from '../../entities/insight/insight'
 import { dynamicActivate, i18n } from '../../shared/i18n'
 import { LiveInsights } from './LiveInsights'
 import { guardarVoto, lerVotos } from '../../entities/insight/voto-store'
 import { gravarConsentimento, lerConsentimento } from '../../entities/insight/consentimento-voto'
+import * as blocosTranscricao from '../../entities/insight/blocos-transcricao'
 import { webcrypto as limmiarWebcrypto } from '@limmiar/crypto'
 
 vi.mock('../../entities/insight/insight', () => ({ consultarInsight: vi.fn(), enviarVoto: vi.fn() }))
@@ -19,10 +20,78 @@ const props = { palavras: [{ texto: 'Tenho medo.', inicioMs: 0, fimMs: 1000, loc
 const fonte = { trecho_id: 't1', titulo: 'Livro', autor: 'Autor', pagina: 1, paragrafo: 2, citacao_literal: 'Citação literal.', fenomeno_na_fala: 'Medo', fenomeno_no_trecho: 'Medo', probabilidade: 0.995, nivel: 'forte' as const }
 const possivel = { ...fonte, trecho_id: 't2', titulo: 'Artigo', probabilidade: 0.93, nivel: 'possivel' as const }
 const resultado: ResultadoInsight = { cartoes: [fonte, possivel], alerta_risco: true, clarificar: true, completo: true, juiz: 'v7' }
+// Cada fala com fontes próprias: um trecho aparece uma vez por sessão.
+const fontesPorFala = async (consulta: ConsultaInsight) => ({ ...resultado, cartoes: resultado.cartoes.map((item) => ({ ...item, trecho_id: `${consulta.id}/${item.trecho_id}` })) })
 function view(value: ComponentProps<typeof LiveInsights> = props) { return <I18nProvider i18n={i18n}><LiveInsights {...value} /></I18nProvider> }
 beforeAll(async () => dynamicActivate('pt-BR'))
-afterEach(() => { cleanup(); vi.useRealTimers(); vi.clearAllMocks() })
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); vi.clearAllMocks() })
 describe('insights durante a sessão', () => {
+  it('atualiza a hipótese sem reconstruir os blocos finais até uma fala final ou correção', () => {
+    const montarBlocos = vi.spyOn(blocosTranscricao, 'montarBlocos')
+    const finais = [{ texto: 'Tenho medo.', inicioMs: 0, fimMs: 1000, locutor: 's' }]
+    const hipotese = [{ texto: 'Estou', inicioMs: 1200, fimMs: 1200, locutor: null }]
+    const mounted = render(view({ ...props, palavras: [...finais, ...hipotese], finais: 1,
+      palavrasFinais: finais, palavrasHipotese: hipotese } as ComponentProps<typeof LiveInsights>))
+
+    expect(screen.getByText('Estou')).toBeTruthy()
+    expect(montarBlocos.mock.calls.filter(([, palavras]) => palavras === finais)).toHaveLength(1)
+
+    const proximaHipotese = [{ ...hipotese[0]!, texto: 'Estou bem' }]
+    mounted.rerender(view({ ...props, palavras: [...finais, ...proximaHipotese], finais: 1,
+      palavrasFinais: finais, palavrasHipotese: proximaHipotese } as ComponentProps<typeof LiveInsights>))
+
+    expect(screen.getByText('Estou bem')).toBeTruthy()
+    expect(montarBlocos.mock.calls.filter(([, palavras]) => palavras === finais)).toHaveLength(1)
+
+    const corrigidos = [{ ...finais[0]!, texto: 'Não tenho medo.' }]
+    mounted.rerender(view({ ...props, palavras: [...corrigidos, ...proximaHipotese], finais: 1,
+      palavrasFinais: corrigidos, palavrasHipotese: proximaHipotese } as ComponentProps<typeof LiveInsights>))
+
+    expect(screen.getByText('Não tenho medo.')).toBeTruthy()
+    expect(montarBlocos.mock.calls.filter(([, palavras]) => palavras === corrigidos)).toHaveLength(1)
+  })
+  it.each([0.6, 0.7, 0.8])('mostra a maior nota final do juiz no resumo fechado (%s)', async (probabilidade) => {
+    vi.useFakeTimers()
+    consultar.mockResolvedValue({ ...resultado, cartoes: [{ ...fonte, probabilidade: 0.5 }, { ...possivel, probabilidade }] })
+    render(view())
+    await act(async () => vi.advanceTimersByTimeAsync(500))
+    const resumo = screen.getByText(/^Fontes pertinentes/)
+    expect(resumo.tagName).toBe('SUMMARY')
+    expect(resumo.closest('details')!.open).toBe(false)
+    expect(resumo.textContent).toContain(`Maior pertinência — juiz: ${probabilidade * 100}%`)
+    expect(screen.getByText(`Pertinência à frase — juiz: ${probabilidade * 100}%`)).toBeTruthy()
+  })
+  it('não inventa nota para um alerta sem fontes', async () => {
+    vi.useFakeTimers()
+    consultar.mockResolvedValue({ ...resultado, cartoes: [] })
+    render(view())
+    await act(async () => vi.advanceTimersByTimeAsync(500))
+    expect(screen.getByText(/^Fontes pertinentes/).textContent).toBe('Fontes pertinentes (0)')
+    expect(screen.queryByText(/Maior pertinência/)).toBeNull()
+  })
+  it('mantém a fila quando a bibliografia é recriada com o mesmo conteúdo', async () => {
+    vi.useFakeTimers()
+    consultar.mockResolvedValue(resultado)
+    const mounted = render(view({ ...props, bibliografia }))
+    await act(async () => vi.advanceTimersByTimeAsync(500))
+    expect(consultar).toHaveBeenCalledOnce()
+    mounted.rerender(view({ ...props, bibliografia: { ...bibliografia, materialIds: [...bibliografia.materialIds] } }))
+    await act(async () => vi.advanceTimersByTimeAsync(500))
+    expect(consultar).toHaveBeenCalledOnce()
+  })
+  it('mantém a fila quando o token de acesso é renovado', async () => {
+    vi.useFakeTimers()
+    consultar.mockResolvedValue(resultado)
+    const mounted = render(view({ ...props, bibliografia }))
+    await act(async () => vi.advanceTimersByTimeAsync(500))
+    expect(consultar).toHaveBeenCalledOnce()
+
+    mounted.rerender(view({ ...props, bibliografia: { ...bibliografia, accessToken: 'token renovado' } }))
+    await act(async () => vi.advanceTimersByTimeAsync(500))
+
+    expect(consultar).toHaveBeenCalledOnce()
+    expect(screen.getByText('Pertinência à frase — juiz: 99.5%')).toBeTruthy()
+  })
   it('distingue seleção vazia de acervo não autorizado e não envia a fala', async () => {
     render(view({ ...props, bibliografia: { ...bibliografia, materialIds: [] }, temObrasAutorizadas: true }))
     expect(screen.getByText('Selecione uma obra para receber referências nesta sessão.')).toBeTruthy()
@@ -48,14 +117,15 @@ describe('insights durante a sessão', () => {
     const onSelectFonte = vi.fn()
     render(view({ ...props, onSelectFonte }))
     await act(async () => vi.advanceTimersByTimeAsync(500))
+    expect(screen.getByRole('button', { name: 'Tenho medo.' }).getAttribute('data-consulta-id')).toBe('0:s')
     fireEvent.click(screen.getByRole('button', { name: 'Tenho medo.' }))
     expect(onSelectFonte).not.toHaveBeenCalled()
     fireEvent.click(screen.getAllByRole('button', { name: 'Usar na nota' })[1]!)
-    expect(onSelectFonte).toHaveBeenCalledWith({ id: '0:s', frase: 'Tenho medo.', contexto: [] }, resultado.cartoes[1], 0, 1000)
+    expect(onSelectFonte).toHaveBeenCalledWith({ id: '0:s', frase: 'Tenho medo.', contexto: [], fimMs: 1000 }, resultado.cartoes[1], 0, 1000)
   })
   it('analisa cada frase da trilha do paciente inteira apesar de falas simultâneas do profissional', async () => {
     vi.useFakeTimers()
-    consultar.mockResolvedValue(resultado)
+    consultar.mockImplementation(fontesPorFala)
     render(view({ ...props, trilhasSeparadas: true, estavelAteMs: 2000, palavras: [
       { texto: 'Tenho', inicioMs: 0, fimMs: 100, locutor: 's' },
       { texto: 'Conte.', inicioMs: 50, fimMs: 140, locutor: 'p' },
@@ -67,30 +137,53 @@ describe('insights durante a sessão', () => {
     ], papeis: { s: 'paciente', p: 'voce' } }))
     await act(async () => vi.advanceTimersByTimeAsync(1000))
     expect(consultar.mock.calls.map(call => call[0]).sort((a, b) => a.id.localeCompare(b.id))).toEqual([
-      { id: '0:s', frase: 'Tenho medo.', contexto: [] },
-      { id: '220:s', frase: 'Agora não.', contexto: ['Tenho medo.'] },
+      { id: '0:s', frase: 'Tenho medo.', contexto: [], fimMs: 200 },
+      { id: '220:s', frase: 'Agora não.', contexto: ['Tenho medo.'], fimMs: 500 },
     ])
     expect(screen.getByRole('button', { name: 'Tenho medo.' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Agora não.' })).toBeTruthy()
     expect(screen.getByText('Conte.')).toBeTruthy(); expect(screen.getByText('Continue.')).toBeTruthy()
   })
-  it('publica fontes antes do fim da sessão enquanto o paciente continua a próxima frase', async () => {
+  it('durante a gravação, fala nova não cancela a consulta em curso e entra assim que ela termina', async () => {
     vi.useFakeTimers()
-    let publicar!: (r: ResultadoInsight) => void
     let concluir!: (r: ResultadoInsight) => void
-    consultar.mockImplementationOnce((_consulta, _signal, atualizar) => {
-      publicar = atualizar
-      return new Promise((resolve) => { concluir = resolve })
-    })
-    const mounted = render(view())
-    await act(async () => vi.advanceTimersByTimeAsync(500))
-    mounted.rerender(view({ ...props, palavras: [...props.palavras, { texto: 'Quando', inicioMs: 1100, fimMs: 1300, locutor: 's' }], estavelAteMs: 1400 }))
+    consultar.mockImplementationOnce(() => new Promise((resolve) => { concluir = resolve })).mockImplementation(fontesPorFala)
+    const mounted = render(view({ ...props, finais: 1 }))
+    expect(consultar).toHaveBeenCalledOnce()
+    const palavras = [...props.palavras, { texto: 'Quando', inicioMs: 1100, fimMs: 1300, locutor: 's' }]
+    mounted.rerender(view({ ...props, palavras, finais: 2, estavelAteMs: 1301 }))
     expect(consultar.mock.calls[0]![1].aborted).toBe(false)
-    await act(async () => publicar(resultado))
-    expect(screen.getByText('Livro')).toBeTruthy()
-    expect(screen.getByText('Artigo')).toBeTruthy()
     expect(consultar).toHaveBeenCalledOnce()
     await act(async () => concluir(resultado))
+    expect(screen.getByRole('button', { name: 'Tenho medo.' })).toBeTruthy()
+    expect(consultar.mock.lastCall![0]).toMatchObject({ id: '1100:s', frase: 'Quando' })
+  })
+  it('durante a gravação consulta a fala mais nova e deixa a passada da fala inteira e as falas velhas para depois', async () => {
+    vi.useFakeTimers()
+    consultar.mockImplementation(fontesPorFala)
+    const papeis = { s: 'paciente' as const, p: 'voce' as const }
+    const palavras = [
+      { texto: 'Tenho medo.', inicioMs: 0, fimMs: 1000, locutor: 's' }, { texto: 'Não durmo.', inicioMs: 1100, fimMs: 2000, locutor: 's' },
+      { texto: 'Conte.', inicioMs: 2100, fimMs: 2500, locutor: 'p' }, { texto: 'Estou triste.', inicioMs: 30_000, fimMs: 31_000, locutor: 's' },
+    ]
+    const mounted = render(view({ ...props, papeis, palavras, finais: 4, estavelAteMs: 31_001 }))
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    expect(consultar.mock.calls.map(([consulta]) => consulta.id)).toEqual(['30000:s'])
+    mounted.rerender(view({ ...props, papeis, palavras, estavelAteMs: Number.MAX_SAFE_INTEGER }))
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    expect(consultar.mock.calls.map(([consulta]) => consulta.id)).toEqual(['30000:s', '0:s', '1100:s', 'turno:0:s'])
+  })
+  it('mostra cada trecho uma vez na sessão, com a fala que o mostrou primeiro', async () => {
+    vi.useFakeTimers()
+    consultar.mockResolvedValue({ ...resultado, cartoes: [fonte], clarificar: false, alerta_risco: false })
+    const palavras = [{ texto: 'Tenho medo.', inicioMs: 0, fimMs: 1000, locutor: 's' }, { texto: 'Estou triste.', inicioMs: 2000, fimMs: 3000, locutor: 's' }]
+    const mounted = render(view({ ...props, palavras, finais: 2, estavelAteMs: 3001 }))
+    await act(async () => vi.advanceTimersByTimeAsync(1000))
+    expect(consultar.mock.calls.map(([consulta]) => consulta.id)).toEqual(['2000:s', '0:s'])
+    mounted.rerender(view({ ...props, palavras, estavelAteMs: Number.MAX_SAFE_INTEGER }))
+    expect(screen.getAllByText('Livro')).toHaveLength(1)
+    expect(screen.getByRole('button', { name: 'Estou triste.' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Tenho medo.' })).toBeNull()
   })
   it.each([
     { fenomeno_na_fala: '', fenomeno_no_trecho: '' },
@@ -118,7 +211,7 @@ describe('insights durante a sessão', () => {
     expect(within(screen.getByRole('region', { name: 'Transcrição ao vivo' })).getByRole('button', { name: 'Não tenho medo.' })).toBeTruthy()
     mounted.rerender(view({ ...props, autorizada: false }))
     expect(screen.queryByText('Livro')).toBeNull()
-    expect(consultar.mock.calls[0]![0]).toEqual({ id: '0:s', frase: 'Tenho medo.', contexto: [] })
+    expect(consultar.mock.calls[0]![0]).toEqual({ id: '0:s', frase: 'Tenho medo.', contexto: [], fimMs: 1000 })
   })
   describe('falhas do copiloto', () => {
     it('503: avisa que o copiloto não foi liberado, sem fabricar referências, e some quando a análise é retirada', async () => {
@@ -136,6 +229,7 @@ describe('insights durante a sessão', () => {
     })
     it('rede ou prazo: avisa que o serviço está fora, tenta de novo sozinho e limpa o aviso quando volta', async () => {
       vi.useFakeTimers()
+      vi.spyOn(Math, 'random').mockReturnValue(0.9)
       consultar.mockRejectedValueOnce(new FalhaServicoInsight('fora')).mockResolvedValue(resultado)
       render(view())
       await act(async () => vi.advanceTimersByTimeAsync(500))
@@ -212,7 +306,7 @@ describe('insights durante a sessão', () => {
   })
   it('mantém balões e tracejados sincronizados pelo clique no resumo e fecha a fala anterior', async () => {
     vi.useFakeTimers()
-    consultar.mockResolvedValue(resultado)
+    consultar.mockImplementation(fontesPorFala)
     render(view({ ...props, palavras: [...props.palavras, { texto: 'Estou triste.', inicioMs: 2000, fimMs: 2200, locutor: 's' }], estavelAteMs: 2500 }))
     await act(async () => vi.advanceTimersByTimeAsync(1000))
     const primeiro = screen.getByRole('button', { name: 'Tenho medo.' })
@@ -354,7 +448,7 @@ describe('insights durante a sessão', () => {
     vi.useFakeTimers()
     consultar.mockResolvedValue(resultado)
     const kek = await limmiarWebcrypto.importKek(crypto.getRandomValues(new Uint8Array(32)))
-    await guardarVoto(kek, 'conta-3', { fala: 'Tenho medo.', contexto: [], trecho: 'Citação literal.', obra: 'Livro', voto: 'util', juiz: 'v1' }, false)
+    await guardarVoto(kek, 'conta-3', { fala: 'Tenho medo.', contexto: [], trecho: 'Citação literal.', obra: 'Livro', voto: 'util', juiz: 'v7' }, false)
     const mounted = render(view({ ...props, votos: { accountId: 'conta-3', kek } }))
     await act(async () => vi.advanceTimersByTimeAsync(500))
     await vi.waitFor(() => expect(screen.getAllByRole('button', { name: 'Útil' })[0]!.getAttribute('aria-pressed')).toBe('true'))
@@ -555,6 +649,7 @@ describe('detalhes dos insights', () => {
     await act(async () => vi.advanceTimersByTimeAsync(1000))
     fireEvent.click(screen.getAllByRole('button', { name: 'Usar na nota' })[0]!)
     expect(onSelectFonte).toHaveBeenCalledWith(expect.objectContaining({ id: 'turno:0:s', ancoras: ['0:s', '600:s'] }), expect.objectContaining({ trecho_id: 't9' }), 0, 1000)
+    expect(screen.getByRole('button', { name: 'Tenho medo.' }).getAttribute('data-consulta-id')).toBe('turno:0:s')
   })
 
   it('com trilhas separadas, as linhas saem por início mesmo vindas de falantes diferentes e só contam palavras com falante', async () => {
@@ -573,10 +668,10 @@ describe('detalhes dos insights', () => {
     const mounted = render(view({ ...props, bibliografia }))
     await act(async () => vi.advanceTimersByTimeAsync(500))
     expect(consultar).toHaveBeenCalledOnce()
-    mounted.rerender(view({ ...props, bibliografia: { ...bibliografia, materialIds: ['m1'] } }))
+    mounted.rerender(view({ ...props, bibliografia: { ...bibliografia, materialIds: ['m2'] } }))
     await act(async () => vi.advanceTimersByTimeAsync(500))
     expect(consultar).toHaveBeenCalledTimes(2)
-    expect(consultar.mock.lastCall![4]).toEqual({ ...bibliografia, materialIds: ['m1'] })
+    expect(consultar.mock.lastCall![2]).toEqual({ ...bibliografia, materialIds: ['m2'] })
     mounted.unmount()
     expect(sinal.aborted).toBe(true)
   })
@@ -598,7 +693,7 @@ describe('detalhes dos insights', () => {
 
   it('o resultado de uma fala cujo contexto mudou não vale para o novo contexto', async () => {
     vi.useFakeTimers()
-    consultar.mockResolvedValue(resultado)
+    consultar.mockImplementation(fontesPorFala)
     const duas = [
       { texto: 'Tenho medo.', inicioMs: 0, fimMs: 500, locutor: 's' }, { texto: 'Conte.', inicioMs: 600, fimMs: 700, locutor: 'p' },
       { texto: 'Estou triste.', inicioMs: 800, fimMs: 1000, locutor: 's' },

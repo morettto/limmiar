@@ -9,12 +9,11 @@ import logging
 from pathlib import Path
 from typing import Annotated, Literal
 
-import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from . import busca, decisao, embedder, jev, juiz, metadados, parse, traducao, treinado
+from . import busca, decisao, embedder, juiz_pequeno, metadados, parse
 from .esquema import DIR_PDFS, conectar, criar_esquema
 
 WEB = Path(__file__).resolve().parent / "web"
@@ -30,13 +29,10 @@ def arrancar() -> None:
     DIR_PDFS.mkdir(parents=True, exist_ok=True)
     log.info("Carregando o índice bibliográfico")
     busca.INDICE.recarregar(con)
-    log.info("Carregando o modelo de busca %s", busca.INDICE.modelo)
-    embedder.carregar(busca.INDICE.modelo)
-    log.info("Carregando os modelos de tradução")
-    traducao.aquecer()
-    if decisao.decisor() == "treinado":
-        log.info("Carregando triagem e juiz %s", treinado.NOME_JUIZ)
-        treinado.aquecer()
+    log.info("Carregando o modelo de busca %s", embedder.PADRAO)
+    embedder.carregar()
+    log.info("Carregando o juiz %s de %s", juiz_pequeno.VERSAO, juiz_pequeno.PASTA)
+    juiz_pequeno.principal("Frase sintética de aquecimento.", ["Trecho sintético de aquecimento."])
     log.info("Verificando as páginas do acervo")
     for linha in con.execute(
         "select distinct o.arquivo, t.pagina from trecho t join obra o on o.id = t.obra_id"
@@ -48,7 +44,6 @@ class CorpoPesquisa(BaseModel):
     model_config = ConfigDict(extra="forbid")
     frase: str = Field(min_length=1, max_length=2000)
     obras_ids: list[str] | None = None
-    idioma: Literal["pt-BR", "es", "en-US"] = "pt-BR"
     falante: Literal["paciente", "terapeuta", "desconhecido"] = "paciente"
     contexto: list[Annotated[str, Field(min_length=1, max_length=2000)]] = Field(default_factory=list, max_length=5)
 
@@ -60,13 +55,6 @@ class CorpoPesquisa(BaseModel):
         return frase
 
 
-def _no_ar(url: str) -> bool:
-    try:
-        return httpx.get(f"{url}/health", timeout=2).status_code == 200
-    except httpx.HTTPError:
-        return False
-
-
 @app.get("/")
 def raiz() -> FileResponse:
     return FileResponse(WEB / "index.html")
@@ -75,16 +63,12 @@ def raiz() -> FileResponse:
 @app.get("/api/saude")
 def saude() -> dict:
     return {
-        "modelo": busca.INDICE.modelo,
+        "modelo": embedder.PADRAO,
         "trechos_no_indice": len(busca.INDICE.ids),
         "indice_vazio": busca.INDICE.vazio(),
-        "juiz_no_ar": _no_ar(juiz.URL_JUIZ),
-        "decisor": decisao.decisor(),
-        "jev_configurado": jev.disponivel(),
         "limiares": decisao.limiares(),
-        "juiz_modelo": treinado.NOME_JUIZ,
-        "candidatos_juiz": len(busca.INDICE.ids),
-        "fontes_por_lote": decisao.LOTE_FONTES,
+        "juiz_modelo": juiz_pequeno.VERSAO,
+        "candidatos_juiz": decisao.CANDIDATOS,
         **VERSAO,
     }
 
@@ -121,7 +105,7 @@ def consultar(corpo: CorpoPesquisa) -> dict:
                 "motivo_silencio": "acervo vazio", "tempos_ms": {}, "triagem": None}
     try:
         resultado = decisao.decidir(
-            con, corpo.frase, corpo.contexto, corpo.falante, corpo.idioma, corpo.obras_ids
+            con, corpo.frase, corpo.contexto, corpo.falante, corpo.obras_ids
         ).para_json()
     except ValueError as erro:
         raise HTTPException(status_code=422, detail=str(erro)) from erro

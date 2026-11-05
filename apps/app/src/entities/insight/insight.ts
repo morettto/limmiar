@@ -1,4 +1,3 @@
-import { i18n } from '@lingui/core'
 import { COPILOTO_BASE_URL } from '../../shared/api/copiloto'
 import { FalhaServicoInsight } from './falha-insight'
 import type { EventoVoto } from './voto-store'
@@ -22,34 +21,36 @@ export interface ResultadoInsight {
   cartoes: FonteInsight[]
   clarificar: boolean
   alerta_risco: boolean
-  completo: boolean
-  cursor?: string
+  // O servidor decide numa passada só: toda resposta é a última.
+  completo: true
   juiz: string
 }
 
-// Teto folgado por lote de fontes, não medido: só impede que um servidor mudo trave a fila.
-const PRAZO_REQUISICAO_MS = 60_000
+// Acima do máximo medido na carga (23,6 s): uma consulta presa não segura a fila da sessão.
+const PRAZO_REQUISICAO_MS = 30_000
 
 export interface ConsultaInsight {
   id: string
   frase: string
   contexto: string[]
+  // Fim da última palavra, no relógio da sessão; não vai ao servidor.
+  fimMs: number
   ancoras?: string[]
 }
 
 export interface BibliografiaInsight { accountId: string; accessToken: string; materialIds: string[] }
 
-export async function consultarInsight(consulta: ConsultaInsight, signal: AbortSignal,
-  atualizar: (resultado: ResultadoInsight) => void, cursor?: string, bibliografia?: BibliografiaInsight): Promise<ResultadoInsight> {
+export async function consultarInsight(consulta: ConsultaInsight, signal: AbortSignal, bibliografia?: BibliografiaInsight): Promise<ResultadoInsight> {
   const resposta = await fetch(`${COPILOTO_BASE_URL}/api/consultar-qualificado`, {
     method: 'POST', signal: AbortSignal.any([signal, AbortSignal.timeout(PRAZO_REQUISICAO_MS)]),
     headers: { 'Content-Type': 'application/json', ...(bibliografia ? { Authorization: `Bearer ${bibliografia.accessToken}` } : {}) },
-    body: JSON.stringify({ frase: consulta.frase, contexto: consulta.contexto, falante: 'paciente', idioma: i18n.locale, ...(cursor === undefined ? {} : { cursor }),
+    body: JSON.stringify({ frase: consulta.frase, contexto: consulta.contexto, falante: 'paciente',
       ...(bibliografia ? { accountId: bibliografia.accountId, materialIds: bibliografia.materialIds } : {}) }),
   }).catch((erro: unknown) => { throw servicoFora(erro, signal) })
   if (!resposta.ok) {
     if (resposta.status === 503) throw new FalhaServicoInsight('nao_liberado')
-    throw resposta.status >= 500 ? new FalhaServicoInsight('fora') : new Error('Consulta do copiloto recusada.')
+    // 401 é token vencido: o SessionProvider o renova e a nova tentativa já lê o token novo.
+    throw resposta.status >= 500 || resposta.status === 401 ? new FalhaServicoInsight('fora') : new Error('Consulta do copiloto recusada.')
   }
   if (resposta.headers.get('Content-Type')?.split(';')[0] !== 'application/x-ndjson' || !resposta.body) {
     throw new Error('Resposta do copiloto inválida.')
@@ -70,11 +71,8 @@ export async function consultarInsight(consulta: ConsultaInsight, signal: AbortS
       let fim: number
       while ((fim = pendente.indexOf('\n')) >= 0) {
         if (final) throw new Error('Resposta do copiloto inválida.')
-        const dados: unknown = JSON.parse(pendente.slice(0, fim))
+        final = validarResultado(JSON.parse(pendente.slice(0, fim)))
         pendente = pendente.slice(fim + 1)
-        const resultado = validarResultado(dados)
-        atualizar(resultado)
-        final = resultado
       }
       if (done) break
     }
@@ -99,8 +97,7 @@ function validarResultado(dados: unknown): ResultadoInsight {
       typeof resultado.juiz !== 'string' || !resultado.juiz) {
     throw new Error('Resposta do copiloto inválida.')
   }
-  if (typeof resultado.completo !== 'boolean' || (resultado.completo ? resultado.cursor !== undefined :
-    typeof resultado.cursor !== 'string' || resultado.cursor.length !== 48)) throw new Error('Resposta do copiloto inválida.')
+  if (resultado.completo !== true) throw new Error('Resposta do copiloto inválida.')
   for (const fonte of resultado.cartoes) {
     if (!fonte || typeof fonte !== 'object' || typeof fonte.trecho_id !== 'string' || !fonte.trecho_id ||
         typeof fonte.titulo !== 'string' || !fonte.titulo.trim() ||
@@ -109,13 +106,12 @@ function validarResultado(dados: unknown): ResultadoInsight {
         !Number.isInteger(fonte.paragrafo) || fonte.paragrafo < 1 ||
         typeof fonte.citacao_literal !== 'string' || !fonte.citacao_literal.trim() ||
         typeof fonte.fenomeno_na_fala !== 'string' || typeof fonte.fenomeno_no_trecho !== 'string' ||
-        typeof fonte.probabilidade !== 'number' || fonte.probabilidade < 0 || fonte.probabilidade > 1 ||
+        typeof fonte.probabilidade !== 'number' || !Number.isFinite(fonte.probabilidade) || fonte.probabilidade < 0 || fonte.probabilidade > 1 ||
         (fonte.nivel !== 'forte' && fonte.nivel !== 'possivel')) {
       throw new Error('Referência do copiloto inválida.')
     }
   }
-  return { cartoes: resultado.cartoes, clarificar: resultado.clarificar, alerta_risco: resultado.alerta_risco,
-    completo: resultado.completo, juiz: resultado.juiz, ...(resultado.completo ? {} : { cursor: resultado.cursor }) }
+  return { cartoes: resultado.cartoes, clarificar: resultado.clarificar, alerta_risco: resultado.alerta_risco, completo: true, juiz: resultado.juiz }
 }
 
 /** true = resolvido (204 aceito, 400 inválido e inútil reenviar); qualquer outra resposta fica para reenvio. */

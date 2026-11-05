@@ -1,0 +1,19 @@
+.vault-page { max-width: 42rem; margin: 0 auto; padding: clamp(1rem, 4vw, 3rem) 1rem; }
+.vault-brand { font-size: 1.5rem; margin-bottom: 2rem; }
+.vault-panel { background: var(--color-surface, #fff); border: 1px solid #d9d6ce; border-radius: 1rem; padding: clamp(1.25rem, 4vw, 2.5rem); }
+.vault-panel h1 { font-size: clamp(1.7rem, 5vw, 2.3rem); line-height: 1.15; margin: .75rem 0 1.5rem; }
+.vault-panel h2 { font-size: 1rem; margin: 1.5rem 0 .5rem; }
+.vault-panel p { line-height: 1.6; margin: 1rem 0; }
+.vault-panel label { display: grid; gap: .5rem; margin: 1.25rem 0; }
+.vault-panel input:not([type=checkbox]) { width: 100%; min-width: 0; padding: .8rem; border: 1px solid #817c70; border-radius: .4rem; }
+.vault-panel button { min-height: 44px; margin: .25rem 0; }
+.vault-panel button:disabled { cursor: not-allowed; }
+.vault-secret, .vault-codes { display: block; overflow-wrap: anywhere; background: #f5f3ee; border-radius: .5rem; padding: 1rem; font-size: .875rem; }
+.vault-codes { padding-left: 2.25rem; }
+.vault-codes li + li { margin-top: 1rem; }
+.vault-actions { display: flex; gap: .75rem; flex-wrap: wrap; margin-top: 1rem; }
+.vault-panel .vault-confirm { display: flex; align-items: start; gap: .75rem; line-height: 1.5; }
+.vault-confirm input { margin-top: .3rem; flex-shrink: 0; }
+.vault-warning { padding: 1rem; background: #fff5e8; border-left: 3px solid #92601e; color: #633e10; }
+.vault-panel .vault-link { display: block; background: transparent; color: inherit; border: none; text-decoration: underline; padding: .5rem 0; margin-top: 1rem; }
+.vault-footnote { text-align: center; color: #59564f; font-size: .875rem; line-height: 1.6; margin: 1.5rem 0; }

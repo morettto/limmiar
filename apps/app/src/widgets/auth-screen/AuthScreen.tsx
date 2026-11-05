@@ -7,7 +7,6 @@ import {
   continueWithGoogle,
   deriveEmailPasswordVerifier,
   deriveEmailSalt,
-  deriveAccountKek,
   login,
   register,
   type Account,
@@ -42,7 +41,6 @@ export function AuthScreen({ baseUrl, getGoogleIdToken, onAuthenticated, initial
   const [password, setPassword] = useState('')
   const [invitation, setInvitation] = useState('')
   const [mode, setMode] = useState<{ status: 'register' | 'login' }>({ status: 'register' })
-  const [kek, setKek] = useState<CryptoKey | undefined>()
   const [state, setState] = useState<SubmitState | null>(null)
 
   function handleAuthenticated(account: Account, key?: CryptoKey) {
@@ -51,12 +49,11 @@ export function AuthScreen({ baseUrl, getGoogleIdToken, onAuthenticated, initial
     setState({ status: 'success', account })
   }
 
-  function handleAccountResult(account: Account, key?: CryptoKey) {
+  function handleAccountResult(account: Account) {
     if (account.role !== 'Professional' || account.email === null) {
       setState({ status: 'error', message: problemMessage('unexpected_error', {}) })
       return
     }
-    setKek(key)
     switch (account.twoFactorRequirement) {
       case 'SetupRequired':
         setState({ status: 'totp-setup', account })
@@ -65,7 +62,7 @@ export function AuthScreen({ baseUrl, getGoogleIdToken, onAuthenticated, initial
         setState({ status: 'totp-challenge', account })
         break
       case 'NotApplicable':
-        handleAuthenticated(account, key)
+        handleAuthenticated(account)
         break
     }
   }
@@ -90,9 +87,8 @@ export function AuthScreen({ baseUrl, getGoogleIdToken, onAuthenticated, initial
       : await register(baseUrl, { email, passwordVerifier, role })
 
     if (result.ok) {
-      const key = await deriveAccountKek(password, email)
       setPassword('')
-      handleAccountResult(result.account, key)
+      handleAccountResult(result.account)
     } else {
       handleFailure(result.code, result.params)
     }
@@ -127,7 +123,7 @@ export function AuthScreen({ baseUrl, getGoogleIdToken, onAuthenticated, initial
         ticket={state.account.twoFactorTicket!}
         onDone={(tokens) => handleAuthenticated({
           ...state.account, ...tokens, twoFactorRequirement: 'ChallengeRequired', twoFactorTicket: null,
-        }, kek)}
+        })}
       />
     )
   }
@@ -138,7 +134,7 @@ export function AuthScreen({ baseUrl, getGoogleIdToken, onAuthenticated, initial
         baseUrl={baseUrl}
         accountId={state.account.id}
         ticket={state.account.twoFactorTicket!}
-        onVerified={(account) => handleAuthenticated(account, kek)}
+        onVerified={(account) => handleAuthenticated(account)}
       />
     )
   }

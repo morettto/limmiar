@@ -49,7 +49,7 @@ public sealed class AccountKeyPairServiceTests : IAsyncLifetime
     {
         var store = new PostgresAccountStore(_dataSource, SomeTotpSecretCipher);
         var accountId = Guid.NewGuid();
-        await store.InsertAsync(SomeAccount(accountId, "keypair-race@example.com"), CancellationToken.None);
+        await store.InsertAsync(SomeAccount(accountId), CancellationToken.None);
         var service = new AccountKeyPairService(_dataSource);
 
         var pairA = new AccountKeyPair(SomePublicKey(0x01), SomeBlob(0x02), SomeBlob(0x03));
@@ -91,7 +91,7 @@ public sealed class AccountKeyPairServiceTests : IAsyncLifetime
     {
         var store = new PostgresAccountStore(_dataSource, SomeTotpSecretCipher);
         var accountId = Guid.NewGuid();
-        var account = SomeAccount(accountId, "voice-after-keypair@example.com");
+        var account = SomeAccount(accountId);
         await store.InsertAsync(account, CancellationToken.None);
         var service = new AccountKeyPairService(_dataSource);
         var pair = new AccountKeyPair(SomePublicKey(0x07), SomeBlob(0x08), SomeBlob(0x09));
@@ -107,7 +107,7 @@ public sealed class AccountKeyPairServiceTests : IAsyncLifetime
         Assert.Equal(pair.SealedPrivateKey, stillThere.SealedPrivateKey);
     }
 
-    private static Account SomeAccount(Guid id, string email) =>
+    private static Account SomeAccount(Guid id) =>
         new(id, null, AccountRole.Patient, PasswordVerifier: null, GoogleSubjectId: null);
 
     private static byte[] SomePublicKey(byte fill)

@@ -8,6 +8,9 @@ import { problemCodes, type ProblemCode } from './problem-codes'
 // code a type error instead of a silent generic fallback.
 // Stryker disable all
 const knownProblemMessages: Record<ProblemCode, MessageDescriptor> = {
+  'clinical_vault.not_found': msg({ id: 'clinical_vault.not_found', message: 'Chave pessoal ainda não configurada.' }),
+  'clinical_vault.conflict': msg({ id: 'clinical_vault.conflict', message: 'A chave foi alterada em outra sessão. Entre novamente.' }),
+  'clinical_vault.recovery_failed': msg({ id: 'clinical_vault.recovery_failed', message: 'Código inválido ou já substituído. Confira seus códigos atuais.' }),
   'agenda.patient_not_found': msg({
     id: 'agenda.patient_not_found',
     message: 'Prontuário indisponível nesta carteira. Atualize a seleção do paciente.',
@@ -110,25 +113,6 @@ const knownProblemMessages: Record<ProblemCode, MessageDescriptor> = {
     id: 'auth.forbidden',
     message: 'Você não tem acesso a esta conta.',
   }),
-  // The backend returns this same code for an expired, an already-claimed, and a
-  // wrong-account pairing session, so a stolen QR code cannot be told apart from a live
-  // one. Keep the text generic; it must not hint at which.
-  'auth.device_pairing_session_not_found': msg({
-    id: 'auth.device_pairing_session_not_found',
-    message: 'Este código de pareamento não é mais válido. Gere um novo.',
-  }),
-  // Raised on the primary device, which tried to release access before the new device
-  // read the code.
-  'auth.device_pairing_payload_not_ready': msg({
-    id: 'auth.device_pairing_payload_not_ready',
-    message: 'Aguarde o outro dispositivo ler o código antes de liberar o acesso.',
-  }),
-  // Raised on the new device, which asked for access before the primary device released
-  // it.
-  'auth.device_pairing_payload_not_delivered': msg({
-    id: 'auth.device_pairing_payload_not_delivered',
-    message: 'O dispositivo principal ainda não liberou o acesso. Aguarde.',
-  }),
   'patients.not_found': msg({
     id: 'patients.not_found',
     message: 'Prontuário não encontrado.',
@@ -218,6 +202,11 @@ const knownProblemMessages: Record<ProblemCode, MessageDescriptor> = {
     message: 'Suas preferências mudaram em outro dispositivo. Tente novamente.',
   }),
   'materials.not_found': msg({ id: 'materials.not_found', message: 'Este material não está disponível no seu acervo.' }),
+  'materials.not_prepared': msg({ id: 'materials.not_prepared', message: 'Aguarde o preparo do material antes de autorizar ou usar em uma sessão.' }),
+  'materials.readiness_unavailable': msg({ id: 'materials.readiness_unavailable', message: 'Não foi possível verificar o preparo do material. Tente novamente.' }),
+  'materials.in_use': msg({ id: 'materials.in_use', message: 'Este material está em uso em um atendimento. Encerre o atendimento antes de excluir.' }),
+  'materials.session_closed': msg({ id: 'materials.session_closed', message: 'Este atendimento já começou a ser encerrado. Conclua o encerramento para salvar os registros.' }),
+  'materials.not_authorized': msg({ id: 'materials.not_authorized', message: 'Autorize o material preparado antes de usar em uma sessão.' }),
   'materials.already_exists': msg({ id: 'materials.already_exists', message: 'Este material já foi guardado. Atualize seu acervo.' }),
   'rate_limit.too_many_requests': msg({ id: 'rate_limit.too_many_requests', message: 'Muitas tentativas em pouco tempo. Aguarde um minuto e tente de novo.' }),
 }

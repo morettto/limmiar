@@ -37,10 +37,15 @@ ficam num balão só e o balão só quebra quando outra pessoa fala. O profissio
 cada balão com o nome e o instante (m:ss) em que começou; a hipótese do servidor (`delta`) entra na hora no fim do balão
 atual, em tom mais claro, e vira texto final no próximo `completed`.
 
-`LiveInsights` seleciona falas estáveis do paciente e envia texto e contexto ao
-serviço bibliográfico local. Fontes chegam progressivamente em lotes. Atualizar
-texto, contexto ou papel invalida a resposta anterior e cancela a hipótese
-substituída. Não há limite de uma obra ou um cartão.
+`LiveInsights` seleciona as frases finais do paciente e envia texto e contexto ao
+serviço bibliográfico local, uma consulta por vez e sem espera. Cada resposta é completa.
+Durante a gravação (`finais` definido, também na teleconsulta) vai a frase mais nova com
+até 15 s de conversa (`estavelAteMs - fimMs`); as mais velhas e a passada sobre a fala
+inteira esperam o fim da gravação e então seguem na ordem de chegada. Atualizar texto,
+contexto ou papel invalida a resposta anterior e cancela só a consulta daquela frase;
+frase nova não interrompe a consulta em curso. Cada trecho aparece uma vez na sessão,
+no balão da frase que o mostrou primeiro. O botão da frase marcada leva
+`data-consulta-id` (medição da carga, `e2e/carga-sessao.spec.ts`).
 
 Cada cartão vem com `nivel`. Os fortes aparecem abertos no balão; os possíveis ficam num
 `<details>` fechado, "Possíveis: confira antes de usar". A fala que só tem possíveis (sem
@@ -49,15 +54,14 @@ dos fortes. Votos "útil / não útil" e "Escolher referência" valem nos dois n
 a versão `juiz` da resposta.
 
 Três mensagens para três falhas. HTTP 503: "Copiloto não liberado", sem nova tentativa.
-Rede, prazo ou 5xx: "Serviço do copiloto fora do ar. Tentando de novo.", com espera crescente
+Rede, prazo de 30 s, 401 (token vencido; a nova tentativa usa o token renovado) ou 5xx:
+"Serviço do copiloto fora do ar. Tentando de novo.", com espera aleatória sob um teto crescente
 na fila, e o aviso some na primeira resposta boa. Erro no stream ou resposta inválida: a linha
 da fala mostra "Esta fala ficou sem análise." (falha só da passada sobre a fala inteira não
 marca as frases, que já foram analisadas).
 
-A fila preserva a ordem das frases pendentes. Depois de cada lote, a continuação
-volta ao fim da fila: novas falas e fontes restantes recebem sua vez mesmo
-durante fala contínua. Correção invalida a versão antiga, encerra sua consulta e
-enfileira a nova; encerrar a sessão apaga consultas e progresso em memória.
+Correção invalida a versão antiga, encerra sua consulta e enfileira a nova; encerrar a
+sessão apaga as consultas pendentes em memória.
 
 O MediaRecorder fornece somente uma reprodução temporária para revisão, limitada
 a 64 MiB em memória. Blob e URL são descartados ao sair, salvar ou descartar.

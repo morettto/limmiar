@@ -19,7 +19,8 @@ decisão: `docs/adr/ADR-0012-transcricao-no-servidor.md`.
   `esvaziada()` espera o socket escoar (uso: mandar um arquivo inteiro, `transcrever-local`); `descartar()` cancela.
 - Cada resultado é um **snapshot**: todas as palavras (finais e em hipótese) com `inicioMs`/`fimMs` na linha do tempo da
   captura, o falante (`speaker_N`, ou `null`), quantas são finais e `estavelAteMs`, o instante até onde nem o texto nem o
-  falante mudam mais (o menor entre o fim da última palavra final e o `speaker_stable_until` do servidor).
+  falante mudam mais: o fim da última palavra final mais 1 ms, porque cada frase final já chega com o falante resolvido.
+  Ele só avança com uma nova final e é o relógio de conversa da fila de insights (`entities/insight/README.md`).
 - **Silêncio não vai ao servidor** (`porta-de-voz`): com a separação de vozes ligada o servidor processa silêncio mais devagar que o
   tempo real (30 s de pausa viram ~40 s de atraso). A porta mede a energia RMS de cada quadro de 80 ms contra um piso de ruído
   adaptativo (o quadro mais quieto dos últimos ~3 s) com histerese (liga a 3x o piso, desliga abaixo de 1,8x) e deixa passar só a
@@ -30,8 +31,9 @@ decisão: `docs/adr/ADR-0012-transcricao-no-servidor.md`.
   enquanto cai fica numa fila e vai à sessão nova (5 tentativas, 0/1/2/4/8 s). A sessão nova conta o tempo desde o primeiro
   quadro que recebe, então ela ganha um mapa de tempo novo, e os falantes dela ganham o sufixo da época
   (`speaker_1_r1`), porque o servidor numera de novo. Esgotadas as tentativas, `falhar`.
-- **Atraso:** aviso `atrasada` quando há mais de 2 s de áudio parado no socket (`bufferedAmount`) ou quando o servidor
-  processou (`audio_processed`) mais de 2 s a menos que o enviado. Em CPU, com a separação de vozes, o segundo caso é o
+- **Atraso:** aviso `atrasada` quando há mais de 300 ms de áudio parado no socket (`bufferedAmount`) ou quando o servidor
+  processou (`audio_processed`) mais de 300 ms a menos que o enviado. Esse aviso detecta a violação; não garante que o modelo
+  mantenha cada palavra dentro do limite. Em CPU, com a separação de vozes, o segundo caso é o
   que acontece.
 - Sem nenhum evento do servidor por 30 s depois do `commit`, a conclusão falha. Um `error` do servidor derruba a sessão.
 - O PCM nunca é gravado: o que não foi enviado fica na fila de reconexão e é descartado ao encerrar.

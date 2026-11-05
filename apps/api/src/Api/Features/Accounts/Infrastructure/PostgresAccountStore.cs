@@ -19,7 +19,7 @@ public sealed class PostgresAccountStore(NpgsqlDataSource dataSource, TotpSecret
         rejection_reason, verification_submitted_at, totp_secret_encrypted, totp_enabled_at,
         totp_backup_code_hashes, webauthn_credential_id, webauthn_cose_public_key,
         webauthn_sign_count, webauthn_aaguid, recovery_verifier_sha256, voice_wrapped_dek,
-        voice_sealed_embedding, recovery_key_envelope
+        voice_sealed_embedding
         """;
 
     public Task<Account?> FindByEmailAsync(string normalizedEmail, CancellationToken cancellationToken)
@@ -77,13 +77,13 @@ public sealed class PostgresAccountStore(NpgsqlDataSource dataSource, TotpSecret
                 rejection_reason, verification_submitted_at, totp_secret_encrypted, totp_enabled_at,
                 totp_backup_code_hashes, webauthn_credential_id, webauthn_cose_public_key,
                 webauthn_sign_count, webauthn_aaguid, recovery_verifier_sha256, voice_wrapped_dek,
-                voice_sealed_embedding, recovery_key_envelope)
+                voice_sealed_embedding)
             VALUES (
                 @id, @email, @role, @passwordVerifier, @googleSubjectId, @verificationStatus,
                 @rejectionReason, @verificationSubmittedAt, @totpSecret, @totpEnabledAt,
                 @totpBackupCodeHashes, @webauthnCredentialId, @webauthnCosePublicKey,
                 @webauthnSignCount, @webauthnAaGuid, @recoveryVerifier, @voiceWrappedDek,
-                @voiceSealedEmbedding, @recoveryEnvelope)
+                @voiceSealedEmbedding)
             """;
         AddAccountParameters(insertCommand, account);
         await insertCommand.ExecuteNonQueryAsync(cancellationToken);
@@ -121,8 +121,7 @@ public sealed class PostgresAccountStore(NpgsqlDataSource dataSource, TotpSecret
                 webauthn_aaguid = @webauthnAaGuid,
                 recovery_verifier_sha256 = @recoveryVerifier,
                 voice_wrapped_dek = @voiceWrappedDek,
-                voice_sealed_embedding = @voiceSealedEmbedding,
-                recovery_key_envelope = @recoveryEnvelope
+                voice_sealed_embedding = @voiceSealedEmbedding
             WHERE id = @id
             """;
         AddAccountParameters(updateCommand, account);
@@ -176,7 +175,6 @@ public sealed class PostgresAccountStore(NpgsqlDataSource dataSource, TotpSecret
         command.Parameters.AddWithValue("webauthnSignCount", account.WebAuthnSignCount is { } signCount ? (long)signCount : DBNull.Value);
         command.Parameters.AddWithValue("webauthnAaGuid", (object?)account.WebAuthnAaGuid ?? DBNull.Value);
         command.Parameters.AddWithValue("recoveryVerifier", (object?)account.RecoveryVerifier ?? DBNull.Value);
-        command.Parameters.AddWithValue("recoveryEnvelope", (object?)account.RecoveryEnvelope ?? DBNull.Value);
         command.Parameters.AddWithValue("voiceWrappedDek", (object?)account.VoiceEnrollment?.WrappedDek ?? DBNull.Value);
         command.Parameters.AddWithValue("voiceSealedEmbedding", (object?)account.VoiceEnrollment?.SealedEmbedding ?? DBNull.Value);
     }
@@ -203,8 +201,7 @@ public sealed class PostgresAccountStore(NpgsqlDataSource dataSource, TotpSecret
             WebAuthnSignCount: reader.IsDBNull(Ord("webauthn_sign_count")) ? null : (uint)reader.GetInt64(Ord("webauthn_sign_count")),
             WebAuthnAaGuid: reader.IsDBNull(Ord("webauthn_aaguid")) ? null : reader.GetGuid(Ord("webauthn_aaguid")),
             RecoveryVerifier: reader.IsDBNull(Ord("recovery_verifier_sha256")) ? null : reader.GetFieldValue<byte[]>(Ord("recovery_verifier_sha256")),
-            VoiceEnrollment: ReadVoiceEnrollment(wrappedDek, sealedEmbedding),
-            RecoveryEnvelope: reader.IsDBNull(Ord("recovery_key_envelope")) ? null : reader.GetFieldValue<byte[]>(Ord("recovery_key_envelope")));
+            VoiceEnrollment: ReadVoiceEnrollment(wrappedDek, sealedEmbedding));
     }
 
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage(Justification =

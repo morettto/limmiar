@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { authorizeMaterial, deleteMaterial, getMaterialContent, listMaterials, uploadMaterial } from './api'
+import { beginMaterialCapture, releaseMaterialCapture, authorizeMaterial, deleteMaterial, getMaterialContent, listMaterials, setMaterialUsage, uploadMaterial } from './api'
 const access = { baseUrl: 'https://api.example', accountId: 'owner', accessToken: 'secret' }
 const bytes = new Uint8Array([1, 2, 3])
 const fetcher = vi.fn()
@@ -13,8 +13,8 @@ it('usa bearer e apenas IDs/cifras na criação, lista, arquivo, autorização e
   expect(fetcher.mock.lastCall![1].headers.Authorization).toBe('Bearer secret')
   const alvo = () => [fetcher.mock.lastCall![1].method ?? 'GET', fetcher.mock.lastCall![0]]
   expect(alvo()).toEqual(['POST', 'https://api.example/accounts/owner/materials'])
-  fetcher.mockResolvedValueOnce(Response.json({ materials: [{ materialId: 'id', wrappedDek: 'AQID', metadataCiphertext: 'AQID', authorized: false, createdAt: 'date' }] }))
-  expect(await listMaterials(access)).toEqual({ ok: true, materials: [{ materialId: 'id', wrappedDek: bytes, metadataCiphertext: bytes, authorized: false, createdAt: 'date' }] })
+  fetcher.mockResolvedValueOnce(Response.json({ materials: [{ materialId: 'id', wrappedDek: 'AQID', metadataCiphertext: 'AQID', authorized: false, inUse: false, createdAt: 'date' }] }))
+  expect(await listMaterials(access)).toEqual({ ok: true, materials: [{ materialId: 'id', wrappedDek: bytes, metadataCiphertext: bytes, authorized: false, inUse: false, createdAt: 'date' }] })
   expect(alvo()).toEqual(['GET', 'https://api.example/accounts/owner/materials'])
   fetcher.mockResolvedValueOnce(Response.json({ contentCiphertext: 'AQID' }))
   expect(await getMaterialContent(access, 'id')).toEqual({ ok: true, ciphertext: bytes })
@@ -34,5 +34,26 @@ it('preserva recusas da API em todas as operações', async () => {
   expect(await getMaterialContent(access, 'id')).toEqual(failed)
   expect(await authorizeMaterial(access, 'id', false)).toEqual(failed)
   expect(await deleteMaterial(access, 'id')).toEqual(failed)
+  expect(await setMaterialUsage(access, 'session', ['id'])).toEqual(failed)
   expect(await uploadMaterial(access, { materialId: 'id', wrappedDek: bytes, metadataCiphertext: bytes, contentCiphertext: bytes })).toEqual(failed)
+})
+
+
+it('reserva e libera a seleção do atendimento sem enviar conteúdo privado', async () => {
+  fetcher.mockResolvedValue(new Response(null, { status: 204 }))
+  expect(await setMaterialUsage(access, 'sessao', ['id'])).toEqual({ ok: true })
+  expect(fetcher.mock.lastCall![0]).toBe('https://api.example/accounts/owner/materials/usage/sessao')
+  expect(JSON.parse(fetcher.mock.lastCall![1].body)).toEqual({ materialIds: ['id'] })
+  expect(fetcher.mock.lastCall![1].headers.Authorization).toBe('Bearer secret')
+  expect(await setMaterialUsage(access, 'sessao', [])).toEqual({ ok: true })
+  expect(JSON.parse(fetcher.mock.lastCall![1].body)).toEqual({ materialIds: [] })
+})
+
+it('adquire e libera apenas a captura identificada desta aba', async () => {
+  fetcher.mockResolvedValue(new Response(null, { status: 204 }))
+  expect(await beginMaterialCapture(access, 'sessao', 'captura', ['id'])).toEqual({ ok: true })
+  expect(fetcher.mock.lastCall![0]).toBe('https://api.example/accounts/owner/materials/usage/sessao/captures/captura')
+  expect(JSON.parse(fetcher.mock.lastCall![1].body)).toEqual({ materialIds: ['id'] })
+  expect(await releaseMaterialCapture(access, 'sessao', 'captura')).toEqual({ ok: true })
+  expect(fetcher.mock.lastCall![1].method).toBe('DELETE')
 })

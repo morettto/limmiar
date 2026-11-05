@@ -4,21 +4,21 @@ import { validateMnemonic } from '@limmiar/crypto'
 import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import { problemMessage } from '../../shared/api'
-import { deriveEmailSalt, deriveRecoveryVerifier, openRecoveryEnvelope, recoverAccess, type Account } from '../../entities/account'
+import { deriveEmailSalt, deriveRecoveryVerifier, recoverAccess, type Account } from '../../entities/account'
 import { TotpChallenge } from '../totp-challenge/TotpChallenge'
 import { TotpSetup } from '../totp-enrollment/TotpSetup'
 
 export interface RecoveryScreenProps {
   baseUrl: string
-  onRecovered?: (account: Account, kek: CryptoKey) => void
+  onRecovered?: (account: Account) => void
 }
 
 type SubmitState =
   | { status: 'submitting' }
   | { status: 'error'; message: MessageDescriptor }
   | { status: 'success'; account: Account }
-  | { status: 'totp-setup'; account: Account; kek: CryptoKey }
-  | { status: 'totp-challenge'; account: Account; kek: CryptoKey }
+  | { status: 'totp-setup'; account: Account }
+  | { status: 'totp-challenge'; account: Account }
 
 export function RecoveryScreen({ baseUrl, onRecovered }: RecoveryScreenProps) {
   const { i18n } = useLingui()
@@ -35,21 +35,21 @@ export function RecoveryScreen({ baseUrl, onRecovered }: RecoveryScreenProps) {
   }, [])
   // Stryker restore ArrayDeclaration
 
-  function handleRecovered(account: Account, kek: CryptoKey) {
-    onRecovered?.(account, kek)
+  function handleRecovered(account: Account) {
+    onRecovered?.(account)
     setState({ status: 'success', account })
   }
 
-  function handleAccount(account: Account, kek: CryptoKey) {
+  function handleAccount(account: Account) {
     switch (account.twoFactorRequirement) {
       case 'SetupRequired':
-        setState({ status: 'totp-setup', account, kek })
+        setState({ status: 'totp-setup', account })
         break
       case 'ChallengeRequired':
-        setState({ status: 'totp-challenge', account, kek })
+        setState({ status: 'totp-challenge', account })
         break
       case 'NotApplicable':
-        handleRecovered(account, kek)
+        handleRecovered(account)
         break
     }
   }
@@ -80,11 +80,9 @@ export function RecoveryScreen({ baseUrl, onRecovered }: RecoveryScreenProps) {
         setState({ status: 'error', message: problemMessage(result.code, result.params) })
         return
       }
-      const kek = await openRecoveryEnvelope(trimmedMnemonic, email, result.account.id, result.recoveryEnvelope)
-      if (!active.current) return
       // Stryker disable next-line StringLiteral: equivalent, the form unmounts right after, so the cleared phrase is never rendered.
       setMnemonic('')
-      handleAccount(result.account, kek)
+      handleAccount(result.account)
     } catch {
       setState({ status: 'error', message: msg`Não foi possível recuperar o acesso. Verifique sua frase e tente novamente.` })
     }
@@ -98,7 +96,7 @@ export function RecoveryScreen({ baseUrl, onRecovered }: RecoveryScreenProps) {
         ticket={state.account.twoFactorTicket!}
         onDone={(tokens) => handleRecovered({
           ...state.account, ...tokens, twoFactorRequirement: 'ChallengeRequired', twoFactorTicket: null,
-        }, state.kek)}
+        })}
       />
     )
   }
@@ -109,7 +107,7 @@ export function RecoveryScreen({ baseUrl, onRecovered }: RecoveryScreenProps) {
         baseUrl={baseUrl}
         accountId={state.account.id}
         ticket={state.account.twoFactorTicket!}
-        onVerified={(account) => handleRecovered(account, state.kek)}
+        onVerified={(account) => handleRecovered(account)}
       />
     )
   }

@@ -2,6 +2,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { webcrypto, type CryptoKey } from '@limmiar/crypto'
 import { dynamicActivate } from '../../shared/i18n'
 import * as patients from '../../entities/patient/api'
+import * as materials from '../../entities/material/api'
 import { openEntries, openRecord, sealEntry, sealNewPatient } from '../../entities/patient/patient-crypto'
 import { atendimentoParaEntrada, encerramentoParaEntrada, lerEncerramento } from '../../entities/atendimento/atendimento'
 import { encerrarAtendimento } from './encerrar-atendimento'
@@ -18,6 +19,7 @@ async function acrescentar(bytes: Uint8Array<ArrayBuffer>) {
 
 beforeAll(async () => { await dynamicActivate('pt-BR') })
 beforeEach(async () => {
+  vi.spyOn(materials, 'setMaterialUsage').mockResolvedValue({ ok: true })
   const kek = await webcrypto.importKek(new Uint8Array(32).fill(4))
   const selado = await sealNewPatient(kek, 'paciente', new TextEncoder().encode(JSON.stringify({ name: 'Paciente fictício', risk: 'baixo' })))
   registro = { ok: true, patientId: 'paciente', wrappedDek: selado.wrappedDek, createdAt: data, lastEntryAt: data,
@@ -53,6 +55,21 @@ describe('encerrarAtendimento', () => {
     vi.mocked(patients.appendPatientEntry).mockClear()
     await encerrar()
     expect(patients.appendPatientEntry).not.toHaveBeenCalled()
+  })
+
+  it('repete a liberação de materiais após falha sem duplicar o encerramento', async () => {
+    vi.mocked(materials.setMaterialUsage).mockRejectedValueOnce(new Error('Rede indisponível'))
+    await expect(encerrar()).rejects.toThrow('Rede indisponível')
+    await encerrar()
+    expect(patients.appendPatientEntry).toHaveBeenCalledOnce()
+    expect(materials.setMaterialUsage).toHaveBeenLastCalledWith({ baseUrl: '', accountId: 'conta', accessToken: 'token' }, 'sessao', [])
+  })
+
+  it('recusa encerrar antes de persistir se outra aba ainda captura', async () => {
+    vi.mocked(materials.setMaterialUsage).mockResolvedValueOnce({ ok: false, code: 'materials.in_use', params: {} })
+    await expect(encerrar()).rejects.toThrow()
+    expect(patients.appendPatientEntry).not.toHaveBeenCalled()
+    expect(registro.entries).toHaveLength(2)
   })
 
   it('o encerramento de outra sessão não impede fechar a sessão atual', async () => {

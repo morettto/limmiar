@@ -25,12 +25,6 @@ BEGIN
     END IF;
 END $$;
 
--- Ronda 1 de review (achado importante): um REVOKE de coluna nunca anula um GRANT de tabela
--- inteira no Postgres -- o `GRANT SELECT ON accounts TO app_role` da 0010 continuava a deixar
--- ler totp_secret em claro apesar do REVOKE UPDATE acima. PostgresAccountStore nunca faz
--- `SELECT *` (ver SelectColumns), so colunas nomeadas sem totp_secret, por isso fechar a leitura
--- aqui nao quebra nenhum leitor real. Expand puro e idempotente: repetir este REVOKE/GRANT e um
--- no-op. Prova: AccountsRlsTests.SelectingTotpSecretColumn_IsDeniedByColumnPrivilege.
 REVOKE SELECT ON accounts FROM app_role;
 GRANT SELECT (
     id, email, role, password_verifier_sha256, google_subject_id, verification_status,

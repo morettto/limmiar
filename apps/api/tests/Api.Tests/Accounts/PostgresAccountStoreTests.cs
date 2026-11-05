@@ -63,13 +63,12 @@ public sealed class PostgresAccountStoreTests : IAsyncLifetime
             WebAuthnSignCount: 7,
             WebAuthnAaGuid: Guid.NewGuid(),
             RecoveryVerifier: SomeBytes(32, 0x04),
-            VoiceEnrollment: new VoiceEnrollment(SomeBytes(28, 0x05), SomeBytes(28, 0x06)),
-            RecoveryEnvelope: SomeBytes(120, 0x07));
+            VoiceEnrollment: new VoiceEnrollment(SomeBytes(28, 0x05), SomeBytes(28, 0x06)));
 
         var store = new PostgresAccountStore(_dataSource, SomeTotpSecretCipher);
         await store.InsertAsync(account, CancellationToken.None);
 
-        var found = await store.FindByEmailAsync(account.Email, CancellationToken.None);
+        var found = await store.FindByEmailAsync(account.Email!, CancellationToken.None);
 
         Assert.Equivalent(account, found);
     }
@@ -116,13 +115,12 @@ public sealed class PostgresAccountStoreTests : IAsyncLifetime
         var updated = account with
         {
             VerificationStatus = AccountVerificationStatus.Active, RejectionReason = null,
-            RecoveryVerifier = SomeBytes(32, 0x04), RecoveryEnvelope = SomeBytes(120, 0x07),
+            RecoveryVerifier = SomeBytes(32, 0x04),
         };
         await store.MutateAsync(updated.Id, _ => updated, CancellationToken.None);
 
         var found = await store.FindByIdAsync(account.Id, CancellationToken.None);
         Assert.Equal(AccountVerificationStatus.Active, found!.VerificationStatus);
-        Assert.Equal(updated.RecoveryEnvelope, found.RecoveryEnvelope);
     }
 
     [Fact]
@@ -136,7 +134,7 @@ public sealed class PostgresAccountStoreTests : IAsyncLifetime
         await Task.WhenAll(
             store.MutateAsync(account.Id, current => current with { VoiceEnrollment = voice }, CancellationToken.None),
             store.MutateAsync(account.Id, current => current with { TotpSecret = "SOMESECRET", TotpEnabledAt = DateTimeOffset.UtcNow, TotpBackupCodeHashes = ["hash-a"] }, CancellationToken.None),
-            store.MutateAsync(account.Id, current => current with { RecoveryVerifier = verifier, RecoveryEnvelope = SomeBytes(120, 0x07) }, CancellationToken.None));
+            store.MutateAsync(account.Id, current => current with { RecoveryVerifier = verifier }, CancellationToken.None));
         var found = await store.FindByIdAsync(account.Id, CancellationToken.None);
         Assert.Equal(voice.WrappedDek, found!.VoiceEnrollment!.WrappedDek);
         Assert.Equal(voice.SealedEmbedding, found.VoiceEnrollment.SealedEmbedding);
@@ -220,7 +218,6 @@ public sealed class PostgresAccountStoreTests : IAsyncLifetime
         var account = MinimalAccount("pg-totp-race@example.com") with
         {
             RecoveryVerifier = SomeBytes(32, 0x04),
-            RecoveryEnvelope = SomeBytes(120, 0x07),
             VerificationStatus = AccountVerificationStatus.InReview,
         };
         var store = new PostgresAccountStore(_dataSource, SomeTotpSecretCipher);
@@ -232,7 +229,6 @@ public sealed class PostgresAccountStoreTests : IAsyncLifetime
         Assert.Equal(secrets[0], secrets[1]);
         var restored = await new PostgresAccountStore(_dataSource, SomeTotpSecretCipher).FindByIdAsync(account.Id, CancellationToken.None);
         Assert.Equal(secrets[0], restored!.TotpSecret);
-        Assert.Equal(account.RecoveryEnvelope, restored.RecoveryEnvelope);
         Assert.Equal(account.VerificationStatus, restored.VerificationStatus);
         var repeated = await store.GetOrCreatePendingTotpSecretAsync(account.Id, "THIRDSECRET", CancellationToken.None);
         Assert.Equal(secrets[0], repeated);

@@ -9,15 +9,18 @@ import { openEntries, sealEntry, sealNewPatient } from '../../entities/patient/p
 import { lerTranscricao, transcricaoParaEntrada, type Transcricao } from '../../entities/transcricao/transcricao'
 import { dynamicActivate, i18n } from '../../shared/i18n'
 import { deferred } from '../../test-support/deferred'
+import { fakeWebLocks } from '../../test-support/web-locks'
 import { transcreverLocal } from './transcrever-local'
 import { transcreverAoVivo } from './transcrever-ao-vivo'
 import { transcreverOnline } from './transcrever-online'
 import { SessionReview, type SessionReviewProps } from './SessionReview'
 import { abrirPerfilDeVoz } from './perfil-de-voz'
+import { beginMaterialCapture, releaseMaterialCapture } from '../../entities/material/api'
 import { prepareAuthorizedMaterials } from '../../entities/material/authorized-materials'
 import { consultarInsight } from '../../entities/insight/insight'
 import { lerVotos } from '../../entities/insight/voto-store'
 
+vi.mock('../../entities/material/api', () => ({ setMaterialUsage: vi.fn(async () => ({ ok: true })), beginMaterialCapture: vi.fn(async () => ({ ok: true })), releaseMaterialCapture: vi.fn(async () => ({ ok: true })) }))
 vi.mock('./transcrever-local', () => ({ transcreverLocal: vi.fn() }))
 vi.mock('@tanstack/react-router', () => ({ Link: ({ children, to }: { children: ReactNode; to: string }) => <a href={to}>{children}</a> }))
 vi.mock('./transcrever-ao-vivo', async importOriginal => ({ ...await importOriginal<typeof import('./transcrever-ao-vivo')>(), transcreverAoVivo: vi.fn() }))
@@ -68,21 +71,45 @@ describe('SessionReview', () => {
     const obra = await screen.findByRole('checkbox', { name: 'Obra de teste' })
     expect(obra).toHaveProperty('checked', true)
     fireEvent.click(obra)
+    await waitFor(() => expect(obra).toHaveProperty('checked', false))
     fireEvent.click(obra)
-    expect(obra).toHaveProperty('checked', true)
+    await waitFor(() => expect(obra).toHaveProperty('checked', true))
     fireEvent.click(obra)
+    await waitFor(() => expect(obra).toHaveProperty('checked', false))
     fireEvent.click(screen.getByRole('button', { name: 'Salvar transcrição' }))
     await screen.findByText('Transcrição salva no prontuário. Somente texto, tempos e identificação das falas foram armazenados.')
     const entradas = await openEntries(paciente.dek, registro.entries, paciente.id)
     expect(lerTranscricao(entradas.at(-1)!, paciente.id)!.materialIds).toEqual([])
   })
 
+  it('descarta da seleção IDs que não estão preparados nesta máquina', async () => {
+    const transcricao: Transcricao = { id: 'atendimento', patientId: paciente.id, revisao: 0, autorId: 'conta', registradaEm: '2026-10-02T12:00:00Z',
+      palavras: [{ texto: 'Fala', locutor: 'paciente', inicioMs: 0, fimMs: 1000 }], papeis: { paciente: 'paciente' }, materialIds: ['indisponivel', 'm2'] }
+    vi.mocked(prepareAuthorizedMaterials).mockResolvedValueOnce({ materialIds: ['m2', 'm3'], pending: 0, materials: [
+      { materialId: 'm2', title: 'Obra existente', ready: true }, { materialId: 'm3', title: 'Obra nova', ready: true },
+    ] })
+    await montar(false, { transcricao })
+    const obra = await screen.findByRole('checkbox', { name: 'Obra nova' })
+    fireEvent.click(obra)
+    await waitFor(() => expect(obra).toHaveProperty('checked', true))
+  })
+
   it('obra em preparação não pode ser escolhida e finalização bloqueia nova captura', async () => {
     vi.mocked(prepareAuthorizedMaterials).mockResolvedValueOnce({ materialIds: [], pending: 1, materials: [{ materialId: 'm1', title: 'Obra preparando', ready: false }] })
     await montar(false, { bloqueada: true })
-    const obra = await screen.findByRole('checkbox', { name: /^Obra preparando/ })
-    expect(obra).toHaveProperty('disabled', true)
+    await screen.findByText('Há materiais autorizados que não estão prontos nesta máquina. Verifique seu acervo pessoal.')
+    expect(screen.queryByRole('checkbox', { name: /^Obra preparando/ })).toBeNull()
     expect(screen.getByRole('button', { name: 'Iniciar gravação' })).toHaveProperty('disabled', true)
+  })
+
+  it('não reinicia a busca de materiais quando a revisão atual é reconstruída pelo componente pai', async () => {
+    const transcricao: Transcricao = { id: 'atendimento', patientId: 'paciente', revisao: 0, autorId: 'conta', registradaEm: '2026-10-02T12:00:00Z',
+      palavras: [{ texto: 'Fala', locutor: 'paciente', inicioMs: 0, fimMs: 1000 }], papeis: { paciente: 'paciente' }, materialIds: ['m1'] }
+    vi.mocked(prepareAuthorizedMaterials).mockResolvedValue({ materialIds: [], pending: 1, materials: [] })
+    const view = await montar(false, { transcricao })
+    expect(prepareAuthorizedMaterials).toHaveBeenCalledTimes(1)
+    view.rerender(<I18nProvider i18n={i18n}><SessionReview {...props} paciente={paciente} transcricao={{ ...transcricao }} /></I18nProvider>)
+    expect(prepareAuthorizedMaterials).toHaveBeenCalledTimes(1)
   })
 
   it('atualiza obra preparada em segundo plano sem mudar a seleção do profissional', async () => {
@@ -169,7 +196,9 @@ describe('SessionReview', () => {
     expect(gravadores[0]!.state).toBe('inactive')
     expect(encerrarSessao).toHaveBeenCalled()
     expect(terminou).not.toHaveBeenCalled()
+    expect(releaseMaterialCapture).not.toHaveBeenCalled()
     await act(async () => { fim.resolve(); await encerramento })
+    expect(releaseMaterialCapture).toHaveBeenCalledOnce()
     expect(terminou).toHaveBeenCalledOnce()
     expect(screen.queryByRole('button', { name: 'Pausar sessão' })).toBeNull()
     encerrarSessao.mockResolvedValue(undefined)
@@ -262,6 +291,8 @@ describe('SessionReview', () => {
   })
   beforeAll(async () => { await dynamicActivate('pt-BR') })
   beforeEach(async () => {
+    localStorage.clear()
+    Object.defineProperty(navigator, 'locks', { value: fakeWebLocks().manager, configurable: true })
     vi.mocked(prepareAuthorizedMaterials).mockResolvedValue({ materialIds: ['m1'], pending: 0, materials: [{ materialId: 'm1', title: 'Obra de teste', ready: true }] })
     Object.defineProperty(navigator, 'storage', { value: { getDirectory: armazenamento }, configurable: true })
     const kek = await webcrypto.importKek(new Uint8Array(32).fill(3))
@@ -339,6 +370,38 @@ describe('SessionReview', () => {
       { texto: 'aqui.', inicioMs: 200, fimMs: 450, locutor: 'online-paciente' },
       { texto: 'Pode falar.', inicioMs: 10, fimMs: 180, locutor: 'online-profissional' },
     ], finais: 3, estavelAteMs: 500 })
+    it('descarta trilhas online antes de liberar quando encerrar rejeita', async () => {
+      encerrarSessao.mockRejectedValueOnce(new Error('conclusão recusada'))
+      const view = render(apresentar())
+      await screen.findByText('Transcrição online ao vivo. Cada trilha identifica quem está falando.')
+      const signal = vi.mocked(transcreverOnline).mock.calls[0]![2]
+      view.rerender(apresentar({ ...online, ativa: false }))
+      await waitFor(() => expect(releaseMaterialCapture).toHaveBeenCalledOnce())
+      expect(signal.aborted).toBe(true)
+      expect(screen.getByText('A transcrição foi interrompida. Revise o texto recuperado.')).toBeTruthy()
+    })
+
+    it('descarta abertura online recusada antes de liberar a captura', async () => {
+      vi.mocked(transcreverOnline).mockRejectedValueOnce(new Error('abertura recusada'))
+      render(apresentar())
+      await screen.findByText('Não foi possível transcrever a chamada. O áudio não foi salvo.')
+      await waitFor(() => expect(releaseMaterialCapture).toHaveBeenCalledOnce())
+      expect(vi.mocked(transcreverOnline).mock.calls[0]![2].aborted).toBe(true)
+    })
+
+    it('ao desmontar espera abertura online terminar, descarta e libera mesmo se encerrar falha', async () => {
+      const aberta = deferred<Awaited<ReturnType<typeof transcreverOnline>>>()
+      vi.mocked(transcreverOnline).mockReturnValueOnce(aberta.promise)
+      const view = render(apresentar())
+      await waitFor(() => expect(transcreverOnline).toHaveBeenCalledOnce())
+      const signal = vi.mocked(transcreverOnline).mock.calls[0]![2]
+      view.unmount()
+      expect(releaseMaterialCapture).not.toHaveBeenCalled()
+      await act(async () => aberta.resolve({ encerrar: vi.fn(async () => { throw new Error('conclusão recusada') }), pausar: vi.fn() }))
+      await waitFor(() => expect(releaseMaterialCapture).toHaveBeenCalledOnce())
+      expect(signal.aborted).toBe(true)
+    })
+
     it('usa as trilhas originais com papéis fixos, finaliza o texto e salva apenas sua versão cifrada', async () => {
       let finalizar!: () => Promise<void>
       render(apresentar(online, callback => { finalizar = callback }))
@@ -886,7 +949,7 @@ describe('SessionReview', () => {
     const arquivo = () => screen.getByLabelText('Ou carregar áudio') as HTMLInputElement
     const conferi = () => screen.getByRole('checkbox', { name: 'Conferi o texto e quem falou cada trecho ouvindo o áudio.' }) as HTMLInputElement
 
-    it('abre com a seção nomeada, o texto do perfil de voz, o acervo em preparo e nada bloqueado sem motivo', async () => {
+    it('aguarda o acervo antes de liberar gravação e arquivo', async () => {
       const preparo = deferred<Awaited<ReturnType<typeof prepareAuthorizedMaterials>>>()
       vi.mocked(prepareAuthorizedMaterials).mockReturnValueOnce(preparo.promise)
       await montar()
@@ -898,10 +961,12 @@ describe('SessionReview', () => {
       expect(screen.queryByRole('alert')).toBeNull()
       expect(screen.queryByRole('combobox')).toBeNull()
       expect(screen.queryByText(/Revisões e correções/)).toBeNull()
-      expect(iniciar().disabled).toBe(false)
-      expect(arquivo().disabled).toBe(false)
+      expect(iniciar().disabled).toBe(true)
+      expect(arquivo().disabled).toBe(true)
       await act(async () => preparo.resolve({ materialIds: [], pending: 0, materials: [] }))
       expect(screen.queryByText('Preparando seu acervo autorizado para o copiloto local...')).toBeNull()
+      expect(iniciar().disabled).toBe(false)
+      expect(arquivo().disabled).toBe(false)
     })
 
     it('com o preparo do acervo falho não diz que ainda prepara; sem consentimento de análise nem prepara', async () => {
@@ -1026,7 +1091,7 @@ describe('SessionReview', () => {
       override stop() { if (this.state === 'inactive') throw new Error('InvalidStateError'); this.state = 'inactive' }
     }
     const fonte = { trecho_id: 'fonte', titulo: 'Livro', autor: 'Autor', pagina: 4, paragrafo: 2, citacao_literal: 'Citação literal', fenomeno_na_fala: 'Medo', fenomeno_no_trecho: 'Medo', probabilidade: 0.995, nivel: 'forte' as const }
-    const semFonte = async () => ({ cartoes: [], clarificar: false, alerta_risco: false, completo: true, juiz: 'v7' })
+    const semFonte = async () => ({ cartoes: [], clarificar: false, alerta_risco: false, completo: true as const, juiz: 'v7' })
     const comFonte = () => vi.mocked(consultarInsight).mockImplementation(async () => ({ cartoes: [fonte], clarificar: false, alerta_risco: false, completo: true, juiz: 'v7' }))
     const salva = (revisao = 0): Transcricao => ({ id: 'atendimento', patientId: 'paciente', revisao, autorId: 'conta', materialIds: ['m1'], registradaEm: '2026-10-02T12:00:00Z',
       palavras: [{ texto: 'Tenho medo.', inicioMs: 100, fimMs: 900, locutor: 'A' }], papeis: { A: 'paciente' } })
@@ -1119,7 +1184,7 @@ describe('SessionReview', () => {
       expect(consultarInsight).not.toHaveBeenCalled()
       await act(async () => preparo.resolve({ materialIds: ['m1'], pending: 0, materials: [{ materialId: 'm1', title: 'Obra de teste', ready: true }] }))
       await waitFor(() => expect(consultarInsight).toHaveBeenCalled())
-      expect(vi.mocked(consultarInsight).mock.lastCall![4]).toEqual({ accountId: 'conta', accessToken: 'token', materialIds: ['m1'] })
+      expect(vi.mocked(consultarInsight).mock.lastCall![2]).toEqual({ accountId: 'conta', accessToken: 'token', materialIds: ['m1'] })
     })
 
     it('a referência para a nota só existe com a ação, a revisão salva e nada pendente', async () => {
@@ -1416,6 +1481,17 @@ describe('SessionReview', () => {
         expect(screen.queryByText('Tardia')).toBeNull()
       })
 
+      it('durante a chamada só a fala recente vai ao copiloto; a mais antiga espera a chamada terminar', async () => {
+        const view = render(apresentar())
+        await screen.findByText('Transcrição online ao vivo. Cada trilha identifica quem está falando.')
+        act(() => chamada()[3]({ palavras: [palavra('Tenho medo.', 0, 1000), palavra('Estou triste.', 30_000, 31_000)], finais: 2, estavelAteMs: 31_001 }))
+        await waitFor(() => expect(consultarInsight).toHaveBeenCalledOnce())
+        expect(vi.mocked(consultarInsight).mock.lastCall![0].frase).toBe('Estou triste.')
+        view.rerender(apresentar({ ...online, ativa: false }))
+        await waitFor(() => expect(vi.mocked(consultarInsight).mock.calls.map(([consulta]) => consulta.frase))
+          .toEqual(['Estou triste.', 'Tenho medo.', 'Tenho medo. Estou triste.']))
+      })
+
       it('uma atualização vazia não deixa alteração pendente quando a chamada termina', async () => {
         const view = render(apresentar())
         await waitFor(() => expect(transcreverOnline).toHaveBeenCalledOnce())
@@ -1424,7 +1500,7 @@ describe('SessionReview', () => {
         await waitFor(() => expect(pendencias.mock.lastCall![0]).toBe(false))
       })
 
-      it('cancelar durante a abertura aborta o pedido e esquece o resultado; com a sessão aberta não aborta', async () => {
+      it('cancelar durante a abertura aborta o pedido; a sessão aberta é descartada após concluir', async () => {
         const aberta = abertura()
         vi.mocked(transcreverOnline).mockReturnValueOnce(aberta.promise)
         const view = render(apresentar())
@@ -1441,7 +1517,7 @@ describe('SessionReview', () => {
         const sinalAberto = chamada()[2]
         view.rerender(apresentar({ ...online, ativa: false }))
         await waitFor(() => expect(encerrarSessao).toHaveBeenCalledTimes(2))
-        expect(sinalAberto.aborted).toBe(false)
+        expect(sinalAberto.aborted).toBe(true)
       })
 
       it('falha na abertura não acusa o erro se a chamada já foi cancelada, nem tenta encerrar uma sessão que não existe', async () => {
@@ -1459,6 +1535,131 @@ describe('SessionReview', () => {
         await act(async () => {})
         expect(screen.queryByText('A transcrição foi interrompida. Revise o texto recuperado.')).toBeNull()
       })
+
+      it('renovar o token durante a chamada mantém a sessão de transcrição aberta', async () => {
+        const view = render(apresentar())
+        await waitFor(() => expect(transcreverOnline).toHaveBeenCalledOnce())
+        await screen.findByText('Transcrição online ao vivo. Cada trilha identifica quem está falando.')
+        const sinal = chamada()[2]
+
+        view.rerender(apresentar(online, { accessToken: 'token renovado' }))
+
+        await waitFor(() => expect(beginMaterialCapture).toHaveBeenCalledTimes(1))
+        expect(sinal.aborted).toBe(false)
+        expect(transcreverOnline).toHaveBeenCalledOnce()
+        expect(encerrarSessao).not.toHaveBeenCalled()
+      })
     })
   })
+
+it('reserva obras antes de transcrever e mantém a reserva após desmontar', async () => {
+  const view = await montar()
+  enviar()
+  await waitFor(() => expect(transcrever).toHaveBeenCalled())
+  expect(beginMaterialCapture).toHaveBeenCalledWith({ baseUrl: '', accountId: 'conta', accessToken: 'token' }, 'atendimento', expect.any(String), ['m1'])
+  expect(vi.mocked(beginMaterialCapture).mock.invocationCallOrder[0]).toBeLessThan(transcrever.mock.invocationCallOrder[0]!)
+  const chamadas = vi.mocked(beginMaterialCapture).mock.calls.length
+  view.unmount()
+  expect(beginMaterialCapture).toHaveBeenCalledTimes(chamadas)
+})
+
+it('aguarda ASR de arquivo terminar antes de liberar a captura da aba', async () => {
+  const concluida = deferred<Awaited<ReturnType<typeof transcreverLocal>>>()
+  transcrever.mockReturnValueOnce(concluida.promise)
+  await montar()
+  enviar()
+  await waitFor(() => expect(transcrever).toHaveBeenCalled())
+  expect(releaseMaterialCapture).not.toHaveBeenCalled()
+  await act(async () => concluida.resolve([]))
+  await waitFor(() => expect(releaseMaterialCapture).toHaveBeenCalledOnce())
+  expect(releaseMaterialCapture).toHaveBeenCalledWith({ baseUrl: '', accountId: 'conta', accessToken: 'token' }, 'atendimento', vi.mocked(beginMaterialCapture).mock.calls[0]![2])
+})
+
+it('libera a captura com o token renovado durante o ASR', async () => {
+  const concluida = deferred<Awaited<ReturnType<typeof transcreverLocal>>>()
+  transcrever.mockReturnValueOnce(concluida.promise)
+  const view = await montar()
+  enviar()
+  await waitFor(() => expect(transcrever).toHaveBeenCalled())
+  view.rerender(<I18nProvider i18n={i18n}><SessionReview {...props} accessToken="token renovado" paciente={paciente} /></I18nProvider>)
+
+  await act(async () => concluida.resolve([]))
+
+  await waitFor(() => expect(releaseMaterialCapture).toHaveBeenCalledWith(
+    { baseUrl: '', accountId: 'conta', accessToken: 'token renovado' }, 'atendimento', vi.mocked(beginMaterialCapture).mock.calls[0]![2],
+  ))
+})
+
+it('abre o perfil de voz com o token atual quando a captura termina depois da renovação', async () => {
+  const captura = deferred<{ ok: true }>()
+  vi.mocked(beginMaterialCapture).mockReturnValueOnce(captura.promise)
+  const view = await montar()
+  enviar()
+  await waitFor(() => expect(beginMaterialCapture).toHaveBeenCalledOnce())
+  view.rerender(<I18nProvider i18n={i18n}><SessionReview {...props} accessToken="token renovado" paciente={paciente} /></I18nProvider>)
+
+  await act(async () => captura.resolve({ ok: true }))
+
+  await waitFor(() => expect(abrirPerfil).toHaveBeenCalledWith('', 'conta', 'token renovado', props.kek, expect.any(AbortSignal)))
+})
+
+it('descarta o transporte e libera a captura quando concluir o microfone falha', async () => {
+  encerrarSessao.mockRejectedValueOnce(new Error('teardown falhou'))
+  await montar()
+  fireEvent.click(screen.getByRole('button', { name: 'Iniciar gravação' }))
+  await screen.findByRole('button', { name: 'Encerrar gravação' })
+  const id = vi.mocked(beginMaterialCapture).mock.calls[0]![2]
+  fireEvent.click(screen.getByRole('button', { name: 'Encerrar gravação' }))
+  await screen.findByText('A transcrição foi interrompida. Revise o texto recuperado.')
+  await waitFor(() => expect(releaseMaterialCapture).toHaveBeenCalledOnce())
+  expect(aoVivo.mock.calls[0]![1].aborted).toBe(true)
+  expect(parar.mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(releaseMaterialCapture).mock.invocationCallOrder[0]!)
+  expect(localStorage.getItem(`limmiar/material-capture/${id}`)).toBeNull()
+})
+
+it('libera captura após descartar uma abertura de microfone recusada', async () => {
+  aoVivo.mockRejectedValueOnce(new Error('abertura recusada'))
+  await montar()
+  fireEvent.click(screen.getByRole('button', { name: 'Iniciar gravação' }))
+  await screen.findByText('Não foi possível iniciar a gravação.')
+  await waitFor(() => expect(releaseMaterialCapture).toHaveBeenCalledOnce())
+  expect(aoVivo.mock.calls[0]![1].aborted).toBe(true)
+  expect(parar.mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(releaseMaterialCapture).mock.invocationCallOrder[0]!)
+})
+
+it('oferece repetição sem reload se liberar captura descartada falhar', async () => {
+  encerrarSessao.mockRejectedValueOnce(new Error('conclusão recusada'))
+  vi.mocked(releaseMaterialCapture).mockRejectedValueOnce(new Error('release offline'))
+  await montar()
+  fireEvent.click(screen.getByRole('button', { name: 'Iniciar gravação' }))
+  await screen.findByRole('button', { name: 'Encerrar gravação' })
+  fireEvent.click(screen.getByRole('button', { name: 'Encerrar gravação' }))
+  const retry = await screen.findByRole('button', { name: 'Tentar liberar captura encerrada' })
+  expect(aoVivo.mock.calls[0]![1].aborted).toBe(true)
+  fireEvent.click(retry)
+  await waitFor(() => expect(releaseMaterialCapture).toHaveBeenCalledTimes(2))
+  expect(screen.queryByRole('button', { name: 'Tentar liberar captura encerrada' })).toBeNull()
+})
+
+it('ao desmontar descarta o microfone antes de liberar mesmo com encerrar recusado', async () => {
+  encerrarSessao.mockRejectedValueOnce(new Error('conclusão recusada'))
+  const view = await montar()
+  fireEvent.click(screen.getByRole('button', { name: 'Iniciar gravação' }))
+  await screen.findByRole('button', { name: 'Encerrar gravação' })
+  const signal = aoVivo.mock.calls[0]![1]
+  view.unmount()
+  await waitFor(() => expect(releaseMaterialCapture).toHaveBeenCalledOnce())
+  expect(signal.aborted).toBe(true)
+  expect(parar.mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(releaseMaterialCapture).mock.invocationCallOrder[0]!)
+})
+
+it('não inicia ASR quando não consegue reservar as obras', async () => {
+  vi.mocked(beginMaterialCapture).mockResolvedValueOnce({ ok: false, code: 'materials.not_found', params: {} })
+  await montar()
+  enviar()
+  await waitFor(() => expect(beginMaterialCapture).toHaveBeenCalled())
+  await waitFor(() => expect(screen.getByLabelText('Ou carregar áudio')).toHaveProperty('disabled', false))
+  expect(transcrever).not.toHaveBeenCalled()
+})
+
 })

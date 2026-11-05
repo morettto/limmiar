@@ -8,11 +8,13 @@ export async function prepareAuthorizedMaterials(access: MaterialAccess, kek: Cr
   const list = await listMaterials(access)
   if (!list.ok) throw new Error('material.unavailable')
   const prepared = await listPreparedMaterials(access)
-  const materials = await Promise.all(list.materials.filter(item => item.authorized).map(async item => {
+  const authorized = list.materials.filter(item => item.authorized)
+  const readyIds = new Set(prepared.filter(item => item.ready).map(item => item.materialId))
+  const materials = await Promise.all(authorized.filter(item => readyIds.has(item.materialId)).map(async item => {
     const { metadata } = await openMaterialMetadata(kek, access.accountId, item)
     return { materialId: item.materialId, title: metadata.title,
       ready: prepared.some(ready => ready.materialId === item.materialId && ready.ready && ready.sha256 === metadata.sha256) }
   }))
   const materialIds = materials.filter(item => item.ready).map(item => item.materialId)
-  return { materialIds, pending: materials.length - materialIds.length, materials }
+  return { materialIds, pending: authorized.length - materialIds.length, materials: materials.filter(item => item.ready) }
 }

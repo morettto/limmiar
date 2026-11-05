@@ -46,13 +46,15 @@ public sealed class HealthDbEndpointTests
         Assert.Equal(503, doc.RootElement.GetProperty("status").GetInt32());
     }
 
-    [Fact]
-    public async Task GetHealthDb_WhenDatabaseReachable_Returns200()
+    [Theory]
+    [InlineData("public", HttpStatusCode.OK)]
+    [InlineData("missing_readiness_schema", HttpStatusCode.ServiceUnavailable)]
+    public async Task GetHealthDb_ChecksApplicationSchema(string schema, HttpStatusCode expected)
     {
         using var factory = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>
             {
-                builder.UseSetting("ConnectionStrings:AppDb", _fixture.AppRoleConnectionString);
+                builder.UseSetting("ConnectionStrings:AppDb", $"{_fixture.AppRoleConnectionString};Search Path={schema}");
                 builder.UseSetting("StaffAccess:ApiKey", "test-staff-api-key");
                 builder.UseSetting("WebAuthn:RelyingPartyId", "limmiar.test");
                 builder.UseSetting("WebAuthn:ExpectedOrigin", "https://limmiar.test");
@@ -65,6 +67,6 @@ public sealed class HealthDbEndpointTests
 
         var response = await client.GetAsync("/health/db");
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(expected, response.StatusCode);
     }
 }

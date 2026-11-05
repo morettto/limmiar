@@ -455,8 +455,6 @@ describe('verifyTotpChallenge', () => {
 
 const RECOVERY_VERIFIER = new Uint8Array(32).fill(0x0b)
 const RECOVERY_VERIFIER_BASE64 = 'CwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCws='
-const RECOVERY_ENVELOPE = new Uint8Array(120).fill(7)
-const RECOVERY_ENVELOPE_BASE64 = btoa(String.fromCharCode(...RECOVERY_ENVELOPE))
 
 describe('recoverAccess', () => {
   afterEach(() => {
@@ -472,7 +470,6 @@ describe('recoverAccess', () => {
           role: 'Professional',
           twoFactorRequirement: 'ChallengeRequired',
           twoFactorTicket: 'ticket-recover',
-          recoveryEnvelope: RECOVERY_ENVELOPE_BASE64,
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
@@ -493,7 +490,6 @@ describe('recoverAccess', () => {
         twoFactorRequirement: 'ChallengeRequired',
         twoFactorTicket: 'ticket-recover',
       },
-      recoveryEnvelope: RECOVERY_ENVELOPE,
     })
     expect(fetchMock).toHaveBeenCalledWith('http://api.test/auth/recover', {
       method: 'POST',
@@ -748,13 +744,13 @@ describe('registerRecoveryPhrase', () => {
     )
     vi.stubGlobal('fetch', fetchMock)
 
-    const result = await registerRecoveryPhrase('http://api.test', ACCOUNT_ID, ACCESS_TOKEN, RECOVERY_VERIFIER, RECOVERY_ENVELOPE)
+    const result = await registerRecoveryPhrase('http://api.test', ACCOUNT_ID, ACCESS_TOKEN, RECOVERY_VERIFIER)
 
     expect(result).toEqual({ ok: true })
     expect(fetchMock).toHaveBeenCalledWith(`http://api.test/accounts/${ACCOUNT_ID}/recovery-phrase`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ACCESS_TOKEN}` },
-      body: JSON.stringify({ recoveryVerifier: RECOVERY_VERIFIER_BASE64, recoveryEnvelope: RECOVERY_ENVELOPE_BASE64 }),
+      body: JSON.stringify({ recoveryVerifier: RECOVERY_VERIFIER_BASE64 }),
     })
   })
 
@@ -771,7 +767,7 @@ describe('registerRecoveryPhrase', () => {
     )
     vi.stubGlobal('fetch', fetchMock)
 
-    const result = await registerRecoveryPhrase('http://api.test', ACCOUNT_ID, ACCESS_TOKEN, RECOVERY_VERIFIER, RECOVERY_ENVELOPE)
+    const result = await registerRecoveryPhrase('http://api.test', ACCOUNT_ID, ACCESS_TOKEN, RECOVERY_VERIFIER)
 
     expect(result).toEqual({ ok: false, code: 'auth.not_a_professional_account', params: {} })
   })

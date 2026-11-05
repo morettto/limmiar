@@ -11,6 +11,17 @@ const agora = new Date('2026-10-08T10:00:00Z')
 describe('votos de insight', () => {
   afterEach(() => localStorage.clear())
 
+  it('preserva votos de duas versões do juiz e marca envio apenas na versão correspondente', async () => {
+    const kek = await makeKek()
+    await guardarVoto(kek, CONTA, entrada, true, agora)
+    const [normal] = await lerVotos(kek, CONTA)
+    await guardarVoto(kek, CONTA, { ...entrada, juiz: 'v2', voto: 'nao_util' }, true, agora)
+    await marcarEnviado(kek, CONTA, normal!)
+    expect((await lerVotos(kek, CONTA)).map(voto => [voto.juiz, voto.voto, voto.enviado])).toEqual([
+      ['v1', 'util', true], ['v2', 'nao_util', false],
+    ])
+  })
+
   it('grava o evento no contrato com consentiu=false e pseudônimo, sem texto em claro', async () => {
     const kek = await makeKek()
     await guardarVoto(kek, CONTA, entrada, false, agora)

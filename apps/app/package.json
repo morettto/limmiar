@@ -36,7 +36,6 @@
     "@lingui/core": "^6.6.0",
     "@lingui/react": "^6.6.0",
     "@tanstack/react-router": "^1.170.18",
-    "jsqr": "^1.4.0",
     "minisearch": "^7.2.0",
     "qrcode": "^1.5.4",
     "react": "^19.2.8",

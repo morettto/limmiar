@@ -62,14 +62,14 @@ async function gravar(kek: CryptoKey, accountId: string, votos: VotoGuardado[]):
   window.localStorage.setItem(storageKeyFor(accountId), JSON.stringify({ wrappedDek: encodeBase64(wrapped), ciphertext: encodeBase64(ciphertext) }))
 }
 
-/** Um envelope por conta com todos os votos; o voto novo na mesma fala e trecho substitui o anterior. */
+/** Um voto por fala, trecho e versão do fluxo preserva a comparação do experimento. */
 export async function guardarVoto(kek: CryptoKey, accountId: string,
   entrada: Pick<EventoVoto, 'fala' | 'contexto' | 'trecho' | 'obra' | 'voto' | 'juiz'>, consentiu: boolean, agora = new Date()): Promise<void> {
   assertAccountId(accountId)
   return serializar(async () => {
     const evento: VotoGuardado = { v: 1, consentiu, usuario: await pseudonimoDaConta(accountId), ...entrada, em: agora.toISOString(), enviado: false }
     const existentes = await lerVotos(kek, accountId)
-    await gravar(kek, accountId, [...existentes.filter((voto) => voto.fala !== evento.fala || voto.trecho !== evento.trecho), evento])
+    await gravar(kek, accountId, [...existentes.filter((voto) => voto.fala !== evento.fala || voto.trecho !== evento.trecho || voto.juiz !== evento.juiz), evento])
   })
 }
 
@@ -77,6 +77,6 @@ export async function guardarVoto(kek: CryptoKey, accountId: string,
 export async function marcarEnviado(kek: CryptoKey, accountId: string, enviado: EventoVoto): Promise<void> {
   return serializar(async () => {
     const votos = await lerVotos(kek, accountId)
-    await gravar(kek, accountId, votos.map((voto) => voto.fala === enviado.fala && voto.trecho === enviado.trecho && voto.em === enviado.em ? { ...voto, enviado: true } : voto))
+    await gravar(kek, accountId, votos.map((voto) => voto.fala === enviado.fala && voto.trecho === enviado.trecho && voto.juiz === enviado.juiz && voto.em === enviado.em ? { ...voto, enviado: true } : voto))
   })
 }

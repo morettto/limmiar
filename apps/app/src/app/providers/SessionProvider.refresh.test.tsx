@@ -26,6 +26,24 @@ function montar(account = conta()) {
 describe('renovação da sessão', () => {
   beforeEach(() => { vi.useFakeTimers(); refresh.mockReset(); window.sessionStorage.clear() })
   afterEach(() => { cleanup(); vi.useRealTimers(); window.sessionStorage.clear() })
+  it('desbloqueio iniciado antes da renovação preserva os tokens novos e recusa outra conta após logout', async () => {
+    refresh.mockResolvedValue({ ok: true, ...tokens })
+    montar()
+    const unlock = contexto.desbloquearProntuarios
+    const key = await webcrypto.importKek(new Uint8Array(32).fill(6))
+    await act(async () => { await vi.advanceTimersByTimeAsync(100) })
+    act(() => unlock('conta', key))
+    expect(contexto.sessao?.refreshToken).toBe(tokens.refreshToken)
+    expect(contexto.kek).toBe(key)
+    act(() => contexto.bloquearProntuarios())
+    expect(contexto.kek).toBeNull()
+    expect(contexto.sessao?.accessToken).toBe(tokens.accessToken)
+    act(() => unlock('outra-conta', key))
+    expect(contexto.kek).toBeNull()
+    act(() => contexto.terminarSessao())
+    act(() => unlock('conta', key))
+    expect(contexto.kek).toBeNull()
+  })
   it('renova tokens sem substituir a chave de criptografia em memória', async () => {
     refresh.mockResolvedValue({ ok: true, ...tokens })
     montar()

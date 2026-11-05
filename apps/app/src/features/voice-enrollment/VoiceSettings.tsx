@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { useContext, useEffect, useRef, useState } from 'react'
 import { Trans, useLingui } from '@lingui/react/macro'
 import type { MessageDescriptor } from '@lingui/core'
 import { msg } from '@lingui/core/macro'
 import type { CryptoKey } from '@limmiar/crypto'
-import { abrirEmbedding } from '../../entities/voz/voice-crypto'
-import { cadastrarVoz, obterCadastroVoz, removerCadastroVoz } from '../../entities/voz/voice-enrollment'
+import { cadastrarVoz, removerCadastroVoz } from '../../entities/voz/voice-enrollment'
 import { capturarPerfil } from './capturar-perfil'
+import { temPerfilDeVoz } from './perfil-de-voz'
+import { VoiceEnrollmentContext } from './enrollment-context'
 
 export interface VoiceSettingsProps {
   baseUrl: string
@@ -16,12 +17,14 @@ export interface VoiceSettingsProps {
 
 export function VoiceSettings({ baseUrl, accountId, accessToken, kek }: VoiceSettingsProps) {
   const { i18n, t } = useLingui()
+  const onReady = useContext(VoiceEnrollmentContext)
   const [cadastrada, setCadastrada] = useState(false)
   const [ocupado, setOcupado] = useState(true)
   const [cancelavel, setCancelavel] = useState(false)
   const [verificado, setVerificado] = useState(false)
   const [autorizada, setAutorizada] = useState(false)
   const [segundos, setSegundos] = useState(0)
+  const [tentativa, setTentativa] = useState(0)
   const [mensagem, setMensagem] = useState<MessageDescriptor | null>(null)
   const controller = useRef<AbortController | null>(null)
 
@@ -30,19 +33,13 @@ export function VoiceSettings({ baseUrl, accountId, accessToken, kek }: VoiceSet
     controller.current = abort
     void (async () => {
       try {
-        const cadastro = await obterCadastroVoz(baseUrl, accountId, accessToken)
-        if (abort.signal.aborted) return
-        if (cadastro.ok) {
-          const vetor = await abrirEmbedding(kek, accountId, cadastro.wrappedDek, cadastro.sealedEmbedding)
-          vetor.fill(0)
-          if (!abort.signal.aborted) { setCadastrada(true); setVerificado(true) }
-        } else if (cadastro.code !== 'voice.enrollment_not_found') throw new Error()
-        else setVerificado(true)
+        const existe = await temPerfilDeVoz(baseUrl, accountId, accessToken, kek, abort.signal)
+        setCadastrada(existe); setVerificado(true); onReady?.(existe)
       } catch { if (!abort.signal.aborted) setMensagem(msg`Não foi possível abrir seu perfil de voz. Tente novamente.`) }
       finally { if (!abort.signal.aborted) setOcupado(false) }
     })()
     return () => { abort.abort(); controller.current!.abort() }
-  }, [baseUrl, accountId, accessToken, kek])
+  }, [baseUrl, accountId, accessToken, kek, onReady, tentativa])
 
   async function cadastrar() {
     const abort = new AbortController()
@@ -57,7 +54,7 @@ export function VoiceSettings({ baseUrl, accountId, accessToken, kek }: VoiceSet
       setMensagem(msg`Cifrando seu perfil de voz...`)
       const resultado = await cadastrarVoz(baseUrl, accountId, accessToken, kek, vetor)
       if (!resultado.ok) throw new Error(resultado.code)
-      if (!abort.signal.aborted) { setCadastrada(true); setVerificado(true); setMensagem(msg`Perfil de voz salvo. Ele será usado nas próximas sessões.`) }
+      if (!abort.signal.aborted) { setCadastrada(true); setVerificado(true); setMensagem(msg`Perfil de voz salvo. Ele será usado nas próximas sessões.`); onReady?.(true) }
     } catch (erro) {
       // A causa técnica (nome e mensagem do erro) acompanha o texto: sem ela, falhas de navegador e de servidor são indistinguíveis.
       const causa = erro instanceof Error || erro instanceof DOMException ? ` (${erro.name}: ${erro.message})` : ''
@@ -75,7 +72,7 @@ export function VoiceSettings({ baseUrl, accountId, accessToken, kek }: VoiceSet
     try {
       const resultado = await removerCadastroVoz(baseUrl, accountId, accessToken)
       if (!resultado.ok) throw new Error()
-      if (!abort.signal.aborted) { setCadastrada(false); setMensagem(msg`Perfil de voz removido.`) }
+      if (!abort.signal.aborted) { setCadastrada(false); setMensagem(msg`Perfil de voz removido.`); onReady?.(false) }
     } catch { if (!abort.signal.aborted) setMensagem(msg`Não foi possível remover seu perfil de voz.`) }
     finally { if (!abort.signal.aborted) setOcupado(false) }
   }
@@ -92,11 +89,12 @@ export function VoiceSettings({ baseUrl, accountId, accessToken, kek }: VoiceSet
     {verificado && <p role="status">{cadastrada ? <Trans>Você já tem um perfil de voz.</Trans> : <Trans>Você ainda não tem um perfil de voz.</Trans>}</p>}
     <label><input type="checkbox" disabled={ocupado} checked={autorizada} onChange={(evento) => setAutorizada(evento.target.checked)} /> <Trans>Autorizo o uso do microfone para cadastrar minha voz.</Trans></label>
     <div className="my-4 flex flex-wrap gap-3">
+      {!verificado && !ocupado && <button type="button" onClick={() => { setOcupado(true); setMensagem(null); setTentativa(valor => valor + 1) }}><Trans>Tentar novamente</Trans></button>}
       <button type="button" className="button-primary" disabled={ocupado || !autorizada} onClick={() => void cadastrar()}>{cadastrada ? <Trans>Substituir perfil de voz</Trans> : <Trans>Cadastrar minha voz</Trans>}</button>
       {cadastrada && <button type="button" disabled={ocupado} onClick={() => void remover()}><Trans>Remover perfil de voz</Trans></button>}
       {ocupado && cancelavel && <button type="button" onClick={() => { controller.current!.abort(); setOcupado(false); setCancelavel(false); setMensagem(msg`Cadastro cancelado.`) }}><Trans>Cancelar</Trans></button>}
     </div>
-    {ocupado && segundos > 0 && <p role="status"><Trans>Amostra: {segundos} de 15 segundos.</Trans></p>}
+    {ocupado && segundos > 0 && <><progress aria-label={t`Progresso da amostra de voz`} max={15} value={segundos} /><p role="status"><Trans>Amostra: {segundos} de 15 segundos.</Trans></p></>}
     {mensagem !== null && <p role="status">{i18n._(mensagem)}</p>}
   </section>
 }

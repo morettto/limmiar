@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Copiloto ao vivo</title>
+<style>
+  :root { --fundo: #f6f5f2; --cartao: #ffffff; --texto: #1f1f1d; --suave: #6b6a65; --borda: #e2e0da;
+          --paciente: #2f5d8a; --profissional: #6b6a65; --insight: #e9f4ec; --insight-borda: #2e7d4f; --erro: #b3261e; }
+  @media (prefers-color-scheme: dark) {
+    :root { --fundo: #161615; --cartao: #1f1f1d; --texto: #ecebe6; --suave: #9b9a94; --borda: #33322f;
+            --paciente: #8fb8e0; --profissional: #9b9a94; --insight: #17301f; --insight-borda: #4caf74; --erro: #ef8a80; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--fundo); color: var(--texto); font: 15px/1.45 system-ui, sans-serif; }
+  header { position: sticky; top: 0; background: var(--fundo); border-bottom: 1px solid var(--borda); padding: 12px 16px; z-index: 1; }
+  h1 { font-size: 17px; margin: 0 0 4px; }
+  .numeros { color: var(--suave); font-size: 13px; display: flex; flex-wrap: wrap; gap: 4px 16px; }
+  main { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; padding: 16px; }
+  section { background: var(--cartao); border: 1px solid var(--borda); border-radius: 10px; display: flex; flex-direction: column; max-height: calc(100vh - 110px); }
+  section h2 { font-size: 14px; margin: 0; padding: 10px 12px; border-bottom: 1px solid var(--borda); }
+  section h2 small { display: block; color: var(--suave); font-weight: normal; font-size: 12px; }
+  .falas { overflow-y: auto; padding: 8px 12px 16px; }
+  .fala { margin: 8px 0; }
+  .papel { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; font-weight: 600; }
+  .Paciente .papel { color: var(--paciente); }
+  .Profissional .papel { color: var(--profissional); }
+  .Profissional .texto { color: var(--suave); }
+  .estado { font-size: 12px; color: var(--suave); margin-top: 2px; }
+  .insight { margin-top: 6px; background: var(--insight); border-left: 3px solid var(--insight-borda); border-radius: 6px; padding: 8px 10px; }
+  .insight .obra { font-weight: 600; font-size: 13px; }
+  .insight .citacao { font-style: italic; margin: 4px 0; }
+  .insight .meta { font-size: 12px; color: var(--suave); }
+  .erro { color: var(--erro); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Copiloto ao vivo: falas e cartões</h1>
+  <div class="numeros" id="numeros">aguardando o teste…</div>
+</header>
+<main id="sessoes"></main>
+<script>
+const estado = { desde: 0, obras: 0, totalObras: 0, enviadas: 0, respostas: 0, cartoes: 0, latencias: [], colunas: {} };
+const $ = (tag, cls, texto) => { const e = document.createElement(tag); if (cls) e.className = cls; if (texto != null) e.textContent = texto; return e; };
+
+function coluna(id, fontes) {
+  if (estado.colunas[id]) return estado.colunas[id];
+  const s = $("section"); const h = $("h2", null, id);
+  if (fontes) h.append($("small", null, fontes.length + " obras: " + fontes.join(" · ")));
+  const lista = $("div", "falas"); s.append(h, lista);
+  document.getElementById("sessoes").append(s);
+  return (estado.colunas[id] = { lista, pendentes: {} });
+}
+
+function rolar(lista) { if (lista.scrollHeight - lista.scrollTop - lista.clientHeight < 200) lista.scrollTop = lista.scrollHeight; }
+
+function aplicar(ev) {
+  if (ev.tipo === "preparo") { estado.obras++; estado.totalObras = ev.total; return; }
+  if (ev.tipo === "inicio") { coluna(ev.sessao, ev.fontes); return; }
+  const c = coluna(ev.sessao);
+  if (ev.tipo === "fala") {
+    const d = $("div", "fala " + ev.papel); d.append($("div", "papel", ev.papel), $("div", "texto", ev.texto));
+    if (ev.papel === "Paciente") { const e = $("div", "estado", "analisando…"); d.append(e); c.pendentes[ev.fala_indice] = d; estado.enviadas++; }
+    c.lista.append(d); rolar(c.lista); return;
+  }
+  if (ev.tipo === "resposta") {
+    estado.respostas++; estado.latencias.push(ev.latencia_ms);
+    const d = c.pendentes[ev.fala_indice]; if (!d) return;
+    const e = d.querySelector(".estado"); const s = (ev.latencia_ms / 1000).toFixed(1) + " s";
+    if (ev.erro) { e.className = "estado erro"; e.textContent = "falhou (" + ev.erro + ") em " + s; return; }
+    if (ev.cartao) {
+      estado.cartoes++; e.textContent = "cartão em " + s;
+      const k = $("div", "insight");
+      k.append($("div", "obra", ev.cartao.titulo + " · p. " + ev.cartao.pagina),
+               $("div", "citacao", "“" + ev.cartao.citacao_literal + "”"),
+               $("div", "meta", "relação " + ev.cartao.probabilidade.toFixed(2) + " · vivência " + (ev.vivencia ?? 0).toFixed(2)));
+      d.append(k); rolar(c.lista);
+    } else {
+      e.textContent = "sem cartão (" + (ev.motivo || "—") + ") em " + s;
+    }
+    return;
+  }
+  if (ev.tipo === "fim") c.lista.append($("div", "estado", "sessão encerrada"));
+}
+
+function numeros() {
+  const l = [...estado.latencias].sort((a, b) => a - b);
+  const p = q => l.length ? (l[Math.min(l.length - 1, Math.floor(l.length * q))] / 1000).toFixed(1) + " s" : "—";
+  document.getElementById("numeros").textContent = "";
+  const itens = ["acervo " + estado.obras + "/" + (estado.totalObras || "?") + " obras prontas", "falas do paciente " + estado.enviadas,
+                 "respondidas " + estado.respostas, "cartões " + estado.cartoes, "tempo até a resposta: mediana " + p(0.5) + ", p90 " + p(0.9) + ", máx " + p(1)];
+  for (const t of itens) document.getElementById("numeros").append($("span", null, t));
+}
+
+async function puxar() {
+  try {
+    const novos = await (await fetch("/eventos?desde=" + estado.desde)).json();
+    estado.desde += novos.length; novos.forEach(aplicar); numeros();
+  } catch (e) { /* o teste ainda não subiu ou acabou */ }
+  setTimeout(puxar, 800);
+}
+puxar();
+</script>
+</body>
+</html>

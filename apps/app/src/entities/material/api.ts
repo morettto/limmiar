@@ -4,6 +4,7 @@ import type { SealedMaterial } from './material-crypto'
 
 export interface MaterialSummary extends Pick<SealedMaterial, 'materialId' | 'wrappedDek' | 'metadataCiphertext'> {
   authorized: boolean
+  inUse: boolean
   createdAt: string
 }
 export interface MaterialAccess { baseUrl: string; accountId: string; accessToken: string }
@@ -36,5 +37,20 @@ export async function authorizeMaterial(access: MaterialAccess, id: string, auth
 
 export async function deleteMaterial(access: MaterialAccess, id: string): Promise<{ ok: true } | ProblemResult> {
   const result = await request(access.baseUrl, 'DELETE', `${path(access)}/${id}`, undefined, access.accessToken)
+  return result.ok ? { ok: true } : result
+}
+
+export async function setMaterialUsage(access: MaterialAccess, sessionId: string, materialIds: string[]): Promise<{ ok: true } | ProblemResult> {
+  const result = await request(access.baseUrl, 'PUT', `${path(access)}/usage/${sessionId}`, { materialIds }, access.accessToken)
+  return result.ok ? { ok: true } : result
+}
+
+export async function beginMaterialCapture(access: MaterialAccess, sessionId: string, captureId: string, materialIds: string[]): Promise<{ ok: true } | ProblemResult> {
+  const result = await request(access.baseUrl, 'PUT', `${path(access)}/usage/${sessionId}/captures/${captureId}`, { materialIds }, access.accessToken)
+  return result.ok ? { ok: true } : result
+}
+
+export async function releaseMaterialCapture(access: MaterialAccess, sessionId: string, captureId: string): Promise<{ ok: true } | ProblemResult> {
+  const result = await request(access.baseUrl, 'DELETE', `${path(access)}/usage/${sessionId}/captures/${captureId}`, undefined, access.accessToken)
   return result.ok ? { ok: true } : result
 }

@@ -65,7 +65,7 @@ public sealed class PatientLinkEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        var accountId = patient ? await RegisterPatientAsync(factory, client, "unused")
+        var accountId = patient ? await RegisterPatientAsync(factory, client)
             : await RegisterProfessionalWithoutVerificationAsync(client, "revoke-unverified@example.test");
         Assert.Equal(HttpStatusCode.Forbidden, (await client.DeleteAsync($"/accounts/{accountId}/patients/{Guid.NewGuid()}/link-invites")).StatusCode);
     }
@@ -104,7 +104,7 @@ public sealed class PatientLinkEndpointsTests : IAsyncLifetime
         await PublishKeyPairAsync(professionalClient, professionalId, 0xA1);
 
         using var patientClient = factory.CreateClient();
-        var patientAccountId = await RegisterPatientAsync(factory, patientClient, "link-patient@example.com");
+        var patientAccountId = await RegisterPatientAsync(factory, patientClient);
         await PublishKeyPairAsync(patientClient, patientAccountId, 0xB2);
 
         var patientId = Guid.NewGuid();
@@ -158,7 +158,7 @@ public sealed class PatientLinkEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        var accountId = await RegisterPatientAsync(factory, client, "link-invite-patient@example.com");
+        var accountId = await RegisterPatientAsync(factory, client);
 
         var response = await client.PostAsync($"/accounts/{accountId}/patients/{Guid.NewGuid()}/link-invites", null);
 
@@ -215,7 +215,7 @@ public sealed class PatientLinkEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        var patientAccountId = await RegisterPatientAsync(factory, client, "link-redeem-empty@example.com");
+        var patientAccountId = await RegisterPatientAsync(factory, client);
 
         var response = await client.PostAsJsonAsync(
             $"/accounts/{patientAccountId}/links",
@@ -248,10 +248,10 @@ public sealed class PatientLinkEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        await RegisterPatientAsync(factory, client, "link-redeem-wrong-owner@example.com");
+        await RegisterPatientAsync(factory, client);
 
         using var otherClient = factory.CreateClient();
-        var otherAccountId = await RegisterPatientAsync(factory, otherClient, "link-redeem-wrong-owner-target@example.com");
+        var otherAccountId = await RegisterPatientAsync(factory, otherClient);
 
         var response = await client.PostAsJsonAsync(
             $"/accounts/{otherAccountId}/links",
@@ -285,7 +285,7 @@ public sealed class PatientLinkEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        var patientAccountId = await RegisterPatientAsync(factory, client, "link-redeem-unknown@example.com");
+        var patientAccountId = await RegisterPatientAsync(factory, client);
 
         var response = await client.PostAsJsonAsync(
             $"/accounts/{patientAccountId}/links",
@@ -325,7 +325,7 @@ public sealed class PatientLinkEndpointsTests : IAsyncLifetime
         var professionalId = await RegisterActiveProfessionalAsync(professionalClient, "link-conflict-professional@example.com");
 
         using var patientClient = factory.CreateClient();
-        var patientAccountId = await RegisterPatientAsync(factory, patientClient, "link-conflict-patient@example.com");
+        var patientAccountId = await RegisterPatientAsync(factory, patientClient);
 
         var patientId = Guid.NewGuid();
         var firstInvite = await CreateInviteAsync(professionalClient, professionalId, patientId);
@@ -362,10 +362,10 @@ public sealed class PatientLinkEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        await RegisterPatientAsync(factory, client, "link-get-wrong-owner@example.com");
+        await RegisterPatientAsync(factory, client);
 
         using var otherClient = factory.CreateClient();
-        var otherAccountId = await RegisterPatientAsync(factory, otherClient, "link-get-wrong-owner-target@example.com");
+        var otherAccountId = await RegisterPatientAsync(factory, otherClient);
 
         var response = await client.GetAsync($"/accounts/{otherAccountId}/links");
 
@@ -377,7 +377,7 @@ public sealed class PatientLinkEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        var accountId = await RegisterPatientAsync(factory, client, "link-get-empty@example.com");
+        var accountId = await RegisterPatientAsync(factory, client);
 
         var links = await GetLinksAsync(client, accountId);
 
@@ -392,7 +392,7 @@ public sealed class PatientLinkEndpointsTests : IAsyncLifetime
         var professionalId = await RegisterActiveProfessionalAsync(professionalClient, "link-delete-professional@example.com");
 
         using var patientClient = factory.CreateClient();
-        var patientAccountId = await RegisterPatientAsync(factory, patientClient, "link-delete-patient@example.com");
+        var patientAccountId = await RegisterPatientAsync(factory, patientClient);
 
         var invite = await CreateInviteAsync(professionalClient, professionalId, Guid.NewGuid());
         await patientClient.PostAsJsonAsync(
@@ -430,10 +430,10 @@ public sealed class PatientLinkEndpointsTests : IAsyncLifetime
     {
         using var factory = CreateFactory();
         using var client = factory.CreateClient();
-        await RegisterPatientAsync(factory, client, "link-delete-wrong-owner@example.com");
+        await RegisterPatientAsync(factory, client);
 
         using var otherClient = factory.CreateClient();
-        var otherAccountId = await RegisterPatientAsync(factory, otherClient, "link-delete-wrong-owner-target@example.com");
+        var otherAccountId = await RegisterPatientAsync(factory, otherClient);
 
         var response = await client.DeleteAsync($"/accounts/{otherAccountId}/links/{Guid.NewGuid()}");
 
@@ -552,7 +552,7 @@ public sealed class PatientLinkEndpointsTests : IAsyncLifetime
     }
 
     /// <summary>A Patient owes no 2FA (ADR-S02-03): register alone returns a usable access token.</summary>
-    private static async Task<Guid> RegisterPatientAsync(WebApplicationFactory<Program> factory, HttpClient client, string email)
+    private static async Task<Guid> RegisterPatientAsync(WebApplicationFactory<Program> factory, HttpClient client)
     {
         var registered = await AnonymousAccountFixture.CreateAsync(factory.Services);
 

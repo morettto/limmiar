@@ -731,7 +731,7 @@ public sealed class SchedulingEndpointsTests : IAsyncLifetime
         Assert.Equal("auth.access_token_invalid", doc.RootElement.GetProperty("code").GetString());
     }
 
-    /// <summary>An Authorization header present but not Bearer is rejected exactly like a missing one (same case DevicePairingEndpointsTests covers for PostPairingSession; S09-02 B4 coverage closure).</summary>
+    /// <summary>An Authorization header present but not Bearer is rejected exactly like a missing one (S09-02 B4 coverage closure).</summary>
     [Fact]
     public async Task ListSessions_WithNonBearerAuthorizationHeader_Returns401()
     {

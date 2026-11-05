@@ -10,7 +10,6 @@ import sqlite3
 import threading
 import time
 from collections.abc import Callable
-from contextlib import nullcontext
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from uuid import UUID
@@ -21,7 +20,7 @@ from fastapi import HTTPException, Request
 from pypdf import PdfReader
 from python_multipart.multipart import MultipartParser, parse_options_header
 
-from . import busca, embedder, parse
+from . import busca, embedder, juiz_pequeno, parse
 from .esquema import criar_esquema
 
 API_PRODUTO = os.environ.get("COPILOTO_API_URL", "http://127.0.0.1:5259").rstrip("/")
@@ -132,6 +131,7 @@ class Material:
     pages: tuple[str, ...]
     blocks: tuple[parse.Bloco, ...]
     embeddings: np.ndarray
+    generico: np.ndarray
     model: str
     prepared_at: str
 
@@ -173,7 +173,7 @@ class Acervo:
         with self._lock:
             return [item.status() for item in self._owners.get(owner, {}).values()]
 
-    def preparar(self, owner: str, id_: str, data: bytes, fields: dict[str, str], trava_modelo=None,
+    def preparar(self, owner: str, id_: str, data: bytes, fields: dict[str, str],
                  progresso: Callable[[str, int, int], None] | None = None) -> Material:
         inicio_preparo = time.perf_counter()
         if not data or len(data) > MAX_BYTES:
@@ -224,24 +224,28 @@ class Acervo:
         textos = list(dict.fromkeys(block.texto for block in blocks))
         ordem = sorted(range(len(textos)), key=lambda indice: len(textos[indice]), reverse=True)
         if progresso: progresso("referencias", 0, len(textos))
-        lotes = []
+        lotes, genericos, generico_s = [], [], 0.0
         for inicio in range(0, len(textos), 8):
-            with trava_modelo if trava_modelo is not None else nullcontext():
-                lotes.append(embedder.codificar_documentos(
-                    [textos[indice] for indice in ordem[inicio:inicio + 8]], model, lote=8))
+            fatia = [textos[indice] for indice in ordem[inicio:inicio + 8]]
+            lotes.append(embedder.codificar_documentos(fatia))
+            inicio_generico = time.perf_counter()
+            genericos += juiz_pequeno.generico(fatia)
+            generico_s += time.perf_counter() - inicio_generico
             if progresso: progresso("referencias", min(inicio + 8, len(textos)), len(textos))
-        unicos = np.concatenate(lotes)[np.argsort(ordem)]
+        desfazer = np.argsort(ordem)
         indices = {texto: indice for indice, texto in enumerate(textos)}
-        vectors = unicos[[indices[block.texto] for block in blocks]]
+        posicoes = [indices[block.texto] for block in blocks]
+        vectors = np.concatenate(lotes)[desfazer][posicoes]
+        generico = np.asarray(genericos, dtype=np.float32)[desfazer][posicoes]
         material = Material(id_, fields["titulo"].strip(), fields["autores"].strip(), digest, pages,
-                            tuple(blocks), vectors, model, datetime.now(timezone.utc).isoformat())
+                            tuple(blocks), vectors, generico, model, datetime.now(timezone.utc).isoformat())
         with self._lock:
             self._owners.setdefault(owner, {})[id_] = material
         logging.getLogger("uvicorn.error").info(json.dumps({"event": "material_prepared", "materialId": id_,
             "pages": len(pages), "paragraphs": len(blocks), "unique_paragraphs": len(textos), "bytes": len(data),
             "extraction_ms": round((inicio_embedding - inicio_preparo) * 1000),
-            "embedding_ms": round((time.perf_counter() - inicio_embedding) * 1000),
-            "device": os.environ.get("COPILOTO_EMBEDDER_DISPOSITIVO", "cpu")}))
+            "embedding_ms": round((time.perf_counter() - inicio_embedding - generico_s) * 1000),
+            "generico_ms": round(generico_s * 1000)}))
         return material
 
     def snapshot(self, owner: str, ids: list[str]) -> Snapshot:
@@ -257,9 +261,10 @@ class Acervo:
         for material in materials:
             connection.execute("INSERT INTO obra (id,titulo,autor,idioma,arquivo,arquivo_hash,paginas,status,modelo) VALUES (?,?,?,'pt-BR',?,?,?,'pronto',?)",
                                (material.id, material.title, material.authors, material.id, material.id + material.sha256, len(material.pages), material.model))
-            for block, vector in zip(material.blocks, material.embeddings, strict=True):
-                connection.execute("INSERT INTO trecho (id,obra_id,pagina,paragrafo,texto,idioma,embedding) VALUES (?,?,?,?,?,'pt-BR',?)",
-                    (f"{material.id}:{block.pagina}:{block.paragrafo}", material.id, block.pagina, block.paragrafo, block.texto, vector.tobytes()))
+            for block, vector, generico in zip(material.blocks, material.embeddings, material.generico, strict=True):
+                connection.execute("INSERT INTO trecho (id,obra_id,pagina,paragrafo,texto,idioma,embedding,generico) VALUES (?,?,?,?,?,'pt-BR',?,?)",
+                    (f"{material.id}:{block.pagina}:{block.paragrafo}", material.id, block.pagina, block.paragrafo, block.texto,
+                     vector.tobytes(), float(generico)))
         connection.commit()
         index = busca.Indice()
         index.recarregar(connection)

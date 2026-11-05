@@ -111,13 +111,3 @@ CREATE POLICY tenant_isolation ON audit_anchors
 GRANT SELECT, INSERT ON audit_anchors TO app_role;
 REVOKE UPDATE, DELETE ON audit_anchors FROM app_role;
 
--- ponytail: audit_anchors lives in the same Postgres database as audit_entries, so what the
--- anchor proves has a hard ceiling. Criterion 3 is proved against an attacker who rewrites the
--- ENTRIES but not the anchors (a careless DBA, a malicious migration, a doctored backup): the
--- rewritten chain walks intact and the surviving witness still contradicts it. It is NOT
--- proved against a superuser who rewrites both tables in the same transaction -- REVOKE closes
--- app_role, never a superuser, and FORCE ROW LEVEL SECURITY holds the table owner, not
--- someone with BYPASSRLS. Upgrade path: an external witness the database cannot reach --
--- S3 Object Lock, an RFC-3161 timestamp authority, or mailing the anchor to the professional
--- themselves. The seam for it is already in place: CaptureAnchorAsync is the single producer
--- of anchors, so the external write has exactly one place to hook into.

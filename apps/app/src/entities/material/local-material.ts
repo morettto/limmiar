@@ -12,15 +12,15 @@ export async function listPreparedMaterials(access: MaterialAccess): Promise<Pre
   const body = await result.json() as { materials: PreparedMaterial[] }
   return body.materials
 }
-export async function prepareLocalMaterial(access: MaterialAccess, id: string, metadata: MaterialMetadata, bytes: Uint8Array<ArrayBuffer>): Promise<void> {
+export async function prepareLocalMaterial(access: MaterialAccess, id: string, metadata: MaterialMetadata, bytes: Uint8Array<ArrayBuffer>, signal?: AbortSignal): Promise<void> {
   const body = new FormData()
   body.append('file', new Blob([bytes]), metadata.filename)
   body.append('titulo', metadata.title)
   body.append('autores', metadata.authors)
   body.append('tipo', metadata.type)
   body.append('sha256', metadata.sha256)
-  const result = await fetch(`${LOCAL_ACERVO}/${access.accountId}/${id}/preparar`, { method: 'POST', headers: { Authorization: `Bearer ${access.accessToken}` }, body })
-  if (!result.ok) throw new Error('material.prepare')
+  const result = await fetch(`${LOCAL_ACERVO}/${access.accountId}/${id}/preparar`, { method: 'POST', signal, headers: { Authorization: `Bearer ${access.accessToken}` }, body })
+  if (!result.ok) throw new Error(result.status === 429 ? 'material.busy' : 'material.prepare')
   const prepared = await result.json() as PreparedMaterial
   if (prepared.materialId !== id || prepared.ready !== false || prepared.sha256 !== metadata.sha256 || !('stage' in prepared)) throw new Error('material.prepare')
 }

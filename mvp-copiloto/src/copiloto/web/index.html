@@ -113,7 +113,7 @@ async function carregarAcervo() {
   try {
     acervo = await api('/api/acervo');
     const saude = await api('/api/saude');
-    $('#saude').textContent = saude.trechos_no_indice + ' trechos · ' + saude.modelo.split('/').pop() + ' · decisor ' + saude.decisor + (saude.decisor === 'local' ? ' · modelo local ' + (saude.juiz_no_ar ? 'no ar' : 'fora do ar') : '');
+    $('#saude').textContent = saude.trechos_no_indice + ' trechos · ' + saude.modelo.split('/').pop() + ' · juiz ' + saude.juiz_modelo;
   } catch (e) {
     $('#saude').textContent = 'servidor indisponível';
     return;

@@ -17,7 +17,7 @@ from fastapi.testclient import TestClient
 from pypdf import PdfWriter
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from copiloto import acervo_profissional as personal, api, busca, decisao, treinado, juiz
+from copiloto import acervo_profissional as personal, api, busca, decisao, juiz_pequeno, risco
 
 TEXT = "O evitamento de lugares associados ao trauma limita a vida cotidiana e restringe as relações sociais."
 
@@ -35,6 +35,8 @@ class AcervoProfissional(unittest.TestCase):
         self.addCleanup(self.patch_store.stop)
         self.embedding = patch.object(personal.embedder, "codificar_documentos", side_effect=lambda texts, *a, **k: np.ones((len(texts), 2), dtype=np.float32))
         self.embedding.start(); self.addCleanup(self.embedding.stop)
+        self.generico = patch.object(personal.juiz_pequeno, "generico", side_effect=lambda texts: [.1] * len(texts))
+        self.generico.start(); self.addCleanup(self.generico.stop)
 
     def authorized(self):
         return {self.material_id: {"materialId": self.material_id, "authorized": True}}
@@ -42,29 +44,22 @@ class AcervoProfissional(unittest.TestCase):
     def prepare(self):
         return self.store.preparar(self.owner, self.material_id, self.data, self.fields)
 
-    def test_preparo_libera_modelo_entre_lotes_para_consultas(self):
-        eventos = []
+    def test_preparo_codifica_em_lotes_e_publica_progresso(self):
         progresso = []
-
-        class Trava:
-            def __enter__(self): eventos.append("entra")
-            def __exit__(self, *args): eventos.append("sai")
 
         def codificar(textos, *args, **kwargs):
             self.assertLessEqual(len(textos), 8)
-            self.assertEqual(eventos[-1], "entra")
-            eventos.append("modelo")
             return np.ones((len(textos), 2), dtype=np.float32)
 
         data = ((TEXT + " ") * 100).encode()
-        with patch.object(personal.embedder, "codificar_documentos", side_effect=codificar):
+        with patch.object(personal.embedder, "codificar_documentos", side_effect=codificar) as codificador:
             material = self.store.preparar(self.owner, self.material_id, data,
-                {**self.fields, "sha256": hashlib.sha256(data).hexdigest()}, Trava(),
-                lambda *estado: progresso.append(estado))
+                {**self.fields, "sha256": hashlib.sha256(data).hexdigest()},
+                progresso=lambda *estado: progresso.append(estado))
         self.assertGreater(len(material.blocks), 8)
         self.assertEqual(len(material.embeddings), len(material.blocks))
         total = len({block.texto for block in material.blocks})
-        self.assertEqual(eventos, ["entra", "modelo", "sai"] * ((total + 7) // 8))
+        self.assertEqual(codificador.call_count, (total + 7) // 8)
         self.assertEqual(progresso[0], ("referencias", 0, total))
         self.assertEqual(progresso[-1], ("referencias", total, total))
         self.assertEqual([item[1] for item in progresso[1:-1]], list(range(8, total, 8)))
@@ -73,12 +68,21 @@ class AcervoProfissional(unittest.TestCase):
         textos = [TEXT, "B" * 900, TEXT, "C" * 200, "D" * 1100]
         data = "\n\n".join(textos).encode()
         with patch.object(personal.embedder, "codificar_documentos",
-            side_effect=lambda entradas, *args, **kw: np.array([[len(texto), ord(texto[0])] for texto in entradas])) as codificar:
+            side_effect=lambda entradas, *args, **kw: np.array([[len(texto), ord(texto[0])] for texto in entradas])) as codificar, \
+             patch.object(personal.juiz_pequeno, "generico", side_effect=lambda entradas: [len(t) / 2000 for t in entradas]) as generico:
             material = self.store.preparar(self.owner, self.material_id, data,
                 {**self.fields, "sha256": hashlib.sha256(data).hexdigest()})
         self.assertEqual(codificar.call_args.args[0], [textos[4], textos[1], textos[3], TEXT])
+        self.assertEqual(generico.call_args.args[0], [textos[4], textos[1], textos[3], TEXT], "each unique text scored once")
         self.assertEqual([block.texto for block in material.blocks], textos)
         self.assertEqual(material.embeddings.tolist(), [[len(texto), ord(texto[0])] for texto in textos])
+        self.assertEqual(material.generico.tolist(), np.float32([len(texto) / 2000 for texto in textos]).tolist())
+        snapshot = self.store.snapshot(self.owner, [self.material_id])
+        guardado = dict(snapshot.connection.execute("select texto, generico from trecho").fetchall())
+        snapshot.connection.close()
+        self.assertEqual(set(guardado), set(textos))
+        for texto, nota in guardado.items():
+            self.assertAlmostEqual(nota, len(texto) / 2000, places=6)
 
     def test_ram_snapshot_isolates_owner_verifies_literal_page_and_keeps_every_paragraph(self):
         with patch.object(Path, "write_bytes", side_effect=AssertionError("disk")), patch.object(Path, "open", side_effect=AssertionError("disk")):
@@ -204,18 +208,18 @@ class AcervoProfissional(unittest.TestCase):
             self.assertEqual(self.store.listar(self.owner), [])
         self.prepare()
         body = {"frase": "Fala sintética", "accountId": self.owner, "materialIds": [self.material_id]}
-        with patch.object(api, "_qualificado", return_value=True), patch.object(personal, "materiais_autorizados", side_effect=[self.authorized(), self.authorized(), {}]), \
-             patch.object(decisao, "decidir_progressivamente", return_value=iter([decisao.Decisao([], False, False, "geral", None)])):
+        with patch.object(api, "_motivo", return_value=None), patch.object(personal, "materiais_autorizados", side_effect=[self.authorized(), self.authorized(), {}]), \
+             patch.object(decisao, "decidir", return_value=decisao.Decisao([], False, False, "geral", None)):
             response = self.client.post("/api/consultar-qualificado", headers={"Authorization": "Bearer opaque"}, json=body)
-            self.assertEqual(json.loads(response.text), {"erro": "insight.indisponivel", "juiz": api.juiz_llm.VERSAO})
+            self.assertEqual(json.loads(response.text), {"erro": "insight.indisponivel", "juiz": api.juiz_pequeno.VERSAO})
 
     def test_gate_private_auth_and_public_mutation_routes_fail_closed(self):
         self.prepare()
         body = {"frase": "Fala sintética", "accountId": self.owner, "materialIds": [self.material_id]}
-        with patch.object(api, "_qualificado", return_value=False), patch.object(decisao, "decidir_progressivamente") as judge:
+        with patch.object(api, "_motivo", return_value="juiz fora"), patch.object(decisao, "decidir") as judge:
             self.assertEqual(self.client.post("/api/consultar-qualificado", json=body).status_code, 503)
             judge.assert_not_called()
-        with patch.object(api, "_qualificado", return_value=True):
+        with patch.object(api, "_motivo", return_value=None):
             self.assertEqual(self.client.post("/api/consultar-qualificado", json={"frase": "Fala"}).status_code, 401)
             self.assertEqual(self.client.post("/api/consultar-qualificado", json=body).status_code, 401)
         for method, path in (("POST", "/api/acervo"), ("DELETE", f"/api/acervo/{self.material_id}"), ("POST", "/api/reindexar")):
@@ -223,19 +227,35 @@ class AcervoProfissional(unittest.TestCase):
 
     def test_private_retrieval_runs_through_same_judge_and_literal_gate_with_injected_index(self):
         self.prepare(); snapshot = self.store.snapshot(self.owner, [self.material_id])
-        with patch.object(treinado, "triar", return_value={"clinica": .99, "risco": 0, "ambigua": 0}), \
-             patch.object(treinado, "julgar", side_effect=lambda f, c, texts: [.99] * len(texts)), \
-             patch.object(busca.traducao, "variantes", return_value={"pt-BR": TEXT}), \
-             patch.object(busca.embedder, "codificar_consultas", return_value=np.ones((1, 2), dtype=np.float32)):
-            results = list(decisao.decidir_progressivamente(snapshot.connection, TEXT, [], "paciente", "pt-BR", [self.material_id],
-                decisao.LIMIARES_PADRAO, indice=snapshot.index, verificar_proveniencia=snapshot.proveniencia))
-            self.assertEqual(len(results[-1].cartoes), 1)
-            self.assertEqual(results[-1].cartoes[0].obra_id, self.material_id)
-            self.assertEqual(results[-1].cartoes[0].citacao_literal, TEXT)
-            denied = list(decisao.decidir_progressivamente(snapshot.connection, TEXT, [], "paciente", "pt-BR", [self.material_id],
-                decisao.LIMIARES_PADRAO, indice=snapshot.index, verificar_proveniencia=lambda *args: False))
-            self.assertEqual(denied[-1].cartoes, [])
+        limites = {"vivencia": .5, "generico": .5, "principal": .9}
+        with (patch.object(juiz_pequeno, "vivencia", return_value=.99),
+              patch.object(juiz_pequeno, "principal", side_effect=lambda f, texts: [.99] * len(texts)),
+              patch.object(busca.embedder, "codificar_consultas", return_value=np.ones((1, 2), dtype=np.float32)),
+              patch.object(risco, "alerta", return_value=False)):
+            result = decisao.decidir(snapshot.connection, TEXT, [], "paciente", [self.material_id], limites,
+                                     indice=snapshot.index, verificar_proveniencia=snapshot.proveniencia)
+            self.assertEqual(len(result.cartoes), 1)
+            self.assertEqual(result.cartoes[0].obra_id, self.material_id)
+            self.assertEqual(result.cartoes[0].citacao_literal, TEXT)
+            denied = decisao.decidir(snapshot.connection, TEXT, [], "paciente", [self.material_id], limites,
+                                     indice=snapshot.index, verificar_proveniencia=lambda *args: False)
+            self.assertEqual(denied.cartoes, [])
+            snapshot.connection.close()
+            with patch.object(personal.juiz_pequeno, "generico", side_effect=lambda texts: [.9] * len(texts)):
+                self.prepare()
+            snapshot = self.store.snapshot(self.owner, [self.material_id])
+            generic = decisao.decidir(snapshot.connection, TEXT, [], "paciente", [self.material_id], limites,
+                                      indice=snapshot.index, verificar_proveniencia=snapshot.proveniencia)
+            self.assertEqual((generic.cartoes, generic.motivo_silencio), ([], "só trechos genéricos entre os candidatos"))
         snapshot.connection.close()
 
+    def test_api_qualificada_decide_so_com_as_obras_autorizadas(self):
+        self.prepare()
+        body = {"frase": "Fala sintética", "accountId": self.owner, "materialIds": [self.material_id]}
+        result = decisao.Decisao([], False, False, "geral", None)
+        with patch.object(api, "_motivo", return_value=None),              patch.object(personal, "materiais_autorizados", return_value=self.authorized()),              patch.object(decisao, "decidir", return_value=result) as decidir:
+            response = self.client.post("/api/consultar-qualificado", headers={"Authorization": "Bearer opaque"}, json=body)
 
-if __name__ == "__main__": unittest.main()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(decidir.call_args.args[4], [self.material_id])
+        self.assertNotIn("cache_salt", decidir.call_args.kwargs)

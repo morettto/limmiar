@@ -7,7 +7,7 @@ Objetivo, Avaliação, Plano) de uma `Nota` (domínio de `entities/nota`), frase
 uma citação por âncora temporal que toca o áudio ao passar o rato ou ganhar foco pelo
 teclado, e o atalho de teclado para assinar. Totalmente controlado pelo chamador
 (`nota`/`onChange`/`aoTocar` por prop) -- este módulo não guarda a nota em estado próprio,
-nem chama backend, nem sabe de onde vem o áudio (isso é `features/nota-audio`, ligado
+nem chama backend, nem sabe de onde vem o áudio (ligado
 pelo chamador -- hoje `NotaDoAtendimento`, abaixo).
 
 `NotaDoAtendimento` (`NotaDoAtendimento.tsx`) é o chamador desta feature: a nota da sessão,
@@ -54,10 +54,8 @@ chama `onAbrirTranscricao` se a revisão existe entre elas. Quem a monta é
   browser, 100% interno a esta feature. Viveu em `features/nota-fila/navegacao-teclado.ts`
   até essa fatia; moveu porque a regra de isolamento de slices (`.dependency-cruiser.cjs`,
   `fsd-no-cross-slice`) deixou de permitir uma feature a importar diretamente de outra do
-  mesmo nível -- as únicas exceções de composição aceites são pares exatos
-  (`recovery`→`totp-challenge`/`totp-enrollment`, `device-pairing-new`→`qr-scan`), e
-  nenhuma delas cobria `nota-editor`→`nota-fila`.
-- Consumido por `widgets/soap-editor/FilaEEditor.tsx`.
+  mesmo nível -- a única exceção de composição aceite é um par exato
+  (`recovery`→`totp-challenge`/`totp-enrollment`), que não cobria `nota-editor`→`nota-fila`.
 
 ## Decisões desta fatia
 
@@ -116,4 +114,4 @@ chama `onAbrirTranscricao` se a revisão existe entre elas. Quem a monta é
   sem saber de rede, crypto ou persistência, só de que `aoAssinar(nota)` é a nota como está
   no momento do atalho.
 - Carregar o áudio real de uma sessão (`dir`/`dek`/`sessionId` vindos de um backend) --
-  continua fora de âmbito, ver README de `features/nota-audio`.
+  continua fora de âmbito.

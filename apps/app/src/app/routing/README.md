@@ -23,7 +23,7 @@ ser chamado direto de qualquer `pages/` -- este módulo deixou de ser o único s
    foram apagados por reencaminharem todas as props sem tocar em nenhuma (nada como o
    `role: string` -> `AccountRole` de `AuthPage.tsx`); não há regra `.dependency-cruiser.cjs` a
    proibir `app -> features` (só `pages -> app`).
-2. `routeTree` regista as rotas E2E-only (`/auth/screen`, `/devices/pair-*`,
+2. `routeTree` regista as rotas E2E-only (`/auth/screen`,
    `/e2e/microfone`, `/e2e/vinculo`, `/e2e/partilha`) só quando
    `VITE_ENABLE_E2E_TEST_ROUTES === 'true'` -- gate de build-time, não `import.meta.env.DEV`,
    porque `playwright.config.ts` corre um `vite build` real, não `vite dev`.
@@ -129,3 +129,7 @@ ser chamado direto de qualquer `pages/` -- este módulo deixou de ser o único s
   do ficheiro seria outra instância de Context) e embrulha sempre em ambos os providers -- um
   no-op para as rotas que não usam nenhum dos dois, e obrigatório desde que `useSession()` passou
   a lançar sem `<SessionProvider>` ancestral.
+
+## Cofre clínico do profissional
+
+`ClinicalVaultGate` envolve o Outlet do produto e exige a chave pessoal separada do login antes de montar qualquer conteúdo profissional protegido. Mantém o destino solicitado ao bloquear. Criação e recuperação mostram os novos segredos uma vez e exigem confirmação de guarda. As antigas rotas de pareamento do profissional foram removidas. Ver `docs/chave-pessoal-prontuarios.md`.
